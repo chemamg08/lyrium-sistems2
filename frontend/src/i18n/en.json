@@ -952,7 +952,15 @@
     "cookieTitle": "We use cookies",
     "cookieDesc": "We use cookies to improve your experience. You can accept all or only essential cookies.",
     "cookieAccept": "Accept all",
-    "cookieReject": "Essential only"
+    "cookieReject": "Essential only",
+    "cookieConfigure": "Configure",
+    "cookieSave": "Save preferences",
+    "cookieCatEssential": "Essential",
+    "cookieCatEssentialDesc": "Required for basic functionality. Always active.",
+    "cookieCatAnalytics": "Analytics",
+    "cookieCatAnalyticsDesc": "Help us understand how you use the app.",
+    "cookieCatMarketing": "Marketing",
+    "cookieCatMarketingDesc": "Allow us to show you personalised ads."
   },
   "legal": {
     "backToHome": "Back to home",

@@ -968,7 +968,15 @@
     "cookieTitle": "Usamos cookies",
     "cookieDesc": "Usamos cookies para mejorar tu experiencia. Puedes aceptar todas o solo las esenciales.",
     "cookieAccept": "Aceptar todas",
-    "cookieReject": "Solo esenciales"
+    "cookieReject": "Solo esenciales",
+    "cookieConfigure": "Configurar",
+    "cookieSave": "Guardar preferencias",
+    "cookieCatEssential": "Esenciales",
+    "cookieCatEssentialDesc": "Necesarias para el funcionamiento básico. Siempre activas.",
+    "cookieCatAnalytics": "Analíticas",
+    "cookieCatAnalyticsDesc": "Nos ayudan a entender cómo usas la app.",
+    "cookieCatMarketing": "Marketing",
+    "cookieCatMarketingDesc": "Permiten mostrarte publicidad personalizada."
   },
   "legal": {
     "backToHome": "Volver al inicio",
