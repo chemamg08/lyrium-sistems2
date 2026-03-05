@@ -1,0 +1,214 @@
+{
+  "country": "Czech Republic",
+  "code": "CZ",
+  "year": 2026,
+  "currency": "CZK",
+  "incomeTax": {
+    "brackets": [
+      {
+        "from": 0,
+        "to": 1582800,
+        "rate": 15
+      },
+      {
+        "from": 1582800,
+        "to": null,
+        "rate": 23
+      }
+    ],
+    "personalAllowance": 0,
+    "notes": "Threshold ~1,582,800 CZK (36x average monthly wage). Tax base reduced by credit 30,840 CZK."
+  },
+  "corporateTax": {
+    "standard": 19,
+    "small": 19,
+    "smallThreshold": 0
+  },
+  "vat": {
+    "standard": 21,
+    "reduced": 12,
+    "superReduced": 0
+  },
+  "socialSecurity": {
+    "employee": 11,
+    "employer": 33.8,
+    "selfEmployed": 29.2
+  },
+  "fields": {
+    "asalariado": {
+      "basic": [
+        { "key": "salarioBruto", "label": "Roční hrubá mzda (CZK)" },
+        { "key": "retencionesEmpresa", "label": "Zálohy na daň z příjmů (CZK)" }
+      ],
+      "advanced": [
+        { "key": "cotizacionesSS", "label": "Sociální a zdravotní pojištění (zaměstnanec) (CZK)" },
+        { "key": "capitalMobiliario", "label": "Kapitálové příjmy (úroky, dividendy) (CZK)" },
+        { "key": "capitalInmobiliario", "label": "Příjmy z pronájmu (CZK)" },
+        { "key": "gananciaPatrimonial", "label": "Kapitálové zisky (CZK)" },
+        { "key": "pensiones", "label": "Důchody a dávky (CZK)" },
+        { "key": "deduccionesAuto", "label": "Slevy na dani / odpocty (CZK)" },
+        { "key": "donaciones", "label": "Dary (odpočitatelné) (CZK)" }
+      ]
+    },
+    "autonomo": {
+      "basic": [
+        { "key": "facturacionTotal", "label": "Příjmy bez DPH (CZK)" },
+        { "key": "gastosDeducibles", "label": "Daňově uznatelné výdaje (vč. pojištění) (CZK)" },
+        { "key": "ivaRepercutido", "label": "DPH na výstupu (CZK)" },
+        { "key": "ivaSoportado", "label": "DPH na vstupu (CZK)" }
+      ],
+      "advanced": [
+        { "key": "otrosIngresos", "label": "Ostatní příjmy (CZK)" },
+        { "key": "amortizaciones", "label": "Odpisy (CZK)" },
+        { "key": "gastosFinancieros", "label": "Finanční náklady (CZK)" },
+        { "key": "pagosFracc130", "label": "Zálohy na DPFO (CZK)" },
+        { "key": "ivaRegularizacion", "label": "Opravy DPH (CZK)" }
+      ]
+    },
+    "empresa": {
+      "basic": [
+        { "key": "ingresosTotal", "label": "Celkové výnosy (CZK)" },
+        { "key": "gastosTotal", "label": "Celkové náklady (CZK)" },
+        { "key": "ivaRepercutidoEmp", "label": "DPH na výstupu (CZK)" },
+        { "key": "ivaSoportadoEmp", "label": "DPH na vstupu (CZK)" }
+      ],
+      "advanced": [
+        { "key": "gastosNoDeducibles", "label": "Daňově neuznatelné náklady (CZK)" },
+        { "key": "basesNegAnter", "label": "Daňová ztráta z minulých let (CZK)" },
+        { "key": "deduccionID", "label": "Odpočet na VÚV (CZK)" },
+        { "key": "deduccionEmpleo", "label": "Slevy na zaměstnance (CZK)" },
+        { "key": "pagosFracc202", "label": "Zálohy na DPPO (CZK)" },
+        { "key": "ivaRegularizEmp", "label": "Opravy DPH (CZK)" }
+      ]
+    }
+  },
+  "clientForm": {
+    "taxIdLabel": "Rodné číslo / DIČ",
+    "taxIdCompanyLabel": "IČO / DIČ",
+    "taxIdPlaceholder": "e.g. CZ12345678",
+    "regionLabel": "Kraj (Region)",
+    "regions": [
+      "Hlavní město Praha",
+      "Středočeský",
+      "Jihočeský",
+      "Plzeňský",
+      "Karlovarský",
+      "Ústecký",
+      "Liberecký",
+      "Královéhradecký",
+      "Pardubický",
+      "Vysočina",
+      "Jihomoravský",
+      "Olomoucký",
+      "Zlínský",
+      "Moravskoslezský"
+    ],
+    "companyTypes": [
+      {
+        "value": "sro",
+        "label": "s.r.o. (společnost s ručením omezeným)"
+      },
+      {
+        "value": "as",
+        "label": "a.s. (akciová společnost)"
+      },
+      {
+        "value": "vos",
+        "label": "v.o.s. (veřejná obchodní společnost)"
+      },
+      {
+        "value": "ks",
+        "label": "k.s. (komanditní společnost)"
+      },
+      {
+        "value": "druzstvo",
+        "label": "Družstvo (Cooperative)"
+      },
+      {
+        "value": "osvc",
+        "label": "OSVČ (Sole proprietor)"
+      },
+      {
+        "value": "other",
+        "label": "Other"
+      }
+    ],
+    "companyTaxTypes": [
+      {
+        "value": "standard_21",
+        "label": "Standard (21%)"
+      },
+      {
+        "value": "other",
+        "label": "Other"
+      }
+    ],
+    "vatRegimes": [
+      {
+        "value": "general",
+        "label": "Standard (21%)"
+      },
+      {
+        "value": "reduced_12",
+        "label": "Reduced (12%)"
+      },
+      {
+        "value": "exempt",
+        "label": "Exempt"
+      }
+    ],
+    "contractTypes": [
+      {
+        "value": "na_dobu_neurcitou",
+        "label": "Permanent (na dobu neurčitou)"
+      },
+      {
+        "value": "na_dobu_urcitou",
+        "label": "Fixed-term (na dobu určitou)"
+      },
+      {
+        "value": "dpp",
+        "label": "DPP (dohoda o provedení práce)"
+      },
+      {
+        "value": "dpc",
+        "label": "DPČ (dohoda o pracovní činnosti)"
+      },
+      {
+        "value": "sluzebni",
+        "label": "Civil servant (služební poměr)"
+      }
+    ],
+    "selfEmployedFields": {
+      "registrationLabel": "Živnostenský list registration date",
+      "activityCodeLabel": "CZ-NACE code",
+      "activityCodePlaceholder": "e.g. 69.10",
+      "hasSSRegistration": true,
+      "ssRegistrationLabel": "ČSSZ registration",
+      "incomeRegimes": [
+        {
+          "value": "skutecne",
+          "label": "Actual expenses (skutečné výdaje)"
+        },
+        {
+          "value": "pausalni",
+          "label": "Flat-rate expenses (paušální výdaje)"
+        },
+        {
+          "value": "pausalni_dan",
+          "label": "Flat-rate tax (paušální daň)"
+        }
+      ],
+      "vatFilingFrequencies": [
+        {
+          "value": "monthly",
+          "label": "Monthly (měsíčně)"
+        },
+        {
+          "value": "quarterly",
+          "label": "Quarterly (čtvrtletně)"
+        }
+      ]
+    }
+  }
+}

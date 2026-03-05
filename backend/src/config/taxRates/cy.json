@@ -1,0 +1,217 @@
+{
+  "country": "Cyprus",
+  "code": "CY",
+  "year": 2026,
+  "currency": "EUR",
+  "incomeTax": {
+    "brackets": [
+      {
+        "from": 0,
+        "to": 19500,
+        "rate": 0
+      },
+      {
+        "from": 19500,
+        "to": 28000,
+        "rate": 20
+      },
+      {
+        "from": 28000,
+        "to": 36300,
+        "rate": 25
+      },
+      {
+        "from": 36300,
+        "to": 60000,
+        "rate": 30
+      },
+      {
+        "from": 60000,
+        "to": null,
+        "rate": 35
+      }
+    ],
+    "personalAllowance": 19500,
+    "notes": ""
+  },
+  "corporateTax": {
+    "standard": 12.5,
+    "small": 12.5,
+    "smallThreshold": 0
+  },
+  "vat": {
+    "standard": 19,
+    "reduced": 9,
+    "superReduced": 5
+  },
+  "socialSecurity": {
+    "employee": 8.8,
+    "employer": 8.8,
+    "selfEmployed": 16.0
+  },
+  "fields": {
+    "asalariado": {
+      "basic": [
+        { "key": "salarioBruto", "label": "Annual gross salary (€)" },
+        { "key": "retencionesEmpresa", "label": "PAYE tax withheld (€)" }
+      ],
+      "advanced": [
+        { "key": "cotizacionesSS", "label": "Social insurance contributions (€)" },
+        { "key": "capitalMobiliario", "label": "Interest & dividend income (€)" },
+        { "key": "capitalInmobiliario", "label": "Rental income (€)" },
+        { "key": "gananciaPatrimonial", "label": "Capital gains (€)" },
+        { "key": "pensiones", "label": "Pensions & benefits (€)" },
+        { "key": "deduccionesAuto", "label": "Additional allowances & deductions (€)" },
+        { "key": "donaciones", "label": "Approved donations (€)" }
+      ]
+    },
+    "autonomo": {
+      "basic": [
+        { "key": "facturacionTotal", "label": "Revenue excl. VAT (€)" },
+        { "key": "gastosDeducibles", "label": "Allowable expenses incl. SI (€)" },
+        { "key": "ivaRepercutido", "label": "VAT collected / output (€)" },
+        { "key": "ivaSoportado", "label": "VAT paid / input (€)" }
+      ],
+      "advanced": [
+        { "key": "otrosIngresos", "label": "Other income (€)" },
+        { "key": "amortizaciones", "label": "Capital allowances (€)" },
+        { "key": "gastosFinancieros", "label": "Interest & financial expenses (€)" },
+        { "key": "pagosFracc130", "label": "Provisional tax / self-assessments (€)" },
+        { "key": "ivaRegularizacion", "label": "VAT adjustments (€)" }
+      ]
+    },
+    "empresa": {
+      "basic": [
+        { "key": "ingresosTotal", "label": "Total income (€)" },
+        { "key": "gastosTotal", "label": "Total allowable expenses (€)" },
+        { "key": "ivaRepercutidoEmp", "label": "Output VAT (€)" },
+        { "key": "ivaSoportadoEmp", "label": "Input VAT (€)" }
+      ],
+      "advanced": [
+        { "key": "gastosNoDeducibles", "label": "Non-deductible expenses (€)" },
+        { "key": "basesNegAnter", "label": "Prior-year losses (€)" },
+        { "key": "deduccionID", "label": "IP Box / R&D deductions (€)" },
+        { "key": "deduccionEmpleo", "label": "Employment credits (€)" },
+        { "key": "pagosFracc202", "label": "Provisional corporate tax (€)" },
+        { "key": "ivaRegularizEmp", "label": "VAT adjustments (€)" }
+      ]
+    }
+  },
+  "clientForm": {
+    "taxIdLabel": "Tax Identification Code (TIC)",
+    "taxIdCompanyLabel": "Tax Identification Code (TIC)",
+    "taxIdPlaceholder": "e.g. 12345678A",
+    "regionLabel": "District",
+    "regions": [
+      "Famagusta",
+      "Kyrenia",
+      "Larnaca",
+      "Limassol",
+      "Nicosia",
+      "Paphos"
+    ],
+    "companyTypes": [
+      {
+        "value": "ltd",
+        "label": "Private Company Limited (Ltd)"
+      },
+      {
+        "value": "plc",
+        "label": "Public Company Limited (PLC)"
+      },
+      {
+        "value": "partnership",
+        "label": "Partnership"
+      },
+      {
+        "value": "sole_trader",
+        "label": "Sole Trader"
+      },
+      {
+        "value": "branch",
+        "label": "Branch of foreign company"
+      },
+      {
+        "value": "other",
+        "label": "Other"
+      }
+    ],
+    "companyTaxTypes": [
+      {
+        "value": "standard_12_5",
+        "label": "Standard (12.5%)"
+      },
+      {
+        "value": "ip_box",
+        "label": "IP Box regime (reduced)"
+      },
+      {
+        "value": "other",
+        "label": "Other"
+      }
+    ],
+    "vatRegimes": [
+      {
+        "value": "general",
+        "label": "Standard (19%)"
+      },
+      {
+        "value": "reduced_9",
+        "label": "Reduced (9%)"
+      },
+      {
+        "value": "reduced_5",
+        "label": "Reduced (5%)"
+      },
+      {
+        "value": "exempt",
+        "label": "Exempt"
+      }
+    ],
+    "contractTypes": [
+      {
+        "value": "permanent",
+        "label": "Permanent (indefinite)"
+      },
+      {
+        "value": "fixed_term",
+        "label": "Fixed-term"
+      },
+      {
+        "value": "part_time",
+        "label": "Part-time"
+      },
+      {
+        "value": "seasonal",
+        "label": "Seasonal"
+      }
+    ],
+    "selfEmployedFields": {
+      "registrationLabel": "Tax department registration date",
+      "activityCodeLabel": "NACE code",
+      "activityCodePlaceholder": "e.g. 69.10",
+      "hasSSRegistration": true,
+      "ssRegistrationLabel": "Social Insurance registration",
+      "incomeRegimes": [
+        {
+          "value": "cash",
+          "label": "Cash basis"
+        },
+        {
+          "value": "accrual",
+          "label": "Accrual basis"
+        }
+      ],
+      "vatFilingFrequencies": [
+        {
+          "value": "quarterly",
+          "label": "Quarterly"
+        },
+        {
+          "value": "monthly",
+          "label": "Monthly"
+        }
+      ]
+    }
+  }
+}

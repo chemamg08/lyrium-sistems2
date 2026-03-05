@@ -1,0 +1,234 @@
+{
+  "country": "Suomi / Finland",
+  "code": "FI",
+  "year": 2026,
+  "currency": "EUR",
+  "incomeTax": {
+    "brackets": [
+      {
+        "from": 0,
+        "to": 19900,
+        "rate": 12.64
+      },
+      {
+        "from": 19900,
+        "to": 29700,
+        "rate": 19
+      },
+      {
+        "from": 29700,
+        "to": 49000,
+        "rate": 30.25
+      },
+      {
+        "from": 49000,
+        "to": 85800,
+        "rate": 34
+      },
+      {
+        "from": 85800,
+        "to": null,
+        "rate": 44
+      }
+    ],
+    "personalAllowance": 0,
+    "notes": "State + municipal combined rates. Municipal avg ~20.9%. Includes YEL pension for self-employed."
+  },
+  "corporateTax": {
+    "standard": 20,
+    "small": 20,
+    "smallThreshold": 0
+  },
+  "vat": {
+    "standard": 25.5,
+    "reduced": 14,
+    "superReduced": 10
+  },
+  "socialSecurity": {
+    "employee": 7.4,
+    "employer": 17.0,
+    "selfEmployed": 24.1
+  },
+  "fields": {
+    "asalariado": {
+      "basic": [
+        { "key": "salarioBruto", "label": "Vuosibruttopalkka (€)" },
+        { "key": "retencionesEmpresa", "label": "Ennakonpidätys (€)" }
+      ],
+      "advanced": [
+        { "key": "cotizacionesSS", "label": "Työeläkemaksu (TyEL, työntekijä) (€)" },
+        { "key": "capitalMobiliario", "label": "Pääomatulot (korot, osingot) (€)" },
+        { "key": "capitalInmobiliario", "label": "Vuokratulot (€)" },
+        { "key": "gananciaPatrimonial", "label": "Luovutusvoitot (€)" },
+        { "key": "pensiones", "label": "Eläkkeet ja etuudet (€)" },
+        { "key": "deduccionesAuto", "label": "Vähennykset (matkakulut, tulonhankkimiskulut) (€)" },
+        { "key": "donaciones", "label": "Lahjoitusvähennykset (€)" }
+      ]
+    },
+    "autonomo": {
+      "basic": [
+        { "key": "facturacionTotal", "label": "Liikevaihto (alv 0 %) (€)" },
+        { "key": "gastosDeducibles", "label": "Vähennyskelpoiset kulut (sis. YEL) (€)" },
+        { "key": "ivaRepercutido", "label": "Myynnin ALV (€)" },
+        { "key": "ivaSoportado", "label": "Ostojen ALV (€)" }
+      ],
+      "advanced": [
+        { "key": "otrosIngresos", "label": "Muut tulot (€)" },
+        { "key": "amortizaciones", "label": "Poistot (€)" },
+        { "key": "gastosFinancieros", "label": "Rahoituskulut (€)" },
+        { "key": "pagosFracc130", "label": "Ennakkoverot maksettu (€)" },
+        { "key": "ivaRegularizacion", "label": "ALV-oikaisut (€)" }
+      ]
+    },
+    "empresa": {
+      "basic": [
+        { "key": "ingresosTotal", "label": "Kokonaistulot (€)" },
+        { "key": "gastosTotal", "label": "Kokonaiskulut (€)" },
+        { "key": "ivaRepercutidoEmp", "label": "Myynnin ALV (€)" },
+        { "key": "ivaSoportadoEmp", "label": "Ostojen ALV (€)" }
+      ],
+      "advanced": [
+        { "key": "gastosNoDeducibles", "label": "Vähennyskelvottomat kulut (€)" },
+        { "key": "basesNegAnter", "label": "Aikaisempien vuosien tappiot (€)" },
+        { "key": "deduccionID", "label": "T&K-vähennys (€)" },
+        { "key": "deduccionEmpleo", "label": "Työllistämisvähennykset (€)" },
+        { "key": "pagosFracc202", "label": "Ennakkoverot yhtiö (€)" },
+        { "key": "ivaRegularizEmp", "label": "ALV-oikaisut (€)" }
+      ]
+    }
+  },
+  "clientForm": {
+    "taxIdLabel": "Henkilötunnus (Personal ID)",
+    "taxIdCompanyLabel": "Y-tunnus (Business ID)",
+    "taxIdPlaceholder": "e.g. 1234567-8",
+    "regionLabel": "Maakunta (Region)",
+    "regions": [
+      "Ahvenanmaa",
+      "Etelä-Karjala",
+      "Etelä-Pohjanmaa",
+      "Etelä-Savo",
+      "Kainuu",
+      "Kanta-Häme",
+      "Keski-Pohjanmaa",
+      "Keski-Suomi",
+      "Kymenlaakso",
+      "Lappi",
+      "Pirkanmaa",
+      "Pohjanmaa",
+      "Pohjois-Karjala",
+      "Pohjois-Pohjanmaa",
+      "Pohjois-Savo",
+      "Päijät-Häme",
+      "Satakunta",
+      "Uusimaa",
+      "Varsinais-Suomi"
+    ],
+    "companyTypes": [
+      {
+        "value": "oy",
+        "label": "Oy (Osakeyhtiö – Ltd)"
+      },
+      {
+        "value": "oyj",
+        "label": "Oyj (Julkinen osakeyhtiö – Plc)"
+      },
+      {
+        "value": "ky",
+        "label": "Ky (Kommandiittiyhtiö – Limited partnership)"
+      },
+      {
+        "value": "ay",
+        "label": "Ay (Avoin yhtiö – General partnership)"
+      },
+      {
+        "value": "tmi",
+        "label": "Tmi (Toiminimi – Sole trader)"
+      },
+      {
+        "value": "osuuskunta",
+        "label": "Osuuskunta (Cooperative)"
+      },
+      {
+        "value": "other",
+        "label": "Other"
+      }
+    ],
+    "companyTaxTypes": [
+      {
+        "value": "standard_20",
+        "label": "Standard (20%)"
+      },
+      {
+        "value": "other",
+        "label": "Other"
+      }
+    ],
+    "vatRegimes": [
+      {
+        "value": "general",
+        "label": "Standard (25.5%)"
+      },
+      {
+        "value": "reduced_14",
+        "label": "Reduced (14%)"
+      },
+      {
+        "value": "reduced_10",
+        "label": "Reduced (10%)"
+      },
+      {
+        "value": "exempt",
+        "label": "Exempt"
+      }
+    ],
+    "contractTypes": [
+      {
+        "value": "toistaiseksi",
+        "label": "Permanent (toistaiseksi voimassa oleva)"
+      },
+      {
+        "value": "maaraaikainen",
+        "label": "Fixed-term (määräaikainen)"
+      },
+      {
+        "value": "osa_aikainen",
+        "label": "Part-time (osa-aikainen)"
+      },
+      {
+        "value": "koeaika",
+        "label": "Trial period (koeaika)"
+      }
+    ],
+    "selfEmployedFields": {
+      "registrationLabel": "Y-tunnus / trade registration date",
+      "activityCodeLabel": "TOL code",
+      "activityCodePlaceholder": "e.g. 69101",
+      "hasSSRegistration": true,
+      "ssRegistrationLabel": "YEL insurance (self-employed pension)",
+      "incomeRegimes": [
+        {
+          "value": "cash",
+          "label": "Cash basis (maksuperuste)"
+        },
+        {
+          "value": "accrual",
+          "label": "Accrual basis (suoriteperuste)"
+        }
+      ],
+      "vatFilingFrequencies": [
+        {
+          "value": "monthly",
+          "label": "Monthly (kuukausittain)"
+        },
+        {
+          "value": "quarterly",
+          "label": "Quarterly (neljännesvuosittain)"
+        },
+        {
+          "value": "annual",
+          "label": "Annual (vuosittain)"
+        }
+      ]
+    }
+  }
+}

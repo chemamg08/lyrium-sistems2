@@ -1,0 +1,333 @@
+{
+  "country": "Lëtzebuerg / Luxembourg",
+  "code": "LU",
+  "year": 2026,
+  "currency": "EUR",
+  "incomeTax": {
+    "brackets": [
+      {
+        "from": 0,
+        "to": 11265,
+        "rate": 0
+      },
+      {
+        "from": 11265,
+        "to": 13173,
+        "rate": 8
+      },
+      {
+        "from": 13173,
+        "to": 15081,
+        "rate": 9
+      },
+      {
+        "from": 15081,
+        "to": 16989,
+        "rate": 10
+      },
+      {
+        "from": 16989,
+        "to": 18897,
+        "rate": 11
+      },
+      {
+        "from": 18897,
+        "to": 20805,
+        "rate": 12
+      },
+      {
+        "from": 20805,
+        "to": 22713,
+        "rate": 14
+      },
+      {
+        "from": 22713,
+        "to": 24621,
+        "rate": 16
+      },
+      {
+        "from": 24621,
+        "to": 26529,
+        "rate": 18
+      },
+      {
+        "from": 26529,
+        "to": 28437,
+        "rate": 20
+      },
+      {
+        "from": 28437,
+        "to": 30345,
+        "rate": 22
+      },
+      {
+        "from": 30345,
+        "to": 32253,
+        "rate": 24
+      },
+      {
+        "from": 32253,
+        "to": 34161,
+        "rate": 26
+      },
+      {
+        "from": 34161,
+        "to": 36069,
+        "rate": 28
+      },
+      {
+        "from": 36069,
+        "to": 37977,
+        "rate": 30
+      },
+      {
+        "from": 37977,
+        "to": 39885,
+        "rate": 32
+      },
+      {
+        "from": 39885,
+        "to": 41793,
+        "rate": 34
+      },
+      {
+        "from": 41793,
+        "to": 43701,
+        "rate": 36
+      },
+      {
+        "from": 43701,
+        "to": 45609,
+        "rate": 38
+      },
+      {
+        "from": 45609,
+        "to": 100002,
+        "rate": 39
+      },
+      {
+        "from": 100002,
+        "to": 150000,
+        "rate": 40
+      },
+      {
+        "from": 150000,
+        "to": 200004,
+        "rate": 41
+      },
+      {
+        "from": 200004,
+        "to": null,
+        "rate": 42
+      }
+    ],
+    "personalAllowance": 11265,
+    "notes": "Fonds pour l'emploi solidarity contribution +1.19% on income tax. Corp effective ~24.94% incl. municipality."
+  },
+  "corporateTax": {
+    "standard": 17,
+    "small": 15,
+    "smallThreshold": 175000
+  },
+  "vat": {
+    "standard": 17,
+    "reduced": 8,
+    "superReduced": 3
+  },
+  "socialSecurity": {
+    "employee": 12.35,
+    "employer": 12.35,
+    "selfEmployed": 12.35
+  },
+  "fields": {
+    "asalariado": {
+      "basic": [
+        { "key": "salarioBruto", "label": "Salaire brut annuel (€)" },
+        { "key": "retencionesEmpresa", "label": "Retenue d'impôt à la source (€)" }
+      ],
+      "advanced": [
+        { "key": "cotizacionesSS", "label": "Cotisations sociales (salarié) (€)" },
+        { "key": "capitalMobiliario", "label": "Revenus de capitaux (intérêts, dividendes) (€)" },
+        { "key": "capitalInmobiliario", "label": "Revenus locatifs (€)" },
+        { "key": "gananciaPatrimonial", "label": "Plus-values (€)" },
+        { "key": "pensiones", "label": "Pensions et prestations (€)" },
+        { "key": "deduccionesAuto", "label": "Dépenses spéciales / charges extraordinaires (€)" },
+        { "key": "donaciones", "label": "Dons déductibles (€)" }
+      ]
+    },
+    "autonomo": {
+      "basic": [
+        { "key": "facturacionTotal", "label": "Chiffre d'affaires HT (€)" },
+        { "key": "gastosDeducibles", "label": "Frais déductibles (cot. sociales incluses) (€)" },
+        { "key": "ivaRepercutido", "label": "TVA collectée (€)" },
+        { "key": "ivaSoportado", "label": "TVA déductible (€)" }
+      ],
+      "advanced": [
+        { "key": "otrosIngresos", "label": "Autres revenus (€)" },
+        { "key": "amortizaciones", "label": "Amortissements (€)" },
+        { "key": "gastosFinancieros", "label": "Charges financières (€)" },
+        { "key": "pagosFracc130", "label": "Avances d'impôt versées (€)" },
+        { "key": "ivaRegularizacion", "label": "Régularisations TVA (€)" }
+      ]
+    },
+    "empresa": {
+      "basic": [
+        { "key": "ingresosTotal", "label": "Revenus totaux (€)" },
+        { "key": "gastosTotal", "label": "Charges totales (€)" },
+        { "key": "ivaRepercutidoEmp", "label": "TVA collectée (€)" },
+        { "key": "ivaSoportadoEmp", "label": "TVA déductible (€)" }
+      ],
+      "advanced": [
+        { "key": "gastosNoDeducibles", "label": "Charges non déductibles (€)" },
+        { "key": "basesNegAnter", "label": "Pertes reportées (€)" },
+        { "key": "deduccionID", "label": "Crédit d'impôt R&D / IP Box (€)" },
+        { "key": "deduccionEmpleo", "label": "Bonification d'impôt embauche (€)" },
+        { "key": "pagosFracc202", "label": "Avances IRC versées (€)" },
+        { "key": "ivaRegularizEmp", "label": "Régularisations TVA (€)" }
+      ]
+    }
+  },
+  "clientForm": {
+    "taxIdLabel": "Numéro d'identification (ID nationale)",
+    "taxIdCompanyLabel": "Numéro du RCS / Matricule fiscal",
+    "taxIdPlaceholder": "e.g. 1980010112345",
+    "regionLabel": "Canton",
+    "regions": [
+      "Capellen",
+      "Clervaux",
+      "Diekirch",
+      "Echternach",
+      "Esch-sur-Alzette",
+      "Grevenmacher",
+      "Luxembourg",
+      "Mersch",
+      "Redange",
+      "Remich",
+      "Vianden",
+      "Wiltz"
+    ],
+    "companyTypes": [
+      {
+        "value": "sarl",
+        "label": "S.à r.l. (Société à responsabilité limitée)"
+      },
+      {
+        "value": "sa",
+        "label": "S.A. (Société anonyme)"
+      },
+      {
+        "value": "scs",
+        "label": "SCS (Société en commandite simple)"
+      },
+      {
+        "value": "sca",
+        "label": "SCA (Société en commandite par actions)"
+      },
+      {
+        "value": "snc",
+        "label": "SNC (Société en nom collectif)"
+      },
+      {
+        "value": "scsp",
+        "label": "SCSp (Société en commandite spéciale)"
+      },
+      {
+        "value": "other",
+        "label": "Other"
+      }
+    ],
+    "companyTaxTypes": [
+      {
+        "value": "standard_17",
+        "label": "IRC standard (17% + solidarity surcharge)"
+      },
+      {
+        "value": "reduced_15",
+        "label": "Reduced (15% for taxable income ≤ €175k)"
+      },
+      {
+        "value": "municipal",
+        "label": "Municipal business tax (6-12%)"
+      },
+      {
+        "value": "other",
+        "label": "Other"
+      }
+    ],
+    "vatRegimes": [
+      {
+        "value": "general",
+        "label": "Standard (17%)"
+      },
+      {
+        "value": "intermediate_14",
+        "label": "Intermediate (14%)"
+      },
+      {
+        "value": "reduced_8",
+        "label": "Reduced (8%)"
+      },
+      {
+        "value": "super_reduced_3",
+        "label": "Super-reduced (3%)"
+      },
+      {
+        "value": "exempt",
+        "label": "Exempt"
+      }
+    ],
+    "contractTypes": [
+      {
+        "value": "cdi",
+        "label": "CDI (Contrat à durée indéterminée)"
+      },
+      {
+        "value": "cdd",
+        "label": "CDD (Contrat à durée déterminée)"
+      },
+      {
+        "value": "temps_partiel",
+        "label": "Temps partiel"
+      },
+      {
+        "value": "interim",
+        "label": "Intérim"
+      },
+      {
+        "value": "fonctionnaire",
+        "label": "Fonctionnaire"
+      }
+    ],
+    "selfEmployedFields": {
+      "registrationLabel": "Autorisation d'établissement date",
+      "activityCodeLabel": "NACE code",
+      "activityCodePlaceholder": "e.g. 69.10",
+      "hasSSRegistration": true,
+      "ssRegistrationLabel": "CCSS affiliation",
+      "incomeRegimes": [
+        {
+          "value": "comptabilite",
+          "label": "Comptabilité régulière"
+        },
+        {
+          "value": "forfaitaire",
+          "label": "Régime forfaitaire"
+        }
+      ],
+      "vatFilingFrequencies": [
+        {
+          "value": "monthly",
+          "label": "Monthly"
+        },
+        {
+          "value": "quarterly",
+          "label": "Quarterly"
+        },
+        {
+          "value": "annual",
+          "label": "Annual"
+        }
+      ]
+    }
+  }
+}

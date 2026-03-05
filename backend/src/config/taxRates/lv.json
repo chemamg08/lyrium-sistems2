@@ -1,0 +1,215 @@
+{
+  "country": "Latvija / Latvia",
+  "code": "LV",
+  "year": 2026,
+  "currency": "EUR",
+  "incomeTax": {
+    "brackets": [
+      {
+        "from": 0,
+        "to": 20004,
+        "rate": 20
+      },
+      {
+        "from": 20004,
+        "to": 78100,
+        "rate": 23
+      },
+      {
+        "from": 78100,
+        "to": null,
+        "rate": 31
+      }
+    ],
+    "personalAllowance": 0,
+    "notes": "Corporate income distributed as dividends taxed at 20%. Undistributed profit not taxed."
+  },
+  "corporateTax": {
+    "standard": 20,
+    "small": 20,
+    "smallThreshold": 0
+  },
+  "vat": {
+    "standard": 21,
+    "reduced": 12,
+    "superReduced": 5
+  },
+  "socialSecurity": {
+    "employee": 10.5,
+    "employer": 23.59,
+    "selfEmployed": 31.07
+  },
+  "fields": {
+    "asalariado": {
+      "basic": [
+        { "key": "salarioBruto", "label": "Gada bruto alga (€)" },
+        { "key": "retencionesEmpresa", "label": "Ieturētais IIN (€)" }
+      ],
+      "advanced": [
+        { "key": "cotizacionesSS", "label": "VSAOI (darba ņēmēja daļa) (€)" },
+        { "key": "capitalMobiliario", "label": "Kapitāla ienākumi (proc., divid.) (€)" },
+        { "key": "capitalInmobiliario", "label": "Īres ienākumi (€)" },
+        { "key": "gananciaPatrimonial", "label": "Kapitāla pieauguma ienākumi (€)" },
+        { "key": "pensiones", "label": "Pensijas un pabalsti (€)" },
+        { "key": "deduccionesAuto", "label": "Atvieglojumi / atlaides (€)" },
+        { "key": "donaciones", "label": "Ziedojumi (atskaitāmi) (€)" }
+      ]
+    },
+    "autonomo": {
+      "basic": [
+        { "key": "facturacionTotal", "label": "Ieņēmumi bez PVN (€)" },
+        { "key": "gastosDeducibles", "label": "Atskaitāmie izdevumi (ar VSAOI) (€)" },
+        { "key": "ivaRepercutido", "label": "Aprēķinātais PVN (€)" },
+        { "key": "ivaSoportado", "label": "Priekšnodoklis (PVN) (€)" }
+      ],
+      "advanced": [
+        { "key": "otrosIngresos", "label": "Citi ieņēmumi (€)" },
+        { "key": "amortizaciones", "label": "Nolietojums (€)" },
+        { "key": "gastosFinancieros", "label": "Finanšu izdevumi (€)" },
+        { "key": "pagosFracc130", "label": "IIN avanss samaksāts (€)" },
+        { "key": "ivaRegularizacion", "label": "PVN korekcijas (€)" }
+      ]
+    },
+    "empresa": {
+      "basic": [
+        { "key": "ingresosTotal", "label": "Kopējie ieņēmumi (€)" },
+        { "key": "gastosTotal", "label": "Kopējie izdevumi (€)" },
+        { "key": "ivaRepercutidoEmp", "label": "Aprēķinātais PVN (€)" },
+        { "key": "ivaSoportadoEmp", "label": "Priekšnodoklis (PVN) (€)" }
+      ],
+      "advanced": [
+        { "key": "gastosNoDeducibles", "label": "Neatskaitāmie izdevumi (€)" },
+        { "key": "basesNegAnter", "label": "Iepriekšējo gadu zaudējumi (€)" },
+        { "key": "deduccionID", "label": "P&A nodokļu atvieglojumi (€)" },
+        { "key": "deduccionEmpleo", "label": "Nodarbinātības atvieglojumi (€)" },
+        { "key": "pagosFracc202", "label": "UIN avanss (€)" },
+        { "key": "ivaRegularizEmp", "label": "PVN korekcijas (€)" }
+      ]
+    }
+  },
+  "clientForm": {
+    "taxIdLabel": "Personas kods (Personal code)",
+    "taxIdCompanyLabel": "Reģistrācijas numurs (Registration No.)",
+    "taxIdPlaceholder": "e.g. 010180-12345",
+    "regionLabel": "Reģions (Region)",
+    "regions": [
+      "Kurzeme",
+      "Latgale",
+      "Pierīga",
+      "Rīga",
+      "Vidzeme",
+      "Zemgale"
+    ],
+    "companyTypes": [
+      {
+        "value": "sia",
+        "label": "SIA (Sabiedrība ar ierobežotu atbildību – Ltd)"
+      },
+      {
+        "value": "as",
+        "label": "AS (Akciju sabiedrība – Joint-stock)"
+      },
+      {
+        "value": "ps",
+        "label": "PS (Pilnsabiedrība – General partnership)"
+      },
+      {
+        "value": "ks",
+        "label": "KS (Komandītsabiedrība – Limited partnership)"
+      },
+      {
+        "value": "ik",
+        "label": "IK (Individuālais komersants – Sole trader)"
+      },
+      {
+        "value": "other",
+        "label": "Other"
+      }
+    ],
+    "companyTaxTypes": [
+      {
+        "value": "standard_20",
+        "label": "Standard (20% on distributed profit)"
+      },
+      {
+        "value": "micro",
+        "label": "Micro-enterprise tax (25% of revenue)"
+      },
+      {
+        "value": "other",
+        "label": "Other"
+      }
+    ],
+    "vatRegimes": [
+      {
+        "value": "general",
+        "label": "Standard (21%)"
+      },
+      {
+        "value": "reduced_12",
+        "label": "Reduced (12%)"
+      },
+      {
+        "value": "reduced_5",
+        "label": "Reduced (5%)"
+      },
+      {
+        "value": "exempt",
+        "label": "Exempt"
+      }
+    ],
+    "contractTypes": [
+      {
+        "value": "nenoteikets",
+        "label": "Uz nenoteiktu laiku (Permanent)"
+      },
+      {
+        "value": "noteikts",
+        "label": "Uz noteiktu laiku (Fixed-term)"
+      },
+      {
+        "value": "nepilns",
+        "label": "Nepilns darba laiks (Part-time)"
+      },
+      {
+        "value": "sezonals",
+        "label": "Sezonāls (Seasonal)"
+      }
+    ],
+    "selfEmployedFields": {
+      "registrationLabel": "Saimnieciskā darbība registration date (VID)",
+      "activityCodeLabel": "NACE code",
+      "activityCodePlaceholder": "e.g. 69.10",
+      "hasSSRegistration": true,
+      "ssRegistrationLabel": "VSAOI registration",
+      "incomeRegimes": [
+        {
+          "value": "general",
+          "label": "General regime"
+        },
+        {
+          "value": "micro",
+          "label": "Micro-enterprise tax"
+        },
+        {
+          "value": "patent",
+          "label": "Patent fee"
+        }
+      ],
+      "vatFilingFrequencies": [
+        {
+          "value": "monthly",
+          "label": "Monthly (ikmēneša)"
+        },
+        {
+          "value": "quarterly",
+          "label": "Quarterly (ceturkšņa)"
+        },
+        {
+          "value": "semi_annual",
+          "label": "Semi-annual (pusgada)"
+        }
+      ]
+    }
+  }
+}

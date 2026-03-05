@@ -1,0 +1,274 @@
+{
+  "country": "Switzerland",
+  "code": "CH",
+  "year": 2026,
+  "currency": "CHF",
+  "incomeTax": {
+    "brackets": [
+      {
+        "from": 0,
+        "to": 17800,
+        "rate": 0
+      },
+      {
+        "from": 17800,
+        "to": 31600,
+        "rate": 0.77
+      },
+      {
+        "from": 31600,
+        "to": 41400,
+        "rate": 0.88
+      },
+      {
+        "from": 41400,
+        "to": 55200,
+        "rate": 2.64
+      },
+      {
+        "from": 55200,
+        "to": 72500,
+        "rate": 2.97
+      },
+      {
+        "from": 72500,
+        "to": 78100,
+        "rate": 5.94
+      },
+      {
+        "from": 78100,
+        "to": 103600,
+        "rate": 6.6
+      },
+      {
+        "from": 103600,
+        "to": 134600,
+        "rate": 8.8
+      },
+      {
+        "from": 134600,
+        "to": 176000,
+        "rate": 11
+      },
+      {
+        "from": 176000,
+        "to": null,
+        "rate": 11.5
+      }
+    ],
+    "personalAllowance": 0,
+    "notes": "Federal tax only. Cantonal taxes add ~10-15%. Effective combined ~25-35% depending on canton."
+  },
+  "corporateTax": {
+    "standard": 8.5,
+    "small": 8.5,
+    "smallThreshold": 0
+  },
+  "vat": {
+    "standard": 8.1,
+    "reduced": 2.6,
+    "superReduced": 3.8
+  },
+  "socialSecurity": {
+    "employee": 6.35,
+    "employer": 6.35,
+    "selfEmployed": 10.1
+  },
+  "fields": {
+    "asalariado": {
+      "basic": [
+        { "key": "salarioBruto", "label": "Jahresbruttolohn (CHF)" },
+        { "key": "retencionesEmpresa", "label": "Quellensteuer / Abzüge (CHF)" }
+      ],
+      "advanced": [
+        { "key": "cotizacionesSS", "label": "AHV/IV/EO-Beiträge (AN-Anteil) (CHF)" },
+        { "key": "capitalMobiliario", "label": "Kapitalerträge (Zinsen, Dividenden) (CHF)" },
+        { "key": "capitalInmobiliario", "label": "Liegenschaftsertrag (CHF)" },
+        { "key": "gananciaPatrimonial", "label": "Kapitalgewinne (CHF)" },
+        { "key": "pensiones", "label": "Renten und Pensionen (CHF)" },
+        { "key": "deduccionesAuto", "label": "Berufskosten / Abzüge (CHF)" },
+        { "key": "donaciones", "label": "Absetzbare Spenden (CHF)" }
+      ]
+    },
+    "autonomo": {
+      "basic": [
+        { "key": "facturacionTotal", "label": "Betriebsertrag netto (ohne MWST) (CHF)" },
+        { "key": "gastosDeducibles", "label": "Geschäftsaufwand (inkl. AHV/IV) (CHF)" },
+        { "key": "ivaRepercutido", "label": "Vereinnahmte MWST (CHF)" },
+        { "key": "ivaSoportado", "label": "Vorsteuer (MWST) (CHF)" }
+      ],
+      "advanced": [
+        { "key": "otrosIngresos", "label": "Übrige Einkünfte (CHF)" },
+        { "key": "amortizaciones", "label": "Abschreibungen (CHF)" },
+        { "key": "gastosFinancieros", "label": "Finanzaufwand (CHF)" },
+        { "key": "pagosFracc130", "label": "Vorauszahlungen Einkommenssteuer (CHF)" },
+        { "key": "ivaRegularizacion", "label": "MWST-Korrekturen (CHF)" }
+      ]
+    },
+    "empresa": {
+      "basic": [
+        { "key": "ingresosTotal", "label": "Gesamtertrag (CHF)" },
+        { "key": "gastosTotal", "label": "Gesamtaufwand (CHF)" },
+        { "key": "ivaRepercutidoEmp", "label": "MWST geschuldet (CHF)" },
+        { "key": "ivaSoportadoEmp", "label": "Vorsteuer (MWST) (CHF)" }
+      ],
+      "advanced": [
+        { "key": "gastosNoDeducibles", "label": "Nicht abzugsfähiger Aufwand (CHF)" },
+        { "key": "basesNegAnter", "label": "Verlustvortrag (CHF)" },
+        { "key": "deduccionID", "label": "F&E-Abzüge (CHF)" },
+        { "key": "deduccionEmpleo", "label": "Beschäftigungsanreize (CHF)" },
+        { "key": "pagosFracc202", "label": "Vorauszahlungen Gewinnsteuer (CHF)" },
+        { "key": "ivaRegularizEmp", "label": "MWST-Korrekturen (CHF)" }
+      ]
+    }
+  },
+  "clientForm": {
+    "taxIdLabel": "AHV-Nummer / AVS Number",
+    "taxIdCompanyLabel": "UID (Unternehmens-Identifikationsnummer)",
+    "taxIdPlaceholder": "e.g. CHE-123.456.789",
+    "regionLabel": "Kanton / Canton",
+    "regions": [
+      "Aargau",
+      "Appenzell Ausserrhoden",
+      "Appenzell Innerrhoden",
+      "Basel-Landschaft",
+      "Basel-Stadt",
+      "Bern",
+      "Freiburg",
+      "Genf",
+      "Glarus",
+      "Graubünden",
+      "Jura",
+      "Luzern",
+      "Neuenburg",
+      "Nidwalden",
+      "Obwalden",
+      "Schaffhausen",
+      "Schwyz",
+      "Solothurn",
+      "St. Gallen",
+      "Thurgau",
+      "Tessin",
+      "Uri",
+      "Waadt",
+      "Wallis",
+      "Zug",
+      "Zürich"
+    ],
+    "companyTypes": [
+      {
+        "value": "ag",
+        "label": "AG (Aktiengesellschaft)"
+      },
+      {
+        "value": "gmbh",
+        "label": "GmbH (Gesellschaft mit beschränkter Haftung)"
+      },
+      {
+        "value": "einzelfirma",
+        "label": "Einzelfirma (Sole proprietorship)"
+      },
+      {
+        "value": "kollektivgesellschaft",
+        "label": "Kollektivgesellschaft (General partnership)"
+      },
+      {
+        "value": "kommanditgesellschaft",
+        "label": "Kommanditgesellschaft (Limited partnership)"
+      },
+      {
+        "value": "genossenschaft",
+        "label": "Genossenschaft (Cooperative)"
+      },
+      {
+        "value": "other",
+        "label": "Other"
+      }
+    ],
+    "companyTaxTypes": [
+      {
+        "value": "federal_8_5",
+        "label": "Federal CIT (8.5%)"
+      },
+      {
+        "value": "cantonal",
+        "label": "Cantonal + municipal (varies)"
+      },
+      {
+        "value": "other",
+        "label": "Other"
+      }
+    ],
+    "vatRegimes": [
+      {
+        "value": "general",
+        "label": "Standard (8.1%)"
+      },
+      {
+        "value": "reduced_2_6",
+        "label": "Reduced (2.6%)"
+      },
+      {
+        "value": "lodging_3_8",
+        "label": "Lodging (3.8%)"
+      },
+      {
+        "value": "exempt",
+        "label": "Exempt / below threshold"
+      }
+    ],
+    "contractTypes": [
+      {
+        "value": "unbefristet",
+        "label": "Permanent (unbefristet)"
+      },
+      {
+        "value": "befristet",
+        "label": "Fixed-term (befristet)"
+      },
+      {
+        "value": "teilzeit",
+        "label": "Part-time (Teilzeit)"
+      },
+      {
+        "value": "lehrvertrag",
+        "label": "Apprenticeship (Lehrvertrag)"
+      },
+      {
+        "value": "praktikum",
+        "label": "Internship (Praktikum)"
+      }
+    ],
+    "selfEmployedFields": {
+      "registrationLabel": "AHV / commercial register registration",
+      "activityCodeLabel": "NOGA code",
+      "activityCodePlaceholder": "e.g. 69.101",
+      "hasSSRegistration": true,
+      "ssRegistrationLabel": "AHV/IV/EO self-employed registration",
+      "incomeRegimes": [
+        {
+          "value": "effective",
+          "label": "Effective method"
+        },
+        {
+          "value": "simplified",
+          "label": "Simplified accounting"
+        }
+      ],
+      "vatFilingFrequencies": [
+        {
+          "value": "quarterly",
+          "label": "Quarterly"
+        },
+        {
+          "value": "semi_annual",
+          "label": "Semi-annual"
+        },
+        {
+          "value": "annual",
+          "label": "Annual"
+        }
+      ]
+    }
+  }
+}

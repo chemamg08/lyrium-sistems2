@@ -1,0 +1,216 @@
+{
+  "country": "Slovenia",
+  "code": "SI",
+  "year": 2026,
+  "currency": "EUR",
+  "incomeTax": {
+    "brackets": [
+      {
+        "desde": 0,
+        "hasta": 8755,
+        "tipo": 16
+      },
+      {
+        "desde": 8755,
+        "hasta": 25750,
+        "tipo": 26
+      },
+      {
+        "desde": 25750,
+        "hasta": 51500,
+        "tipo": 33
+      },
+      {
+        "desde": 51500,
+        "hasta": 74160,
+        "tipo": 39
+      },
+      {
+        "desde": 74160,
+        "hasta": null,
+        "tipo": 50
+      }
+    ],
+    "personalAllowance": 5000,
+    "notes": "General allowance ~€5 000; additional for low income"
+  },
+  "corporateTax": {
+    "standard": 19,
+    "small": 19,
+    "smallThreshold": 0
+  },
+  "vat": {
+    "standard": 22,
+    "reduced": 9.5,
+    "superReduced": 5
+  },
+  "socialSecurity": {
+    "employee": 22.1,
+    "employer": 16.1,
+    "selfEmployed": 38.2
+  },
+  "fields": {
+    "asalariado": {
+      "basic": [
+        { "key": "salarioBruto", "label": "Letna bruto plača (€)" },
+        { "key": "retencionesEmpresa", "label": "Akontacija dohodnine (€)" },
+        { "key": "planPensiones", "label": "Prostovoljni pokojninski prispevki (€)" }
+      ],
+      "advanced": [
+        { "key": "cotizacionesSS", "label": "Prispevki za socialno varnost (€)" },
+        { "key": "capitalMobiliario", "label": "Dohodek iz kapitala (€)" },
+        { "key": "capitalInmobiliario", "label": "Dohodek iz oddajanja premoženja v najem (€)" },
+        { "key": "retencionesTotales", "label": "Skupne akontacije (€)" }
+      ]
+    },
+    "autonomo": {
+      "basic": [
+        { "key": "facturacionTotal", "label": "Prihodki brez DDV (€)" },
+        { "key": "gastosDeducibles", "label": "Davčno priznani odhodki (€)" },
+        { "key": "ivaRepercutido", "label": "Obračunani DDV (€)" },
+        { "key": "ivaSoportado", "label": "Vstopni DDV (€)" }
+      ],
+      "advanced": [
+        { "key": "cuotaRETA", "label": "Prispevki za socialno varnost (s.p.) (€)" },
+        { "key": "pagosFracc130", "label": "Akontacije dohodnine vplačane (€)" }
+      ]
+    },
+    "empresa": {
+      "basic": [
+        { "key": "ingresosTotal", "label": "Skupni prihodki (€)" },
+        { "key": "gastosTotal", "label": "Skupni odhodki (€)" },
+        { "key": "ivaRepercutidoEmp", "label": "Obračunani DDV (€)" },
+        { "key": "ivaSoportadoEmp", "label": "Vstopni DDV (€)" }
+      ],
+      "advanced": [
+        { "key": "gastosNoDeducibles", "label": "Davčno nepriznani odhodki (€)" },
+        { "key": "basesNegAnter", "label": "Izgube preteklih let (€)" },
+        { "key": "pagosFracc202", "label": "Akontacije DDPO (€)" },
+        { "key": "retencionesSop", "label": "Odtegnjeni davki (€)" }
+      ]
+    }
+  },
+  "clientForm": {
+    "taxIdLabel": "Davčna številka (Tax number)",
+    "taxIdCompanyLabel": "Matična številka / Davčna številka",
+    "taxIdPlaceholder": "e.g. 12345678",
+    "regionLabel": "Statistična regija",
+    "regions": [
+      "Gorenjska",
+      "Goriška",
+      "Jugovzhodna Slovenija",
+      "Koroška",
+      "Obalno-kraška",
+      "Osrednjeslovenska",
+      "Podravska",
+      "Pomurska",
+      "Posavska",
+      "Primorsko-notranjska",
+      "Savinjska",
+      "Zasavska"
+    ],
+    "companyTypes": [
+      {
+        "value": "doo",
+        "label": "d.o.o. (družba z omejeno odgovornostjo)"
+      },
+      {
+        "value": "dd",
+        "label": "d.d. (delniška družba)"
+      },
+      {
+        "value": "sp",
+        "label": "s.p. (samostojni podjetnik – Sole trader)"
+      },
+      {
+        "value": "kd",
+        "label": "k.d. (komanditna družba)"
+      },
+      {
+        "value": "dnoo",
+        "label": "d.n.o. (družba z neomejeno odgovornostjo)"
+      },
+      {
+        "value": "zadruga",
+        "label": "Zadruga (Cooperative)"
+      },
+      {
+        "value": "other",
+        "label": "Other"
+      }
+    ],
+    "companyTaxTypes": [
+      {
+        "value": "standard_19",
+        "label": "DDPO standard (19%)"
+      },
+      {
+        "value": "other",
+        "label": "Other"
+      }
+    ],
+    "vatRegimes": [
+      {
+        "value": "general",
+        "label": "DDV standard (22%)"
+      },
+      {
+        "value": "reduced_9_5",
+        "label": "DDV znižana (9.5%)"
+      },
+      {
+        "value": "reduced_5",
+        "label": "DDV super-znižana (5%)"
+      },
+      {
+        "value": "exempt",
+        "label": "Oproščen (exempt)"
+      }
+    ],
+    "contractTypes": [
+      {
+        "value": "nedolocen",
+        "label": "Za nedoločen čas (Permanent)"
+      },
+      {
+        "value": "dolocen",
+        "label": "Za določen čas (Fixed-term)"
+      },
+      {
+        "value": "krajsi",
+        "label": "Krajši delovni čas (Part-time)"
+      },
+      {
+        "value": "javni_usluzbenci",
+        "label": "Javni uslužbenci (Public sector)"
+      }
+    ],
+    "selfEmployedFields": {
+      "registrationLabel": "Datum vpisa s.p. (registration date)",
+      "activityCodeLabel": "SKD code",
+      "activityCodePlaceholder": "e.g. 69.100",
+      "hasSSRegistration": true,
+      "ssRegistrationLabel": "ZPIZ / ZZZS registration",
+      "incomeRegimes": [
+        {
+          "value": "dejanski",
+          "label": "Dejanski odhodki (actual expenses)"
+        },
+        {
+          "value": "normirani",
+          "label": "Normirani odhodki (80% flat-rate)"
+        }
+      ],
+      "vatFilingFrequencies": [
+        {
+          "value": "monthly",
+          "label": "Mesečno (monthly)"
+        },
+        {
+          "value": "quarterly",
+          "label": "Trimesečno (quarterly)"
+        }
+      ]
+    }
+  }
+}

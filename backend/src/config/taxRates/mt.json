@@ -1,0 +1,225 @@
+{
+  "country": "Malta",
+  "code": "MT",
+  "year": 2026,
+  "currency": "EUR",
+  "incomeTax": {
+    "brackets": [
+      {
+        "from": 0,
+        "to": 9100,
+        "rate": 0
+      },
+      {
+        "from": 9100,
+        "to": 14500,
+        "rate": 15
+      },
+      {
+        "from": 14500,
+        "to": 19500,
+        "rate": 25
+      },
+      {
+        "from": 19500,
+        "to": 60000,
+        "rate": 25
+      },
+      {
+        "from": 60000,
+        "to": null,
+        "rate": 35
+      }
+    ],
+    "personalAllowance": 9100,
+    "notes": "Corp tax 35% but refund system brings effective rate to ~5% for foreign shareholders."
+  },
+  "corporateTax": {
+    "standard": 35,
+    "small": 35,
+    "smallThreshold": 0
+  },
+  "vat": {
+    "standard": 18,
+    "reduced": 7,
+    "superReduced": 5
+  },
+  "socialSecurity": {
+    "employee": 10,
+    "employer": 10,
+    "selfEmployed": 15
+  },
+  "fields": {
+    "asalariado": {
+      "basic": [
+        { "key": "salarioBruto", "label": "Annual gross salary (€)" },
+        { "key": "retencionesEmpresa", "label": "FSS tax withheld (€)" }
+      ],
+      "advanced": [
+        { "key": "cotizacionesSS", "label": "NI contributions (€)" },
+        { "key": "capitalMobiliario", "label": "Interest & dividend income (€)" },
+        { "key": "capitalInmobiliario", "label": "Rental income (€)" },
+        { "key": "gananciaPatrimonial", "label": "Capital gains (€)" },
+        { "key": "pensiones", "label": "Pensions & benefits (€)" },
+        { "key": "deduccionesAuto", "label": "Additional deductions (€)" },
+        { "key": "donaciones", "label": "Deductible donations (€)" }
+      ]
+    },
+    "autonomo": {
+      "basic": [
+        { "key": "facturacionTotal", "label": "Revenue excl. VAT (€)" },
+        { "key": "gastosDeducibles", "label": "Allowable expenses incl. SSC (€)" },
+        { "key": "ivaRepercutido", "label": "VAT collected / output (€)" },
+        { "key": "ivaSoportado", "label": "VAT paid / input (€)" }
+      ],
+      "advanced": [
+        { "key": "otrosIngresos", "label": "Other income (€)" },
+        { "key": "amortizaciones", "label": "Wear & tear allowances (€)" },
+        { "key": "gastosFinancieros", "label": "Interest & financial expenses (€)" },
+        { "key": "pagosFracc130", "label": "Provisional tax paid (€)" },
+        { "key": "ivaRegularizacion", "label": "VAT adjustments (€)" }
+      ]
+    },
+    "empresa": {
+      "basic": [
+        { "key": "ingresosTotal", "label": "Total income (€)" },
+        { "key": "gastosTotal", "label": "Total deductible expenses (€)" },
+        { "key": "ivaRepercutidoEmp", "label": "Output VAT (€)" },
+        { "key": "ivaSoportadoEmp", "label": "Input VAT (€)" }
+      ],
+      "advanced": [
+        { "key": "gastosNoDeducibles", "label": "Non-deductible expenses (€)" },
+        { "key": "basesNegAnter", "label": "Unabsorbed losses (€)" },
+        { "key": "deduccionID", "label": "Tax credits (R&D / micro invest) (€)" },
+        { "key": "deduccionEmpleo", "label": "Employment aid credits (€)" },
+        { "key": "pagosFracc202", "label": "Provisional tax – corporate (€)" },
+        { "key": "ivaRegularizEmp", "label": "VAT adjustments (€)" }
+      ]
+    }
+  },
+  "clientForm": {
+    "taxIdLabel": "ID Card Number / TIN",
+    "taxIdCompanyLabel": "Company Registration Number (C-XXXXX)",
+    "taxIdPlaceholder": "e.g. 123456M",
+    "regionLabel": "District",
+    "regions": [
+      "Gozo",
+      "Northern",
+      "Northern Harbour",
+      "South Eastern",
+      "Southern Harbour",
+      "Western"
+    ],
+    "companyTypes": [
+      {
+        "value": "ltd",
+        "label": "Private Limited Company (Ltd)"
+      },
+      {
+        "value": "plc",
+        "label": "Public Limited Company (p.l.c.)"
+      },
+      {
+        "value": "partnership_en_nom",
+        "label": "Partnership en nom collectif"
+      },
+      {
+        "value": "partnership_en_com",
+        "label": "Partnership en commandite"
+      },
+      {
+        "value": "sole_trader",
+        "label": "Sole Trader"
+      },
+      {
+        "value": "other",
+        "label": "Other"
+      }
+    ],
+    "companyTaxTypes": [
+      {
+        "value": "standard_35",
+        "label": "Nominal (35%)"
+      },
+      {
+        "value": "refund_5_7",
+        "label": "Effective 5/7ths refund"
+      },
+      {
+        "value": "refund_2_3",
+        "label": "Effective 2/3rds refund"
+      },
+      {
+        "value": "participation",
+        "label": "Participation exemption"
+      },
+      {
+        "value": "other",
+        "label": "Other"
+      }
+    ],
+    "vatRegimes": [
+      {
+        "value": "general",
+        "label": "Standard (18%)"
+      },
+      {
+        "value": "reduced_7",
+        "label": "Reduced (7%)"
+      },
+      {
+        "value": "reduced_5",
+        "label": "Reduced (5%)"
+      },
+      {
+        "value": "exempt",
+        "label": "Exempt"
+      }
+    ],
+    "contractTypes": [
+      {
+        "value": "indefinite",
+        "label": "Indefinite period"
+      },
+      {
+        "value": "definite",
+        "label": "Definite period"
+      },
+      {
+        "value": "part_time",
+        "label": "Part-time"
+      },
+      {
+        "value": "reduced_hours",
+        "label": "Reduced hours"
+      }
+    ],
+    "selfEmployedFields": {
+      "registrationLabel": "Inland Revenue registration date",
+      "activityCodeLabel": "NACE code",
+      "activityCodePlaceholder": "e.g. 69.10",
+      "hasSSRegistration": true,
+      "ssRegistrationLabel": "Social security (Class Two)",
+      "incomeRegimes": [
+        {
+          "value": "accrual",
+          "label": "Accruals basis"
+        },
+        {
+          "value": "cash",
+          "label": "Cash basis"
+        }
+      ],
+      "vatFilingFrequencies": [
+        {
+          "value": "quarterly",
+          "label": "Quarterly"
+        },
+        {
+          "value": "monthly",
+          "label": "Monthly"
+        }
+      ]
+    }
+  }
+}

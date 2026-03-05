@@ -1,0 +1,245 @@
+{
+  "country": "Polska / Poland",
+  "code": "PL",
+  "year": 2026,
+  "currency": "PLN",
+  "incomeTax": {
+    "brackets": [
+      {
+        "from": 0,
+        "to": 30000,
+        "rate": 0
+      },
+      {
+        "from": 30000,
+        "to": 120000,
+        "rate": 12
+      },
+      {
+        "from": 120000,
+        "to": null,
+        "rate": 32
+      }
+    ],
+    "personalAllowance": 30000,
+    "notes": "Solidarity contribution 4% on income >1M PLN."
+  },
+  "corporateTax": {
+    "standard": 19,
+    "small": 9,
+    "smallThreshold": 2000000
+  },
+  "vat": {
+    "standard": 23,
+    "reduced": 8,
+    "superReduced": 5
+  },
+  "socialSecurity": {
+    "employee": 13.71,
+    "employer": 20.74,
+    "selfEmployed": 26.68
+  },
+  "fields": {
+    "asalariado": {
+      "basic": [
+        { "key": "salarioBruto", "label": "Roczne wynagrodzenie brutto (PLN)" },
+        { "key": "retencionesEmpresa", "label": "Zaliczka na PIT pobrana przez pracodawcę (PLN)" }
+      ],
+      "advanced": [
+        { "key": "cotizacionesSS", "label": "Składki ZUS (pracownik) (PLN)" },
+        { "key": "capitalMobiliario", "label": "Dochody kapitałowe (odsetki, dywidendy) (PLN)" },
+        { "key": "capitalInmobiliario", "label": "Dochody z najmu (PLN)" },
+        { "key": "gananciaPatrimonial", "label": "Zyski kapitałowe (PLN)" },
+        { "key": "pensiones", "label": "Emerytury i świadczenia (PLN)" },
+        { "key": "deduccionesAuto", "label": "Ulgi podatkowe (PLN)" },
+        { "key": "donaciones", "label": "Darowizny odliczane (PLN)" }
+      ]
+    },
+    "autonomo": {
+      "basic": [
+        { "key": "facturacionTotal", "label": "Przychody netto (bez VAT) (PLN)" },
+        { "key": "gastosDeducibles", "label": "Koszty uzyskania przychodu (z ZUS) (PLN)" },
+        { "key": "ivaRepercutido", "label": "VAT należny (PLN)" },
+        { "key": "ivaSoportado", "label": "VAT naliczony (PLN)" }
+      ],
+      "advanced": [
+        { "key": "otrosIngresos", "label": "Inne przychody (PLN)" },
+        { "key": "amortizaciones", "label": "Amortyzacja (PLN)" },
+        { "key": "gastosFinancieros", "label": "Koszty finansowe (PLN)" },
+        { "key": "pagosFracc130", "label": "Zaliczki na PIT wpłacone (PLN)" },
+        { "key": "ivaRegularizacion", "label": "Korekty VAT (PLN)" }
+      ]
+    },
+    "empresa": {
+      "basic": [
+        { "key": "ingresosTotal", "label": "Przychody ogółem (PLN)" },
+        { "key": "gastosTotal", "label": "Koszty ogółem (PLN)" },
+        { "key": "ivaRepercutidoEmp", "label": "VAT należny (PLN)" },
+        { "key": "ivaSoportadoEmp", "label": "VAT naliczony (PLN)" }
+      ],
+      "advanced": [
+        { "key": "gastosNoDeducibles", "label": "Koszty niestanowiące KUP (PLN)" },
+        { "key": "basesNegAnter", "label": "Straty z lat ubiegłych (PLN)" },
+        { "key": "deduccionID", "label": "Ulga B+R / IP Box (PLN)" },
+        { "key": "deduccionEmpleo", "label": "Ulgi pracownicze (PLN)" },
+        { "key": "pagosFracc202", "label": "Zaliczki na CIT (PLN)" },
+        { "key": "ivaRegularizEmp", "label": "Korekty VAT (PLN)" }
+      ]
+    }
+  },
+  "clientForm": {
+    "taxIdLabel": "PESEL / NIP",
+    "taxIdCompanyLabel": "NIP / KRS",
+    "taxIdPlaceholder": "np. 12345678901",
+    "regionLabel": "Województwo",
+    "regions": [
+      "Dolnośląskie",
+      "Kujawsko-pomorskie",
+      "Lubelskie",
+      "Lubuskie",
+      "Łódzkie",
+      "Małopolskie",
+      "Mazowieckie",
+      "Opolskie",
+      "Podkarpackie",
+      "Podlaskie",
+      "Pomorskie",
+      "Śląskie",
+      "Świętokrzyskie",
+      "Warmińsko-mazurskie",
+      "Wielkopolskie",
+      "Zachodniopomorskie"
+    ],
+    "companyTypes": [
+      {
+        "value": "sp_z_oo",
+        "label": "Sp. z o.o. (Spółka z ograniczoną odpowiedzialnością)"
+      },
+      {
+        "value": "sa",
+        "label": "S.A. (Spółka Akcyjna)"
+      },
+      {
+        "value": "sp_j",
+        "label": "Sp. j. (Spółka jawna)"
+      },
+      {
+        "value": "sp_k",
+        "label": "Sp. k. (Spółka komandytowa)"
+      },
+      {
+        "value": "sp_p",
+        "label": "Sp. p. (Spółka partnerska)"
+      },
+      {
+        "value": "jednoosobowa",
+        "label": "JDG (Jednoosobowa działalność gospodarcza)"
+      },
+      {
+        "value": "other",
+        "label": "Other"
+      }
+    ],
+    "companyTaxTypes": [
+      {
+        "value": "standard_19",
+        "label": "CIT standard (19%)"
+      },
+      {
+        "value": "reduced_9",
+        "label": "CIT reduced (9% for small taxpayers)"
+      },
+      {
+        "value": "estonski",
+        "label": "Estoński CIT (ryczałt od dochodów spółek)"
+      },
+      {
+        "value": "other",
+        "label": "Other"
+      }
+    ],
+    "vatRegimes": [
+      {
+        "value": "general",
+        "label": "Standard (23%)"
+      },
+      {
+        "value": "reduced_8",
+        "label": "Reduced (8%)"
+      },
+      {
+        "value": "reduced_5",
+        "label": "Reduced (5%)"
+      },
+      {
+        "value": "zwolniony",
+        "label": "Exempt (zwolniony)"
+      },
+      {
+        "value": "zero_rated",
+        "label": "Zero-rated (0%)"
+      }
+    ],
+    "contractTypes": [
+      {
+        "value": "na_czas_nieokreslony",
+        "label": "Na czas nieokreślony (Permanent)"
+      },
+      {
+        "value": "na_czas_okreslony",
+        "label": "Na czas określony (Fixed-term)"
+      },
+      {
+        "value": "zlecenie",
+        "label": "Umowa zlecenie (Mandate contract)"
+      },
+      {
+        "value": "o_dzielo",
+        "label": "Umowa o dzieło (Contract for specific work)"
+      },
+      {
+        "value": "czesc_etatu",
+        "label": "Część etatu (Part-time)"
+      },
+      {
+        "value": "b2b",
+        "label": "B2B (self-employed contract)"
+      }
+    ],
+    "selfEmployedFields": {
+      "registrationLabel": "Data wpisu CEIDG",
+      "activityCodeLabel": "PKD code",
+      "activityCodePlaceholder": "np. 69.10.Z",
+      "hasSSRegistration": true,
+      "ssRegistrationLabel": "ZUS registration",
+      "incomeRegimes": [
+        {
+          "value": "skala_podatkowa",
+          "label": "Skala podatkowa (12% / 32%)"
+        },
+        {
+          "value": "liniowy",
+          "label": "Podatek liniowy (19%)"
+        },
+        {
+          "value": "ryczalt",
+          "label": "Ryczałt od przychodów ewidencjonowanych"
+        },
+        {
+          "value": "karta_podatkowa",
+          "label": "Karta podatkowa (fixed amounts)"
+        }
+      ],
+      "vatFilingFrequencies": [
+        {
+          "value": "monthly",
+          "label": "Miesięcznie (monthly)"
+        },
+        {
+          "value": "quarterly",
+          "label": "Kwartalnie (quarterly)"
+        }
+      ]
+    }
+  }
+}

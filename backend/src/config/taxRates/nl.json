@@ -1,0 +1,241 @@
+{
+  "country": "Nederland / Netherlands",
+  "code": "NL",
+  "year": 2026,
+  "currency": "EUR",
+  "incomeTax": {
+    "brackets": [
+      {
+        "from": 0,
+        "to": 38441,
+        "rate": 35.82
+      },
+      {
+        "from": 38441,
+        "to": 76817,
+        "rate": 37.48
+      },
+      {
+        "from": 76817,
+        "to": null,
+        "rate": 49.5
+      }
+    ],
+    "personalAllowance": 0,
+    "notes": "SS included in bracket rates (AOW/ANW/WLZ). Box 2: dividends 24.5%. Box 3: wealth tax ~2.17% on savings/investments."
+  },
+  "corporateTax": {
+    "standard": 25.8,
+    "small": 19,
+    "smallThreshold": 200000
+  },
+  "vat": {
+    "standard": 21,
+    "reduced": 9,
+    "superReduced": 0
+  },
+  "socialSecurity": {
+    "employee": 27.65,
+    "employer": 0,
+    "selfEmployed": 27.65
+  },
+  "fields": {
+    "asalariado": {
+      "basic": [
+        { "key": "salarioBruto", "label": "Jaarlijks bruto salaris (€)" },
+        { "key": "retencionesEmpresa", "label": "Ingehouden loonbelasting (€)" }
+      ],
+      "advanced": [
+        { "key": "cotizacionesSS", "label": "Premies volksverzekeringen (WN-deel) (€)" },
+        { "key": "capitalMobiliario", "label": "Inkomsten uit vermogen (rente, dividend) (€)" },
+        { "key": "capitalInmobiliario", "label": "Huurinkomsten (€)" },
+        { "key": "gananciaPatrimonial", "label": "Vermogenswinst (€)" },
+        { "key": "pensiones", "label": "Pensioen en uitkeringen (€)" },
+        { "key": "deduccionesAuto", "label": "Heffingskortingen / aftrekposten (€)" },
+        { "key": "donaciones", "label": "Giftenaftrek (€)" }
+      ]
+    },
+    "autonomo": {
+      "basic": [
+        { "key": "facturacionTotal", "label": "Omzet excl. btw (€)" },
+        { "key": "gastosDeducibles", "label": "Aftrekbare kosten (incl. SV) (€)" },
+        { "key": "ivaRepercutido", "label": "Btw afgedragen (€)" },
+        { "key": "ivaSoportado", "label": "Btw betaald / voorbelasting (€)" }
+      ],
+      "advanced": [
+        { "key": "otrosIngresos", "label": "Overige inkomsten (€)" },
+        { "key": "amortizaciones", "label": "Afschrijvingen (€)" },
+        { "key": "gastosFinancieros", "label": "Financiële lasten (€)" },
+        { "key": "pagosFracc130", "label": "Voorlopige aanslag IB (€)" },
+        { "key": "ivaRegularizacion", "label": "Btw-correcties (€)" }
+      ]
+    },
+    "empresa": {
+      "basic": [
+        { "key": "ingresosTotal", "label": "Totale omzet (€)" },
+        { "key": "gastosTotal", "label": "Totale kosten (€)" },
+        { "key": "ivaRepercutidoEmp", "label": "Btw afgedragen (€)" },
+        { "key": "ivaSoportadoEmp", "label": "Btw voorbelasting (€)" }
+      ],
+      "advanced": [
+        { "key": "gastosNoDeducibles", "label": "Niet-aftrekbare kosten (€)" },
+        { "key": "basesNegAnter", "label": "Verrekenbare verliezen (€)" },
+        { "key": "deduccionID", "label": "WBSO / innovatiebox (€)" },
+        { "key": "deduccionEmpleo", "label": "Loonkostenvoordeel (LKV) (€)" },
+        { "key": "pagosFracc202", "label": "Voorlopige aanslag Vpb (€)" },
+        { "key": "ivaRegularizEmp", "label": "Btw-correcties (€)" }
+      ]
+    }
+  },
+  "clientForm": {
+    "taxIdLabel": "BSN (Burgerservicenummer)",
+    "taxIdCompanyLabel": "KVK-nummer / RSIN",
+    "taxIdPlaceholder": "e.g. 123456789",
+    "regionLabel": "Provincie",
+    "regions": [
+      "Drenthe",
+      "Flevoland",
+      "Friesland",
+      "Gelderland",
+      "Groningen",
+      "Limburg",
+      "Noord-Brabant",
+      "Noord-Holland",
+      "Overijssel",
+      "Utrecht",
+      "Zeeland",
+      "Zuid-Holland"
+    ],
+    "companyTypes": [
+      {
+        "value": "bv",
+        "label": "B.V. (Besloten Vennootschap – Private Ltd)"
+      },
+      {
+        "value": "nv",
+        "label": "N.V. (Naamloze Vennootschap – Public Ltd)"
+      },
+      {
+        "value": "vof",
+        "label": "VOF (Vennootschap onder firma – Partnership)"
+      },
+      {
+        "value": "cv",
+        "label": "C.V. (Commanditaire vennootschap – Limited partnership)"
+      },
+      {
+        "value": "eenmanszaak",
+        "label": "Eenmanszaak (Sole proprietorship)"
+      },
+      {
+        "value": "cooperatie",
+        "label": "Coöperatie"
+      },
+      {
+        "value": "stichting",
+        "label": "Stichting (Foundation)"
+      },
+      {
+        "value": "other",
+        "label": "Other"
+      }
+    ],
+    "companyTaxTypes": [
+      {
+        "value": "standard_25_8",
+        "label": "Standard (25.8%)"
+      },
+      {
+        "value": "reduced_19",
+        "label": "Reduced (19% for ≤ €200k)"
+      },
+      {
+        "value": "innovation_box_9",
+        "label": "Innovation box (9%)"
+      },
+      {
+        "value": "other",
+        "label": "Other"
+      }
+    ],
+    "vatRegimes": [
+      {
+        "value": "general",
+        "label": "Standard (21%)"
+      },
+      {
+        "value": "reduced_9",
+        "label": "Reduced (9%)"
+      },
+      {
+        "value": "zero_rated",
+        "label": "Zero-rated (0%)"
+      },
+      {
+        "value": "kleineondernemersregeling",
+        "label": "KOR (Small business scheme)"
+      },
+      {
+        "value": "exempt",
+        "label": "Exempt"
+      }
+    ],
+    "contractTypes": [
+      {
+        "value": "onbepaalde_tijd",
+        "label": "Onbepaalde tijd (Permanent)"
+      },
+      {
+        "value": "bepaalde_tijd",
+        "label": "Bepaalde tijd (Fixed-term)"
+      },
+      {
+        "value": "deeltijd",
+        "label": "Deeltijd (Part-time)"
+      },
+      {
+        "value": "oproep",
+        "label": "Oproepcontract (On-call)"
+      },
+      {
+        "value": "uitzend",
+        "label": "Uitzendcontract (Temp agency)"
+      }
+    ],
+    "selfEmployedFields": {
+      "registrationLabel": "KVK registration date",
+      "activityCodeLabel": "SBI code",
+      "activityCodePlaceholder": "e.g. 69101",
+      "hasSSRegistration": false,
+      "ssRegistrationLabel": "",
+      "incomeRegimes": [
+        {
+          "value": "ondernemer",
+          "label": "Ondernemer (entrepreneur – IB)"
+        },
+        {
+          "value": "rov",
+          "label": "Resultaat overige werkzaamheden"
+        },
+        {
+          "value": "directeur_groot",
+          "label": "DGA (Directeur-grootaandeelhouder)"
+        }
+      ],
+      "vatFilingFrequencies": [
+        {
+          "value": "quarterly",
+          "label": "Per kwartaal (quarterly)"
+        },
+        {
+          "value": "monthly",
+          "label": "Per maand (monthly)"
+        },
+        {
+          "value": "annual",
+          "label": "Per jaar (annual via KOR)"
+        }
+      ]
+    }
+  }
+}

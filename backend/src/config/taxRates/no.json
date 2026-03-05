@@ -1,0 +1,239 @@
+{
+  "country": "Norge / Norway",
+  "code": "NO",
+  "year": 2026,
+  "currency": "NOK",
+  "incomeTax": {
+    "brackets": [
+      {
+        "from": 0,
+        "to": 208050,
+        "rate": 22
+      },
+      {
+        "from": 208050,
+        "to": 292850,
+        "rate": 22.9
+      },
+      {
+        "from": 292850,
+        "to": 670000,
+        "rate": 26.9
+      },
+      {
+        "from": 670000,
+        "to": 937900,
+        "rate": 37.9
+      },
+      {
+        "from": 937900,
+        "to": 1350000,
+        "rate": 43.9
+      },
+      {
+        "from": 1350000,
+        "to": null,
+        "rate": 47.4
+      }
+    ],
+    "personalAllowance": 73000,
+    "notes": ""
+  },
+  "corporateTax": {
+    "standard": 22,
+    "small": 22,
+    "smallThreshold": 0
+  },
+  "vat": {
+    "standard": 25,
+    "reduced": 15,
+    "superReduced": 12
+  },
+  "socialSecurity": {
+    "employee": 7.9,
+    "employer": 14.1,
+    "selfEmployed": 11.4
+  },
+  "fields": {
+    "asalariado": {
+      "basic": [
+        { "key": "salarioBruto", "label": "Årlig bruttolønn (NOK)" },
+        { "key": "retencionesEmpresa", "label": "Forskuddstrekk (NOK)" }
+      ],
+      "advanced": [
+        { "key": "cotizacionesSS", "label": "Trygdeavgift (NOK)" },
+        { "key": "capitalMobiliario", "label": "Kapitalinntekter (renter, utbytte) (NOK)" },
+        { "key": "capitalInmobiliario", "label": "Leieinntekter (NOK)" },
+        { "key": "gananciaPatrimonial", "label": "Aksjegevinster (NOK)" },
+        { "key": "pensiones", "label": "Pensjon og ytelser (NOK)" },
+        { "key": "deduccionesAuto", "label": "Fradrag (minstefradrag, reisefradrag m.m.) (NOK)" },
+        { "key": "donaciones", "label": "Gavefradrag (NOK)" }
+      ]
+    },
+    "autonomo": {
+      "basic": [
+        { "key": "facturacionTotal", "label": "Omsetning ekskl. mva (NOK)" },
+        { "key": "gastosDeducibles", "label": "Fradragsberettigede kostnader (inkl. trygdeavgift) (NOK)" },
+        { "key": "ivaRepercutido", "label": "Utgående mva (NOK)" },
+        { "key": "ivaSoportado", "label": "Inngående mva (NOK)" }
+      ],
+      "advanced": [
+        { "key": "otrosIngresos", "label": "Andre inntekter (NOK)" },
+        { "key": "amortizaciones", "label": "Avskrivninger (NOK)" },
+        { "key": "gastosFinancieros", "label": "Finanskostnader (NOK)" },
+        { "key": "pagosFracc130", "label": "Forskuddsskatt innbetalt (NOK)" },
+        { "key": "ivaRegularizacion", "label": "Mva-korreksjoner (NOK)" }
+      ]
+    },
+    "empresa": {
+      "basic": [
+        { "key": "ingresosTotal", "label": "Totale inntekter (NOK)" },
+        { "key": "gastosTotal", "label": "Totale kostnader (NOK)" },
+        { "key": "ivaRepercutidoEmp", "label": "Utgående mva (NOK)" },
+        { "key": "ivaSoportadoEmp", "label": "Inngående mva (NOK)" }
+      ],
+      "advanced": [
+        { "key": "gastosNoDeducibles", "label": "Ikke-fradragsberettigede kostnader (NOK)" },
+        { "key": "basesNegAnter", "label": "Fremførbare underskudd (NOK)" },
+        { "key": "deduccionID", "label": "SkatteFUNN / FoU-fradrag (NOK)" },
+        { "key": "deduccionEmpleo", "label": "Lønnstilskudd (NOK)" },
+        { "key": "pagosFracc202", "label": "Forskuddsskatt selskap (NOK)" },
+        { "key": "ivaRegularizEmp", "label": "Mva-korreksjoner (NOK)" }
+      ]
+    }
+  },
+  "clientForm": {
+    "taxIdLabel": "Fødselsnummer (National ID)",
+    "taxIdCompanyLabel": "Organisasjonsnummer",
+    "taxIdPlaceholder": "e.g. 01018012345",
+    "regionLabel": "Fylke (County)",
+    "regions": [
+      "Agder",
+      "Innlandet",
+      "Møre og Romsdal",
+      "Nordland",
+      "Oslo",
+      "Rogaland",
+      "Troms og Finnmark",
+      "Trøndelag",
+      "Vestfold og Telemark",
+      "Vestland",
+      "Viken"
+    ],
+    "companyTypes": [
+      {
+        "value": "as",
+        "label": "AS (Aksjeselskap – Ltd)"
+      },
+      {
+        "value": "asa",
+        "label": "ASA (Allmennaksjeselskap – Public Ltd)"
+      },
+      {
+        "value": "ans",
+        "label": "ANS (Ansvarlig selskap – General partnership)"
+      },
+      {
+        "value": "da",
+        "label": "DA (Selskap med delt ansvar – Limited partnership)"
+      },
+      {
+        "value": "enkeltpersonforetak",
+        "label": "ENK (Enkeltpersonforetak – Sole proprietorship)"
+      },
+      {
+        "value": "nuf",
+        "label": "NUF (Norskregistrert utenlandsk foretak)"
+      },
+      {
+        "value": "other",
+        "label": "Other"
+      }
+    ],
+    "companyTaxTypes": [
+      {
+        "value": "standard_22",
+        "label": "Standard (22%)"
+      },
+      {
+        "value": "financial_25",
+        "label": "Financial sector (25%)"
+      },
+      {
+        "value": "petroleum_78",
+        "label": "Petroleum (78% marginal)"
+      },
+      {
+        "value": "other",
+        "label": "Other"
+      }
+    ],
+    "vatRegimes": [
+      {
+        "value": "general",
+        "label": "Standard (25%)"
+      },
+      {
+        "value": "reduced_15",
+        "label": "Reduced (15% — food)"
+      },
+      {
+        "value": "reduced_12",
+        "label": "Reduced (12% — transport, cinema)"
+      },
+      {
+        "value": "zero_rated",
+        "label": "Zero-rated (0%)"
+      },
+      {
+        "value": "exempt",
+        "label": "Exempt"
+      }
+    ],
+    "contractTypes": [
+      {
+        "value": "fast",
+        "label": "Fast ansettelse (Permanent)"
+      },
+      {
+        "value": "midlertidig",
+        "label": "Midlertidig (Temporary)"
+      },
+      {
+        "value": "deltid",
+        "label": "Deltid (Part-time)"
+      },
+      {
+        "value": "vikariat",
+        "label": "Vikariat (Substitute)"
+      }
+    ],
+    "selfEmployedFields": {
+      "registrationLabel": "Brønnøysundregistrene registration date",
+      "activityCodeLabel": "NACE (SN2007) code",
+      "activityCodePlaceholder": "e.g. 69.100",
+      "hasSSRegistration": true,
+      "ssRegistrationLabel": "Trygdeavgift (National Insurance)",
+      "incomeRegimes": [
+        {
+          "value": "naeringsverksemd",
+          "label": "Næringsvirksomhet (business income)"
+        },
+        {
+          "value": "freelancer",
+          "label": "Frilans (freelancer)"
+        }
+      ],
+      "vatFilingFrequencies": [
+        {
+          "value": "bimonthly",
+          "label": "Bi-monthly (annenhver måned)"
+        },
+        {
+          "value": "annual",
+          "label": "Annual (for small businesses)"
+        }
+      ]
+    }
+  }
+}

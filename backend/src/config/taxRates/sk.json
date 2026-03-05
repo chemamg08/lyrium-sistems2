@@ -1,0 +1,216 @@
+{
+  "country": "Slovensko / Slovakia",
+  "code": "SK",
+  "year": 2026,
+  "currency": "EUR",
+  "incomeTax": {
+    "brackets": [
+      {
+        "from": 0,
+        "to": 47537.98,
+        "rate": 19
+      },
+      {
+        "from": 47537.98,
+        "to": null,
+        "rate": 25
+      }
+    ],
+    "personalAllowance": 4929.33,
+    "notes": ""
+  },
+  "corporateTax": {
+    "standard": 21,
+    "small": 15,
+    "smallThreshold": 100000
+  },
+  "vat": {
+    "standard": 20,
+    "reduced": 10,
+    "superReduced": 0
+  },
+  "socialSecurity": {
+    "employee": 13.4,
+    "employer": 35.2,
+    "selfEmployed": 33.15
+  },
+  "fields": {
+    "asalariado": {
+      "basic": [
+        { "key": "salarioBruto", "label": "Ročná hrubá mzda (€)" },
+        { "key": "retencionesEmpresa", "label": "Preddavky na daň z príjmov (€)" }
+      ],
+      "advanced": [
+        { "key": "cotizacionesSS", "label": "Sociálne a zdravotné poistenie (zamestnanec) (€)" },
+        { "key": "capitalMobiliario", "label": "Príjmy z kapitálu (úroky, dividendy) (€)" },
+        { "key": "capitalInmobiliario", "label": "Príjmy z prenájmu (€)" },
+        { "key": "gananciaPatrimonial", "label": "Kapitálové zisky (€)" },
+        { "key": "pensiones", "label": "Dôchodky a dávky (€)" },
+        { "key": "deduccionesAuto", "label": "Daňový bonus / nezdaniteľná časť (€)" },
+        { "key": "donaciones", "label": "2 % z dane (asignácia) (€)" }
+      ]
+    },
+    "autonomo": {
+      "basic": [
+        { "key": "facturacionTotal", "label": "Príjmy bez DPH (€)" },
+        { "key": "gastosDeducibles", "label": "Daňové výdavky (vrátane poistenia) (€)" },
+        { "key": "ivaRepercutido", "label": "DPH na výstupe (€)" },
+        { "key": "ivaSoportado", "label": "DPH na vstupe (€)" }
+      ],
+      "advanced": [
+        { "key": "otrosIngresos", "label": "Ostatné príjmy (€)" },
+        { "key": "amortizaciones", "label": "Odpisy (€)" },
+        { "key": "gastosFinancieros", "label": "Finančné náklady (€)" },
+        { "key": "pagosFracc130", "label": "Preddavky na daň z príjmov (FŠ) (€)" },
+        { "key": "ivaRegularizacion", "label": "Opravy DPH (€)" }
+      ]
+    },
+    "empresa": {
+      "basic": [
+        { "key": "ingresosTotal", "label": "Celkové výnosy (€)" },
+        { "key": "gastosTotal", "label": "Celkové náklady (€)" },
+        { "key": "ivaRepercutidoEmp", "label": "DPH na výstupe (€)" },
+        { "key": "ivaSoportadoEmp", "label": "DPH na vstupe (€)" }
+      ],
+      "advanced": [
+        { "key": "gastosNoDeducibles", "label": "Daňovo neuznané náklady (€)" },
+        { "key": "basesNegAnter", "label": "Daňová strata z minulých rokov (€)" },
+        { "key": "deduccionID", "label": "Super odpočet na VÚV (€)" },
+        { "key": "deduccionEmpleo", "label": "Daňový bonus za zamestnancov (€)" },
+        { "key": "pagosFracc202", "label": "Preddavky na daň z príjmov (PO) (€)" },
+        { "key": "ivaRegularizEmp", "label": "Opravy DPH (€)" }
+      ]
+    }
+  },
+  "clientForm": {
+    "taxIdLabel": "Rodné číslo / DIČ",
+    "taxIdCompanyLabel": "IČO / DIČ",
+    "taxIdPlaceholder": "napr. 1234567890",
+    "regionLabel": "Kraj (Region)",
+    "regions": [
+      "Banskobystrický",
+      "Bratislavský",
+      "Košický",
+      "Nitriansky",
+      "Prešovský",
+      "Trenčiansky",
+      "Trnavský",
+      "Žilinský"
+    ],
+    "companyTypes": [
+      {
+        "value": "sro",
+        "label": "s.r.o. (spoločnosť s ručením obmedzeným)"
+      },
+      {
+        "value": "as",
+        "label": "a.s. (akciová spoločnosť)"
+      },
+      {
+        "value": "vos",
+        "label": "v.o.s. (verejná obchodná spoločnosť)"
+      },
+      {
+        "value": "ks",
+        "label": "k.s. (komanditná spoločnosť)"
+      },
+      {
+        "value": "szco",
+        "label": "SZČO (živnosť – Sole trader)"
+      },
+      {
+        "value": "druzstvo",
+        "label": "Družstvo (Cooperative)"
+      },
+      {
+        "value": "other",
+        "label": "Other"
+      }
+    ],
+    "companyTaxTypes": [
+      {
+        "value": "standard_21",
+        "label": "Daň z príjmov PO (21%)"
+      },
+      {
+        "value": "reduced_15",
+        "label": "Reduced (15% for ≤ €49,790)"
+      },
+      {
+        "value": "other",
+        "label": "Other"
+      }
+    ],
+    "vatRegimes": [
+      {
+        "value": "general",
+        "label": "DPH standard (20%)"
+      },
+      {
+        "value": "reduced_10",
+        "label": "DPH znížená (10%)"
+      },
+      {
+        "value": "exempt",
+        "label": "Oslobodený od DPH"
+      }
+    ],
+    "contractTypes": [
+      {
+        "value": "dobu_neurcitu",
+        "label": "Na dobu neurčitú (Permanent)"
+      },
+      {
+        "value": "dobu_urcitu",
+        "label": "Na dobu určitú (Fixed-term)"
+      },
+      {
+        "value": "kratsi_cas",
+        "label": "Kratší pracovný čas (Part-time)"
+      },
+      {
+        "value": "dohoda",
+        "label": "Dohoda o pracovnej činnosti"
+      },
+      {
+        "value": "dohoda_brigad",
+        "label": "Dohoda o brigádnickej práci"
+      }
+    ],
+    "selfEmployedFields": {
+      "registrationLabel": "Dátum vydania živnostenského oprávnenia",
+      "activityCodeLabel": "SK NACE code",
+      "activityCodePlaceholder": "napr. 69.10",
+      "hasSSRegistration": true,
+      "ssRegistrationLabel": "Sociálna poisťovňa / Zdravotná poisťovňa",
+      "incomeRegimes": [
+        {
+          "value": "jednoduche",
+          "label": "Jednoduché účtovníctvo (simple accounting)"
+        },
+        {
+          "value": "podvojne",
+          "label": "Podvojné účtovníctvo (double-entry)"
+        },
+        {
+          "value": "pausalne",
+          "label": "Paušálne výdavky (flat-rate expenses 60%)"
+        },
+        {
+          "value": "danova_evidencia",
+          "label": "Daňová evidencia (tax records)"
+        }
+      ],
+      "vatFilingFrequencies": [
+        {
+          "value": "monthly",
+          "label": "Mesačne (monthly)"
+        },
+        {
+          "value": "quarterly",
+          "label": "Štvrťročne (quarterly)"
+        }
+      ]
+    }
+  }
+}

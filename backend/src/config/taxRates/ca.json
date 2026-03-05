@@ -1,0 +1,236 @@
+{
+  "country": "Canada",
+  "code": "CA",
+  "year": 2026,
+  "currency": "CAD",
+  "incomeTax": {
+    "brackets": [
+      {
+        "from": 0,
+        "to": 55867,
+        "rate": 15
+      },
+      {
+        "from": 55867,
+        "to": 111733,
+        "rate": 20.5
+      },
+      {
+        "from": 111733,
+        "to": 154906,
+        "rate": 26
+      },
+      {
+        "from": 154906,
+        "to": 220000,
+        "rate": 29
+      },
+      {
+        "from": 220000,
+        "to": null,
+        "rate": 33
+      }
+    ],
+    "personalAllowance": 15705,
+    "notes": "Federal rates. Provincial income tax averages ~10% additional. HST/GST varies by province."
+  },
+  "corporateTax": {
+    "standard": 26.5,
+    "small": 12.5,
+    "smallThreshold": 500000
+  },
+  "vat": {
+    "standard": 13,
+    "reduced": 0,
+    "superReduced": 0
+  },
+  "socialSecurity": {
+    "employee": 5.95,
+    "employer": 5.95,
+    "selfEmployed": 11.9
+  },
+  "fields": {
+    "asalariado": {
+      "basic": [
+        { "key": "salarioBruto", "label": "Annual gross salary (C$)" },
+        { "key": "retencionesEmpresa", "label": "Income tax withheld (C$)" }
+      ],
+      "advanced": [
+        { "key": "cotizacionesSS", "label": "CPP/QPP & EI premiums (C$)" },
+        { "key": "capitalMobiliario", "label": "Interest & dividend income (C$)" },
+        { "key": "capitalInmobiliario", "label": "Rental income (C$)" },
+        { "key": "gananciaPatrimonial", "label": "Capital gains (C$)" },
+        { "key": "pensiones", "label": "Pension & OAS income (C$)" },
+        { "key": "deduccionesAuto", "label": "RRSP / additional deductions (C$)" },
+        { "key": "donaciones", "label": "Charitable donations (C$)" }
+      ]
+    },
+    "autonomo": {
+      "basic": [
+        { "key": "facturacionTotal", "label": "Business revenue excl. GST/HST (C$)" },
+        { "key": "gastosDeducibles", "label": "Allowable business expenses (C$)" },
+        { "key": "ivaRepercutido", "label": "GST/HST collected (C$)" },
+        { "key": "ivaSoportado", "label": "GST/HST input tax credits (C$)" }
+      ],
+      "advanced": [
+        { "key": "otrosIngresos", "label": "Other income (C$)" },
+        { "key": "amortizaciones", "label": "Capital cost allowance – CCA (C$)" },
+        { "key": "gastosFinancieros", "label": "Interest & financial expenses (C$)" },
+        { "key": "pagosFracc130", "label": "Tax instalments paid (C$)" },
+        { "key": "ivaRegularizacion", "label": "GST/HST adjustments (C$)" }
+      ]
+    },
+    "empresa": {
+      "basic": [
+        { "key": "ingresosTotal", "label": "Total revenue (C$)" },
+        { "key": "gastosTotal", "label": "Total deductible expenses (C$)" },
+        { "key": "ivaRepercutidoEmp", "label": "GST/HST collected (C$)" },
+        { "key": "ivaSoportadoEmp", "label": "GST/HST input tax credits (C$)" }
+      ],
+      "advanced": [
+        { "key": "gastosNoDeducibles", "label": "Non-deductible expenses (C$)" },
+        { "key": "basesNegAnter", "label": "Non-capital losses carried forward (C$)" },
+        { "key": "deduccionID", "label": "SR&ED tax credits (C$)" },
+        { "key": "deduccionEmpleo", "label": "Apprenticeship / hiring credits (C$)" },
+        { "key": "pagosFracc202", "label": "Corporate tax instalments (C$)" },
+        { "key": "ivaRegularizEmp", "label": "GST/HST adjustments (C$)" }
+      ]
+    }
+  },
+  "clientForm": {
+    "taxIdLabel": "Social Insurance Number (SIN)",
+    "taxIdCompanyLabel": "Business Number (BN)",
+    "taxIdPlaceholder": "e.g. 123 456 789",
+    "regionLabel": "Province / Territory",
+    "regions": [
+      "Alberta",
+      "British Columbia",
+      "Manitoba",
+      "New Brunswick",
+      "Newfoundland and Labrador",
+      "Northwest Territories",
+      "Nova Scotia",
+      "Nunavut",
+      "Ontario",
+      "Prince Edward Island",
+      "Quebec",
+      "Saskatchewan",
+      "Yukon"
+    ],
+    "companyTypes": [
+      {
+        "value": "corporation",
+        "label": "Corporation (Inc. / Ltd. / Corp.)"
+      },
+      {
+        "value": "partnership",
+        "label": "Partnership"
+      },
+      {
+        "value": "sole_proprietorship",
+        "label": "Sole Proprietorship"
+      },
+      {
+        "value": "cooperative",
+        "label": "Cooperative"
+      },
+      {
+        "value": "other",
+        "label": "Other"
+      }
+    ],
+    "companyTaxTypes": [
+      {
+        "value": "general_15",
+        "label": "General rate (15% federal)"
+      },
+      {
+        "value": "small_9",
+        "label": "Small business (9% federal)"
+      },
+      {
+        "value": "ccpc",
+        "label": "CCPC (Canadian-Controlled Private Corp.)"
+      },
+      {
+        "value": "other",
+        "label": "Other"
+      }
+    ],
+    "vatRegimes": [
+      {
+        "value": "gst",
+        "label": "GST only (5%)"
+      },
+      {
+        "value": "hst",
+        "label": "HST (combined federal + provincial)"
+      },
+      {
+        "value": "gst_pst",
+        "label": "GST + PST"
+      },
+      {
+        "value": "gst_qst",
+        "label": "GST + QST (Quebec)"
+      },
+      {
+        "value": "exempt",
+        "label": "Exempt"
+      }
+    ],
+    "contractTypes": [
+      {
+        "value": "permanent",
+        "label": "Permanent (indeterminate)"
+      },
+      {
+        "value": "fixed_term",
+        "label": "Fixed-term"
+      },
+      {
+        "value": "part_time",
+        "label": "Part-time"
+      },
+      {
+        "value": "seasonal",
+        "label": "Seasonal"
+      },
+      {
+        "value": "contractor",
+        "label": "Independent contractor"
+      }
+    ],
+    "selfEmployedFields": {
+      "registrationLabel": "BN / GST registration date",
+      "activityCodeLabel": "NAICS code",
+      "activityCodePlaceholder": "e.g. 541110",
+      "hasSSRegistration": false,
+      "ssRegistrationLabel": "",
+      "incomeRegimes": [
+        {
+          "value": "cash",
+          "label": "Cash method"
+        },
+        {
+          "value": "accrual",
+          "label": "Accrual method"
+        }
+      ],
+      "vatFilingFrequencies": [
+        {
+          "value": "monthly",
+          "label": "Monthly"
+        },
+        {
+          "value": "quarterly",
+          "label": "Quarterly"
+        },
+        {
+          "value": "annual",
+          "label": "Annual"
+        }
+      ]
+    }
+  }
+}

@@ -1,0 +1,413 @@
+import { useEffect, useRef, useState } from "react";
+import { MessageSquarePlus, Send, StopCircle, Trash2, PanelLeft, Paperclip, FileText } from "lucide-react";
+import ReactMarkdown from "react-markdown";
+import { useTranslation } from "react-i18next";
+import { useToast } from "@/components/ui/use-toast";
+import { useIsMobile } from "@/hooks/use-mobile";
+import { useStreamingChat } from "@/hooks/useStreamingChat";
+import { authFetch } from '../lib/authFetch';
+
+interface Message {
+  id: string;
+  role: "user" | "assistant";
+  content: string;
+}
+
+interface Chat {
+  id: string;
+  name: string;
+  createdAt: string;
+  messageCount: number;
+}
+
+const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:3000/api';
+const ACTIVE_CHAT_KEY = "assistantActiveChatId";
+
+const AIAssistant = () => {
+  const { t } = useTranslation();
+  const { toast } = useToast();
+  const isMobile = useIsMobile();
+  const [showPanel, setShowPanel] = useState(false);
+  const [chats, setChats] = useState<Chat[]>([]);
+  const [activeChatId, setActiveChatId] = useState<string | null>(null);
+  const [messages, setMessages] = useState<Message[]>([]);
+  const [input, setInput] = useState("");
+  const [isLoading, setIsLoading] = useState(false);
+  const [fileContextName, setFileContextName] = useState<string | null>(null);
+  const [fileContext, setFileContext] = useState<string | null>(null);
+  const [isUploadingFile, setIsUploadingFile] = useState(false);
+  const [isDragOver, setIsDragOver] = useState(false);
+  const endRef = useRef<HTMLDivElement>(null);
+  const fileRef = useRef<HTMLInputElement>(null);
+  const { streamingText, isStreaming, startStream, cancelStream } = useStreamingChat();
+
+  useEffect(() => {
+    loadChats();
+  }, []);
+
+  useEffect(() => {
+    if (activeChatId) {
+      loadChat(activeChatId);
+      sessionStorage.setItem(ACTIVE_CHAT_KEY, activeChatId);
+    }
+  }, [activeChatId]);
+
+  useEffect(() => {
+    endRef.current?.scrollIntoView({ behavior: "smooth" });
+  }, [messages, streamingText]);
+
+  const loadChats = async () => {
+    try {
+      const accountId = sessionStorage.getItem("accountId");
+      if (!accountId) return;
+
+      const response = await authFetch(
+        `${API_URL}/assistant/chats?accountId=${accountId}`
+      );
+      if (response.ok) {
+        const data = await response.json();
+        const chatList: Chat[] = data.chats || data || [];
+        setChats(chatList);
+
+        const savedActiveId = sessionStorage.getItem(ACTIVE_CHAT_KEY);
+        if (savedActiveId && chatList.find((c) => c.id === savedActiveId)) {
+          setActiveChatId(savedActiveId);
+        } else if (chatList.length > 0) {
+          setActiveChatId(chatList[0].id);
+        } else {
+          await createChat();
+        }
+      }
+    } catch (error) {
+      console.error("Error al obtener chats:", error);
+    }
+  };
+
+  const loadChat = async (chatId: string) => {
+    try {
+      const accountId = sessionStorage.getItem("accountId");
+      if (!accountId) return;
+
+      const response = await authFetch(`${API_URL}/assistant/chat?accountId=${accountId}&chatId=${chatId}`);
+      if (response.ok) {
+        const data = await response.json();
+        setMessages(data.messages || []);
+      }
+    } catch (error) {
+      console.error("Error al cargar chat del asistente:", error);
+    }
+  };
+
+  const createChat = async () => {
+    try {
+      const accountId = sessionStorage.getItem("accountId");
+      if (!accountId) return;
+
+      const response = await authFetch(`${API_URL}/assistant/chats`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ accountId })
+      });
+
+      if (response.ok) {
+        const newChat = await response.json();
+        setChats(prev => [...prev, { ...newChat, messageCount: 0 }]);
+        setActiveChatId(newChat.id);
+        setMessages([]);
+      }
+    } catch (error) {
+      console.error("Error al crear chat:", error);
+    }
+  };
+
+  const deleteChat = async (chatId: string) => {
+    try {
+      const accountId = sessionStorage.getItem("accountId");
+      if (!accountId) return;
+
+      const response = await authFetch(`${API_URL}/assistant/chats/${chatId}?accountId=${accountId}`, {
+        method: "DELETE"
+      });
+
+      if (response.ok) {
+        const remaining = chats.filter(c => c.id !== chatId);
+        setChats(remaining);
+
+        if (activeChatId === chatId) {
+          if (remaining.length > 0) {
+            setActiveChatId(remaining[0].id);
+          } else {
+            await createChat();
+          }
+        }
+      }
+    } catch (error) {
+      console.error("Error al eliminar chat:", error);
+    }
+  };
+
+  const handleCancel = () => {
+    cancelStream();
+    setIsLoading(false);
+  };
+
+  const uploadFile = async (file: File) => {
+    const allowed = ["application/pdf", "text/plain", "text/csv"];
+    if (!allowed.includes(file.type) && !file.name.endsWith(".txt")) {
+      toast({ title: "Solo se permiten archivos PDF o TXT", variant: "destructive" });
+      return;
+    }
+    setIsUploadingFile(true);
+    try {
+      const formData = new FormData();
+      formData.append("file", file);
+      const response = await authFetch(`${API_URL}/assistant/upload-file`, {
+        method: "POST",
+        body: formData,
+      });
+      if (!response.ok) throw new Error("Error al subir el archivo");
+      const data = await response.json();
+      setFileContext(data.text);
+      setFileContextName(data.fileName);
+      toast({ title: `Archivo cargado: ${data.fileName}` });
+    } catch {
+      toast({ title: "No se pudo procesar el archivo", variant: "destructive" });
+    } finally {
+      setIsUploadingFile(false);
+    }
+  };
+
+  const clearFile = () => {
+    setFileContext(null);
+    setFileContextName(null);
+    if (fileRef.current) fileRef.current.value = "";
+  };
+
+  const handleDragOver = (e: React.DragEvent) => {
+    e.preventDefault();
+    e.stopPropagation();
+    setIsDragOver(true);
+  };
+
+  const handleDragLeave = (e: React.DragEvent) => {
+    e.preventDefault();
+    e.stopPropagation();
+    setIsDragOver(false);
+  };
+
+  const handleDrop = async (e: React.DragEvent) => {
+    e.preventDefault();
+    e.stopPropagation();
+    setIsDragOver(false);
+    const file = e.dataTransfer.files?.[0];
+    if (file) await uploadFile(file);
+  };
+
+  const sendMessage = async () => {
+    const content = input.trim();
+    if (!content || isLoading || !activeChatId) return;
+
+    const accountId = sessionStorage.getItem("accountId");
+    if (!accountId) {
+      toast({ title: t('assistant.errorNoAccount'), variant: 'destructive' });
+      return;
+    }
+
+    setInput("");
+    setMessages(prev => [...prev, { id: Date.now().toString(), role: 'user', content }]);
+    setIsLoading(true);
+
+    try {
+      await startStream({
+        endpoint: "/assistant/chat/message/stream",
+        body: { accountId, chatId: activeChatId, content, ...(fileContext ? { fileContext } : {}) },
+        onDone: (fullText) => {
+          setMessages(prev => [...prev, { id: `ai-${Date.now()}`, role: 'assistant', content: fullText }]);
+          setIsLoading(false);
+          loadChats();
+        },
+      });
+    } catch (error) {
+      console.error("Error al enviar mensaje:", error);
+      setIsLoading(false);
+      toast({ title: t('assistant.errorSend'), variant: 'destructive' });
+    }
+  };
+
+  return (
+    <div className="flex h-[calc(100vh-0px)] relative">
+      {/* Mobile backdrop */}
+      {isMobile && showPanel && (
+        <div className="fixed inset-0 z-30 bg-black/50" onClick={() => setShowPanel(false)} />
+      )}
+      {/* Panel lateral de chats */}
+      <div className={`${isMobile ? `fixed left-0 top-0 z-40 h-full w-72 transition-transform duration-300 ${showPanel ? 'translate-x-0' : '-translate-x-full'}` : 'w-64'} border-r border-border flex flex-col bg-muted/30 bg-card`}>
+        <div className="p-4 border-b border-border flex items-center justify-between">
+          <h3 className="text-sm font-medium text-foreground">{t('assistant.conversations')}</h3>
+          <button
+            onClick={createChat}
+            className="p-1.5 rounded-md hover:bg-accent transition-colors"
+            title={t('assistant.newChat')}
+          >
+            <MessageSquarePlus className="h-4 w-4 text-muted-foreground" />
+          </button>
+        </div>
+
+        <div className="flex-1 overflow-y-auto p-2 space-y-1">
+          {chats.map((chat) => (
+            <div
+              key={chat.id}
+              className={`group flex items-center justify-between px-3 py-2 rounded-md cursor-pointer transition-colors ${
+                activeChatId === chat.id
+                  ? "bg-primary/10 text-primary"
+                  : "text-muted-foreground hover:bg-accent hover:text-foreground"
+              }`}
+              onClick={() => { setActiveChatId(chat.id); if (isMobile) setShowPanel(false); }}
+            >
+              <span className="text-sm truncate flex-1">{chat.name}</span>
+              <button
+                onClick={(e) => {
+                  e.stopPropagation();
+                  if (confirm(t('assistant.deleteConfirm'))) {
+                    deleteChat(chat.id);
+                  }
+                }}
+                className="p-1 rounded opacity-0 group-hover:opacity-100 hover:bg-destructive/10 transition-all"
+              >
+                <Trash2 className="h-3 w-3 text-destructive" />
+              </button>
+            </div>
+          ))}
+        </div>
+      </div>
+
+      {/* Panel principal del chat */}
+      <div className="flex-1 flex flex-col">
+        <div className="border-b border-border px-4 md:px-6 py-3 md:py-4 flex items-center gap-3">
+          {isMobile && (
+            <button onClick={() => setShowPanel(true)} className="p-1.5 rounded-md hover:bg-accent transition-colors">
+              <PanelLeft className="h-4 w-4 text-muted-foreground" />
+            </button>
+          )}
+          <div>
+            <h2 className="text-lg md:text-xl font-semibold text-foreground">{t('assistant.title')}</h2>
+            <p className="text-sm text-muted-foreground mt-1">{t('assistant.subtitle')}</p>
+          </div>
+        </div>
+
+        <div
+          className="flex-1 overflow-y-auto p-4 md:p-6 space-y-4 relative"
+          onDragOver={handleDragOver}
+          onDragLeave={handleDragLeave}
+          onDrop={handleDrop}
+        >
+          {/* Drag overlay */}
+          {isDragOver && (
+            <div className="absolute inset-0 z-20 flex flex-col items-center justify-center bg-background/80 backdrop-blur-sm border-2 border-dashed border-primary rounded-lg pointer-events-none">
+              <FileText className="h-10 w-10 text-primary mb-3" />
+              <p className="text-sm font-medium text-primary">Suelta el archivo aquí</p>
+              <p className="text-xs text-muted-foreground mt-1">PDF o TXT — el asistente podrá responder preguntas sobre él</p>
+            </div>
+          )}
+          {messages.length === 0 && (
+            <div className="flex items-center justify-center h-full">
+              <div className="text-center">
+                <p className="text-muted-foreground text-sm">{t('assistant.noMessages')}</p>
+                <p className="text-muted-foreground/60 text-xs mt-1">{t('assistant.startMessage')}</p>
+              </div>
+            </div>
+          )}
+
+          {messages.map((msg) => (
+            <div key={msg.id} className={`flex ${msg.role === "user" ? "justify-end" : "justify-start"}`}>
+              <div
+                className={`max-w-[85%] md:max-w-[70%] rounded-lg px-4 py-3 text-sm leading-relaxed prose prose-sm dark:prose-invert prose-p:my-1 prose-ul:my-1 prose-ol:my-1 ${
+                  msg.role === "user"
+                    ? "bg-chat-user text-chat-user-foreground"
+                    : "bg-chat-ai text-chat-ai-foreground"
+                }`}
+              >
+                <ReactMarkdown>{msg.content}</ReactMarkdown>
+              </div>
+            </div>
+          ))}
+
+          {isLoading && !isStreaming && (
+            <div className="flex justify-start">
+              <div className="max-w-[70%] rounded-lg px-4 py-3 text-sm leading-relaxed bg-chat-ai text-chat-ai-foreground opacity-80">
+                {t('assistant.loading')}
+              </div>
+            </div>
+          )}
+
+          {isStreaming && streamingText && (
+            <div className="flex justify-start">
+              <div className="max-w-[85%] md:max-w-[70%] rounded-lg px-4 py-3 text-sm leading-relaxed prose prose-sm dark:prose-invert prose-p:my-1 prose-ul:my-1 prose-ol:my-1 bg-chat-ai text-chat-ai-foreground">
+                <ReactMarkdown>{streamingText}</ReactMarkdown>
+              </div>
+            </div>
+          )}
+          <div ref={endRef} />
+        </div>
+
+        <div className="border-t border-border p-4">
+          {fileContextName && (
+            <div className="mb-2 flex items-center gap-2 text-xs text-muted-foreground bg-primary/10 text-primary rounded px-3 py-1.5 w-fit">
+              <FileText className="h-3 w-3" />
+              <span className="max-w-[200px] truncate">{fileContextName}</span>
+              <button onClick={clearFile} className="ml-1 hover:text-destructive transition-colors">×</button>
+            </div>
+          )}
+          {isUploadingFile && (
+            <div className="mb-2 flex items-center gap-2 text-xs text-muted-foreground bg-accent rounded px-3 py-1.5 w-fit">
+              <Paperclip className="h-3 w-3 animate-pulse" />
+              Procesando archivo...
+            </div>
+          )}
+          <div className="flex items-center gap-2">
+            <input
+              type="file"
+              ref={fileRef}
+              onChange={async (e) => { const f = e.target.files?.[0]; if (f) await uploadFile(f); }}
+              className="hidden"
+              accept=".pdf,.txt,.csv"
+            />
+            <button
+              onClick={() => fileRef.current?.click()}
+              disabled={isUploadingFile}
+              className="p-2 rounded-md hover:bg-accent text-muted-foreground hover:text-foreground transition-colors disabled:opacity-50"
+              title="Adjuntar PDF o TXT"
+            >
+              <Paperclip className="h-5 w-5" />
+            </button>
+            <textarea
+              value={input}
+              rows={1}
+              style={{ height: input === '' ? '40px' : undefined }}
+              onChange={(e) => {
+                setInput(e.target.value);
+                if (e.target.value) {
+                  e.target.style.height = 'auto';
+                  e.target.style.height = Math.min(e.target.scrollHeight, 200) + 'px';
+                }
+              }}
+              onKeyDown={(e) => { if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); sendMessage(); } }}
+              placeholder={t('assistant.placeholder')}
+              disabled={isLoading}
+              className="flex-1 bg-accent/50 border border-border rounded-md px-4 py-2.5 text-sm text-foreground placeholder:text-muted-foreground focus:outline-none focus:ring-1 focus:ring-ring disabled:opacity-70 resize-none overflow-hidden"
+            />
+            <button
+              onClick={isLoading ? handleCancel : sendMessage}
+              disabled={!isLoading && !input.trim()}
+              className="p-2.5 rounded-md bg-primary text-primary-foreground hover:opacity-90 transition-opacity disabled:opacity-40"
+            >
+              {isLoading ? <StopCircle className="h-4 w-4" /> : <Send className="h-4 w-4" />}
+            </button>
+          </div>
+        </div>
+      </div>
+    </div>
+  );
+};
+
+export default AIAssistant;

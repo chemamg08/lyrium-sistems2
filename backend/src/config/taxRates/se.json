@@ -1,0 +1,225 @@
+{
+  "country": "Sverige / Sweden",
+  "code": "SE",
+  "year": 2026,
+  "currency": "SEK",
+  "incomeTax": {
+    "brackets": [
+      {
+        "from": 0,
+        "to": 598500,
+        "rate": 32
+      },
+      {
+        "from": 598500,
+        "to": null,
+        "rate": 52
+      }
+    ],
+    "personalAllowance": 0,
+    "notes": "Municipal tax avg 32%. State tax 20% only above ~598,500 SEK. Employer pays all SS (Arbetsgivaravgifter). Self-employed pay Egenavgifter ~28.97%."
+  },
+  "corporateTax": {
+    "standard": 20.6,
+    "small": 20.6,
+    "smallThreshold": 0
+  },
+  "vat": {
+    "standard": 25,
+    "reduced": 12,
+    "superReduced": 6
+  },
+  "socialSecurity": {
+    "employee": 0,
+    "employer": 31.42,
+    "selfEmployed": 28.97
+  },
+  "fields": {
+    "asalariado": {
+      "basic": [
+        { "key": "salarioBruto", "label": "Årlig bruttolön (SEK)" },
+        { "key": "retencionesEmpresa", "label": "Preliminär skatt (SEK)" }
+      ],
+      "advanced": [
+        { "key": "cotizacionesSS", "label": "Egenavgifter / allmän pensionsavgift (SEK)" },
+        { "key": "capitalMobiliario", "label": "Kapitalinkomster (räntor, utdelningar) (SEK)" },
+        { "key": "capitalInmobiliario", "label": "Hyresinkomster (SEK)" },
+        { "key": "gananciaPatrimonial", "label": "Kapitalvinster (SEK)" },
+        { "key": "pensiones", "label": "Pension och förmåner (SEK)" },
+        { "key": "deduccionesAuto", "label": "Avdrag (resor, räntor m.m.) (SEK)" },
+        { "key": "donaciones", "label": "Gåvor (avdragsgilla) (SEK)" }
+      ]
+    },
+    "autonomo": {
+      "basic": [
+        { "key": "facturacionTotal", "label": "Omsättning exkl. moms (SEK)" },
+        { "key": "gastosDeducibles", "label": "Avdragsgilla kostnader (inkl. egenavgifter) (SEK)" },
+        { "key": "ivaRepercutido", "label": "Utgående moms (SEK)" },
+        { "key": "ivaSoportado", "label": "Ingående moms (SEK)" }
+      ],
+      "advanced": [
+        { "key": "otrosIngresos", "label": "Övriga intäkter (SEK)" },
+        { "key": "amortizaciones", "label": "Avskrivningar (SEK)" },
+        { "key": "gastosFinancieros", "label": "Finansiella kostnader (SEK)" },
+        { "key": "pagosFracc130", "label": "Preliminärskatt inbetald (SEK)" },
+        { "key": "ivaRegularizacion", "label": "Momskorrigeringar (SEK)" }
+      ]
+    },
+    "empresa": {
+      "basic": [
+        { "key": "ingresosTotal", "label": "Totala intäkter (SEK)" },
+        { "key": "gastosTotal", "label": "Totala kostnader (SEK)" },
+        { "key": "ivaRepercutidoEmp", "label": "Utgående moms (SEK)" },
+        { "key": "ivaSoportadoEmp", "label": "Ingående moms (SEK)" }
+      ],
+      "advanced": [
+        { "key": "gastosNoDeducibles", "label": "Ej avdragsgilla kostnader (SEK)" },
+        { "key": "basesNegAnter", "label": "Underskottsavdrag (SEK)" },
+        { "key": "deduccionID", "label": "FoU-avdrag (SEK)" },
+        { "key": "deduccionEmpleo", "label": "Nystartsjobb / arbetsgivaravdrag (SEK)" },
+        { "key": "pagosFracc202", "label": "Preliminärskatt bolag (SEK)" },
+        { "key": "ivaRegularizEmp", "label": "Momskorrigeringar (SEK)" }
+      ]
+    }
+  },
+  "clientForm": {
+    "taxIdLabel": "Personnummer (Personal ID)",
+    "taxIdCompanyLabel": "Organisationsnummer",
+    "taxIdPlaceholder": "e.g. YYYYMMDD-XXXX",
+    "regionLabel": "Län (County)",
+    "regions": [
+      "Blekinge",
+      "Dalarna",
+      "Gävleborg",
+      "Gotland",
+      "Halland",
+      "Jämtland",
+      "Jönköping",
+      "Kalmar",
+      "Kronoberg",
+      "Norrbotten",
+      "Örebro",
+      "Östergötland",
+      "Skåne",
+      "Södermanland",
+      "Stockholm",
+      "Uppsala",
+      "Värmland",
+      "Västerbotten",
+      "Västernorrland",
+      "Västmanland",
+      "Västra Götaland"
+    ],
+    "companyTypes": [
+      {
+        "value": "ab",
+        "label": "AB (Aktiebolag – Ltd)"
+      },
+      {
+        "value": "ab_publ",
+        "label": "AB (publ) – Public company"
+      },
+      {
+        "value": "hb",
+        "label": "HB (Handelsbolag – Trading partnership)"
+      },
+      {
+        "value": "kb",
+        "label": "KB (Kommanditbolag – Limited partnership)"
+      },
+      {
+        "value": "enskild_firma",
+        "label": "Enskild firma (Sole trader)"
+      },
+      {
+        "value": "ekonomisk_forening",
+        "label": "Ekonomisk förening (Cooperative)"
+      },
+      {
+        "value": "other",
+        "label": "Other"
+      }
+    ],
+    "companyTaxTypes": [
+      {
+        "value": "standard_20_6",
+        "label": "Bolagsskatt (20.6%)"
+      },
+      {
+        "value": "other",
+        "label": "Other"
+      }
+    ],
+    "vatRegimes": [
+      {
+        "value": "general",
+        "label": "Moms standard (25%)"
+      },
+      {
+        "value": "reduced_12",
+        "label": "Moms reducerad (12%)"
+      },
+      {
+        "value": "reduced_6",
+        "label": "Moms reducerad (6%)"
+      },
+      {
+        "value": "exempt",
+        "label": "Undantagen (exempt)"
+      }
+    ],
+    "contractTypes": [
+      {
+        "value": "tillsvidare",
+        "label": "Tillsvidareanställning (Permanent)"
+      },
+      {
+        "value": "visstid",
+        "label": "Tidsbegränsad (Fixed-term)"
+      },
+      {
+        "value": "deltid",
+        "label": "Deltid (Part-time)"
+      },
+      {
+        "value": "provanstallning",
+        "label": "Provanställning (Probation)"
+      },
+      {
+        "value": "vikariat",
+        "label": "Vikariat (Substitute)"
+      }
+    ],
+    "selfEmployedFields": {
+      "registrationLabel": "Skatteverket F-skatt registration date",
+      "activityCodeLabel": "SNI code",
+      "activityCodePlaceholder": "e.g. 69.100",
+      "hasSSRegistration": true,
+      "ssRegistrationLabel": "Egenavgifter (self-employed contributions)",
+      "incomeRegimes": [
+        {
+          "value": "enskild_firma",
+          "label": "Enskild näringsverksamhet"
+        },
+        {
+          "value": "ab",
+          "label": "Via AB (eget aktiebolag)"
+        }
+      ],
+      "vatFilingFrequencies": [
+        {
+          "value": "monthly",
+          "label": "Månadsvis (monthly)"
+        },
+        {
+          "value": "quarterly",
+          "label": "Kvartalsvis (quarterly)"
+        },
+        {
+          "value": "annual",
+          "label": "Årsvis (annual for < 1M SEK)"
+        }
+      ]
+    }
+  }
+}

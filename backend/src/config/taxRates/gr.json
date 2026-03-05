@@ -1,0 +1,223 @@
+{
+  "country": "Greece",
+  "code": "GR",
+  "year": 2026,
+  "currency": "EUR",
+  "incomeTax": {
+    "brackets": [
+      {
+        "desde": 0,
+        "hasta": 10000,
+        "tipo": 9
+      },
+      {
+        "desde": 10000,
+        "hasta": 20000,
+        "tipo": 22
+      },
+      {
+        "desde": 20000,
+        "hasta": 30000,
+        "tipo": 28
+      },
+      {
+        "desde": 30000,
+        "hasta": 40000,
+        "tipo": 36
+      },
+      {
+        "desde": 40000,
+        "hasta": null,
+        "tipo": 44
+      }
+    ],
+    "personalAllowance": 0,
+    "notes": "Tax reduction of €777 for income up to €12 000"
+  },
+  "corporateTax": {
+    "standard": 22,
+    "small": 22,
+    "smallThreshold": 0
+  },
+  "vat": {
+    "standard": 24,
+    "reduced": 13,
+    "superReduced": 6
+  },
+  "socialSecurity": {
+    "employee": 13.87,
+    "employer": 22.29,
+    "selfEmployed": 26.95
+  },
+  "fields": {
+    "asalariado": {
+      "basic": [
+        { "key": "salarioBruto", "label": "Ετήσιος μικτός μισθός (€)" },
+        { "key": "retencionesEmpresa", "label": "Παρακρατηθείς φόρος μισθωτού (€)" },
+        { "key": "planPensiones", "label": "Εισφορές ταμείου σύνταξης (€)" }
+      ],
+      "advanced": [
+        { "key": "cotizacionesSS", "label": "Ασφαλιστικές εισφορές ΕΦΚΑ (€)" },
+        { "key": "capitalMobiliario", "label": "Εισόδημα κεφαλαίου (τόκοι, μερίσματα) (€)" },
+        { "key": "capitalInmobiliario", "label": "Εισόδημα ακινήτων (€)" },
+        { "key": "donaciones", "label": "Δωρεές (€)" },
+        { "key": "retencionesTotales", "label": "Σύνολο παρακρατήσεων (€)" }
+      ]
+    },
+    "autonomo": {
+      "basic": [
+        { "key": "facturacionTotal", "label": "Ετήσια έσοδα χωρίς ΦΠΑ (€)" },
+        { "key": "gastosDeducibles", "label": "Εκπιπτόμενες δαπάνες (€)" },
+        { "key": "ivaRepercutido", "label": "ΦΠΑ εκροών (€)" },
+        { "key": "ivaSoportado", "label": "ΦΠΑ εισροών (€)" }
+      ],
+      "advanced": [
+        { "key": "cuotaRETA", "label": "Εισφορές ΕΦΚΑ (€)" },
+        { "key": "pagosFracc130", "label": "Προκαταβολή φόρου (€)" },
+        { "key": "retencionesSoportadas", "label": "Παρακρατηθέντες φόροι (€)" }
+      ]
+    },
+    "empresa": {
+      "basic": [
+        { "key": "ingresosTotal", "label": "Συνολικά έσοδα (€)" },
+        { "key": "gastosTotal", "label": "Συνολικές δαπάνες (€)" },
+        { "key": "ivaRepercutidoEmp", "label": "ΦΠΑ εκροών (€)" },
+        { "key": "ivaSoportadoEmp", "label": "ΦΠΑ εισροών (€)" }
+      ],
+      "advanced": [
+        { "key": "gastosNoDeducibles", "label": "Μη εκπιπτόμενες δαπάνες (€)" },
+        { "key": "basesNegAnter", "label": "Ζημίες προηγουμένων χρήσεων (€)" },
+        { "key": "pagosFracc202", "label": "Προκαταβολή φόρου ΝΠ (€)" },
+        { "key": "retencionesSop", "label": "Παρακρατηθέντες φόροι (€)" }
+      ]
+    }
+  },
+  "clientForm": {
+    "taxIdLabel": "ΑΦΜ (Αριθμός Φορολογικού Μητρώου)",
+    "taxIdCompanyLabel": "ΑΦΜ (Tax ID)",
+    "taxIdPlaceholder": "e.g. 123456789",
+    "regionLabel": "Περιφέρεια (Region)",
+    "regions": [
+      "Αττική",
+      "Βόρειο Αιγαίο",
+      "Νότιο Αιγαίο",
+      "Κρήτη",
+      "Ανατολική Μακεδονία & Θράκη",
+      "Κεντρική Μακεδονία",
+      "Δυτική Μακεδονία",
+      "Ήπειρος",
+      "Θεσσαλία",
+      "Στερεά Ελλάδα",
+      "Δυτική Ελλάδα",
+      "Πελοπόννησος",
+      "Ιόνια Νησιά"
+    ],
+    "companyTypes": [
+      {
+        "value": "ae",
+        "label": "Α.Ε. (Ανώνυμη Εταιρεία – SA)"
+      },
+      {
+        "value": "epe",
+        "label": "Ε.Π.Ε. (Εταιρεία Περιορισμένης Ευθύνης – Ltd)"
+      },
+      {
+        "value": "ike",
+        "label": "Ι.Κ.Ε. (Private Company – PC)"
+      },
+      {
+        "value": "oe",
+        "label": "Ο.Ε. (Ομόρρυθμη Εταιρεία – General partnership)"
+      },
+      {
+        "value": "ee",
+        "label": "Ε.Ε. (Ετερόρρυθμη Εταιρεία – Limited partnership)"
+      },
+      {
+        "value": "atomiki",
+        "label": "Ατομική Επιχείρηση (Sole proprietor)"
+      },
+      {
+        "value": "other",
+        "label": "Other"
+      }
+    ],
+    "companyTaxTypes": [
+      {
+        "value": "standard_22",
+        "label": "Standard (22%)"
+      },
+      {
+        "value": "other",
+        "label": "Other"
+      }
+    ],
+    "vatRegimes": [
+      {
+        "value": "general",
+        "label": "Standard (24%)"
+      },
+      {
+        "value": "reduced_13",
+        "label": "Reduced (13%)"
+      },
+      {
+        "value": "reduced_6",
+        "label": "Super-reduced (6%)"
+      },
+      {
+        "value": "islands",
+        "label": "Island reduced rates"
+      },
+      {
+        "value": "exempt",
+        "label": "Exempt"
+      }
+    ],
+    "contractTypes": [
+      {
+        "value": "aoristou",
+        "label": "Αορίστου χρόνου (Permanent)"
+      },
+      {
+        "value": "orismenou",
+        "label": "Ορισμένου χρόνου (Fixed-term)"
+      },
+      {
+        "value": "meriki",
+        "label": "Μερικής απασχόλησης (Part-time)"
+      },
+      {
+        "value": "epochiaki",
+        "label": "Εποχιακή (Seasonal)"
+      }
+    ],
+    "selfEmployedFields": {
+      "registrationLabel": "Εφορία (Tax office) registration date",
+      "activityCodeLabel": "ΚΑΔ (Κωδικός Αριθμός Δραστηριότητας)",
+      "activityCodePlaceholder": "e.g. 69.10",
+      "hasSSRegistration": true,
+      "ssRegistrationLabel": "ΕΦΚΑ registration",
+      "incomeRegimes": [
+        {
+          "value": "books_b",
+          "label": "Category B' books (simplifed)"
+        },
+        {
+          "value": "books_c",
+          "label": "Category C' books (double-entry)"
+        }
+      ],
+      "vatFilingFrequencies": [
+        {
+          "value": "monthly",
+          "label": "Monthly"
+        },
+        {
+          "value": "quarterly",
+          "label": "Quarterly"
+        }
+      ]
+    }
+  }
+}

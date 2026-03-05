@@ -1,0 +1,257 @@
+{
+  "country": "Italia / Italy",
+  "code": "IT",
+  "year": 2026,
+  "currency": "EUR",
+  "incomeTax": {
+    "brackets": [
+      {
+        "from": 0,
+        "to": 28000,
+        "rate": 23
+      },
+      {
+        "from": 28000,
+        "to": 50000,
+        "rate": 35
+      },
+      {
+        "from": 50000,
+        "to": null,
+        "rate": 43
+      }
+    ],
+    "personalAllowance": 0,
+    "notes": "Regional/municipal addl ~1.73-3%. IRAP ~3.9% for companies. INPS contributions for self-employed via Gestione Separata."
+  },
+  "corporateTax": {
+    "standard": 24,
+    "small": 24,
+    "smallThreshold": 0
+  },
+  "vat": {
+    "standard": 22,
+    "reduced": 10,
+    "superReduced": 5
+  },
+  "socialSecurity": {
+    "employee": 9.49,
+    "employer": 30.0,
+    "selfEmployed": 26.23
+  },
+  "fields": {
+    "asalariado": {
+      "basic": [
+        { "key": "salarioBruto", "label": "Stipendio lordo annuale (€)" },
+        { "key": "retencionesEmpresa", "label": "Ritenute IRPEF operate dal datore (€)" }
+      ],
+      "advanced": [
+        { "key": "cotizacionesSS", "label": "Contributi INPS lavoratore (€)" },
+        { "key": "capitalMobiliario", "label": "Redditi di capitale (interessi, dividendi) (€)" },
+        { "key": "capitalInmobiliario", "label": "Redditi fondiari / locazioni (€)" },
+        { "key": "gananciaPatrimonial", "label": "Plusvalenze (€)" },
+        { "key": "pensiones", "label": "Pensioni e assegni (€)" },
+        { "key": "deduccionesAuto", "label": "Deduzioni / detrazioni aggiuntive (€)" },
+        { "key": "donaciones", "label": "Erogazioni liberali deducibili (€)" }
+      ]
+    },
+    "autonomo": {
+      "basic": [
+        { "key": "facturacionTotal", "label": "Ricavi annuali al netto IVA (€)" },
+        { "key": "gastosDeducibles", "label": "Costi deducibili (INPS inclusi) (€)" },
+        { "key": "ivaRepercutido", "label": "IVA a debito (€)" },
+        { "key": "ivaSoportado", "label": "IVA a credito (€)" }
+      ],
+      "advanced": [
+        { "key": "otrosIngresos", "label": "Altri redditi (€)" },
+        { "key": "amortizaciones", "label": "Ammortamenti (€)" },
+        { "key": "gastosFinancieros", "label": "Oneri finanziari (€)" },
+        { "key": "pagosFracc130", "label": "Acconti IRPEF versati (€)" },
+        { "key": "ivaRegularizacion", "label": "Regolarizzazioni IVA (€)" }
+      ]
+    },
+    "empresa": {
+      "basic": [
+        { "key": "ingresosTotal", "label": "Ricavi totali (€)" },
+        { "key": "gastosTotal", "label": "Costi totali (€)" },
+        { "key": "ivaRepercutidoEmp", "label": "IVA a debito (€)" },
+        { "key": "ivaSoportadoEmp", "label": "IVA a credito (€)" }
+      ],
+      "advanced": [
+        { "key": "gastosNoDeducibles", "label": "Costi non deducibili (€)" },
+        { "key": "basesNegAnter", "label": "Perdite esercizi precedenti (€)" },
+        { "key": "deduccionID", "label": "Credito d\u2019imposta R&S / innovazione (€)" },
+        { "key": "deduccionEmpleo", "label": "Agevolazioni occupazionali (€)" },
+        { "key": "pagosFracc202", "label": "Acconti IRES (€)" },
+        { "key": "ivaRegularizEmp", "label": "Regolarizzazioni IVA (€)" }
+      ]
+    }
+  },
+  "clientForm": {
+    "taxIdLabel": "Codice Fiscale",
+    "taxIdCompanyLabel": "Partita IVA",
+    "taxIdPlaceholder": "e.g. RSSMRA80A01H501U",
+    "regionLabel": "Regione",
+    "regions": [
+      "Abruzzo",
+      "Basilicata",
+      "Calabria",
+      "Campania",
+      "Emilia-Romagna",
+      "Friuli Venezia Giulia",
+      "Lazio",
+      "Liguria",
+      "Lombardia",
+      "Marche",
+      "Molise",
+      "Piemonte",
+      "Puglia",
+      "Sardegna",
+      "Sicilia",
+      "Toscana",
+      "Trentino-Alto Adige",
+      "Umbria",
+      "Valle d'Aosta",
+      "Veneto"
+    ],
+    "companyTypes": [
+      {
+        "value": "srl",
+        "label": "S.r.l. (Società a responsabilità limitata)"
+      },
+      {
+        "value": "srls",
+        "label": "S.r.l.s. (S.r.l. semplificata)"
+      },
+      {
+        "value": "spa",
+        "label": "S.p.A. (Società per Azioni)"
+      },
+      {
+        "value": "sas",
+        "label": "S.a.s. (Società in accomandita semplice)"
+      },
+      {
+        "value": "snc",
+        "label": "S.n.c. (Società in nome collettivo)"
+      },
+      {
+        "value": "ditta_ind",
+        "label": "Ditta individuale (Sole proprietorship)"
+      },
+      {
+        "value": "cooperativa",
+        "label": "Cooperativa"
+      },
+      {
+        "value": "other",
+        "label": "Other"
+      }
+    ],
+    "companyTaxTypes": [
+      {
+        "value": "ires_24",
+        "label": "IRES standard (24%)"
+      },
+      {
+        "value": "irap",
+        "label": "IRAP (3.9% regional)"
+      },
+      {
+        "value": "other",
+        "label": "Other"
+      }
+    ],
+    "vatRegimes": [
+      {
+        "value": "general",
+        "label": "IVA standard (22%)"
+      },
+      {
+        "value": "reduced_10",
+        "label": "IVA ridotta (10%)"
+      },
+      {
+        "value": "reduced_5",
+        "label": "IVA ridotta (5%)"
+      },
+      {
+        "value": "reduced_4",
+        "label": "IVA super-ridotta (4%)"
+      },
+      {
+        "value": "forfettario",
+        "label": "Regime forfettario (no IVA)"
+      },
+      {
+        "value": "exempt",
+        "label": "Esente"
+      }
+    ],
+    "contractTypes": [
+      {
+        "value": "indeterminato",
+        "label": "Tempo indeterminato"
+      },
+      {
+        "value": "determinato",
+        "label": "Tempo determinato"
+      },
+      {
+        "value": "part_time",
+        "label": "Part-time"
+      },
+      {
+        "value": "apprendistato",
+        "label": "Apprendistato"
+      },
+      {
+        "value": "cococo",
+        "label": "Collaborazione coordinata (Co.Co.Co.)"
+      },
+      {
+        "value": "pubblico",
+        "label": "Impiego pubblico"
+      }
+    ],
+    "selfEmployedFields": {
+      "registrationLabel": "Data apertura Partita IVA",
+      "activityCodeLabel": "Codice ATECO",
+      "activityCodePlaceholder": "e.g. 69.10.10",
+      "hasSSRegistration": true,
+      "ssRegistrationLabel": "INPS Gestione Separata / Artigiani-Commercianti",
+      "incomeRegimes": [
+        {
+          "value": "forfettario",
+          "label": "Regime forfettario (15% / 5%)"
+        },
+        {
+          "value": "ordinario",
+          "label": "Regime ordinario"
+        },
+        {
+          "value": "semplificato",
+          "label": "Contabilità semplificata"
+        },
+        {
+          "value": "cassa",
+          "label": "Regime di cassa"
+        }
+      ],
+      "vatFilingFrequencies": [
+        {
+          "value": "monthly",
+          "label": "Mensile"
+        },
+        {
+          "value": "quarterly",
+          "label": "Trimestrale"
+        },
+        {
+          "value": "annual",
+          "label": "Annuale (forfettario)"
+        }
+      ]
+    }
+  }
+}

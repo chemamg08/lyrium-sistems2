@@ -1,0 +1,209 @@
+{
+  "country": "Bulgaria",
+  "code": "BG",
+  "year": 2026,
+  "currency": "BGN",
+  "incomeTax": {
+    "brackets": [
+      {
+        "desde": 0,
+        "hasta": null,
+        "tipo": 10
+      }
+    ],
+    "personalAllowance": 0,
+    "notes": "Flat 10% income tax"
+  },
+  "corporateTax": {
+    "standard": 10,
+    "small": 10,
+    "smallThreshold": 0
+  },
+  "vat": {
+    "standard": 20,
+    "reduced": 9,
+    "superReduced": 0
+  },
+  "socialSecurity": {
+    "employee": 13.78,
+    "employer": 19.62,
+    "selfEmployed": 26.82
+  },
+  "fields": {
+    "asalariado": {
+      "basic": [
+        { "key": "salarioBruto", "label": "Годишна бруто заплата (BGN)" },
+        { "key": "retencionesEmpresa", "label": "Авансов данък, удържан от работодател (BGN)" },
+        { "key": "planPensiones", "label": "Доброволни пенсионни вноски (BGN)" }
+      ],
+      "advanced": [
+        { "key": "cotizacionesSS", "label": "Осигурителни вноски (ДОО, ЗО) (BGN)" },
+        { "key": "capitalMobiliario", "label": "Доходи от капитал (лихви, дивиденти) (BGN)" },
+        { "key": "donaciones", "label": "Дарения (BGN)" },
+        { "key": "retencionesTotales", "label": "Общо удържани данъци (BGN)" }
+      ]
+    },
+    "autonomo": {
+      "basic": [
+        { "key": "facturacionTotal", "label": "Приходи без ДДС (BGN)" },
+        { "key": "gastosDeducibles", "label": "Признати разходи (BGN)" },
+        { "key": "ivaRepercutido", "label": "Начислен ДДС (BGN)" },
+        { "key": "ivaSoportado", "label": "ДДС за възстановяване (BGN)" }
+      ],
+      "advanced": [
+        { "key": "cuotaRETA", "label": "Осигурителни вноски (самоосигуряващ се) (BGN)" },
+        { "key": "pagosFracc130", "label": "Авансови вноски за данък (BGN)" },
+        { "key": "retencionesSoportadas", "label": "Удържани данъци (BGN)" }
+      ]
+    },
+    "empresa": {
+      "basic": [
+        { "key": "ingresosTotal", "label": "Общи приходи (BGN)" },
+        { "key": "gastosTotal", "label": "Общи разходи (BGN)" },
+        { "key": "ivaRepercutidoEmp", "label": "Начислен ДДС (BGN)" },
+        { "key": "ivaSoportadoEmp", "label": "ДДС за възстановяване (BGN)" }
+      ],
+      "advanced": [
+        { "key": "gastosNoDeducibles", "label": "Непризнати разходи (BGN)" },
+        { "key": "basesNegAnter", "label": "Загуби от предходни години (BGN)" },
+        { "key": "pagosFracc202", "label": "Авансови вноски за корпоративен данък (BGN)" },
+        { "key": "retencionesSop", "label": "Удържани данъци (BGN)" }
+      ]
+    }
+  },
+  "clientForm": {
+    "taxIdLabel": "ЕГН (Единен граждански номер)",
+    "taxIdCompanyLabel": "ЕИК (Единен идентификационен код)",
+    "taxIdPlaceholder": "напр. 1234567890",
+    "regionLabel": "Област (Province)",
+    "regions": [
+      "Благоевград",
+      "Бургас",
+      "Варна",
+      "Велико Търново",
+      "Видин",
+      "Враца",
+      "Габрово",
+      "Добрич",
+      "Кърджали",
+      "Кюстендил",
+      "Ловеч",
+      "Монтана",
+      "Пазарджик",
+      "Перник",
+      "Плевен",
+      "Пловдив",
+      "Разград",
+      "Русе",
+      "Силистра",
+      "Сливен",
+      "Смолян",
+      "София-град",
+      "София-област",
+      "Стара Загора",
+      "Търговище",
+      "Хасково",
+      "Шумен",
+      "Ямбол"
+    ],
+    "companyTypes": [
+      {
+        "value": "eood",
+        "label": "ЕООД (Еднолично ООД – Single-member Ltd)"
+      },
+      {
+        "value": "ood",
+        "label": "ООД (Дружество с ограничена отговорност – Ltd)"
+      },
+      {
+        "value": "ad",
+        "label": "АД (Акционерно дружество – PLC)"
+      },
+      {
+        "value": "et",
+        "label": "ЕТ (Едноличен търговец – Sole trader)"
+      },
+      {
+        "value": "sd",
+        "label": "СД (Събирателно дружество – General partnership)"
+      },
+      {
+        "value": "kd",
+        "label": "КД (Командитно дружество – Limited partnership)"
+      },
+      {
+        "value": "other",
+        "label": "Other"
+      }
+    ],
+    "companyTaxTypes": [
+      {
+        "value": "standard_10",
+        "label": "Корпоративен данък (10%)"
+      },
+      {
+        "value": "other",
+        "label": "Other"
+      }
+    ],
+    "vatRegimes": [
+      {
+        "value": "general",
+        "label": "ДДС standard (20%)"
+      },
+      {
+        "value": "reduced_9",
+        "label": "ДДС намалена (9%)"
+      },
+      {
+        "value": "exempt",
+        "label": "Освободен (exempt)"
+      }
+    ],
+    "contractTypes": [
+      {
+        "value": "bezsr",
+        "label": "Безсрочен (Permanent)"
+      },
+      {
+        "value": "srochen",
+        "label": "Срочен (Fixed-term)"
+      },
+      {
+        "value": "nepalno",
+        "label": "Непълно работно време (Part-time)"
+      },
+      {
+        "value": "drzh_sluzhitel",
+        "label": "Държавен служител (Civil servant)"
+      }
+    ],
+    "selfEmployedFields": {
+      "registrationLabel": "Дата на регистрация в НАП",
+      "activityCodeLabel": "КИД код (NACE)",
+      "activityCodePlaceholder": "напр. 69.10",
+      "hasSSRegistration": true,
+      "ssRegistrationLabel": "НОИ / НЗОК registration",
+      "incomeRegimes": [
+        {
+          "value": "patent",
+          "label": "Патентен данък (patent tax)"
+        },
+        {
+          "value": "normative",
+          "label": "Нормативно определени разходи (flat-rate expenses)"
+        },
+        {
+          "value": "real_expenses",
+          "label": "Реални разходи (actual expenses)"
+        }
+      ],
+      "vatFilingFrequencies": [
+        {
+          "value": "monthly",
+          "label": "Месечно (monthly)"
+        }
+      ]
+    }
+  }
+}

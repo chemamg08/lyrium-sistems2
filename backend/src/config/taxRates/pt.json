@@ -1,0 +1,279 @@
+{
+  "country": "Portugal",
+  "code": "PT",
+  "year": 2026,
+  "currency": "EUR",
+  "incomeTax": {
+    "brackets": [
+      {
+        "from": 0,
+        "to": 7703,
+        "rate": 13.25
+      },
+      {
+        "from": 7703,
+        "to": 11623,
+        "rate": 18
+      },
+      {
+        "from": 11623,
+        "to": 16472,
+        "rate": 23
+      },
+      {
+        "from": 16472,
+        "to": 21321,
+        "rate": 26
+      },
+      {
+        "from": 21321,
+        "to": 27146,
+        "rate": 32.75
+      },
+      {
+        "from": 27146,
+        "to": 39791,
+        "rate": 37
+      },
+      {
+        "from": 39791,
+        "to": 51997,
+        "rate": 43.5
+      },
+      {
+        "from": 51997,
+        "to": 81199,
+        "rate": 45
+      },
+      {
+        "from": 81199,
+        "to": null,
+        "rate": 48
+      }
+    ],
+    "personalAllowance": 0,
+    "notes": ""
+  },
+  "corporateTax": {
+    "standard": 21,
+    "small": 17,
+    "smallThreshold": 50000
+  },
+  "vat": {
+    "standard": 23,
+    "reduced": 13,
+    "superReduced": 6
+  },
+  "socialSecurity": {
+    "employee": 11,
+    "employer": 23.75,
+    "selfEmployed": 21.4
+  },
+  "fields": {
+    "asalariado": {
+      "basic": [
+        { "key": "salarioBruto", "label": "Salário bruto anual (€)" },
+        { "key": "retencionesEmpresa", "label": "Retenção na fonte de IRS (€)" }
+      ],
+      "advanced": [
+        { "key": "cotizacionesSS", "label": "Contribuições Segurança Social (€)" },
+        { "key": "capitalMobiliario", "label": "Rendimentos de capitais (juros, dividendos) (€)" },
+        { "key": "capitalInmobiliario", "label": "Rendimentos prediais (€)" },
+        { "key": "gananciaPatrimonial", "label": "Mais-valias (€)" },
+        { "key": "pensiones", "label": "Pensões e prestações sociais (€)" },
+        { "key": "deduccionesAuto", "label": "Deduções adicionais (€)" },
+        { "key": "donaciones", "label": "Donativos dedutíveis (€)" }
+      ]
+    },
+    "autonomo": {
+      "basic": [
+        { "key": "facturacionTotal", "label": "Rendimento bruto sem IVA (€)" },
+        { "key": "gastosDeducibles", "label": "Despesas dedutíveis (SS incl.) (€)" },
+        { "key": "ivaRepercutido", "label": "IVA liquidado (€)" },
+        { "key": "ivaSoportado", "label": "IVA dedutível (€)" }
+      ],
+      "advanced": [
+        { "key": "otrosIngresos", "label": "Outros rendimentos (€)" },
+        { "key": "amortizaciones", "label": "Depreciações e amortizações (€)" },
+        { "key": "gastosFinancieros", "label": "Encargos financeiros (€)" },
+        { "key": "pagosFracc130", "label": "Pagamentos por conta de IRS (€)" },
+        { "key": "ivaRegularizacion", "label": "Regularizações de IVA (€)" }
+      ]
+    },
+    "empresa": {
+      "basic": [
+        { "key": "ingresosTotal", "label": "Proveitos totais (€)" },
+        { "key": "gastosTotal", "label": "Gastos totais (€)" },
+        { "key": "ivaRepercutidoEmp", "label": "IVA liquidado (€)" },
+        { "key": "ivaSoportadoEmp", "label": "IVA dedutível (€)" }
+      ],
+      "advanced": [
+        { "key": "gastosNoDeducibles", "label": "Gastos não dedutíveis (€)" },
+        { "key": "basesNegAnter", "label": "Prejuízos fiscais de exercícios anteriores (€)" },
+        { "key": "deduccionID", "label": "SIFIDE – crédito fiscal I&D (€)" },
+        { "key": "deduccionEmpleo", "label": "Incentivos ao emprego (€)" },
+        { "key": "pagosFracc202", "label": "Pagamentos por conta de IRC (€)" },
+        { "key": "ivaRegularizEmp", "label": "Regularizações de IVA (€)" }
+      ]
+    }
+  },
+  "clientForm": {
+    "taxIdLabel": "NIF (Número de Identificação Fiscal)",
+    "taxIdCompanyLabel": "NIPC",
+    "taxIdPlaceholder": "e.g. 123456789",
+    "regionLabel": "Distrito",
+    "regions": [
+      "Aveiro",
+      "Beja",
+      "Braga",
+      "Bragança",
+      "Castelo Branco",
+      "Coimbra",
+      "Évora",
+      "Faro",
+      "Guarda",
+      "Leiria",
+      "Lisboa",
+      "Portalegre",
+      "Porto",
+      "Santarém",
+      "Setúbal",
+      "Viana do Castelo",
+      "Vila Real",
+      "Viseu",
+      "Açores",
+      "Madeira"
+    ],
+    "companyTypes": [
+      {
+        "value": "lda",
+        "label": "Lda. (Sociedade por Quotas)"
+      },
+      {
+        "value": "sa",
+        "label": "S.A. (Sociedade Anónima)"
+      },
+      {
+        "value": "unipessoal",
+        "label": "Unipessoal Lda. (Single-member Ltd)"
+      },
+      {
+        "value": "snc",
+        "label": "SNC (Sociedade em Nome Coletivo)"
+      },
+      {
+        "value": "eni",
+        "label": "ENI (Empresário em Nome Individual)"
+      },
+      {
+        "value": "cooperativa",
+        "label": "Cooperativa"
+      },
+      {
+        "value": "other",
+        "label": "Other"
+      }
+    ],
+    "companyTaxTypes": [
+      {
+        "value": "standard_21",
+        "label": "IRC standard (21%)"
+      },
+      {
+        "value": "pme_17",
+        "label": "PME / Interior (17% primeiros €50k)"
+      },
+      {
+        "value": "madeira_azores",
+        "label": "Madeira / Açores (reduced)"
+      },
+      {
+        "value": "other",
+        "label": "Other"
+      }
+    ],
+    "vatRegimes": [
+      {
+        "value": "general",
+        "label": "IVA standard (23%)"
+      },
+      {
+        "value": "reduced_13",
+        "label": "IVA reduzido (13%)"
+      },
+      {
+        "value": "reduced_6",
+        "label": "IVA super-reduzida (6%)"
+      },
+      {
+        "value": "isento",
+        "label": "Isento (art.º 53.º / 9.º)"
+      },
+      {
+        "value": "azores",
+        "label": "Açores (16% / 9% / 4%)"
+      },
+      {
+        "value": "madeira",
+        "label": "Madeira (22% / 12% / 5%)"
+      }
+    ],
+    "contractTypes": [
+      {
+        "value": "sem_termo",
+        "label": "Sem termo (Permanent)"
+      },
+      {
+        "value": "termo_certo",
+        "label": "A termo certo (Fixed-term)"
+      },
+      {
+        "value": "termo_incerto",
+        "label": "A termo incerto (Uncertain-term)"
+      },
+      {
+        "value": "tempo_parcial",
+        "label": "Tempo parcial (Part-time)"
+      },
+      {
+        "value": "intermitente",
+        "label": "Intermitente"
+      },
+      {
+        "value": "funcionario",
+        "label": "Função pública"
+      }
+    ],
+    "selfEmployedFields": {
+      "registrationLabel": "Data de início de atividade (Finanças)",
+      "activityCodeLabel": "CAE / CIRS code",
+      "activityCodePlaceholder": "e.g. 69100",
+      "hasSSRegistration": true,
+      "ssRegistrationLabel": "Segurança Social registration",
+      "incomeRegimes": [
+        {
+          "value": "simplificado",
+          "label": "Regime simplificado"
+        },
+        {
+          "value": "contabilidade",
+          "label": "Contabilidade organizada"
+        },
+        {
+          "value": "ato_isolado",
+          "label": "Ato isolado"
+        }
+      ],
+      "vatFilingFrequencies": [
+        {
+          "value": "trimestral",
+          "label": "Trimestral"
+        },
+        {
+          "value": "mensal",
+          "label": "Mensal"
+        }
+      ]
+    }
+  }
+}

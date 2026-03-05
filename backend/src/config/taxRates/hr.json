@@ -1,0 +1,221 @@
+{
+  "country": "Hrvatska / Croatia",
+  "code": "HR",
+  "year": 2026,
+  "currency": "EUR",
+  "incomeTax": {
+    "brackets": [
+      {
+        "from": 0,
+        "to": 50400,
+        "rate": 20
+      },
+      {
+        "from": 50400,
+        "to": null,
+        "rate": 30
+      }
+    ],
+    "personalAllowance": 0,
+    "notes": ""
+  },
+  "corporateTax": {
+    "standard": 18,
+    "small": 10,
+    "smallThreshold": 1000000
+  },
+  "vat": {
+    "standard": 25,
+    "reduced": 13,
+    "superReduced": 5
+  },
+  "socialSecurity": {
+    "employee": 20,
+    "employer": 16.5,
+    "selfEmployed": 20
+  },
+  "fields": {
+    "asalariado": {
+      "basic": [
+        { "key": "salarioBruto", "label": "Godišnja bruto plaća (€)" },
+        { "key": "retencionesEmpresa", "label": "Predujam poreza na dohodak (€)" }
+      ],
+      "advanced": [
+        { "key": "cotizacionesSS", "label": "Doprinosi iz plaće (MIO I+II, ZO) (€)" },
+        { "key": "capitalMobiliario", "label": "Prihodi od kapitala (kamate, dividende) (€)" },
+        { "key": "capitalInmobiliario", "label": "Prihodi od najma (€)" },
+        { "key": "gananciaPatrimonial", "label": "Kapitalni dobici (€)" },
+        { "key": "pensiones", "label": "Mirovine i naknade (€)" },
+        { "key": "deduccionesAuto", "label": "Osobni odbitak / olakšice (€)" },
+        { "key": "donaciones", "label": "Donacije (porezno priznate) (€)" }
+      ]
+    },
+    "autonomo": {
+      "basic": [
+        { "key": "facturacionTotal", "label": "Prihodi bez PDV-a (€)" },
+        { "key": "gastosDeducibles", "label": "Porezno priznati rashodi (s doprinosima) (€)" },
+        { "key": "ivaRepercutido", "label": "Obračunati PDV (€)" },
+        { "key": "ivaSoportado", "label": "Pretporez (PDV) (€)" }
+      ],
+      "advanced": [
+        { "key": "otrosIngresos", "label": "Ostali prihodi (€)" },
+        { "key": "amortizaciones", "label": "Amortizacija (€)" },
+        { "key": "gastosFinancieros", "label": "Financijski rashodi (€)" },
+        { "key": "pagosFracc130", "label": "Predujmovi poreza uplaćeni (€)" },
+        { "key": "ivaRegularizacion", "label": "Ispravci PDV-a (€)" }
+      ]
+    },
+    "empresa": {
+      "basic": [
+        { "key": "ingresosTotal", "label": "Ukupni prihodi (€)" },
+        { "key": "gastosTotal", "label": "Ukupni rashodi (€)" },
+        { "key": "ivaRepercutidoEmp", "label": "Obračunati PDV (€)" },
+        { "key": "ivaSoportadoEmp", "label": "Pretporez (PDV) (€)" }
+      ],
+      "advanced": [
+        { "key": "gastosNoDeducibles", "label": "Porezno nepriznati rashodi (€)" },
+        { "key": "basesNegAnter", "label": "Preneseni gubici (€)" },
+        { "key": "deduccionID", "label": "Poticaji za I&R (€)" },
+        { "key": "deduccionEmpleo", "label": "Olakšice za zapošljavanje (€)" },
+        { "key": "pagosFracc202", "label": "Predujam poreza na dobit (€)" },
+        { "key": "ivaRegularizEmp", "label": "Ispravci PDV-a (€)" }
+      ]
+    }
+  },
+  "clientForm": {
+    "taxIdLabel": "OIB (Osobni identifikacijski broj)",
+    "taxIdCompanyLabel": "OIB",
+    "taxIdPlaceholder": "e.g. 12345678901",
+    "regionLabel": "Županija (County)",
+    "regions": [
+      "Bjelovarsko-bilogorska",
+      "Brodsko-posavska",
+      "Dubrovačko-neretvanska",
+      "Grad Zagreb",
+      "Istarska",
+      "Karlovačka",
+      "Koprivničko-križevačka",
+      "Krapinsko-zagorska",
+      "Ličko-senjska",
+      "Međimurska",
+      "Osječko-baranjska",
+      "Požeško-slavonska",
+      "Primorsko-goranska",
+      "Šibensko-kninska",
+      "Sisačko-moslavačka",
+      "Splitsko-dalmatinska",
+      "Varaždinska",
+      "Virovitičko-podravska",
+      "Vukovarsko-srijemska",
+      "Zadarska",
+      "Zagrebačka"
+    ],
+    "companyTypes": [
+      {
+        "value": "doo",
+        "label": "d.o.o. (društvo s ograničenom odgovornošću)"
+      },
+      {
+        "value": "jdoo",
+        "label": "j.d.o.o. (jednostavno d.o.o.)"
+      },
+      {
+        "value": "dd",
+        "label": "d.d. (dioničko društvo)"
+      },
+      {
+        "value": "jt",
+        "label": "j.t.d. (javno trgovačko društvo)"
+      },
+      {
+        "value": "kd",
+        "label": "k.d. (komanditno društvo)"
+      },
+      {
+        "value": "obrt",
+        "label": "Obrt (Sole trader)"
+      },
+      {
+        "value": "other",
+        "label": "Other"
+      }
+    ],
+    "companyTaxTypes": [
+      {
+        "value": "standard_18",
+        "label": "Standard (18%)"
+      },
+      {
+        "value": "reduced_10",
+        "label": "Reduced (10% for ≤ €1M revenue)"
+      },
+      {
+        "value": "other",
+        "label": "Other"
+      }
+    ],
+    "vatRegimes": [
+      {
+        "value": "general",
+        "label": "Standard (25%)"
+      },
+      {
+        "value": "reduced_13",
+        "label": "Reduced (13%)"
+      },
+      {
+        "value": "reduced_5",
+        "label": "Reduced (5%)"
+      },
+      {
+        "value": "exempt",
+        "label": "Exempt"
+      }
+    ],
+    "contractTypes": [
+      {
+        "value": "neodredeno",
+        "label": "Na neodređeno (Permanent)"
+      },
+      {
+        "value": "odredeno",
+        "label": "Na određeno (Fixed-term)"
+      },
+      {
+        "value": "nepuno",
+        "label": "Nepuno radno vrijeme (Part-time)"
+      },
+      {
+        "value": "sezonski",
+        "label": "Sezonski (Seasonal)"
+      }
+    ],
+    "selfEmployedFields": {
+      "registrationLabel": "Obrt registration date",
+      "activityCodeLabel": "NKD code",
+      "activityCodePlaceholder": "e.g. 69.10",
+      "hasSSRegistration": true,
+      "ssRegistrationLabel": "HZMO / HZZO registration",
+      "incomeRegimes": [
+        {
+          "value": "knjige",
+          "label": "Business books (poslovne knjige)"
+        },
+        {
+          "value": "pausalni",
+          "label": "Flat-rate (paušalni obrt)"
+        }
+      ],
+      "vatFilingFrequencies": [
+        {
+          "value": "monthly",
+          "label": "Monthly (mjesečno)"
+        },
+        {
+          "value": "quarterly",
+          "label": "Quarterly (tromjesečno)"
+        }
+      ]
+    }
+  }
+}

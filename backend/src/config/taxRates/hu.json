@@ -1,0 +1,235 @@
+{
+  "country": "Magyarország / Hungary",
+  "code": "HU",
+  "year": 2026,
+  "currency": "HUF",
+  "incomeTax": {
+    "brackets": [
+      {
+        "from": 0,
+        "to": null,
+        "rate": 15
+      }
+    ],
+    "personalAllowance": 0,
+    "notes": "Flat 15% PIT. Local business tax ~2% additional on companies."
+  },
+  "corporateTax": {
+    "standard": 9,
+    "small": 9,
+    "smallThreshold": 0
+  },
+  "vat": {
+    "standard": 27,
+    "reduced": 18,
+    "superReduced": 5
+  },
+  "socialSecurity": {
+    "employee": 18.5,
+    "employer": 13.0,
+    "selfEmployed": 18.5
+  },
+  "fields": {
+    "asalariado": {
+      "basic": [
+        { "key": "salarioBruto", "label": "Éves bruttó bér (HUF)" },
+        { "key": "retencionesEmpresa", "label": "Levont SZJA előleg (HUF)" }
+      ],
+      "advanced": [
+        { "key": "cotizacionesSS", "label": "TB járulék (munkavállalói) (HUF)" },
+        { "key": "capitalMobiliario", "label": "Tőkejövedelem (kamat, osztalék) (HUF)" },
+        { "key": "capitalInmobiliario", "label": "Bérleti jövedelem (HUF)" },
+        { "key": "gananciaPatrimonial", "label": "Árfolyamnyereség (HUF)" },
+        { "key": "pensiones", "label": "Nyugdíj és ellátások (HUF)" },
+        { "key": "deduccionesAuto", "label": "Adókedvezmények (családi, személyi) (HUF)" },
+        { "key": "donaciones", "label": "Adományok (levonható) (HUF)" }
+      ]
+    },
+    "autonomo": {
+      "basic": [
+        { "key": "facturacionTotal", "label": "Bevétel ÁFA nélkül (HUF)" },
+        { "key": "gastosDeducibles", "label": "Elismert költségek (TB-vel) (HUF)" },
+        { "key": "ivaRepercutido", "label": "Felszámított ÁFA (HUF)" },
+        { "key": "ivaSoportado", "label": "Levonható ÁFA (HUF)" }
+      ],
+      "advanced": [
+        { "key": "otrosIngresos", "label": "Egyéb bevételek (HUF)" },
+        { "key": "amortizaciones", "label": "Értékcsökkenési leírás (HUF)" },
+        { "key": "gastosFinancieros", "label": "Pénzügyi ráfordítások (HUF)" },
+        { "key": "pagosFracc130", "label": "SZJA előleg befizetve (HUF)" },
+        { "key": "ivaRegularizacion", "label": "ÁFA korrekciók (HUF)" }
+      ]
+    },
+    "empresa": {
+      "basic": [
+        { "key": "ingresosTotal", "label": "Összes bevétel (HUF)" },
+        { "key": "gastosTotal", "label": "Összes költség (HUF)" },
+        { "key": "ivaRepercutidoEmp", "label": "Felszámított ÁFA (HUF)" },
+        { "key": "ivaSoportadoEmp", "label": "Levonható ÁFA (HUF)" }
+      ],
+      "advanced": [
+        { "key": "gastosNoDeducibles", "label": "Nem elismert költségek (HUF)" },
+        { "key": "basesNegAnter", "label": "Korábbi évek vesztesége (HUF)" },
+        { "key": "deduccionID", "label": "K+F adókedvezmény (HUF)" },
+        { "key": "deduccionEmpleo", "label": "Foglalkoztatási kedvezmény (HUF)" },
+        { "key": "pagosFracc202", "label": "TAO előleg (HUF)" },
+        { "key": "ivaRegularizEmp", "label": "ÁFA korrekciók (HUF)" }
+      ]
+    }
+  },
+  "clientForm": {
+    "taxIdLabel": "Adóazonosító jel (Tax ID)",
+    "taxIdCompanyLabel": "Adószám (Tax number)",
+    "taxIdPlaceholder": "e.g. 8123456789",
+    "regionLabel": "Megye (County)",
+    "regions": [
+      "Bács-Kiskun",
+      "Baranya",
+      "Békés",
+      "Borsod-Abaúj-Zemplén",
+      "Budapest",
+      "Csongrád-Csanád",
+      "Fejér",
+      "Győr-Moson-Sopron",
+      "Hajdú-Bihar",
+      "Heves",
+      "Jász-Nagykun-Szolnok",
+      "Komárom-Esztergom",
+      "Nógrád",
+      "Pest",
+      "Somogy",
+      "Szabolcs-Szatmár-Bereg",
+      "Tolna",
+      "Vas",
+      "Veszprém",
+      "Zala"
+    ],
+    "companyTypes": [
+      {
+        "value": "kft",
+        "label": "Kft. (Korlátolt Felelősségű Társaság – Ltd)"
+      },
+      {
+        "value": "zrt",
+        "label": "Zrt. (Zártkörűen Működő Rt. – Private Co.)"
+      },
+      {
+        "value": "nyrt",
+        "label": "Nyrt. (Nyilvánosan Működő Rt. – Public Co.)"
+      },
+      {
+        "value": "bt",
+        "label": "Bt. (Betéti Társaság – Limited partnership)"
+      },
+      {
+        "value": "kkt",
+        "label": "Kkt. (Közkereseti Társaság – General partnership)"
+      },
+      {
+        "value": "ev",
+        "label": "E.V. (Egyéni Vállalkozó – Sole proprietor)"
+      },
+      {
+        "value": "other",
+        "label": "Other"
+      }
+    ],
+    "companyTaxTypes": [
+      {
+        "value": "standard_9",
+        "label": "Standard (9%)"
+      },
+      {
+        "value": "kiva",
+        "label": "KIVA (Small business tax)"
+      },
+      {
+        "value": "kata",
+        "label": "KATA (Simplified entrepreneur tax)"
+      },
+      {
+        "value": "other",
+        "label": "Other"
+      }
+    ],
+    "vatRegimes": [
+      {
+        "value": "general",
+        "label": "Standard (27%)"
+      },
+      {
+        "value": "reduced_18",
+        "label": "Reduced (18%)"
+      },
+      {
+        "value": "reduced_5",
+        "label": "Reduced (5%)"
+      },
+      {
+        "value": "exempt",
+        "label": "Exempt / KATA"
+      }
+    ],
+    "contractTypes": [
+      {
+        "value": "határozatlan",
+        "label": "Határozatlan idejű (Permanent)"
+      },
+      {
+        "value": "hatarozott",
+        "label": "Határozott idejű (Fixed-term)"
+      },
+      {
+        "value": "reszmunkaido",
+        "label": "Részmunkaidő (Part-time)"
+      },
+      {
+        "value": "kozszolgalati",
+        "label": "Közszolgálati (Civil servant)"
+      },
+      {
+        "value": "alkalmi",
+        "label": "Alkalmi (Casual)"
+      }
+    ],
+    "selfEmployedFields": {
+      "registrationLabel": "NAV registration date",
+      "activityCodeLabel": "TEÁOR code",
+      "activityCodePlaceholder": "e.g. 6910",
+      "hasSSRegistration": true,
+      "ssRegistrationLabel": "TB registration",
+      "incomeRegimes": [
+        {
+          "value": "egyeni",
+          "label": "Egyéni vállalkozó (standard self-employed)"
+        },
+        {
+          "value": "kata",
+          "label": "KATA (flat-rate tax)"
+        },
+        {
+          "value": "teteleskoltseg",
+          "label": "Tételes költségelszámolás (itemised costs)"
+        },
+        {
+          "value": "percentage",
+          "label": "Átalányban (percentage-based costs)"
+        }
+      ],
+      "vatFilingFrequencies": [
+        {
+          "value": "monthly",
+          "label": "Monthly (havonta)"
+        },
+        {
+          "value": "quarterly",
+          "label": "Quarterly (negyedévente)"
+        },
+        {
+          "value": "annual",
+          "label": "Annual (évente)"
+        }
+      ]
+    }
+  }
+}

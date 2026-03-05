@@ -1,0 +1,254 @@
+{
+  "country": "Austria",
+  "code": "AT",
+  "year": 2026,
+  "currency": "EUR",
+  "incomeTax": {
+    "brackets": [
+      {
+        "from": 0,
+        "to": 12816,
+        "rate": 0
+      },
+      {
+        "from": 12816,
+        "to": 20818,
+        "rate": 20
+      },
+      {
+        "from": 20818,
+        "to": 34513,
+        "rate": 30
+      },
+      {
+        "from": 34513,
+        "to": 66612,
+        "rate": 41
+      },
+      {
+        "from": 66612,
+        "to": 99266,
+        "rate": 48
+      },
+      {
+        "from": 99266,
+        "to": 1000000,
+        "rate": 50
+      },
+      {
+        "from": 1000000,
+        "to": null,
+        "rate": 55
+      }
+    ],
+    "personalAllowance": 0,
+    "notes": ""
+  },
+  "corporateTax": {
+    "standard": 23,
+    "small": 23,
+    "smallThreshold": 0
+  },
+  "vat": {
+    "standard": 20,
+    "reduced": 10,
+    "superReduced": 13
+  },
+  "socialSecurity": {
+    "employee": 18.07,
+    "employer": 21.33,
+    "selfEmployed": 27.05
+  },
+  "fields": {
+    "asalariado": {
+      "basic": [
+        { "key": "salarioBruto", "label": "Jahresbruttgehalt (€)" },
+        { "key": "retencionesEmpresa", "label": "Einbehaltene Lohnsteuer (€)" }
+      ],
+      "advanced": [
+        { "key": "cotizacionesSS", "label": "SV-Beiträge (DN-Anteil) (€)" },
+        { "key": "capitalMobiliario", "label": "Kapitalerträge (Zinsen, Dividenden) (€)" },
+        { "key": "capitalInmobiliario", "label": "Einkünfte aus Vermietung (€)" },
+        { "key": "gananciaPatrimonial", "label": "Immobilienertragsteuer / Veräußerungsgewinne (€)" },
+        { "key": "pensiones", "label": "Pensionen und Renten (€)" },
+        { "key": "deduccionesAuto", "label": "Sonderausgaben / außergewöhnliche Belastungen (€)" },
+        { "key": "donaciones", "label": "Absetzbare Spenden (€)" }
+      ]
+    },
+    "autonomo": {
+      "basic": [
+        { "key": "facturacionTotal", "label": "Betriebseinnahmen netto (ohne USt) (€)" },
+        { "key": "gastosDeducibles", "label": "Betriebsausgaben (inkl. SVA) (€)" },
+        { "key": "ivaRepercutido", "label": "Vereinnahmte USt (€)" },
+        { "key": "ivaSoportado", "label": "Vorsteuer (€)" }
+      ],
+      "advanced": [
+        { "key": "otrosIngresos", "label": "Sonstige Einkünfte (€)" },
+        { "key": "amortizaciones", "label": "Abschreibungen (AfA) (€)" },
+        { "key": "gastosFinancieros", "label": "Zinsaufwendungen (€)" },
+        { "key": "pagosFracc130", "label": "ESt-Vorauszahlungen (€)" },
+        { "key": "ivaRegularizacion", "label": "USt-Berichtigungen (€)" }
+      ]
+    },
+    "empresa": {
+      "basic": [
+        { "key": "ingresosTotal", "label": "Gesamteinnahmen (€)" },
+        { "key": "gastosTotal", "label": "Gesamtausgaben (€)" },
+        { "key": "ivaRepercutidoEmp", "label": "Umsatzsteuer (USt) (€)" },
+        { "key": "ivaSoportadoEmp", "label": "Vorsteuer (€)" }
+      ],
+      "advanced": [
+        { "key": "gastosNoDeducibles", "label": "Nicht absetzbare Aufwendungen (€)" },
+        { "key": "basesNegAnter", "label": "Verlustvortrag (€)" },
+        { "key": "deduccionID", "label": "Forschungsprämie (€)" },
+        { "key": "deduccionEmpleo", "label": "Beschäftigungsbonus (€)" },
+        { "key": "pagosFracc202", "label": "KÖSt-Vorauszahlungen (€)" },
+        { "key": "ivaRegularizEmp", "label": "USt-Berichtigungen (€)" }
+      ]
+    }
+  },
+  "clientForm": {
+    "taxIdLabel": "Steuernummer",
+    "taxIdCompanyLabel": "UID-Nummer",
+    "taxIdPlaceholder": "e.g. 12 345/6789",
+    "regionLabel": "Bundesland",
+    "regions": [
+      "Burgenland",
+      "Kärnten",
+      "Niederösterreich",
+      "Oberösterreich",
+      "Salzburg",
+      "Steiermark",
+      "Tirol",
+      "Vorarlberg",
+      "Wien"
+    ],
+    "companyTypes": [
+      {
+        "value": "gmbh",
+        "label": "GmbH (Gesellschaft mit beschränkter Haftung)"
+      },
+      {
+        "value": "ag",
+        "label": "AG (Aktiengesellschaft)"
+      },
+      {
+        "value": "kg",
+        "label": "KG (Kommanditgesellschaft)"
+      },
+      {
+        "value": "og",
+        "label": "OG (Offene Gesellschaft)"
+      },
+      {
+        "value": "einzelunternehmen",
+        "label": "Einzelunternehmen"
+      },
+      {
+        "value": "genossenschaft",
+        "label": "Genossenschaft"
+      },
+      {
+        "value": "verein",
+        "label": "Verein"
+      },
+      {
+        "value": "other",
+        "label": "Other"
+      }
+    ],
+    "companyTaxTypes": [
+      {
+        "value": "standard_25",
+        "label": "Standard (25%)"
+      },
+      {
+        "value": "minimum",
+        "label": "Minimum corporate tax"
+      },
+      {
+        "value": "other",
+        "label": "Other"
+      }
+    ],
+    "vatRegimes": [
+      {
+        "value": "general",
+        "label": "General (20%)"
+      },
+      {
+        "value": "reduced_13",
+        "label": "Reduced (13%)"
+      },
+      {
+        "value": "reduced_10",
+        "label": "Reduced (10%)"
+      },
+      {
+        "value": "exempt",
+        "label": "Exempt"
+      }
+    ],
+    "contractTypes": [
+      {
+        "value": "unbefristet",
+        "label": "Permanent (unbefristet)"
+      },
+      {
+        "value": "befristet",
+        "label": "Fixed-term (befristet)"
+      },
+      {
+        "value": "teilzeit",
+        "label": "Part-time (Teilzeit)"
+      },
+      {
+        "value": "geringfuegig",
+        "label": "Marginal employment (geringfügig)"
+      },
+      {
+        "value": "lehrling",
+        "label": "Apprentice (Lehrling)"
+      },
+      {
+        "value": "beamter",
+        "label": "Civil servant (Beamter)"
+      }
+    ],
+    "selfEmployedFields": {
+      "registrationLabel": "Gewerbeschein / Finanzamt registration",
+      "activityCodeLabel": "ÖNACE code",
+      "activityCodePlaceholder": "e.g. 69.10",
+      "hasSSRegistration": true,
+      "ssRegistrationLabel": "SVS registration",
+      "incomeRegimes": [
+        {
+          "value": "einnahmen_ausgaben",
+          "label": "Einnahmen-Ausgaben-Rechnung"
+        },
+        {
+          "value": "bilanzierung",
+          "label": "Bilanzierung (double-entry)"
+        },
+        {
+          "value": "pauschalierung",
+          "label": "Pauschalierung (lump-sum)"
+        }
+      ],
+      "vatFilingFrequencies": [
+        {
+          "value": "monthly",
+          "label": "Monthly (Monatlich)"
+        },
+        {
+          "value": "quarterly",
+          "label": "Quarterly (Vierteljährlich)"
+        },
+        {
+          "value": "annual",
+          "label": "Annual (Jährlich)"
+        }
+      ]
+    }
+  }
+}

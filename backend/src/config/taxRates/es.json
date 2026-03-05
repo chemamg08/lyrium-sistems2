@@ -1,0 +1,480 @@
+{
+  "country": "España",
+  "year": 2026,
+  "currency": "EUR",
+  "irpf": {
+    "tramoEstatales": [
+      {
+        "desde": 0,
+        "hasta": 12450,
+        "tipo": 9.5
+      },
+      {
+        "desde": 12450,
+        "hasta": 20200,
+        "tipo": 12.0
+      },
+      {
+        "desde": 20200,
+        "hasta": 35200,
+        "tipo": 15.0
+      },
+      {
+        "desde": 35200,
+        "hasta": 60000,
+        "tipo": 18.5
+      },
+      {
+        "desde": 60000,
+        "hasta": 300000,
+        "tipo": 22.5
+      },
+      {
+        "desde": 300000,
+        "hasta": null,
+        "tipo": 24.5
+      }
+    ],
+    "tramoAutonomicos": [
+      {
+        "desde": 0,
+        "hasta": 12450,
+        "tipo": 9.0
+      },
+      {
+        "desde": 12450,
+        "hasta": 20200,
+        "tipo": 12.0
+      },
+      {
+        "desde": 20200,
+        "hasta": 35200,
+        "tipo": 15.0
+      },
+      {
+        "desde": 35200,
+        "hasta": 60000,
+        "tipo": 17.5
+      },
+      {
+        "desde": 60000,
+        "hasta": 300000,
+        "tipo": 20.5
+      },
+      {
+        "desde": 300000,
+        "hasta": null,
+        "tipo": 22.5
+      }
+    ],
+    "minimoPersonal": 5550,
+    "minimoPersonalMayor65": 6700,
+    "minimoPersonalMayor75": 8100,
+    "reduccionRendimientoTrabajo": {
+      "hastaRendimiento": 13115,
+      "reduccionMaxima": 7302,
+      "reduccionBase": 5565,
+      "reduccionPorEuro": 1.5,
+      "umbralSuperior": 16825
+    },
+    "limitePlanPensiones": 1500,
+    "limitePlanPensionesEmpresa": 8500,
+    "deduccionMaternidad": 1200,
+    "deduccionFamiliaNumerosa": 1200
+  },
+  "is": {
+    "tipoGeneral": 25,
+    "tipoNuevaEmpresa": 15,
+    "tipoEntidadesReducidaDimension": 25,
+    "umbralReducidaDimension": 10000000,
+    "limiteDeducciones": {
+      "idIT": 25,
+      "innovacionTecnologica": 12,
+      "creacionEmpleo": 3000
+    }
+  },
+  "iva": {
+    "general": 21,
+    "reducido": 10,
+    "superreducido": 4
+  },
+  "ss": {
+    "cotizacionTrabajador": 6.35,
+    "cotizacionEmpresario": 29.9
+  },
+  "code": "ES",
+  "fields": {
+    "asalariado": {
+      "basic": [
+        {
+          "key": "salarioBruto",
+          "label": "Salario bruto anual (€)"
+        },
+        {
+          "key": "retencionesEmpresa",
+          "label": "Retenciones practicadas por la empresa (€)"
+        },
+        {
+          "key": "planPensiones",
+          "label": "Aportación plan de pensiones (€)"
+        }
+      ],
+      "advanced": [
+        {
+          "key": "cotizacionesSS",
+          "label": "Cotizaciones S.S. (€) — si no, se calcula automáticamente"
+        },
+        {
+          "key": "pagasExtras",
+          "label": "Pagas extra fuera del bruto (€)"
+        },
+        {
+          "key": "retribucionesEspecie",
+          "label": "Retribuciones en especie (€)"
+        },
+        {
+          "key": "capitalMobiliario",
+          "label": "Capital mobiliario (intereses, dividendos) (€)"
+        },
+        {
+          "key": "capitalInmobiliario",
+          "label": "Capital inmobiliario / alquileres (€)"
+        },
+        {
+          "key": "gananciaPatrimonial",
+          "label": "Ganancias patrimoniales (€)"
+        },
+        {
+          "key": "pensiones",
+          "label": "Pensiones y prestaciones (€)"
+        },
+        {
+          "key": "cuotasSindicales",
+          "label": "Cuotas sindicales (€)"
+        },
+        {
+          "key": "donaciones",
+          "label": "Donaciones (€)"
+        },
+        {
+          "key": "deduccionesAuto",
+          "label": "Deducciones autonómicas (€)"
+        },
+        {
+          "key": "viviendaHabitual",
+          "label": "Vivienda habitual — deducción antigua (€)"
+        },
+        {
+          "key": "retencionesTotales",
+          "label": "Retenciones totales (si difieren de las de empresa) (€)"
+        }
+      ]
+    },
+    "autonomo": {
+      "basic": [
+        {
+          "key": "facturacionTotal",
+          "label": "Ingresos anuales sin IVA (€)"
+        },
+        {
+          "key": "gastosDeducibles",
+          "label": "Gastos deducibles totales incl. RETA (€)"
+        },
+        {
+          "key": "ivaRepercutido",
+          "label": "IVA cobrado / repercutido (€)"
+        },
+        {
+          "key": "ivaSoportado",
+          "label": "IVA pagado / soportado (€)"
+        }
+      ],
+      "advanced": [
+        {
+          "key": "ingresosIntracom",
+          "label": "Ingresos intracomunitarios (€)"
+        },
+        {
+          "key": "subvenciones",
+          "label": "Subvenciones (€)"
+        },
+        {
+          "key": "otrosIngresos",
+          "label": "Otros ingresos (€)"
+        },
+        {
+          "key": "cuotaRETA",
+          "label": "Cuota RETA desglosada (€)"
+        },
+        {
+          "key": "gastosActividad",
+          "label": "Gastos actividad (local, suministros) (€)"
+        },
+        {
+          "key": "amortizaciones",
+          "label": "Amortizaciones (€)"
+        },
+        {
+          "key": "gastosFinancieros",
+          "label": "Gastos financieros (€)"
+        },
+        {
+          "key": "dietasDesplaz",
+          "label": "Dietas y desplazamientos (€)"
+        },
+        {
+          "key": "segurosPro",
+          "label": "Seguros profesionales (€)"
+        },
+        {
+          "key": "pagosFracc130",
+          "label": "Pagos fraccionados mod. 130 (€)"
+        },
+        {
+          "key": "retencionesSoportadas",
+          "label": "Retenciones soportadas 15% (€)"
+        },
+        {
+          "key": "ivaIntracom",
+          "label": "IVA intracomunitario (€)"
+        },
+        {
+          "key": "ivaRegularizacion",
+          "label": "Regularizaciones / compensaciones IVA (€)"
+        }
+      ]
+    },
+    "empresa": {
+      "basic": [
+        {
+          "key": "ingresosTotal",
+          "label": "Ingresos totales (€)"
+        },
+        {
+          "key": "gastosTotal",
+          "label": "Gastos totales (€)"
+        },
+        {
+          "key": "ivaRepercutidoEmp",
+          "label": "IVA cobrado / repercutido (€)"
+        },
+        {
+          "key": "ivaSoportadoEmp",
+          "label": "IVA pagado / soportado (€)"
+        }
+      ],
+      "advanced": [
+        {
+          "key": "gastosNoDeducibles",
+          "label": "Gastos no deducibles (€)"
+        },
+        {
+          "key": "amortizFiscal",
+          "label": "Ajuste amortizaciones fiscales (€)"
+        },
+        {
+          "key": "provisiones",
+          "label": "Provisiones (€)"
+        },
+        {
+          "key": "deterioros",
+          "label": "Deterioros (€)"
+        },
+        {
+          "key": "opVinculadas",
+          "label": "Operaciones vinculadas (€)"
+        },
+        {
+          "key": "basesNegAnter",
+          "label": "Bases imponibles negativas anteriores (€)"
+        },
+        {
+          "key": "reservaCapitalizacion",
+          "label": "Reserva de capitalización (€)"
+        },
+        {
+          "key": "reservaNivelacion",
+          "label": "Reserva de nivelación (€)"
+        },
+        {
+          "key": "deduccionID",
+          "label": "I+D (€)"
+        },
+        {
+          "key": "deduccionEmpleo",
+          "label": "Creación de empleo (€)"
+        },
+        {
+          "key": "dobleImposicion",
+          "label": "Doble imposición internacional (€)"
+        },
+        {
+          "key": "deduccionDonac",
+          "label": "Donaciones (€)"
+        },
+        {
+          "key": "incentivosAuto",
+          "label": "Incentivos autonómicos (€)"
+        },
+        {
+          "key": "pagosFracc202",
+          "label": "Pagos fraccionados mod. 202 (€)"
+        },
+        {
+          "key": "retencionesSop",
+          "label": "Retenciones soportadas (€)"
+        },
+        {
+          "key": "ivaRegularizEmp",
+          "label": "Regularizaciones y compensaciones IVA (€)"
+        }
+      ]
+    }
+  },
+  "clientForm": {
+    "taxIdLabel": "NIF / DNI / NIE",
+    "taxIdCompanyLabel": "CIF",
+    "taxIdPlaceholder": "Ej: 12345678A",
+    "regionLabel": "Comunidad Autónoma",
+    "regions": [
+      "Andalucía",
+      "Aragón",
+      "Asturias",
+      "Baleares",
+      "Canarias",
+      "Cantabria",
+      "Castilla-La Mancha",
+      "Castilla y León",
+      "Cataluña",
+      "Extremadura",
+      "Galicia",
+      "La Rioja",
+      "Madrid",
+      "Murcia",
+      "Navarra",
+      "País Vasco",
+      "Valencia",
+      "Ceuta",
+      "Melilla"
+    ],
+    "companyTypes": [
+      {
+        "value": "sl",
+        "label": "S.L. (Sociedad Limitada)"
+      },
+      {
+        "value": "sa",
+        "label": "S.A. (Sociedad Anónima)"
+      },
+      {
+        "value": "slp",
+        "label": "S.L.P. (Sociedad Limitada Profesional)"
+      },
+      {
+        "value": "cooperativa",
+        "label": "Cooperativa"
+      },
+      {
+        "value": "cb",
+        "label": "C.B. (Comunidad de Bienes)"
+      },
+      {
+        "value": "other",
+        "label": "Other"
+      }
+    ],
+    "companyTaxTypes": [
+      {
+        "value": "general_25",
+        "label": "General (25%)"
+      },
+      {
+        "value": "nueva_empresa_15",
+        "label": "Nueva empresa (15%)"
+      },
+      {
+        "value": "parcialmente_exenta",
+        "label": "Entidad parcialmente exenta"
+      },
+      {
+        "value": "cooperativa",
+        "label": "Cooperativa"
+      },
+      {
+        "value": "other",
+        "label": "Other"
+      }
+    ],
+    "vatRegimes": [
+      {
+        "value": "general",
+        "label": "General (21%)"
+      },
+      {
+        "value": "recargo_equivalencia",
+        "label": "Recargo de equivalencia"
+      },
+      {
+        "value": "criterio_caja",
+        "label": "Criterio de caja"
+      },
+      {
+        "value": "exento",
+        "label": "Exento"
+      }
+    ],
+    "contractTypes": [
+      {
+        "value": "indefinido",
+        "label": "Indefinido"
+      },
+      {
+        "value": "temporal",
+        "label": "Temporal"
+      },
+      {
+        "value": "funcionario",
+        "label": "Funcionario"
+      },
+      {
+        "value": "practicas",
+        "label": "Prácticas"
+      },
+      {
+        "value": "parcial",
+        "label": "Tiempo parcial"
+      }
+    ],
+    "selfEmployedFields": {
+      "registrationLabel": "Fecha alta Hacienda (036/037)",
+      "activityCodeLabel": "Epígrafe IAE / CNAE",
+      "activityCodePlaceholder": "Ej: 6910",
+      "hasSSRegistration": true,
+      "ssRegistrationLabel": "Alta RETA",
+      "incomeRegimes": [
+        {
+          "value": "estimacion_directa",
+          "label": "Estimación directa simplificada"
+        },
+        {
+          "value": "estimacion_directa_normal",
+          "label": "Estimación directa normal"
+        },
+        {
+          "value": "modulos",
+          "label": "Estimación objetiva (módulos)"
+        }
+      ],
+      "vatFilingFrequencies": [
+        {
+          "value": "trimestral",
+          "label": "Trimestral"
+        },
+        {
+          "value": "mensual",
+          "label": "Mensual"
+        }
+      ]
+    }
+  }
+}

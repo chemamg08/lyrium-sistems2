@@ -1,0 +1,369 @@
+{
+  "country": "United States",
+  "code": "US",
+  "year": 2026,
+  "currency": "USD",
+  "incomeTax": {
+    "brackets": [
+      {
+        "desde": 0,
+        "hasta": 11600,
+        "tipo": 10
+      },
+      {
+        "desde": 11600,
+        "hasta": 47150,
+        "tipo": 12
+      },
+      {
+        "desde": 47150,
+        "hasta": 100525,
+        "tipo": 22
+      },
+      {
+        "desde": 100525,
+        "hasta": 191950,
+        "tipo": 24
+      },
+      {
+        "desde": 191950,
+        "hasta": 243725,
+        "tipo": 32
+      },
+      {
+        "desde": 243725,
+        "hasta": 609350,
+        "tipo": 35
+      },
+      {
+        "desde": 609350,
+        "hasta": null,
+        "tipo": 37
+      }
+    ],
+    "personalAllowance": 14600,
+    "notes": "Federal brackets (single filer); standard deduction $14 600"
+  },
+  "corporateTax": {
+    "standard": 21,
+    "small": 21,
+    "smallThreshold": 0
+  },
+  "vat": {
+    "standard": 0,
+    "reduced": 0,
+    "superReduced": 0,
+    "notes": "No federal VAT; state sales tax varies 0-10.25%"
+  },
+  "socialSecurity": {
+    "employee": 7.65,
+    "employer": 7.65,
+    "selfEmployed": 15.3
+  },
+  "fields": {
+    "asalariado": {
+      "basic": [
+        {
+          "key": "salarioBruto",
+          "label": "Annual gross salary ($)"
+        },
+        {
+          "key": "retencionesEmpresa",
+          "label": "Federal income tax withheld ($)"
+        },
+        {
+          "key": "planPensiones",
+          "label": "401(k) / IRA contributions ($)"
+        }
+      ],
+      "advanced": [
+        {
+          "key": "cotizacionesSS",
+          "label": "FICA (Social Security + Medicare) ($)"
+        },
+        {
+          "key": "capitalMobiliario",
+          "label": "Investment income (interest, dividends) ($)"
+        },
+        {
+          "key": "capitalInmobiliario",
+          "label": "Rental income ($)"
+        },
+        {
+          "key": "gananciaPatrimonial",
+          "label": "Capital gains ($)"
+        },
+        {
+          "key": "donaciones",
+          "label": "Charitable contributions ($)"
+        },
+        {
+          "key": "retencionesTotales",
+          "label": "Total federal withholdings ($)"
+        }
+      ]
+    },
+    "autonomo": {
+      "basic": [
+        {
+          "key": "facturacionTotal",
+          "label": "Gross receipts ($)"
+        },
+        {
+          "key": "gastosDeducibles",
+          "label": "Business deductions (Schedule C) ($)"
+        },
+        {
+          "key": "ivaRepercutido",
+          "label": "Sales tax collected ($)"
+        },
+        {
+          "key": "ivaSoportado",
+          "label": "Sales tax paid ($)"
+        }
+      ],
+      "advanced": [
+        {
+          "key": "cuotaRETA",
+          "label": "Self-employment tax (Schedule SE) ($)"
+        },
+        {
+          "key": "pagosFracc130",
+          "label": "Estimated tax payments (Form 1040-ES) ($)"
+        },
+        {
+          "key": "retencionesSoportadas",
+          "label": "Backup withholdings ($)"
+        }
+      ]
+    },
+    "empresa": {
+      "basic": [
+        {
+          "key": "ingresosTotal",
+          "label": "Total gross receipts ($)"
+        },
+        {
+          "key": "gastosTotal",
+          "label": "Total deductions ($)"
+        },
+        {
+          "key": "ivaRepercutidoEmp",
+          "label": "Sales tax collected ($)"
+        },
+        {
+          "key": "ivaSoportadoEmp",
+          "label": "Sales tax paid ($)"
+        }
+      ],
+      "advanced": [
+        {
+          "key": "gastosNoDeducibles",
+          "label": "Non-deductible expenses ($)"
+        },
+        {
+          "key": "basesNegAnter",
+          "label": "Net operating loss carryover ($)"
+        },
+        {
+          "key": "pagosFracc202",
+          "label": "Estimated tax payments (Form 1120) ($)"
+        },
+        {
+          "key": "retencionesSop",
+          "label": "Federal tax withheld ($)"
+        }
+      ]
+    }
+  },
+  "clientForm": {
+    "taxIdLabel": "SSN (Social Security Number)",
+    "taxIdCompanyLabel": "EIN (Employer Identification Number)",
+    "taxIdPlaceholder": "e.g. 123-45-6789",
+    "regionLabel": "State",
+    "regions": [
+      "Alabama",
+      "Alaska",
+      "Arizona",
+      "Arkansas",
+      "California",
+      "Colorado",
+      "Connecticut",
+      "Delaware",
+      "Florida",
+      "Georgia",
+      "Hawaii",
+      "Idaho",
+      "Illinois",
+      "Indiana",
+      "Iowa",
+      "Kansas",
+      "Kentucky",
+      "Louisiana",
+      "Maine",
+      "Maryland",
+      "Massachusetts",
+      "Michigan",
+      "Minnesota",
+      "Mississippi",
+      "Missouri",
+      "Montana",
+      "Nebraska",
+      "Nevada",
+      "New Hampshire",
+      "New Jersey",
+      "New Mexico",
+      "New York",
+      "North Carolina",
+      "North Dakota",
+      "Ohio",
+      "Oklahoma",
+      "Oregon",
+      "Pennsylvania",
+      "Rhode Island",
+      "South Carolina",
+      "South Dakota",
+      "Tennessee",
+      "Texas",
+      "Utah",
+      "Vermont",
+      "Virginia",
+      "Washington",
+      "West Virginia",
+      "Wisconsin",
+      "Wyoming",
+      "District of Columbia"
+    ],
+    "companyTypes": [
+      {
+        "value": "llc",
+        "label": "LLC (Limited Liability Company)"
+      },
+      {
+        "value": "c_corp",
+        "label": "C-Corporation"
+      },
+      {
+        "value": "s_corp",
+        "label": "S-Corporation"
+      },
+      {
+        "value": "sole_prop",
+        "label": "Sole Proprietorship"
+      },
+      {
+        "value": "partnership",
+        "label": "Partnership (LP / LLP / GP)"
+      },
+      {
+        "value": "nonprofit",
+        "label": "501(c)(3) Nonprofit"
+      },
+      {
+        "value": "other",
+        "label": "Other"
+      }
+    ],
+    "companyTaxTypes": [
+      {
+        "value": "c_corp_21",
+        "label": "C-Corp federal (21%)"
+      },
+      {
+        "value": "s_corp_pass",
+        "label": "S-Corp (pass-through)"
+      },
+      {
+        "value": "llc_disregarded",
+        "label": "LLC disregarded entity"
+      },
+      {
+        "value": "llc_partnership",
+        "label": "LLC taxed as partnership"
+      },
+      {
+        "value": "llc_c_corp",
+        "label": "LLC taxed as C-Corp"
+      },
+      {
+        "value": "other",
+        "label": "Other"
+      }
+    ],
+    "vatRegimes": [
+      {
+        "value": "no_vat",
+        "label": "No federal VAT / Sales tax varies by state"
+      },
+      {
+        "value": "sales_tax",
+        "label": "State sales tax applies"
+      },
+      {
+        "value": "exempt",
+        "label": "Exempt (food, medicine, etc.)"
+      }
+    ],
+    "contractTypes": [
+      {
+        "value": "at_will",
+        "label": "At-will employment"
+      },
+      {
+        "value": "contract",
+        "label": "Employment contract"
+      },
+      {
+        "value": "part_time",
+        "label": "Part-time"
+      },
+      {
+        "value": "w2",
+        "label": "W-2 employee"
+      },
+      {
+        "value": "1099",
+        "label": "1099 independent contractor"
+      },
+      {
+        "value": "government",
+        "label": "Government employee"
+      }
+    ],
+    "selfEmployedFields": {
+      "registrationLabel": "Business registration / EIN date",
+      "activityCodeLabel": "NAICS code",
+      "activityCodePlaceholder": "e.g. 541110",
+      "hasSSRegistration": false,
+      "ssRegistrationLabel": "",
+      "incomeRegimes": [
+        {
+          "value": "schedule_c",
+          "label": "Schedule C (Sole proprietorship)"
+        },
+        {
+          "value": "s_corp_salary",
+          "label": "S-Corp salary + distributions"
+        },
+        {
+          "value": "partnership_k1",
+          "label": "Partnership (Schedule K-1)"
+        }
+      ],
+      "vatFilingFrequencies": [
+        {
+          "value": "quarterly",
+          "label": "Quarterly estimated taxes (1040-ES)"
+        },
+        {
+          "value": "annual",
+          "label": "Annual return (Form 1040)"
+        },
+        {
+          "value": "state_varies",
+          "label": "State filing varies"
+        }
+      ]
+    }
+  }
+}

@@ -1,0 +1,210 @@
+{
+  "country": "Danmark",
+  "code": "DK",
+  "year": 2026,
+  "currency": "DKK",
+  "incomeTax": {
+    "brackets": [
+      {
+        "from": 0,
+        "to": 50000,
+        "rate": 37.1
+      },
+      {
+        "from": 50000,
+        "to": 588899,
+        "rate": 37.1
+      },
+      {
+        "from": 588899,
+        "to": null,
+        "rate": 51.7
+      }
+    ],
+    "personalAllowance": 50000,
+    "notes": "Rates include municipal tax avg ~25.1% + bottom tax 12.09% + top tax 15%. Personal allowance 50,000 DKK."
+  },
+  "corporateTax": {
+    "standard": 22,
+    "small": 22,
+    "smallThreshold": 0
+  },
+  "vat": {
+    "standard": 25,
+    "reduced": 0,
+    "superReduced": 0
+  },
+  "socialSecurity": {
+    "employee": 8,
+    "employer": 0.5,
+    "selfEmployed": 8
+  },
+  "fields": {
+    "asalariado": {
+      "basic": [
+        { "key": "salarioBruto", "label": "Årlig bruttoløn (DKK)" },
+        { "key": "retencionesEmpresa", "label": "A-skat (indeholdt) (DKK)" }
+      ],
+      "advanced": [
+        { "key": "cotizacionesSS", "label": "AM-bidrag (DKK)" },
+        { "key": "capitalMobiliario", "label": "Kapitalindkomst (renter, udbytte) (DKK)" },
+        { "key": "capitalInmobiliario", "label": "Lejeindkomst (DKK)" },
+        { "key": "gananciaPatrimonial", "label": "Aktiegevinster (DKK)" },
+        { "key": "pensiones", "label": "Pension og ydelser (DKK)" },
+        { "key": "deduccionesAuto", "label": "Fradrag (beskæftigelsesfradrag m.m.) (DKK)" },
+        { "key": "donaciones", "label": "Gavefradrag (DKK)" }
+      ]
+    },
+    "autonomo": {
+      "basic": [
+        { "key": "facturacionTotal", "label": "Omsætning ekskl. moms (DKK)" },
+        { "key": "gastosDeducibles", "label": "Fradragsberettigede udgifter (inkl. bidrag) (DKK)" },
+        { "key": "ivaRepercutido", "label": "Salgsmoms (DKK)" },
+        { "key": "ivaSoportado", "label": "Købsmoms (DKK)" }
+      ],
+      "advanced": [
+        { "key": "otrosIngresos", "label": "Øvrige indtægter (DKK)" },
+        { "key": "amortizaciones", "label": "Afskrivninger (DKK)" },
+        { "key": "gastosFinancieros", "label": "Finansielle omkostninger (DKK)" },
+        { "key": "pagosFracc130", "label": "Acontoskat indbetalt (DKK)" },
+        { "key": "ivaRegularizacion", "label": "Momskorrektioner (DKK)" }
+      ]
+    },
+    "empresa": {
+      "basic": [
+        { "key": "ingresosTotal", "label": "Samlede indtægter (DKK)" },
+        { "key": "gastosTotal", "label": "Samlede udgifter (DKK)" },
+        { "key": "ivaRepercutidoEmp", "label": "Salgsmoms (DKK)" },
+        { "key": "ivaSoportadoEmp", "label": "Købsmoms (DKK)" }
+      ],
+      "advanced": [
+        { "key": "gastosNoDeducibles", "label": "Ikke-fradragsberettigede udgifter (DKK)" },
+        { "key": "basesNegAnter", "label": "Fremførte underskud (DKK)" },
+        { "key": "deduccionID", "label": "F&U-fradrag (DKK)" },
+        { "key": "deduccionEmpleo", "label": "Beskæftigelsesfradrag (DKK)" },
+        { "key": "pagosFracc202", "label": "Acontoskat selskab (DKK)" },
+        { "key": "ivaRegularizEmp", "label": "Momskorrektioner (DKK)" }
+      ]
+    }
+  },
+  "clientForm": {
+    "taxIdLabel": "CPR-nummer",
+    "taxIdCompanyLabel": "CVR-nummer",
+    "taxIdPlaceholder": "e.g. 010190-1234",
+    "regionLabel": "Region",
+    "regions": [
+      "Hovedstaden",
+      "Midtjylland",
+      "Nordjylland",
+      "Sjælland",
+      "Syddanmark"
+    ],
+    "companyTypes": [
+      {
+        "value": "aps",
+        "label": "ApS (Anpartsselskab)"
+      },
+      {
+        "value": "as",
+        "label": "A/S (Aktieselskab)"
+      },
+      {
+        "value": "is",
+        "label": "I/S (Interessentskab)"
+      },
+      {
+        "value": "ks",
+        "label": "K/S (Kommanditselskab)"
+      },
+      {
+        "value": "pmv",
+        "label": "P/S (Partnerselskab)"
+      },
+      {
+        "value": "enkeltmandsvirksomhed",
+        "label": "Enkeltmandsvirksomhed (Sole proprietorship)"
+      },
+      {
+        "value": "other",
+        "label": "Other"
+      }
+    ],
+    "companyTaxTypes": [
+      {
+        "value": "standard_22",
+        "label": "Standard (22%)"
+      },
+      {
+        "value": "other",
+        "label": "Other"
+      }
+    ],
+    "vatRegimes": [
+      {
+        "value": "general",
+        "label": "Standard (25%)"
+      },
+      {
+        "value": "exempt",
+        "label": "Exempt"
+      }
+    ],
+    "contractTypes": [
+      {
+        "value": "fastansat",
+        "label": "Permanent (fastansat)"
+      },
+      {
+        "value": "tidsbegrainset",
+        "label": "Fixed-term (tidsbegrænset)"
+      },
+      {
+        "value": "deltid",
+        "label": "Part-time (deltid)"
+      },
+      {
+        "value": "fleksjob",
+        "label": "Flex job (fleksjob)"
+      },
+      {
+        "value": "elev",
+        "label": "Apprentice (elev)"
+      }
+    ],
+    "selfEmployedFields": {
+      "registrationLabel": "CVR registration date",
+      "activityCodeLabel": "DB07 branch code",
+      "activityCodePlaceholder": "e.g. 69.10.00",
+      "hasSSRegistration": false,
+      "ssRegistrationLabel": "",
+      "incomeRegimes": [
+        {
+          "value": "virksomhedsordning",
+          "label": "Virksomhedsordningen (business scheme)"
+        },
+        {
+          "value": "kapitalafkastordning",
+          "label": "Kapitalafkastordningen (capital return scheme)"
+        },
+        {
+          "value": "personskatteloven",
+          "label": "Standard personal tax rules"
+        }
+      ],
+      "vatFilingFrequencies": [
+        {
+          "value": "monthly",
+          "label": "Monthly (månedligt)"
+        },
+        {
+          "value": "quarterly",
+          "label": "Quarterly (kvartalsvist)"
+        },
+        {
+          "value": "half_yearly",
+          "label": "Half-yearly (halvårligt)"
+        }
+      ]
+    }
+  }
+}

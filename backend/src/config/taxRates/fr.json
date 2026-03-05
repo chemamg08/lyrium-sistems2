@@ -1,0 +1,277 @@
+{
+  "country": "France",
+  "code": "FR",
+  "year": 2026,
+  "currency": "EUR",
+  "incomeTax": {
+    "brackets": [
+      {
+        "from": 0,
+        "to": 11497,
+        "rate": 0
+      },
+      {
+        "from": 11497,
+        "to": 29315,
+        "rate": 11
+      },
+      {
+        "from": 29315,
+        "to": 83823,
+        "rate": 30
+      },
+      {
+        "from": 83823,
+        "to": 180294,
+        "rate": 41
+      },
+      {
+        "from": 180294,
+        "to": null,
+        "rate": 45
+      }
+    ],
+    "personalAllowance": 0,
+    "notes": "CSG/CRDS ~9.7% additional on gross income. Employee SS ~22% total on gross."
+  },
+  "corporateTax": {
+    "standard": 25,
+    "small": 15,
+    "smallThreshold": 42500
+  },
+  "vat": {
+    "standard": 20,
+    "reduced": 10,
+    "superReduced": 5.5
+  },
+  "socialSecurity": {
+    "employee": 22.0,
+    "employer": 42.0,
+    "selfEmployed": 22.0
+  },
+  "fields": {
+    "asalariado": {
+      "basic": [
+        { "key": "salarioBruto", "label": "Salaire brut annuel (€)" },
+        { "key": "retencionesEmpresa", "label": "Prélèvement à la source retenu (€)" }
+      ],
+      "advanced": [
+        { "key": "cotizacionesSS", "label": "Cotisations sociales salarié (€)" },
+        { "key": "capitalMobiliario", "label": "Revenus de capitaux mobiliers (€)" },
+        { "key": "capitalInmobiliario", "label": "Revenus fonciers (€)" },
+        { "key": "gananciaPatrimonial", "label": "Plus-values mobilières et immobilières (€)" },
+        { "key": "pensiones", "label": "Pensions et retraites (€)" },
+        { "key": "deduccionesAuto", "label": "Déductions supplémentaires (€)" },
+        { "key": "donaciones", "label": "Dons aux œuvres (€)" }
+      ]
+    },
+    "autonomo": {
+      "basic": [
+        { "key": "facturacionTotal", "label": "Chiffre d\u2019affaires HT (€)" },
+        { "key": "gastosDeducibles", "label": "Charges déductibles (cotisations URSSAF incl.) (€)" },
+        { "key": "ivaRepercutido", "label": "TVA collectée (€)" },
+        { "key": "ivaSoportado", "label": "TVA déductible (€)" }
+      ],
+      "advanced": [
+        { "key": "otrosIngresos", "label": "Autres revenus (€)" },
+        { "key": "amortizaciones", "label": "Amortissements (€)" },
+        { "key": "gastosFinancieros", "label": "Charges financières (€)" },
+        { "key": "pagosFracc130", "label": "Acomptes d\u2019IR / prélèvements (€)" },
+        { "key": "ivaRegularizacion", "label": "Régularisations TVA (€)" }
+      ]
+    },
+    "empresa": {
+      "basic": [
+        { "key": "ingresosTotal", "label": "Produits totaux (€)" },
+        { "key": "gastosTotal", "label": "Charges totales (€)" },
+        { "key": "ivaRepercutidoEmp", "label": "TVA collectée (€)" },
+        { "key": "ivaSoportadoEmp", "label": "TVA déductible (€)" }
+      ],
+      "advanced": [
+        { "key": "gastosNoDeducibles", "label": "Charges non déductibles (€)" },
+        { "key": "basesNegAnter", "label": "Déficits antérieurs reportables (€)" },
+        { "key": "deduccionID", "label": "Crédit d\u2019impôt recherche – CIR (€)" },
+        { "key": "deduccionEmpleo", "label": "Crédit d\u2019impôt emploi / CICE (€)" },
+        { "key": "pagosFracc202", "label": "Acomptes IS (€)" },
+        { "key": "ivaRegularizEmp", "label": "Régularisations TVA (€)" }
+      ]
+    }
+  },
+  "clientForm": {
+    "taxIdLabel": "Numéro fiscal (SPI)",
+    "taxIdCompanyLabel": "SIREN / SIRET",
+    "taxIdPlaceholder": "e.g. 13 chiffres",
+    "regionLabel": "Région",
+    "regions": [
+      "Auvergne-Rhône-Alpes",
+      "Bourgogne-Franche-Comté",
+      "Bretagne",
+      "Centre-Val de Loire",
+      "Corse",
+      "Grand Est",
+      "Hauts-de-France",
+      "Île-de-France",
+      "Normandie",
+      "Nouvelle-Aquitaine",
+      "Occitanie",
+      "Pays de la Loire",
+      "Provence-Alpes-Côte d'Azur",
+      "Guadeloupe",
+      "Guyane",
+      "La Réunion",
+      "Martinique",
+      "Mayotte"
+    ],
+    "companyTypes": [
+      {
+        "value": "sarl",
+        "label": "SARL (Société à responsabilité limitée)"
+      },
+      {
+        "value": "eurl",
+        "label": "EURL (Entreprise unipersonnelle à responsabilité limitée)"
+      },
+      {
+        "value": "sas",
+        "label": "SAS (Société par actions simplifiée)"
+      },
+      {
+        "value": "sasu",
+        "label": "SASU (SAS unipersonnelle)"
+      },
+      {
+        "value": "sa",
+        "label": "SA (Société anonyme)"
+      },
+      {
+        "value": "sci",
+        "label": "SCI (Société civile immobilière)"
+      },
+      {
+        "value": "micro",
+        "label": "Micro-entreprise / Auto-entrepreneur"
+      },
+      {
+        "value": "other",
+        "label": "Other"
+      }
+    ],
+    "companyTaxTypes": [
+      {
+        "value": "is_25",
+        "label": "IS standard (25%)"
+      },
+      {
+        "value": "is_15",
+        "label": "IS réduit PME (15% ≤ 42 500 €)"
+      },
+      {
+        "value": "ir",
+        "label": "IR (impôt sur le revenu – pass-through)"
+      },
+      {
+        "value": "other",
+        "label": "Other"
+      }
+    ],
+    "vatRegimes": [
+      {
+        "value": "general",
+        "label": "TVA standard (20%)"
+      },
+      {
+        "value": "reduced_10",
+        "label": "TVA réduit (10%)"
+      },
+      {
+        "value": "reduced_5_5",
+        "label": "TVA réduit (5.5%)"
+      },
+      {
+        "value": "reduced_2_1",
+        "label": "TVA super-réduit (2.1%)"
+      },
+      {
+        "value": "franchise",
+        "label": "Franchise en base de TVA"
+      },
+      {
+        "value": "exempt",
+        "label": "Exonéré"
+      }
+    ],
+    "contractTypes": [
+      {
+        "value": "cdi",
+        "label": "CDI (contrat à durée indéterminée)"
+      },
+      {
+        "value": "cdd",
+        "label": "CDD (contrat à durée déterminée)"
+      },
+      {
+        "value": "interim",
+        "label": "Intérim"
+      },
+      {
+        "value": "alternance",
+        "label": "Alternance / apprentissage"
+      },
+      {
+        "value": "fonctionnaire",
+        "label": "Fonctionnaire"
+      },
+      {
+        "value": "temps_partiel",
+        "label": "Temps partiel"
+      }
+    ],
+    "selfEmployedFields": {
+      "registrationLabel": "Date d'immatriculation URSSAF",
+      "activityCodeLabel": "Code APE / NAF",
+      "activityCodePlaceholder": "e.g. 69.10Z",
+      "hasSSRegistration": true,
+      "ssRegistrationLabel": "URSSAF / SSI registration",
+      "incomeRegimes": [
+        {
+          "value": "micro_bnc",
+          "label": "Micro-BNC (abattement 34%)"
+        },
+        {
+          "value": "micro_bic",
+          "label": "Micro-BIC (abattement 50%/71%)"
+        },
+        {
+          "value": "reel_simplifie",
+          "label": "Réel simplifié"
+        },
+        {
+          "value": "reel_normal",
+          "label": "Réel normal"
+        },
+        {
+          "value": "declaration_controlee",
+          "label": "Déclaration contrôlée"
+        }
+      ],
+      "vatFilingFrequencies": [
+        {
+          "value": "monthly",
+          "label": "Mensuelle"
+        },
+        {
+          "value": "quarterly",
+          "label": "Trimestrielle"
+        },
+        {
+          "value": "annual",
+          "label": "Annuelle (régime simplifié)"
+        },
+        {
+          "value": "none",
+          "label": "Franchise de TVA"
+        }
+      ]
+    }
+  }
+}

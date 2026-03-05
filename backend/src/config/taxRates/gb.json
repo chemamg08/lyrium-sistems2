@@ -1,0 +1,310 @@
+{
+  "country": "United Kingdom",
+  "code": "GB",
+  "year": 2026,
+  "currency": "GBP",
+  "incomeTax": {
+    "brackets": [
+      {
+        "desde": 0,
+        "hasta": 12570,
+        "tipo": 0
+      },
+      {
+        "desde": 12570,
+        "hasta": 50270,
+        "tipo": 20
+      },
+      {
+        "desde": 50270,
+        "hasta": 125140,
+        "tipo": 40
+      },
+      {
+        "desde": 125140,
+        "hasta": null,
+        "tipo": 45
+      }
+    ],
+    "personalAllowance": 12570,
+    "notes": "Personal allowance tapers above £100k"
+  },
+  "corporateTax": {
+    "standard": 25,
+    "small": 19,
+    "smallThreshold": 50000
+  },
+  "vat": {
+    "standard": 20,
+    "reduced": 5,
+    "superReduced": 0
+  },
+  "socialSecurity": {
+    "employee": 8,
+    "employer": 13.8,
+    "selfEmployed": 6
+  },
+  "fields": {
+    "asalariado": {
+      "basic": [
+        {
+          "key": "salarioBruto",
+          "label": "Annual gross salary (£)"
+        },
+        {
+          "key": "retencionesEmpresa",
+          "label": "PAYE tax withheld (£)"
+        },
+        {
+          "key": "planPensiones",
+          "label": "Pension contributions (£)"
+        }
+      ],
+      "advanced": [
+        {
+          "key": "cotizacionesSS",
+          "label": "Employee NIC (£)"
+        },
+        {
+          "key": "capitalMobiliario",
+          "label": "Savings & dividend income (£)"
+        },
+        {
+          "key": "capitalInmobiliario",
+          "label": "Rental income (£)"
+        },
+        {
+          "key": "gananciaPatrimonial",
+          "label": "Capital gains (£)"
+        },
+        {
+          "key": "donaciones",
+          "label": "Gift Aid donations (£)"
+        },
+        {
+          "key": "retencionesTotales",
+          "label": "Total withholdings (£)"
+        }
+      ]
+    },
+    "autonomo": {
+      "basic": [
+        {
+          "key": "facturacionTotal",
+          "label": "Turnover excl. VAT (£)"
+        },
+        {
+          "key": "gastosDeducibles",
+          "label": "Allowable expenses (£)"
+        },
+        {
+          "key": "ivaRepercutido",
+          "label": "VAT collected / output tax (£)"
+        },
+        {
+          "key": "ivaSoportado",
+          "label": "VAT paid / input tax (£)"
+        }
+      ],
+      "advanced": [
+        {
+          "key": "cuotaRETA",
+          "label": "Class 2 & 4 NIC (£)"
+        },
+        {
+          "key": "pagosFracc130",
+          "label": "Payments on account (£)"
+        },
+        {
+          "key": "retencionesSoportadas",
+          "label": "CIS deductions suffered (£)"
+        }
+      ]
+    },
+    "empresa": {
+      "basic": [
+        {
+          "key": "ingresosTotal",
+          "label": "Total turnover (£)"
+        },
+        {
+          "key": "gastosTotal",
+          "label": "Total allowable expenses (£)"
+        },
+        {
+          "key": "ivaRepercutidoEmp",
+          "label": "Output VAT (£)"
+        },
+        {
+          "key": "ivaSoportadoEmp",
+          "label": "Input VAT (£)"
+        }
+      ],
+      "advanced": [
+        {
+          "key": "gastosNoDeducibles",
+          "label": "Disallowable expenses (£)"
+        },
+        {
+          "key": "basesNegAnter",
+          "label": "Prior-year losses (£)"
+        },
+        {
+          "key": "pagosFracc202",
+          "label": "Quarterly instalment payments (£)"
+        },
+        {
+          "key": "retencionesSop",
+          "label": "Tax deducted at source (£)"
+        }
+      ]
+    }
+  },
+  "clientForm": {
+    "taxIdLabel": "National Insurance Number (NI)",
+    "taxIdCompanyLabel": "Company Registration Number (CRN)",
+    "taxIdPlaceholder": "e.g. QQ 12 34 56 A",
+    "regionLabel": "Region",
+    "regions": [
+      "East Midlands",
+      "East of England",
+      "London",
+      "North East",
+      "North West",
+      "Northern Ireland",
+      "Scotland",
+      "South East",
+      "South West",
+      "Wales",
+      "West Midlands",
+      "Yorkshire and the Humber"
+    ],
+    "companyTypes": [
+      {
+        "value": "ltd",
+        "label": "Ltd (Private Limited Company)"
+      },
+      {
+        "value": "plc",
+        "label": "PLC (Public Limited Company)"
+      },
+      {
+        "value": "llp",
+        "label": "LLP (Limited Liability Partnership)"
+      },
+      {
+        "value": "partnership",
+        "label": "Partnership"
+      },
+      {
+        "value": "sole_trader",
+        "label": "Sole Trader"
+      },
+      {
+        "value": "cic",
+        "label": "CIC (Community Interest Company)"
+      },
+      {
+        "value": "other",
+        "label": "Other"
+      }
+    ],
+    "companyTaxTypes": [
+      {
+        "value": "main_25",
+        "label": "Main rate (25%)"
+      },
+      {
+        "value": "small_profits_19",
+        "label": "Small profits rate (19%)"
+      },
+      {
+        "value": "marginal_relief",
+        "label": "Marginal relief (£50k–£250k)"
+      },
+      {
+        "value": "other",
+        "label": "Other"
+      }
+    ],
+    "vatRegimes": [
+      {
+        "value": "general",
+        "label": "Standard (20%)"
+      },
+      {
+        "value": "reduced_5",
+        "label": "Reduced (5%)"
+      },
+      {
+        "value": "zero_rated",
+        "label": "Zero-rated (0%)"
+      },
+      {
+        "value": "flat_rate",
+        "label": "Flat Rate Scheme"
+      },
+      {
+        "value": "exempt",
+        "label": "Exempt / below threshold"
+      }
+    ],
+    "contractTypes": [
+      {
+        "value": "permanent",
+        "label": "Permanent (full-time)"
+      },
+      {
+        "value": "fixed_term",
+        "label": "Fixed-term"
+      },
+      {
+        "value": "part_time",
+        "label": "Part-time"
+      },
+      {
+        "value": "zero_hours",
+        "label": "Zero-hours contract"
+      },
+      {
+        "value": "agency",
+        "label": "Agency worker"
+      },
+      {
+        "value": "apprentice",
+        "label": "Apprentice"
+      }
+    ],
+    "selfEmployedFields": {
+      "registrationLabel": "HMRC self-employment registration date",
+      "activityCodeLabel": "SIC code",
+      "activityCodePlaceholder": "e.g. 69109",
+      "hasSSRegistration": false,
+      "ssRegistrationLabel": "",
+      "incomeRegimes": [
+        {
+          "value": "cash",
+          "label": "Cash basis"
+        },
+        {
+          "value": "accrual",
+          "label": "Traditional (accrual) accounting"
+        }
+      ],
+      "vatFilingFrequencies": [
+        {
+          "value": "quarterly",
+          "label": "Quarterly"
+        },
+        {
+          "value": "monthly",
+          "label": "Monthly"
+        },
+        {
+          "value": "annual",
+          "label": "Annual accounting scheme"
+        }
+      ]
+    }
+  }
+}

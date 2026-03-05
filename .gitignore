@@ -1,0 +1,138 @@
+# ==========================================
+# Dependencias
+# ==========================================
+node_modules/
+frontend/node_modules/
+backend/node_modules/
+
+# ==========================================
+# Build
+# ==========================================
+dist/
+build/
+frontend/dist/
+backend/dist/
+
+# ==========================================
+# Logs
+# ==========================================
+*.log
+npm-debug.log*
+logs/
+
+# ==========================================
+# Environment
+# ==========================================
+.env
+.env.local
+.env.*.local
+backend/.env
+
+# ==========================================
+# IDE
+# ==========================================
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+
+# ==========================================
+# OS
+# ==========================================
+.DS_Store
+Thumbs.db
+
+# ==========================================
+# Tests
+# ==========================================
+coverage/
+.nyc_output/
+
+# ==========================================
+# Temp
+# ==========================================
+*.tmp
+.cache/
+
+# ==========================================
+# Uploads (user files — do not commit)
+# ==========================================
+backend/uploads/
+
+# ==========================================
+# Generated contracts and template PDFs (user data — stored on Render disk)
+# ==========================================
+backend/generated_contracts/
+backend/templates/
+
+# ==========================================
+# Raw legal source PDFs (processed versions are in legal_knowledge/)
+# ==========================================
+backend/leyes/
+
+# ==========================================
+# Backend JSON data files (migrated to MongoDB — do not commit)
+# ==========================================
+backend/accounts.json
+backend/subaccounts.json
+backend/clientes.json
+backend/chats.json
+backend/contract_chats.json
+backend/defense_chat.json
+backend/assistant_chats.json
+backend/document_summaries_chats.json
+backend/fiscal_chats.json
+backend/fiscal_profiles.json
+backend/fiscal_alerts.json
+backend/automatizaciones.json
+backend/calculos.json
+backend/writing_texts.json
+backend/stats.json
+backend/specialties_settings.json
+backend/jobs.json
+backend/subscriptions.json
+backend/email_config.json
+backend/conf.json
+backend/generatedContracts.json
+backend/subicontra.json
+
+# ==========================================
+# Legal knowledge embeddings (too large for git, 546MB+)
+# ==========================================
+backend/legal_knowledge/
+
+# ==========================================
+# Dev scripts — Python dev/debug scripts and temp JS files
+# ==========================================
+backend/check_*.py
+backend/fix_*.py
+backend/patch_*.py
+backend/read_*.py
+backend/scan_*.py
+backend/verify_*.py
+backend/final_scan.py
+backend/tmp_*.mjs
+backend/importacion_log.txt
+
+# ==========================================
+# Root temp/dev helper files
+# ==========================================
+_*.py
+_*.json
+_*.txt
+email_config.json
+
+# ==========================================
+# Old/unused folders
+# ==========================================
+finalista/
+fine-tuning/
+legal españa/
+
+# ==========================================
+# Misc — superseded or sensitive files
+# ==========================================
+gitignore.txt
+STRIPE_SETUP.md
+vitest.config.ts

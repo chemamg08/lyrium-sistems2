@@ -1,0 +1,250 @@
+{
+  "country": "Ireland",
+  "code": "IE",
+  "year": 2026,
+  "currency": "EUR",
+  "incomeTax": {
+    "brackets": [
+      {
+        "from": 0,
+        "to": 42000,
+        "rate": 20
+      },
+      {
+        "from": 42000,
+        "to": null,
+        "rate": 40
+      }
+    ],
+    "personalAllowance": 0,
+    "notes": "USC: 0-12012 @0.5%, 12012-25760 @2%, 25760-70044 @4%, >70044 @8%. PRSI employee 4.1%, employer ~10.95%."
+  },
+  "corporateTax": {
+    "standard": 12.5,
+    "small": 12.5,
+    "smallThreshold": 0
+  },
+  "vat": {
+    "standard": 23,
+    "reduced": 13.5,
+    "superReduced": 9
+  },
+  "socialSecurity": {
+    "employee": 4.1,
+    "employer": 10.95,
+    "selfEmployed": 4.1
+  },
+  "fields": {
+    "asalariado": {
+      "basic": [
+        { "key": "salarioBruto", "label": "Annual gross salary (€)" },
+        { "key": "retencionesEmpresa", "label": "PAYE income tax withheld (€)" }
+      ],
+      "advanced": [
+        { "key": "cotizacionesSS", "label": "Employee PRSI (€)" },
+        { "key": "capitalMobiliario", "label": "Deposit interest & dividends – DIRT (€)" },
+        { "key": "capitalInmobiliario", "label": "Rental income (€)" },
+        { "key": "gananciaPatrimonial", "label": "Capital gains – CGT (€)" },
+        { "key": "pensiones", "label": "Pensions & social welfare (€)" },
+        { "key": "deduccionesAuto", "label": "Tax credits & reliefs (USC, health, etc.) (€)" },
+        { "key": "donaciones", "label": "Approved charity donations (€)" }
+      ]
+    },
+    "autonomo": {
+      "basic": [
+        { "key": "facturacionTotal", "label": "Turnover excl. VAT (€)" },
+        { "key": "gastosDeducibles", "label": "Allowable expenses incl. PRSI (€)" },
+        { "key": "ivaRepercutido", "label": "VAT charged / output VAT (€)" },
+        { "key": "ivaSoportado", "label": "VAT paid / input VAT (€)" }
+      ],
+      "advanced": [
+        { "key": "otrosIngresos", "label": "Other income (€)" },
+        { "key": "amortizaciones", "label": "Capital allowances (€)" },
+        { "key": "gastosFinancieros", "label": "Interest & financial expenses (€)" },
+        { "key": "pagosFracc130", "label": "Preliminary tax paid (€)" },
+        { "key": "ivaRegularizacion", "label": "VAT adjustments (€)" }
+      ]
+    },
+    "empresa": {
+      "basic": [
+        { "key": "ingresosTotal", "label": "Total income (€)" },
+        { "key": "gastosTotal", "label": "Total deductible expenses (€)" },
+        { "key": "ivaRepercutidoEmp", "label": "Output VAT (€)" },
+        { "key": "ivaSoportadoEmp", "label": "Input VAT (€)" }
+      ],
+      "advanced": [
+        { "key": "gastosNoDeducibles", "label": "Disallowable expenses (€)" },
+        { "key": "basesNegAnter", "label": "Losses forward (€)" },
+        { "key": "deduccionID", "label": "R&D tax credit (25%) (€)" },
+        { "key": "deduccionEmpleo", "label": "Employment & investment incentive (€)" },
+        { "key": "pagosFracc202", "label": "Preliminary corporation tax (€)" },
+        { "key": "ivaRegularizEmp", "label": "VAT adjustments (€)" }
+      ]
+    }
+  },
+  "clientForm": {
+    "taxIdLabel": "PPS Number (Personal Public Service)",
+    "taxIdCompanyLabel": "CRO Number / Tax Reference",
+    "taxIdPlaceholder": "e.g. 1234567AB",
+    "regionLabel": "County",
+    "regions": [
+      "Carlow",
+      "Cavan",
+      "Clare",
+      "Cork",
+      "Donegal",
+      "Dublin",
+      "Galway",
+      "Kerry",
+      "Kildare",
+      "Kilkenny",
+      "Laois",
+      "Leitrim",
+      "Limerick",
+      "Longford",
+      "Louth",
+      "Mayo",
+      "Meath",
+      "Monaghan",
+      "Offaly",
+      "Roscommon",
+      "Sligo",
+      "Tipperary",
+      "Waterford",
+      "Westmeath",
+      "Wexford",
+      "Wicklow"
+    ],
+    "companyTypes": [
+      {
+        "value": "ltd",
+        "label": "Private Company Limited by Shares (Ltd)"
+      },
+      {
+        "value": "dac",
+        "label": "DAC (Designated Activity Company)"
+      },
+      {
+        "value": "plc",
+        "label": "PLC (Public Limited Company)"
+      },
+      {
+        "value": "clg",
+        "label": "CLG (Company Limited by Guarantee)"
+      },
+      {
+        "value": "partnership",
+        "label": "Partnership"
+      },
+      {
+        "value": "sole_trader",
+        "label": "Sole Trader"
+      },
+      {
+        "value": "other",
+        "label": "Other"
+      }
+    ],
+    "companyTaxTypes": [
+      {
+        "value": "standard_12_5",
+        "label": "Trading income (12.5%)"
+      },
+      {
+        "value": "passive_25",
+        "label": "Non-trading / passive (25%)"
+      },
+      {
+        "value": "pillar2_15",
+        "label": "Pillar Two minimum (15%)"
+      },
+      {
+        "value": "other",
+        "label": "Other"
+      }
+    ],
+    "vatRegimes": [
+      {
+        "value": "general",
+        "label": "Standard (23%)"
+      },
+      {
+        "value": "reduced_13_5",
+        "label": "Reduced (13.5%)"
+      },
+      {
+        "value": "reduced_9",
+        "label": "Reduced (9%)"
+      },
+      {
+        "value": "reduced_4_8",
+        "label": "Livestock (4.8%)"
+      },
+      {
+        "value": "zero_rated",
+        "label": "Zero-rated (0%)"
+      },
+      {
+        "value": "exempt",
+        "label": "Exempt"
+      }
+    ],
+    "contractTypes": [
+      {
+        "value": "permanent",
+        "label": "Permanent (full-time)"
+      },
+      {
+        "value": "fixed_term",
+        "label": "Fixed-term"
+      },
+      {
+        "value": "part_time",
+        "label": "Part-time"
+      },
+      {
+        "value": "specified_purpose",
+        "label": "Specified-purpose"
+      },
+      {
+        "value": "agency",
+        "label": "Agency"
+      }
+    ],
+    "selfEmployedFields": {
+      "registrationLabel": "Revenue registration date",
+      "activityCodeLabel": "NACE code",
+      "activityCodePlaceholder": "e.g. 69.10",
+      "hasSSRegistration": true,
+      "ssRegistrationLabel": "PRSI Class S",
+      "incomeRegimes": [
+        {
+          "value": "self_assessed",
+          "label": "Self-assessed (Form 11)"
+        },
+        {
+          "value": "cash",
+          "label": "Cash basis"
+        },
+        {
+          "value": "accrual",
+          "label": "Accruals basis"
+        }
+      ],
+      "vatFilingFrequencies": [
+        {
+          "value": "bimonthly",
+          "label": "Bi-monthly"
+        },
+        {
+          "value": "quarterly",
+          "label": "Quarterly"
+        },
+        {
+          "value": "annual",
+          "label": "Annual"
+        }
+      ]
+    }
+  }
+}

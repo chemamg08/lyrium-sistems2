@@ -1,0 +1,202 @@
+{
+  "country": "Lithuania",
+  "code": "LT",
+  "year": 2026,
+  "currency": "EUR",
+  "incomeTax": {
+    "brackets": [
+      {
+        "desde": 0,
+        "hasta": 101094,
+        "tipo": 20
+      },
+      {
+        "desde": 101094,
+        "hasta": null,
+        "tipo": 32
+      }
+    ],
+    "personalAllowance": 8112,
+    "notes": "NPD (tax-free amount) decreases with higher income"
+  },
+  "corporateTax": {
+    "standard": 15,
+    "small": 5,
+    "smallThreshold": 300000
+  },
+  "vat": {
+    "standard": 21,
+    "reduced": 9,
+    "superReduced": 5
+  },
+  "socialSecurity": {
+    "employee": 19.5,
+    "employer": 1.77,
+    "selfEmployed": 19.5
+  },
+  "fields": {
+    "asalariado": {
+      "basic": [
+        { "key": "salarioBruto", "label": "Metinis bruto atlyginimas (€)" },
+        { "key": "retencionesEmpresa", "label": "Darbdavio išskaičiuotas GPM (€)" },
+        { "key": "planPensiones", "label": "Pensijų fondų įmokos (€)" }
+      ],
+      "advanced": [
+        { "key": "cotizacionesSS", "label": "Sodra įmokos (€)" },
+        { "key": "capitalMobiliario", "label": "Kapitalo pajamos (€)" },
+        { "key": "retencionesTotales", "label": "Iš viso išskaičiuota (€)" }
+      ]
+    },
+    "autonomo": {
+      "basic": [
+        { "key": "facturacionTotal", "label": "Pajamos be PVM (€)" },
+        { "key": "gastosDeducibles", "label": "Leidžiami atskaitymai (€)" },
+        { "key": "ivaRepercutido", "label": "Pardavimo PVM (€)" },
+        { "key": "ivaSoportado", "label": "Pirkimo PVM (€)" }
+      ],
+      "advanced": [
+        { "key": "cuotaRETA", "label": "Sodra (savarankiškas darbuotojas) (€)" },
+        { "key": "pagosFracc130", "label": "Avansiniai GPM mokėjimai (€)" }
+      ]
+    },
+    "empresa": {
+      "basic": [
+        { "key": "ingresosTotal", "label": "Visos pajamos (€)" },
+        { "key": "gastosTotal", "label": "Visos sąnaudos (€)" },
+        { "key": "ivaRepercutidoEmp", "label": "Pardavimo PVM (€)" },
+        { "key": "ivaSoportadoEmp", "label": "Pirkimo PVM (€)" }
+      ],
+      "advanced": [
+        { "key": "gastosNoDeducibles", "label": "Neleidžiami atskaitymai (€)" },
+        { "key": "basesNegAnter", "label": "Ankstesnių metų nuostoliai (€)" },
+        { "key": "pagosFracc202", "label": "Avansiniai pelno mokesčio mokėjimai (€)" },
+        { "key": "retencionesSop", "label": "Išskaičiuoti mokesčiai (€)" }
+      ]
+    }
+  },
+  "clientForm": {
+    "taxIdLabel": "Asmens kodas (Personal code)",
+    "taxIdCompanyLabel": "Įmonės kodas (Company code)",
+    "taxIdPlaceholder": "e.g. 38001010001",
+    "regionLabel": "Apskritis (County)",
+    "regions": [
+      "Alytaus",
+      "Kauno",
+      "Klaipėdos",
+      "Marijampolės",
+      "Panevėžio",
+      "Šiaulių",
+      "Tauragės",
+      "Telšių",
+      "Utenos",
+      "Vilniaus"
+    ],
+    "companyTypes": [
+      {
+        "value": "uab",
+        "label": "UAB (Uždaroji akcinė bendrovė – Private Ltd)"
+      },
+      {
+        "value": "ab",
+        "label": "AB (Akcinė bendrovė – Public Ltd)"
+      },
+      {
+        "value": "ii",
+        "label": "IĮ (Individuali įmonė – Sole proprietorship)"
+      },
+      {
+        "value": "mb",
+        "label": "MB (Mažoji bendrija – Small partnership)"
+      },
+      {
+        "value": "tikroji",
+        "label": "TŪB (Tikroji ūkinė bendrija – General partnership)"
+      },
+      {
+        "value": "komanditine",
+        "label": "KŪB (Komanditinė – Limited partnership)"
+      },
+      {
+        "value": "other",
+        "label": "Other"
+      }
+    ],
+    "companyTaxTypes": [
+      {
+        "value": "standard_15",
+        "label": "Standard (15%)"
+      },
+      {
+        "value": "reduced_5",
+        "label": "Reduced (5% for small companies)"
+      },
+      {
+        "value": "other",
+        "label": "Other"
+      }
+    ],
+    "vatRegimes": [
+      {
+        "value": "general",
+        "label": "Standard (21%)"
+      },
+      {
+        "value": "reduced_9",
+        "label": "Reduced (9%)"
+      },
+      {
+        "value": "reduced_5",
+        "label": "Reduced (5%)"
+      },
+      {
+        "value": "exempt",
+        "label": "Exempt"
+      }
+    ],
+    "contractTypes": [
+      {
+        "value": "neterminuota",
+        "label": "Neterminuota (Permanent)"
+      },
+      {
+        "value": "terminuota",
+        "label": "Terminuota (Fixed-term)"
+      },
+      {
+        "value": "ne_visa",
+        "label": "Ne visa darbo diena (Part-time)"
+      },
+      {
+        "value": "laikina",
+        "label": "Laikina (Temporary)"
+      }
+    ],
+    "selfEmployedFields": {
+      "registrationLabel": "Individualios veiklos pažyma (certificate date)",
+      "activityCodeLabel": "EVRK code",
+      "activityCodePlaceholder": "e.g. 69.10",
+      "hasSSRegistration": true,
+      "ssRegistrationLabel": "Sodra registration",
+      "incomeRegimes": [
+        {
+          "value": "individuali_veikla",
+          "label": "Individuali veikla (business certificate)"
+        },
+        {
+          "value": "verslo_liudijimas",
+          "label": "Verslo liudijimas (business licence)"
+        }
+      ],
+      "vatFilingFrequencies": [
+        {
+          "value": "monthly",
+          "label": "Monthly (kas mėnesį)"
+        },
+        {
+          "value": "quarterly",
+          "label": "Quarterly (kas ketvirtį)"
+        }
+      ]
+    }
+  }
+}

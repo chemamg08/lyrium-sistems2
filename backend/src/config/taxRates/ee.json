@@ -1,0 +1,189 @@
+{
+  "country": "Estonia",
+  "code": "EE",
+  "year": 2026,
+  "currency": "EUR",
+  "incomeTax": {
+    "brackets": [
+      {
+        "desde": 0,
+        "hasta": null,
+        "tipo": 20
+      }
+    ],
+    "personalAllowance": 7848,
+    "notes": "Flat 20% income tax; basic exemption up to €7 848"
+  },
+  "corporateTax": {
+    "standard": 20,
+    "small": 14,
+    "smallThreshold": 0,
+    "notes": "CIT only on distributed profits"
+  },
+  "vat": {
+    "standard": 22,
+    "reduced": 9,
+    "superReduced": 5
+  },
+  "socialSecurity": {
+    "employee": 1.6,
+    "employer": 33.8,
+    "selfEmployed": 33.8
+  },
+  "fields": {
+    "asalariado": {
+      "basic": [
+        { "key": "salarioBruto", "label": "Aasta brutopalk (€)" },
+        { "key": "retencionesEmpresa", "label": "Tööandja kinnipeetud tulumaks (€)" },
+        { "key": "planPensiones", "label": "II samba pensionimaksed (€)" }
+      ],
+      "advanced": [
+        { "key": "cotizacionesSS", "label": "Sotsiaalkindlustuse maksed (€)" },
+        { "key": "capitalMobiliario", "label": "Kapitalitulu (€)" },
+        { "key": "retencionesTotales", "label": "Kinnipidamised kokku (€)" }
+      ]
+    },
+    "autonomo": {
+      "basic": [
+        { "key": "facturacionTotal", "label": "Käive ilma käibemaksuta (€)" },
+        { "key": "gastosDeducibles", "label": "Mahaarvatavad kulud (€)" },
+        { "key": "ivaRepercutido", "label": "Käibemaks müügilt (€)" },
+        { "key": "ivaSoportado", "label": "Sisendkäibemaks (€)" }
+      ],
+      "advanced": [
+        { "key": "cuotaRETA", "label": "Sotsiaalmaks (€)" },
+        { "key": "pagosFracc130", "label": "Tulumaksu ettemaksed (€)" }
+      ]
+    },
+    "empresa": {
+      "basic": [
+        { "key": "ingresosTotal", "label": "Kogutulud (€)" },
+        { "key": "gastosTotal", "label": "Kogukulud (€)" },
+        { "key": "ivaRepercutidoEmp", "label": "Käibemaks müügilt (€)" },
+        { "key": "ivaSoportadoEmp", "label": "Sisendkäibemaks (€)" }
+      ],
+      "advanced": [
+        { "key": "gastosNoDeducibles", "label": "Mittemahaarvatavad kulud (€)" },
+        { "key": "pagosFracc202", "label": "Ettevõtte tulumaksu ettemaksed (€)" }
+      ]
+    }
+  },
+  "clientForm": {
+    "taxIdLabel": "Isikukood (Personal ID)",
+    "taxIdCompanyLabel": "Registrikood",
+    "taxIdPlaceholder": "e.g. 38001010001",
+    "regionLabel": "Maakond (County)",
+    "regions": [
+      "Harju",
+      "Hiiu",
+      "Ida-Viru",
+      "Järva",
+      "Jõgeva",
+      "Lääne",
+      "Lääne-Viru",
+      "Pärnu",
+      "Põlva",
+      "Rapla",
+      "Saare",
+      "Tartu",
+      "Valga",
+      "Viljandi",
+      "Võru"
+    ],
+    "companyTypes": [
+      {
+        "value": "ou",
+        "label": "OÜ (Osaühing – Private limited)"
+      },
+      {
+        "value": "as",
+        "label": "AS (Aktsiaselts – Public limited)"
+      },
+      {
+        "value": "tu",
+        "label": "TÜ (Täisühing – General partnership)"
+      },
+      {
+        "value": "uu",
+        "label": "UÜ (Usaldusühing – Limited partnership)"
+      },
+      {
+        "value": "fie",
+        "label": "FIE (Sole proprietor)"
+      },
+      {
+        "value": "other",
+        "label": "Other"
+      }
+    ],
+    "companyTaxTypes": [
+      {
+        "value": "standard_20",
+        "label": "Standard (20% on distributions)"
+      },
+      {
+        "value": "reduced_14",
+        "label": "Reduced (14% for regular dividends)"
+      },
+      {
+        "value": "other",
+        "label": "Other"
+      }
+    ],
+    "vatRegimes": [
+      {
+        "value": "general",
+        "label": "Standard (22%)"
+      },
+      {
+        "value": "reduced_9",
+        "label": "Reduced (9%)"
+      },
+      {
+        "value": "reduced_5",
+        "label": "Reduced (5%)"
+      },
+      {
+        "value": "exempt",
+        "label": "Exempt"
+      }
+    ],
+    "contractTypes": [
+      {
+        "value": "taihtajatu",
+        "label": "Permanent (tähtajatu)"
+      },
+      {
+        "value": "taihtajaline",
+        "label": "Fixed-term (tähtajaline)"
+      },
+      {
+        "value": "osaline",
+        "label": "Part-time (osaline tööaeg)"
+      }
+    ],
+    "selfEmployedFields": {
+      "registrationLabel": "FIE registration date",
+      "activityCodeLabel": "EMTAK code",
+      "activityCodePlaceholder": "e.g. 69101",
+      "hasSSRegistration": false,
+      "ssRegistrationLabel": "",
+      "incomeRegimes": [
+        {
+          "value": "cash",
+          "label": "Cash basis"
+        },
+        {
+          "value": "accrual",
+          "label": "Accrual basis"
+        }
+      ],
+      "vatFilingFrequencies": [
+        {
+          "value": "monthly",
+          "label": "Monthly"
+        }
+      ]
+    }
+  }
+}

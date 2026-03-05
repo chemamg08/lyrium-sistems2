@@ -1,0 +1,223 @@
+{
+  "country": "Australia",
+  "code": "AU",
+  "year": 2026,
+  "currency": "AUD",
+  "incomeTax": {
+    "brackets": [
+      {
+        "from": 0,
+        "to": 18200,
+        "rate": 0
+      },
+      {
+        "from": 18200,
+        "to": 45000,
+        "rate": 19
+      },
+      {
+        "from": 45000,
+        "to": 120000,
+        "rate": 32.5
+      },
+      {
+        "from": 120000,
+        "to": 180000,
+        "rate": 37
+      },
+      {
+        "from": 180000,
+        "to": null,
+        "rate": 45
+      }
+    ],
+    "personalAllowance": 18200,
+    "notes": "Medicare levy 2% added to income tax. Super contributions: employer 11.5%"
+  },
+  "corporateTax": {
+    "standard": 30,
+    "small": 25,
+    "smallThreshold": 50000000
+  },
+  "vat": {
+    "standard": 10,
+    "reduced": 0,
+    "superReduced": 0
+  },
+  "socialSecurity": {
+    "employee": 0,
+    "employer": 11.5,
+    "selfEmployed": 11.5
+  },
+  "fields": {
+    "asalariado": {
+      "basic": [
+        { "key": "salarioBruto", "label": "Annual gross salary (A$)" },
+        { "key": "retencionesEmpresa", "label": "PAYG tax withheld (A$)" }
+      ],
+      "advanced": [
+        { "key": "cotizacionesSS", "label": "Superannuation guarantee (A$)" },
+        { "key": "capitalMobiliario", "label": "Interest & dividend income (A$)" },
+        { "key": "capitalInmobiliario", "label": "Rental income (A$)" },
+        { "key": "gananciaPatrimonial", "label": "Capital gains (A$)" },
+        { "key": "pensiones", "label": "Pensions & government payments (A$)" },
+        { "key": "deduccionesAuto", "label": "Work-related deductions (A$)" },
+        { "key": "donaciones", "label": "Deductible gifts & donations (A$)" }
+      ]
+    },
+    "autonomo": {
+      "basic": [
+        { "key": "facturacionTotal", "label": "Business income excl. GST (A$)" },
+        { "key": "gastosDeducibles", "label": "Allowable business deductions (A$)" },
+        { "key": "ivaRepercutido", "label": "GST collected (A$)" },
+        { "key": "ivaSoportado", "label": "GST paid / input credits (A$)" }
+      ],
+      "advanced": [
+        { "key": "otrosIngresos", "label": "Other income (A$)" },
+        { "key": "amortizaciones", "label": "Depreciation / capital allowances (A$)" },
+        { "key": "gastosFinancieros", "label": "Interest & financial expenses (A$)" },
+        { "key": "pagosFracc130", "label": "PAYG instalments paid (A$)" },
+        { "key": "ivaRegularizacion", "label": "GST adjustments (A$)" }
+      ]
+    },
+    "empresa": {
+      "basic": [
+        { "key": "ingresosTotal", "label": "Total assessable income (A$)" },
+        { "key": "gastosTotal", "label": "Total allowable deductions (A$)" },
+        { "key": "ivaRepercutidoEmp", "label": "GST collected (A$)" },
+        { "key": "ivaSoportadoEmp", "label": "GST paid / input credits (A$)" }
+      ],
+      "advanced": [
+        { "key": "gastosNoDeducibles", "label": "Non-deductible expenses (A$)" },
+        { "key": "basesNegAnter", "label": "Prior-year tax losses (A$)" },
+        { "key": "deduccionID", "label": "R&D tax incentive (A$)" },
+        { "key": "deduccionEmpleo", "label": "Employment tax offsets (A$)" },
+        { "key": "pagosFracc202", "label": "Company PAYG instalments (A$)" },
+        { "key": "ivaRegularizEmp", "label": "GST adjustments (A$)" }
+      ]
+    }
+  },
+  "clientForm": {
+    "taxIdLabel": "Tax File Number (TFN)",
+    "taxIdCompanyLabel": "Australian Business Number (ABN)",
+    "taxIdPlaceholder": "e.g. 123 456 789",
+    "regionLabel": "State / Territory",
+    "regions": [
+      "Australian Capital Territory",
+      "New South Wales",
+      "Northern Territory",
+      "Queensland",
+      "South Australia",
+      "Tasmania",
+      "Victoria",
+      "Western Australia"
+    ],
+    "companyTypes": [
+      {
+        "value": "pty_ltd",
+        "label": "Pty Ltd (Proprietary Limited)"
+      },
+      {
+        "value": "ltd",
+        "label": "Ltd (Public Company)"
+      },
+      {
+        "value": "partnership",
+        "label": "Partnership"
+      },
+      {
+        "value": "trust",
+        "label": "Trust"
+      },
+      {
+        "value": "sole_trader",
+        "label": "Sole Trader"
+      },
+      {
+        "value": "other",
+        "label": "Other"
+      }
+    ],
+    "companyTaxTypes": [
+      {
+        "value": "standard_30",
+        "label": "Standard (30%)"
+      },
+      {
+        "value": "base_rate_25",
+        "label": "Base rate entity (25%)"
+      },
+      {
+        "value": "other",
+        "label": "Other"
+      }
+    ],
+    "vatRegimes": [
+      {
+        "value": "general",
+        "label": "GST registered (10%)"
+      },
+      {
+        "value": "gst_free",
+        "label": "GST-free"
+      },
+      {
+        "value": "exempt",
+        "label": "Input-taxed / exempt"
+      }
+    ],
+    "contractTypes": [
+      {
+        "value": "permanent_ft",
+        "label": "Permanent full-time"
+      },
+      {
+        "value": "permanent_pt",
+        "label": "Permanent part-time"
+      },
+      {
+        "value": "casual",
+        "label": "Casual"
+      },
+      {
+        "value": "fixed_term",
+        "label": "Fixed-term"
+      },
+      {
+        "value": "contractor",
+        "label": "Independent contractor"
+      }
+    ],
+    "selfEmployedFields": {
+      "registrationLabel": "ABN registration date",
+      "activityCodeLabel": "ANZSIC code",
+      "activityCodePlaceholder": "e.g. 6931",
+      "hasSSRegistration": false,
+      "ssRegistrationLabel": "",
+      "incomeRegimes": [
+        {
+          "value": "cash",
+          "label": "Cash basis"
+        },
+        {
+          "value": "accrual",
+          "label": "Accrual basis"
+        }
+      ],
+      "vatFilingFrequencies": [
+        {
+          "value": "monthly",
+          "label": "Monthly"
+        },
+        {
+          "value": "quarterly",
+          "label": "Quarterly"
+        },
+        {
+          "value": "annual",
+          "label": "Annual"
+        }
+      ]
+    }
+  }
+}

@@ -1,0 +1,242 @@
+{
+  "country": "Romania",
+  "code": "RO",
+  "year": 2026,
+  "currency": "RON",
+  "incomeTax": {
+    "brackets": [
+      {
+        "desde": 0,
+        "hasta": null,
+        "tipo": 10
+      }
+    ],
+    "personalAllowance": 0,
+    "notes": "Flat 10% income tax"
+  },
+  "corporateTax": {
+    "standard": 16,
+    "small": 1,
+    "smallThreshold": 500000,
+    "notes": "Micro-enterprise: 1% on turnover (or 3% without employees)"
+  },
+  "vat": {
+    "standard": 19,
+    "reduced": 9,
+    "superReduced": 5
+  },
+  "socialSecurity": {
+    "employee": 35,
+    "employer": 2.25,
+    "selfEmployed": 35
+  },
+  "fields": {
+    "asalariado": {
+      "basic": [
+        { "key": "salarioBruto", "label": "Salariul brut anual (RON)" },
+        { "key": "retencionesEmpresa", "label": "Impozit pe venit reținut (RON)" },
+        { "key": "planPensiones", "label": "Contribuții pensie privată (RON)" }
+      ],
+      "advanced": [
+        { "key": "cotizacionesSS", "label": "CAS + CASS (angajat) (RON)" },
+        { "key": "capitalMobiliario", "label": "Venituri din capital (RON)" },
+        { "key": "retencionesTotales", "label": "Total rețineri (RON)" }
+      ]
+    },
+    "autonomo": {
+      "basic": [
+        { "key": "facturacionTotal", "label": "Venituri fără TVA (RON)" },
+        { "key": "gastosDeducibles", "label": "Cheltuieli deductibile (RON)" },
+        { "key": "ivaRepercutido", "label": "TVA colectată (RON)" },
+        { "key": "ivaSoportado", "label": "TVA deductibilă (RON)" }
+      ],
+      "advanced": [
+        { "key": "cuotaRETA", "label": "CAS + CASS (PFA) (RON)" },
+        { "key": "pagosFracc130", "label": "Plăți anticipate impozit (RON)" }
+      ]
+    },
+    "empresa": {
+      "basic": [
+        { "key": "ingresosTotal", "label": "Venituri totale (RON)" },
+        { "key": "gastosTotal", "label": "Cheltuieli totale (RON)" },
+        { "key": "ivaRepercutidoEmp", "label": "TVA colectată (RON)" },
+        { "key": "ivaSoportadoEmp", "label": "TVA deductibilă (RON)" }
+      ],
+      "advanced": [
+        { "key": "gastosNoDeducibles", "label": "Cheltuieli nedeductibile (RON)" },
+        { "key": "basesNegAnter", "label": "Pierderi din anii precedenți (RON)" },
+        { "key": "pagosFracc202", "label": "Plăți anticipate impozit pe profit (RON)" },
+        { "key": "retencionesSop", "label": "Impozite reținute (RON)" }
+      ]
+    }
+  },
+  "clientForm": {
+    "taxIdLabel": "CNP (Cod Numeric Personal)",
+    "taxIdCompanyLabel": "CUI (Cod Unic de Înregistrare)",
+    "taxIdPlaceholder": "e.g. 1800101123456",
+    "regionLabel": "Județ (County)",
+    "regions": [
+      "Alba",
+      "Arad",
+      "Argeș",
+      "Bacău",
+      "Bihor",
+      "Bistrița-Năsăud",
+      "Botoșani",
+      "Brașov",
+      "Brăila",
+      "București",
+      "Buzău",
+      "Caraș-Severin",
+      "Călărași",
+      "Cluj",
+      "Constanța",
+      "Covasna",
+      "Dâmbovița",
+      "Dolj",
+      "Galați",
+      "Giurgiu",
+      "Gorj",
+      "Harghita",
+      "Hunedoara",
+      "Ialomița",
+      "Iași",
+      "Ilfov",
+      "Maramureș",
+      "Mehedinți",
+      "Mureș",
+      "Neamț",
+      "Olt",
+      "Prahova",
+      "Satu Mare",
+      "Sălaj",
+      "Sibiu",
+      "Suceava",
+      "Teleorman",
+      "Timiș",
+      "Tulcea",
+      "Vaslui",
+      "Vâlcea",
+      "Vrancea"
+    ],
+    "companyTypes": [
+      {
+        "value": "srl",
+        "label": "SRL (Societate cu Răspundere Limitată)"
+      },
+      {
+        "value": "srl_d",
+        "label": "SRL-D (SRL Debutant)"
+      },
+      {
+        "value": "sa",
+        "label": "SA (Societate pe Acțiuni)"
+      },
+      {
+        "value": "scs",
+        "label": "SCS (Societate în Comandită Simplă)"
+      },
+      {
+        "value": "snc",
+        "label": "SNC (Societate în Nume Colectiv)"
+      },
+      {
+        "value": "pfa",
+        "label": "PFA (Persoană Fizică Autorizată)"
+      },
+      {
+        "value": "ii",
+        "label": "II (Întreprindere Individuală)"
+      },
+      {
+        "value": "other",
+        "label": "Other"
+      }
+    ],
+    "companyTaxTypes": [
+      {
+        "value": "impozit_profit_16",
+        "label": "Impozit pe profit (16%)"
+      },
+      {
+        "value": "micro_1",
+        "label": "Microîntreprindere – 1%"
+      },
+      {
+        "value": "micro_3",
+        "label": "Microîntreprindere – 3%"
+      },
+      {
+        "value": "other",
+        "label": "Other"
+      }
+    ],
+    "vatRegimes": [
+      {
+        "value": "general",
+        "label": "TVA standard (19%)"
+      },
+      {
+        "value": "reduced_9",
+        "label": "TVA redus (9%)"
+      },
+      {
+        "value": "reduced_5",
+        "label": "TVA redus (5%)"
+      },
+      {
+        "value": "scutit",
+        "label": "Scutit (exempt)"
+      }
+    ],
+    "contractTypes": [
+      {
+        "value": "nedeterminata",
+        "label": "Pe durată nedeterminată (Permanent)"
+      },
+      {
+        "value": "determinata",
+        "label": "Pe durată determinată (Fixed-term)"
+      },
+      {
+        "value": "partial",
+        "label": "Cu timp parțial (Part-time)"
+      },
+      {
+        "value": "temporar",
+        "label": "Muncă temporară"
+      }
+    ],
+    "selfEmployedFields": {
+      "registrationLabel": "Data înregistrare PFA / ONRC",
+      "activityCodeLabel": "Cod CAEN",
+      "activityCodePlaceholder": "e.g. 6910",
+      "hasSSRegistration": true,
+      "ssRegistrationLabel": "CAS / CASS declaration",
+      "incomeRegimes": [
+        {
+          "value": "sistem_real",
+          "label": "Sistem real (real income)"
+        },
+        {
+          "value": "norma_venit",
+          "label": "Norma de venit (income norm)"
+        }
+      ],
+      "vatFilingFrequencies": [
+        {
+          "value": "monthly",
+          "label": "Lunar (monthly)"
+        },
+        {
+          "value": "quarterly",
+          "label": "Trimestrial (quarterly)"
+        },
+        {
+          "value": "semi_annual",
+          "label": "Semestrial (semi-annual)"
+        }
+      ]
+    }
+  }
+}
