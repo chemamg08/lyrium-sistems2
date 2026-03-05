@@ -945,7 +945,15 @@
     "cookieDesc": "Vi bruker informasjonskapsler for å forbedre opplevelsen din. Du kan godta alle eller bare de nødvendige.",
     "cookieAccept": "Godta alle",
     "cookieReject": "Bare nødvendige",
-    "footerCustomerService": "Kundeservice e-post:",
+    "cookieConfigure": "Konfigurer",
+    "cookieSave": "Lagre preferanser",
+    "cookieCatEssential": "Nødvendige",
+    "cookieCatEssentialDesc": "Kreves for grunnleggende funksjonalitet. Alltid aktive.",
+    "cookieCatAnalytics": "Analyse",
+    "cookieCatAnalyticsDesc": "Hjelper oss å forstå hvordan du bruker appen.",
+    "cookieCatMarketing": "Markedsføring",
+    "cookieCatMarketingDesc": "Lar oss vise deg personaliserte annonser.",
+    "footerCustomerService": "Kundeservice e-post (også for forslag) (også for forslag):",
     "footerCopy": "© 2026 Lyrium. Alle rettigheter forbeholdt."
   },
   "legal": {

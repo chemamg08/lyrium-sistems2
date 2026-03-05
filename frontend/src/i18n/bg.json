@@ -945,7 +945,15 @@
     "cookieDesc": "Използваме бисквитки, за да подобрим вашето изживяване. Можете да приемете всички или само основните.",
     "cookieAccept": "Приеми всички",
     "cookieReject": "Само основните",
-    "footerCustomerService": "Имейл за обслужване на клиенти:",
+    "cookieConfigure": "Конфигуриране",
+    "cookieSave": "Запазване на предпочитанията",
+    "cookieCatEssential": "Основни",
+    "cookieCatEssentialDesc": "Необходими за основната функционалност. Винаги активни.",
+    "cookieCatAnalytics": "Аналитика",
+    "cookieCatAnalyticsDesc": "Помагат ни да разберем как използвате приложението.",
+    "cookieCatMarketing": "Маркетинг",
+    "cookieCatMarketingDesc": "Позволяват ни да ви показваме персонализирани реклами.",
+    "footerCustomerService": "Имейл за обслужване на клиенти (също за предложения) (също за предложения):",
     "footerCopy": "© 2026 Lyrium. Всички права запазени."
   },
   "legal": {

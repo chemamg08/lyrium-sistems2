@@ -945,7 +945,15 @@
     "cookieDesc": "Käytämme evästeitä parantaaksemme kokemustasi. Voit hyväksyä kaikki tai vain välttämättömät.",
     "cookieAccept": "Hyväksy kaikki",
     "cookieReject": "Vain välttämättömät",
-    "footerCustomerService": "Asiakaspalvelun sähköposti:",
+    "cookieConfigure": "Määritä",
+    "cookieSave": "Tallenna asetukset",
+    "cookieCatEssential": "Välttämättömät",
+    "cookieCatEssentialDesc": "Vaaditaan perustoiminnallisuuteen. Aina aktiiviset.",
+    "cookieCatAnalytics": "Analytiikka",
+    "cookieCatAnalyticsDesc": "Auttavat meitä ymmärtämään, miten käytät sovellusta.",
+    "cookieCatMarketing": "Markkinointi",
+    "cookieCatMarketingDesc": "Mahdollistavat personoitujen mainosten näyttämisen.",
+    "footerCustomerService": "Asiakaspalvelun sähköposti (myös ehdotuksille) (myös ehdotuksille):",
     "footerCopy": "© 2026 Lyrium. Kaikki oikeudet pidätetään."
   },
   "legal": {

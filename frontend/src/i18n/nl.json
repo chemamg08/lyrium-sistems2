@@ -946,7 +946,15 @@
     "cookieDesc": "Wij gebruiken cookies om uw ervaring te verbeteren. U kunt alle cookies of alleen de essentiële accepteren.",
     "cookieAccept": "Alle accepteren",
     "cookieReject": "Alleen essentiële",
-    "footerCustomerService": "Klantenservice e-mail:",
+    "cookieConfigure": "Configureren",
+    "cookieSave": "Voorkeuren opslaan",
+    "cookieCatEssential": "Essentieel",
+    "cookieCatEssentialDesc": "Vereist voor de basisfunctionaliteit. Altijd actief.",
+    "cookieCatAnalytics": "Analyse",
+    "cookieCatAnalyticsDesc": "Helpt ons te begrijpen hoe u de app gebruikt.",
+    "cookieCatMarketing": "Marketing",
+    "cookieCatMarketingDesc": "Stellen ons in staat gepersonaliseerde advertenties te tonen.",
+    "footerCustomerService": "Klantenservice e-mail (ook voor suggesties) (ook voor suggesties):",
     "footerCopy": "© 2026 Lyrium. Alle rechten voorbehouden."
   },
   "legal": {

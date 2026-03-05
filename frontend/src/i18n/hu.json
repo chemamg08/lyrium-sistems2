@@ -945,7 +945,15 @@
     "cookieDesc": "Cookie-kat használunk az élmény javításához. Elfogadhatja az összeset vagy csak a szükségeseket.",
     "cookieAccept": "Összes elfogadása",
     "cookieReject": "Csak szükségesek",
-    "footerCustomerService": "Ügyfélszolgálati e-mail:",
+    "cookieConfigure": "Konfigurálás",
+    "cookieSave": "Beállítások mentése",
+    "cookieCatEssential": "Szükséges",
+    "cookieCatEssentialDesc": "Az alapvető funkcionalitáshoz szükséges. Mindig aktív.",
+    "cookieCatAnalytics": "Analitika",
+    "cookieCatAnalyticsDesc": "Segítenek megérteni, hogyan használja az alkalmazást.",
+    "cookieCatMarketing": "Marketing",
+    "cookieCatMarketingDesc": "Lehetővé teszik személyre szabott hirdetések megjelenítését.",
+    "footerCustomerService": "Ügyfélszolgálati e-mail (javaslatok esetén is) (javaslatok esetén is):",
     "footerCopy": "© 2026 Lyrium. Minden jog fenntartva."
   },
   "legal": {

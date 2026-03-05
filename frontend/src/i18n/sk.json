@@ -945,7 +945,15 @@
     "cookieDesc": "Používame cookies na zlepšenie vášho zážitku. Môžete prijať všetky alebo len nevyhnutné.",
     "cookieAccept": "Prijať všetky",
     "cookieReject": "Len nevyhnutné",
-    "footerCustomerService": "E-mail zákazníckej podpory:",
+    "cookieConfigure": "Konfigurovať",
+    "cookieSave": "Uložiť predvoľby",
+    "cookieCatEssential": "Nevyhnutné",
+    "cookieCatEssentialDesc": "Vyžadované pre základnú funkčnosť. Vždy aktívne.",
+    "cookieCatAnalytics": "Analytika",
+    "cookieCatAnalyticsDesc": "Pomáhajú nám pochopiť, ako používate aplikáciu.",
+    "cookieCatMarketing": "Marketing",
+    "cookieCatMarketingDesc": "Umožňujú nám zobrazovať vám personalizované reklamy.",
+    "footerCustomerService": "E-mail zákazníckej podpory (aj pre návrhy) (aj pre návrhy):",
     "footerCopy": "© 2026 Lyrium. Všetky práva vyhradené."
   },
   "legal": {

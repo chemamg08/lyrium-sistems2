@@ -945,7 +945,15 @@
     "cookieDesc": "Kasutame küpsiseid teie kogemuse parandamiseks. Saate aktsepteerida kõik või ainult olulised.",
     "cookieAccept": "Aktsepteeri kõik",
     "cookieReject": "Ainult olulised",
-    "footerCustomerService": "Klienditeeninduse e-post:",
+    "cookieConfigure": "Seadistamine",
+    "cookieSave": "Salvesta eelistused",
+    "cookieCatEssential": "Vajalikud",
+    "cookieCatEssentialDesc": "Vajalikud põhifunktsionaalsuse jaoks. Alati aktiivsed.",
+    "cookieCatAnalytics": "Analüütika",
+    "cookieCatAnalyticsDesc": "Aitavad meil mõista, kuidas rakendust kasutate.",
+    "cookieCatMarketing": "Turundus",
+    "cookieCatMarketingDesc": "Võimaldavad meil näidata teile isikupärastatud reklaame.",
+    "footerCustomerService": "Klienditeeninduse e-post (ka ettepanekuteks) (ka ettepanekuteks):",
     "footerCopy": "© 2026 Lyrium. Kõik õigused kaitstud."
   },
   "legal": {

@@ -949,7 +949,15 @@
     "cookieDesc": "Nous utilisons des cookies pour améliorer votre expérience. Vous pouvez accepter tous les cookies ou uniquement les essentiels.",
     "cookieAccept": "Tout accepter",
     "cookieReject": "Essentiels uniquement",
-    "footerCustomerService": "E-mail du service client:",
+    "cookieConfigure": "Configurer",
+    "cookieSave": "Sauvegarder les préférences",
+    "cookieCatEssential": "Essentiels",
+    "cookieCatEssentialDesc": "Requis pour le fonctionnement de base. Toujours actifs.",
+    "cookieCatAnalytics": "Analytique",
+    "cookieCatAnalyticsDesc": "Nous aident à comprendre comment vous utilisez l'application.",
+    "cookieCatMarketing": "Marketing",
+    "cookieCatMarketingDesc": "Nous permettent de vous afficher des publicités personnalisées.",
+    "footerCustomerService": "E-mail du service client (aussi pour les suggestions) (aussi pour les suggestions):",
     "footerCopy": "© 2026 Lyrium. Tous droits réservés."
   },
   "legal": {

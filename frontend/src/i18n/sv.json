@@ -945,7 +945,15 @@
     "cookieDesc": "Vi använder cookies för att förbättra din upplevelse. Du kan acceptera alla eller bara de nödvändiga.",
     "cookieAccept": "Acceptera alla",
     "cookieReject": "Bara nödvändiga",
-    "footerCustomerService": "Kundtjänst e-post:",
+    "cookieConfigure": "Konfigurera",
+    "cookieSave": "Spara inställningar",
+    "cookieCatEssential": "Nödvändiga",
+    "cookieCatEssentialDesc": "Krävs för grundläggande funktionalitet. Alltid aktiva.",
+    "cookieCatAnalytics": "Analys",
+    "cookieCatAnalyticsDesc": "Hjälper oss förstå hur du använder appen.",
+    "cookieCatMarketing": "Marknadsföring",
+    "cookieCatMarketingDesc": "Gör det möjligt för oss att visa personanpassade annonser.",
+    "footerCustomerService": "Kundtjänst e-post (även för förslag) (även för förslag):",
     "footerCopy": "© 2026 Lyrium. Alla rättigheter reserverade."
   },
   "legal": {

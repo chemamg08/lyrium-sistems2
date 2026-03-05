@@ -945,7 +945,15 @@
     "cookieDesc": "Naudojame slapukus jūsų patirčiai pagerinti. Galite priimti visus arba tik būtinuosius.",
     "cookieAccept": "Priimti visus",
     "cookieReject": "Tik būtinieji",
-    "footerCustomerService": "Klientų aptarnavimo el. paštas:",
+    "cookieConfigure": "Konfigūruoti",
+    "cookieSave": "Išsaugoti nuostatas",
+    "cookieCatEssential": "Būtinosios",
+    "cookieCatEssentialDesc": "Reikalingos pagrindiniam funkcionalumui. Visada aktyvios.",
+    "cookieCatAnalytics": "Analitika",
+    "cookieCatAnalyticsDesc": "Padeda mums suprasti, kaip naudojate programėlę.",
+    "cookieCatMarketing": "Rinkodara",
+    "cookieCatMarketingDesc": "Leidžia mums rodyti jums suasmenintą reklamą.",
+    "footerCustomerService": "Klientų aptarnavimo el. paštas (taip pat pasiūlymams) (taip pat pasiūlymams):",
     "footerCopy": "© 2026 Lyrium. Visos teisės saugomos."
   },
   "legal": {
