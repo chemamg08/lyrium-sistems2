@@ -1,0 +1,156 @@
+{
+  "country": "Uruguay",
+  "code": "UY",
+  "year": 2026,
+  "currency": "UYU",
+  "incomeTax": {
+    "brackets": [
+      {
+        "from": 0,
+        "to": 468120,
+        "rate": 0
+      },
+      {
+        "from": 468120,
+        "to": 669600,
+        "rate": 10
+      },
+      {
+        "from": 669600,
+        "to": 1005000,
+        "rate": 15
+      },
+      {
+        "from": 1005000,
+        "to": 1541400,
+        "rate": 24
+      },
+      {
+        "from": 1541400,
+        "to": 2350200,
+        "rate": 25
+      },
+      {
+        "from": 2350200,
+        "to": 3560400,
+        "rate": 27
+      },
+      {
+        "from": 3560400,
+        "to": 5423400,
+        "rate": 31
+      },
+      {
+        "from": 5423400,
+        "to": null,
+        "rate": 36
+      }
+    ],
+    "personalAllowance": 468120,
+    "notes": "IRPF (Impuesto a la Renta de las Personas Físicas). Monthly BPC-based thresholds annualized."
+  },
+  "corporateTax": {
+    "standard": 25,
+    "small": 25,
+    "smallThreshold": 0
+  },
+  "vat": {
+    "standard": 22,
+    "reduced": 10,
+    "superReduced": 0
+  },
+  "socialSecurity": {
+    "employee": 18.1,
+    "employer": 12.6,
+    "selfEmployed": 30.7
+  },
+  "fields": {
+    "asalariado": {
+      "basic": [
+        {
+          "key": "salarioBruto",
+          "label": "Sueldo nominal anual (UYU)"
+        },
+        {
+          "key": "retencionesEmpresa",
+          "label": "IRPF retenido (UYU)"
+        }
+      ],
+      "advanced": [
+        {
+          "key": "cotizacionesSS",
+          "label": "Aportes BPS (jubilatorio + FONASA) (UYU)"
+        }
+      ]
+    },
+    "autonomo": {
+      "basic": [
+        {
+          "key": "facturacionTotal",
+          "label": "Ingresos brutos (UYU)"
+        },
+        {
+          "key": "gastosDeducibles",
+          "label": "Gastos deducibles (UYU)"
+        },
+        {
+          "key": "ivaRepercutido",
+          "label": "IVA facturado (UYU)"
+        },
+        {
+          "key": "ivaSoportado",
+          "label": "IVA compras (UYU)"
+        }
+      ],
+      "advanced": []
+    },
+    "empresa": {
+      "basic": [
+        {
+          "key": "ingresosTotal",
+          "label": "Ingresos gravados (UYU)"
+        },
+        {
+          "key": "gastosTotal",
+          "label": "Gastos deducibles (UYU)"
+        },
+        {
+          "key": "ivaRepercutidoEmp",
+          "label": "IVA ventas (UYU)"
+        },
+        {
+          "key": "ivaSoportadoEmp",
+          "label": "IVA compras (UYU)"
+        }
+      ],
+      "advanced": []
+    }
+  },
+  "clientForm": {
+    "taxIdLabel": "RUT / CI",
+    "taxIdCompanyLabel": "RUT",
+    "taxIdPlaceholder": "ej. 211234560019",
+    "regionLabel": "Departamento",
+    "regions": [
+      "Artigas",
+      "Canelones",
+      "Cerro Largo",
+      "Colonia",
+      "Durazno",
+      "Flores",
+      "Florida",
+      "Lavalleja",
+      "Maldonado",
+      "Montevideo",
+      "Paysandú",
+      "Río Negro",
+      "Rivera",
+      "Rocha",
+      "Salto",
+      "San José",
+      "Soriano",
+      "Tacuarembó",
+      "Treinta y Tres"
+    ]
+  }
+}

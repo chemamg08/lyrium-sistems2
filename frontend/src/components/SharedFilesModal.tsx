@@ -3,7 +3,7 @@ import { useTranslation } from 'react-i18next';
 import { X, Share2, Eye, Trash2, Upload, FileText, Users, Check } from 'lucide-react';
 import { authFetch } from '../lib/authFetch';
 
-const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:3000/api';
+const API_URL = import.meta.env.VITE_API_URL;
 
 interface SharedFile {
   id: string;

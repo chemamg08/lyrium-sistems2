@@ -2,7 +2,7 @@ import { Request, Response } from 'express';
 import fs from 'fs/promises';
 import path from 'path';
 import { fileURLToPath } from 'url';
-import { callDefenseAI, extractDefenseStrategy, streamDefenseAI, getAiClient } from '../services/aiService.js';
+import { callDefenseAI, extractDefenseStrategy, streamDefenseAI, getAiClient, AI_MODEL } from '../services/aiService.js';
 import { generateDefensePDF } from '../services/pdfService.js';
 import { getAccountSpecialties } from '../services/specialtiesService.js';
 import { getLegalContextForAccount, buildCountryLegalSystemPrompt, getAccountCountry } from '../services/legalKnowledgeService.js';
@@ -11,6 +11,8 @@ import { DefenseChat } from '../models/DefenseChat.js';
 import { Chat } from '../models/Chat.js';
 import { Client } from '../models/Client.js';
 import { Stat } from '../models/Stat.js';
+import { sanitizeFilename } from '../utils/sanitizeFilename.js';
+import { verifyOwnership } from '../middleware/auth.js';
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
@@ -45,6 +47,7 @@ export const getDefenseChats = async (req: Request, res: Response) => {
     if (!accountId) {
       return res.status(400).json({ error: 'accountId es requerido' });
     }
+    if (!verifyOwnership(req, accountId as string)) return res.status(403).json({ error: 'Acceso denegado' });
     
     const filter: any = { accountId: accountId as string };
     const user = (req as any).user;
@@ -80,6 +83,7 @@ export const createDefenseChat = async (req: Request, res: Response) => {
     if (!accountId) {
       return res.status(400).json({ error: 'accountId es requerido' });
     }
+    if (!verifyOwnership(req, accountId as string)) return res.status(403).json({ error: 'Acceso denegado' });
 
     const accountChatsCount = await DefenseChat.countDocuments({ accountId: accountId as string });
     
@@ -116,6 +120,7 @@ export const deleteDefenseChatById = async (req: Request, res: Response) => {
     if (!chatId || !accountId) {
       return res.status(400).json({ error: 'chatId y accountId son requeridos' });
     }
+    if (!verifyOwnership(req, accountId as string)) return res.status(403).json({ error: 'Acceso denegado' });
 
     const deleteFilter: any = { _id: chatId, accountId: accountId as string };
     const user = (req as any).user;
@@ -145,6 +150,7 @@ export const updateDefenseChatTitle = async (req: Request, res: Response) => {
     if (!chatId || !accountId || !title) {
       return res.status(400).json({ error: 'chatId, accountId y title son requeridos' });
     }
+    if (!verifyOwnership(req, accountId as string)) return res.status(403).json({ error: 'Acceso denegado' });
 
     const chat = await DefenseChat.findOneAndUpdate(
       { _id: chatId, accountId },
@@ -171,6 +177,7 @@ export const getDefenseChat = async (req: Request, res: Response) => {
     if (!accountId) {
       return res.status(400).json({ error: 'accountId es requerido' });
     }
+    if (!verifyOwnership(req, accountId as string)) return res.status(403).json({ error: 'Acceso denegado' });
     
     let chat;
     const user = (req as any).user;
@@ -219,6 +226,7 @@ export const sendDefenseMessage = async (req: Request, res: Response) => {
     if (!accountId) {
       return res.status(400).json({ error: 'accountId es requerido' });
     }
+    if (!verifyOwnership(req, accountId as string)) return res.status(403).json({ error: 'Acceso denegado' });
 
     let chat;
     
@@ -261,6 +269,24 @@ export const sendDefenseMessage = async (req: Request, res: Response) => {
       // El usuario confirmó guardar estrategia
       try {
         const extraction = await extractDefenseStrategy(chat.messages);
+
+        // Validar que la extracción tiene contenido real
+        const hasContent = extraction.lineasDefensa.length > 0 ||
+          extraction.argumentosJuridicos.length > 0 ||
+          extraction.jurisprudencia.length > 0 ||
+          extraction.recomendaciones.length > 0;
+
+        if (!hasContent) {
+          // No hay contenido suficiente para guardar
+          const userMessage: Message = { id: Date.now().toString(), role: 'user', content: content.trim() };
+          chat.messages.push(userMessage);
+          const assistantMessage: Message = { id: (Date.now() + 1).toString(), role: 'assistant', content: 'No he podido extraer una estrategia estructurada de la conversación. Continúa desarrollándola y cuando esté más completa, pruébalo de nuevo.' };
+          chat.messages.push(assistantMessage);
+          chat.awaitingStrategyConfirmation = false;
+          chat.lastModified = new Date().toISOString();
+          await chat.save();
+          return res.json({ userMessage, assistantMessage, strategySaved: false });
+        }
         
         const newStrategy: SavedStrategy = {
           id: Date.now().toString(),
@@ -377,7 +403,7 @@ export const sendDefenseMessage = async (req: Request, res: Response) => {
 async function wantsSaveStrategy(userMessage: string): Promise<boolean> {
   try {
     const response = await getAiClient().chat.completions.create({
-      model: 'Qwen/Qwen3-235B-A22B-Instruct-2507',
+      model: AI_MODEL,
       messages: [
         {
           role: 'system',
@@ -404,6 +430,7 @@ export const streamDefenseMessage = async (req: Request, res: Response) => {
     const { content, accountId, chatId } = req.body;
     if (!content || !content.trim()) return res.status(400).json({ error: 'El contenido es requerido' });
     if (!accountId) return res.status(400).json({ error: 'accountId es requerido' });
+    if (!verifyOwnership(req, accountId as string)) return res.status(403).json({ error: 'Acceso denegado' });
 
     let chat = chatId
       ? await DefenseChat.findOne({ accountId, _id: chatId })
@@ -441,13 +468,45 @@ export const streamDefenseMessage = async (req: Request, res: Response) => {
 
     if (wantsSave) {
       // Iniciar SSE inmediatamente para que el frontend muestre spinner
+      let clientDisconnected = false;
+      res.on('close', () => { clientDisconnected = true; });
+      const safeWrite = (data: string) => {
+        if (!clientDisconnected) { try { res.write(data); } catch { clientDisconnected = true; } }
+      };
+      const safeEnd = () => {
+        if (!clientDisconnected) { try { res.end(); } catch { /* already closed */ } }
+      };
+
       res.setHeader('Content-Type', 'text/event-stream');
       res.setHeader('Cache-Control', 'no-cache');
       res.setHeader('Connection', 'keep-alive');
-      res.write(`data: ${JSON.stringify({ saving: true })}\n\n`);
+      safeWrite(`data: ${JSON.stringify({ saving: true })}\n\n`);
 
       try {
         const extraction = await extractDefenseStrategy(chat.messages);
+
+        // Validar que la extracción tiene contenido real
+        const hasContent = extraction.lineasDefensa.length > 0 ||
+          extraction.argumentosJuridicos.length > 0 ||
+          extraction.jurisprudencia.length > 0 ||
+          extraction.recomendaciones.length > 0;
+
+        if (!hasContent) {
+          // Enviar mensaje informativo y continuar con flujo normal
+          const infoMsg = 'No he podido extraer una estrategia estructurada aún. Continúa desarrollándola y pruébalo de nuevo.';
+          const words = infoMsg.split(' ');
+          for (const word of words) {
+            safeWrite(`data: ${JSON.stringify({ token: word + ' ' })}\n\n`);
+          }
+          chat.awaitingStrategyConfirmation = false;
+          const assistantMsg: Message = { id: (Date.now() + 1).toString(), role: 'assistant', content: infoMsg };
+          chat.messages.push(assistantMsg);
+          await chat.save();
+          safeWrite(`data: ${JSON.stringify({ done: true })}\n\n`);
+          safeEnd();
+          return;
+        }
+
         const newStrategy: SavedStrategy = {
           id: Date.now().toString(),
           title: extraction.title,
@@ -470,13 +529,18 @@ export const streamDefenseMessage = async (req: Request, res: Response) => {
         };
         chat.messages.push(confirmMsg);
         await chat.save();
+
+        // Incrementar contador de defensas creadas
+        try {
+          await Stat.findByIdAndUpdate(accountId, { $inc: { defensesCreated: 1 } }, { upsert: true });
+        } catch (e) { console.error('Error al actualizar estadísticas:', e); }
         // Enviar tokens SSE (headers ya establecidos arriba)
         const words = confirmMsg.content.split(' ');
         for (const word of words) {
-          res.write(`data: ${JSON.stringify({ token: word + ' ' })}\n\n`);
+          safeWrite(`data: ${JSON.stringify({ token: word + ' ' })}\n\n`);
         }
-        res.write(`data: ${JSON.stringify({ done: true })}\n\n`);
-        res.end();
+        safeWrite(`data: ${JSON.stringify({ done: true })}\n\n`);
+        safeEnd();
         return;
       } catch (extractError) {
         console.error('Error extrayendo estrategia:', extractError);
@@ -493,9 +557,22 @@ export const streamDefenseMessage = async (req: Request, res: Response) => {
       legalCountryPrompt = buildCountryLegalSystemPrompt(legalContext.country, legalContext.context);
     }
 
-    const fullText = await streamDefenseAI(res, aiMessages, selectedSpecialties, legalCountryPrompt || undefined, accountCountry);
+    // RAG: Search improve AI files if ragEnabled
+    let ragContext: string | undefined;
+    let ragFound = false;
+    if (req.body.ragEnabled) {
+      const { searchImproveAIContext } = await import('../services/ragService.js');
+      const ragResult = await searchImproveAIContext(accountId, aiMessages);
+      if (ragResult.found) {
+        ragContext = ragResult.context;
+        ragFound = true;
+      }
+    }
 
-    const assistantMessage: Message = { id: (Date.now() + 1).toString(), role: 'assistant', content: fullText };
+    const fullText = await streamDefenseAI(res, aiMessages, selectedSpecialties, legalCountryPrompt || undefined, accountCountry, ragContext, ragFound);
+
+    const defAssistantContent = ragFound ? `${fullText}\n<!-- rag-enhanced -->` : fullText;
+    const assistantMessage: Message = { id: (Date.now() + 1).toString(), role: 'assistant', content: defAssistantContent };
     chat.messages.push(assistantMessage);
 
     // Detectar si la IA está preguntando por guardar/actualizar estrategia
@@ -525,6 +602,7 @@ export const exportDefenseChat = async (req: Request, res: Response) => {
     if (!accountId) {
       return res.status(400).json({ error: 'accountId es requerido' });
     }
+    if (!verifyOwnership(req, accountId as string)) return res.status(403).json({ error: 'Acceso denegado' });
 
     let defenseChat;
     
@@ -598,21 +676,6 @@ export const exportDefenseChat = async (req: Request, res: Response) => {
       // No falla la exportación si hay error al guardar en cliente
     }
 
-    // Incrementar contador de defensas exportadas
-    try {
-      await Stat.findOneAndUpdate(
-        { accountId },
-        {
-          $inc: { defensesExported: 1 },
-          $setOnInsert: { _id: accountId, contractsDownloaded: 0 }
-        },
-        { upsert: true }
-      );
-    } catch (error) {
-      console.error('Error al actualizar estadísticas:', error);
-      // No falla la exportación si hay error en estadísticas
-    }
-
     // Configurar headers para descarga
     res.setHeader('Content-Type', 'application/pdf');
     res.setHeader('Content-Disposition', `attachment; filename="${encodeURIComponent(chatTitle)}.pdf"`);
@@ -633,6 +696,7 @@ export const downloadDefensePDF = async (req: Request, res: Response) => {
     if (!accountId) {
       return res.status(400).json({ error: 'accountId es requerido' });
     }
+    if (!verifyOwnership(req, accountId as string)) return res.status(403).json({ error: 'Acceso denegado' });
 
     let defenseChat;
     if (chatId) {
@@ -681,6 +745,7 @@ export const importDefenseChat = async (req: Request, res: Response) => {
     if (!accountId) {
       return res.status(400).json({ error: 'accountId es requerido' });
     }
+    if (!verifyOwnership(req, accountId as string)) return res.status(403).json({ error: 'Acceso denegado' });
 
     const chatToImport = await Chat.findById(sourceChatId);
 
@@ -732,6 +797,7 @@ export const getSavedStrategies = async (req: Request, res: Response) => {
     if (!accountId) {
       return res.status(400).json({ error: 'accountId es requerido' });
     }
+    if (!verifyOwnership(req, accountId as string)) return res.status(403).json({ error: 'Acceso denegado' });
     
     if (chatId && typeof chatId === 'string') {
       const defenseChat = await DefenseChat.findOne({ accountId: accountId as string, _id: chatId });
@@ -760,6 +826,7 @@ export const deleteStrategy = async (req: Request, res: Response) => {
     if (!accountId) {
       return res.status(400).json({ error: 'accountId es requerido' });
     }
+    if (!verifyOwnership(req, accountId as string)) return res.status(403).json({ error: 'Acceso denegado' });
     
     let defenseChat;
     
@@ -808,7 +875,7 @@ export const uploadPdfToChat = async (req: Request, res: Response) => {
     await fs.unlink(pdfPath).catch(() => {});
 
     res.json({
-      filename: req.file.originalname,
+      filename: sanitizeFilename(req.file.originalname),
       text: extractedText
     });
   } catch (error) {
@@ -828,6 +895,7 @@ export const clearDefenseChat = async (req: Request, res: Response) => {
     if (!accountId) {
       return res.status(400).json({ error: 'accountId es requerido' });
     }
+    if (!verifyOwnership(req, accountId as string)) return res.status(403).json({ error: 'Acceso denegado' });
     
     await DefenseChat.deleteMany({ accountId });
     res.json({ message: 'Chat de defensa limpiado' });

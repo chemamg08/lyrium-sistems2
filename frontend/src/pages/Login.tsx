@@ -1,16 +1,16 @@
 import { useState } from "react";
-import { useNavigate } from "react-router-dom";
+import { useNavigate, useSearchParams } from "react-router-dom";
 import { motion } from "framer-motion";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
-import { AlertCircle, Scale } from "lucide-react";
+import { AlertCircle, Scale, ArrowLeft, CheckCircle2 } from "lucide-react";
 import RenewalModal from "@/components/RenewalModal";
 import i18n, { getLanguageForCountry } from "@/i18n";
 import { useTranslation } from "react-i18next";
 import { useToast } from "@/components/ui/use-toast";
 
-const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:3000/api';
+const API_URL = import.meta.env.VITE_API_URL;
 
 const WavesBg = () => (
   <div className="pointer-events-none absolute inset-0 z-0 overflow-hidden">
@@ -48,7 +48,15 @@ const Login = () => {
   const { toast } = useToast();
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
+  const [totpCode, setTotpCode] = useState("");
+  const [recoveryCode, setRecoveryCode] = useState("");
+  const [useRecoveryCode, setUseRecoveryCode] = useState(false);
   const [isLoading, setIsLoading] = useState(false);
+  const [view, setView] = useState<'login' | 'forgot'>('login');
+  const [forgotEmail, setForgotEmail] = useState("");
+  const [forgotSent, setForgotSent] = useState(false);
+  const [emailNotVerified, setEmailNotVerified] = useState(false);
+  const [resendingSent, setResendingSent] = useState(false);
   const [subscriptionError, setSubscriptionError] = useState<{
     message: string;
     type: 'main' | 'subaccount' | null;
@@ -57,6 +65,7 @@ const Login = () => {
   } | null>(null);
   const [showRenewalModal, setShowRenewalModal] = useState(false);
   const navigate = useNavigate();
+  const [searchParams] = useSearchParams();
 
   const handleLogin = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -65,18 +74,23 @@ const Login = () => {
     setSubscriptionError(null);
     
     try {
+      const body: any = { email, password };
+      if (useRecoveryCode && recoveryCode) {
+        body.recoveryCode = recoveryCode;
+      } else if (totpCode) {
+        body.totpCode = totpCode;
+      }
+
       const response = await fetch(`${API_URL}/accounts/login`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ email, password }),
+        body: JSON.stringify(body),
+        credentials: 'include',
       });
 
-      if (response.ok) {
-        const data = await response.json();
-        
-        // Guardar token JWT
-        sessionStorage.setItem('authToken', data.token);
-        
+      const data = await response.json();
+
+      if (response.ok && data.success) {
         // Guardar información del usuario en sessionStorage
         sessionStorage.setItem('userId', data.user.id);
         sessionStorage.setItem('userName', data.user.name);
@@ -84,6 +98,14 @@ const Login = () => {
         sessionStorage.setItem('userType', data.user.type);
         const userCountry = data.user.country || 'ES';
         sessionStorage.setItem('country', userCountry);
+
+        // Check if admin
+        if (data.user.role === 'admin') {
+          sessionStorage.setItem('userRole', 'admin');
+          sessionStorage.setItem('accountId', data.user.id);
+          navigate('/admin');
+          return;
+        }
         const lang = getLanguageForCountry(userCountry);
         i18n.changeLanguage(lang);
         localStorage.setItem('appLanguage', lang);
@@ -93,14 +115,20 @@ const Login = () => {
           sessionStorage.setItem('parentAccountId', data.user.parentAccountId);
           sessionStorage.setItem('accountId', data.user.parentAccountId);
         } else {
-          // Si es cuenta principal, el accountId es su propio ID
           sessionStorage.setItem('accountId', data.user.id);
         }
         
         navigate("/");
-      } else if (response.status === 403) {
-        // Suscripción caducada
-        const data = await response.json();
+      } else if (data.needs2FASetup) {
+        // Redirect to 2FA setup
+        navigate(`/setup-2fa?userId=${data.userId}&userType=${data.userType}`);
+      } else if (response.status === 403 && data.emailNotVerified) {
+        setEmailNotVerified(true);
+      } else if (response.status === 403 && data.requires2FA) {
+        toast({ title: t('auth.enter2FA'), variant: 'destructive' });
+      } else if (response.status === 423 && data.locked) {
+        toast({ title: `${t('auth.accountLocked')} ${data.minutesLeft} min`, variant: 'destructive' });
+      } else if (response.status === 403 && data.needsPayment !== undefined) {
         setSubscriptionError({
           message: data.error,
           type: data.type,
@@ -112,6 +140,24 @@ const Login = () => {
       }
     } catch (error) {
       console.error('Error:', error);
+      toast({ title: t('auth.errorLogin'), variant: 'destructive' });
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
+  const handleForgotPassword = async (e: React.FormEvent) => {
+    e.preventDefault();
+    setIsLoading(true);
+    try {
+      await fetch(`${API_URL}/accounts/forgot-password`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ email: forgotEmail }),
+        credentials: 'include',
+      });
+      setForgotSent(true);
+    } catch {
       toast({ title: t('auth.errorLogin'), variant: 'destructive' });
     } finally {
       setIsLoading(false);
@@ -156,10 +202,48 @@ const Login = () => {
         <CardHeader className="space-y-1">
           <CardTitle className="text-2xl font-bold text-center">Lyrium Systems</CardTitle>
           <CardDescription className="text-center">
-            {t('auth.enterCredentials')}
+            {view === 'login' ? t('auth.enterCredentials') : t('auth.forgotPasswordDesc')}
           </CardDescription>
         </CardHeader>
         <CardContent>
+          {/* Email not verified banner */}
+          {emailNotVerified && (
+            <div className="mb-4 bg-amber-500/10 border border-amber-500/20 rounded-lg p-4">
+              <div className="flex items-start gap-3">
+                <AlertCircle className="h-5 w-5 text-amber-500 flex-shrink-0 mt-0.5" />
+                <div className="flex-1">
+                  <p className="text-sm text-amber-500 font-medium">{t('auth.emailNotVerified')}</p>
+                  {resendingSent ? (
+                    <p className="text-xs text-green-500 mt-2">{t('auth.resendSuccess')}</p>
+                  ) : (
+                    <Button
+                      type="button"
+                      variant="outline"
+                      size="sm"
+                      className="mt-2 border-amber-500/30 text-amber-500 hover:bg-amber-500/10"
+                      onClick={async () => {
+                        try {
+                          await fetch(`${API_URL}/accounts/resend-verification`, {
+                            method: 'POST',
+                            headers: { 'Content-Type': 'application/json' },
+                            body: JSON.stringify({ email }),
+                            credentials: 'include',
+                          });
+                          setResendingSent(true);
+                        } catch {
+                          toast({ title: t('auth.errorResend'), variant: 'destructive' });
+                        }
+                      }}
+                    >
+                      {t('auth.resendEmail')}
+                    </Button>
+                  )}
+                </div>
+              </div>
+            </div>
+          )}
+
+          {/* Subscription error */}
           {subscriptionError && (
             <div className="mb-4 bg-destructive/10 border border-destructive/20 rounded-lg p-4">
               <div className="flex items-start gap-3">
@@ -189,46 +273,131 @@ const Login = () => {
               </div>
             </div>
           )}
-          
-          <form onSubmit={handleLogin} className="space-y-4">
-            <div className="space-y-2">
-              <label htmlFor="email" className="text-sm font-medium">
-                {t('auth.email')}
-              </label>
-              <Input
-                id="email"
-                type="email"
-                placeholder={t('auth.emailPlaceholder')}
-                value={email}
-                onChange={(e) => setEmail(e.target.value)}
-                required
-              />
+
+          {view === 'login' ? (
+            <form onSubmit={handleLogin} className="space-y-4">
+              <div className="space-y-2">
+                <label htmlFor="email" className="text-sm font-medium">
+                  {t('auth.email')}
+                </label>
+                <Input
+                  id="email"
+                  type="email"
+                  placeholder={t('auth.emailPlaceholder')}
+                  value={email}
+                  onChange={(e) => setEmail(e.target.value)}
+                  required
+                />
+              </div>
+              <div className="space-y-2">
+                <label htmlFor="password" className="text-sm font-medium">
+                  {t('auth.password')}
+                </label>
+                <Input
+                  id="password"
+                  type="password"
+                  placeholder="••••••••"
+                  value={password}
+                  onChange={(e) => setPassword(e.target.value)}
+                  required
+                />
+              </div>
+              {/* 2FA Code Field */}
+              <div className="space-y-2">
+                <label htmlFor="totpCode" className="text-sm font-medium">
+                  {t('auth.twoFactorCode')}
+                </label>
+                {useRecoveryCode ? (
+                  <Input
+                    id="recoveryCode"
+                    type="text"
+                    placeholder={t('auth.recoveryCodePlaceholder')}
+                    value={recoveryCode}
+                    onChange={(e) => setRecoveryCode(e.target.value)}
+                    maxLength={8}
+                    className="font-mono tracking-widest"
+                  />
+                ) : (
+                  <Input
+                    id="totpCode"
+                    type="text"
+                    inputMode="numeric"
+                    placeholder="000000"
+                    value={totpCode}
+                    onChange={(e) => setTotpCode(e.target.value.replace(/\D/g, '').slice(0, 6))}
+                    maxLength={6}
+                    className="font-mono tracking-widest text-center text-lg"
+                  />
+                )}
+                <button
+                  type="button"
+                  onClick={() => { setUseRecoveryCode(!useRecoveryCode); setTotpCode(''); setRecoveryCode(''); }}
+                  className="text-xs text-muted-foreground hover:text-foreground transition-colors"
+                >
+                  {useRecoveryCode ? t('auth.useAuthenticator') : t('auth.useRecoveryCode')}
+                </button>
+              </div>
+              <Button type="submit" className="w-full" disabled={isLoading}>
+                {isLoading ? t('auth.loading') : t('auth.login')}
+              </Button>
+              <Button 
+                type="button" 
+                variant="outline" 
+                className="w-full" 
+                onClick={() => navigate("/signup")}
+              >
+                {t('auth.createAccount')}
+              </Button>
+              <button
+                type="button"
+                onClick={() => { setView('forgot'); setForgotSent(false); setForgotEmail(''); }}
+                className="w-full text-sm text-muted-foreground hover:text-foreground transition-colors"
+              >
+                {t('auth.forgotPassword')}
+              </button>
+            </form>
+          ) : (
+            /* Forgot password view */
+            <div className="space-y-4">
+              {forgotSent ? (
+                <div className="text-center space-y-4">
+                  <CheckCircle2 className="h-12 w-12 text-green-500 mx-auto" />
+                  <p className="text-sm text-muted-foreground">{t('auth.forgotPasswordSent')}</p>
+                  <Button variant="outline" className="w-full" onClick={() => setView('login')}>
+                    <ArrowLeft className="h-4 w-4 mr-2" />
+                    {t('auth.backToLogin')}
+                  </Button>
+                </div>
+              ) : (
+                <form onSubmit={handleForgotPassword} className="space-y-4">
+                  <div className="space-y-2">
+                    <label htmlFor="forgotEmail" className="text-sm font-medium">
+                      {t('auth.email')}
+                    </label>
+                    <Input
+                      id="forgotEmail"
+                      type="email"
+                      placeholder={t('auth.emailPlaceholder')}
+                      value={forgotEmail}
+                      onChange={(e) => setForgotEmail(e.target.value)}
+                      required
+                    />
+                  </div>
+                  <Button type="submit" className="w-full" disabled={isLoading}>
+                    {isLoading ? t('auth.sending') : t('auth.sendResetLink')}
+                  </Button>
+                  <button
+                    type="button"
+                    onClick={() => setView('login')}
+                    className="w-full text-sm text-muted-foreground hover:text-foreground transition-colors flex items-center justify-center gap-2"
+                  >
+                    <ArrowLeft className="h-3 w-3" />
+                    {t('auth.backToLogin')}
+                  </button>
+                </form>
+              )}
             </div>
-            <div className="space-y-2">
-              <label htmlFor="password" className="text-sm font-medium">
-                {t('auth.password')}
-              </label>
-              <Input
-                id="password"
-                type="password"
-                placeholder="••••••••"
-                value={password}
-                onChange={(e) => setPassword(e.target.value)}
-                required
-              />
-            </div>
-            <Button type="submit" className="w-full" disabled={isLoading}>
-              {isLoading ? t('auth.loading') : t('auth.login')}
-            </Button>
-            <Button 
-              type="button" 
-              variant="outline" 
-              className="w-full" 
-              onClick={() => navigate("/signup")}
-            >
-              {t('auth.createAccount')}
-            </Button>
-          </form>
+          )}
         </CardContent>
       </Card>
 

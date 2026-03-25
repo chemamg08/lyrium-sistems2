@@ -20,7 +20,7 @@ export interface ISubscription {
 
 const subscriptionSchema = new Schema<ISubscription>({
   _id: { type: String, required: true },
-  accountId: { type: String, required: true },
+  accountId: { type: String, required: true, index: true },
   plan: { type: String, required: true },
   interval: { type: String, required: true },
   status: { type: String, required: true },

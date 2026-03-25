@@ -26,7 +26,7 @@ const desgloseSchema = new Schema({
 
 const calculationSchema = new Schema<ICalculation>({
   _id: { type: String, required: true },
-  clientId: { type: String, required: true },
+  clientId: { type: String, required: true, index: true },
   clientName: { type: String, default: '' },
   clientType: { type: String, default: '' },
   label: { type: String, default: '' },

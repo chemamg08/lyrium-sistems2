@@ -1,5 +1,5 @@
 import { useState, useEffect } from "react";
-import { X, Plus, Trash2, CreditCard, Check, Calendar } from "lucide-react";
+import { X, Plus, Trash2, CreditCard, Check, Calendar, Eye, EyeOff, Copy, Key, Webhook } from "lucide-react";
 import { Button } from "./ui/button";
 import { Input } from "./ui/input";
 import { loadStripe } from "@stripe/stripe-js";
@@ -48,7 +48,7 @@ interface PlanConfig {
   features: string[];
 }
 
-const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:3000/api';
+const API_URL = import.meta.env.VITE_API_URL;
 
 interface ProfileModalProps {
   isOpen: boolean;
@@ -207,11 +207,32 @@ const PaymentForm = ({ clientSecret, accountId, plan, interval, paymentIntentId,
 const ProfileModal = ({ isOpen, onClose }: ProfileModalProps) => {
   const { t } = useTranslation();
   const { toast } = useToast();
-  const [activeTab, setActiveTab] = useState<"billing" | "subaccounts">("subaccounts");
+  const [activeTab, setActiveTab] = useState<"billing" | "subaccounts" | "information" | "integrations">("subaccounts");
   const [subaccounts, setSubaccounts] = useState<Subaccount[]>([]);
   const [showCreateForm, setShowCreateForm] = useState(false);
   const [formData, setFormData] = useState({ name: "", email: "", password: "" });
   const [isLoading, setIsLoading] = useState(false);
+
+  // Integrations tab states
+  const [apiKeys, setApiKeys] = useState<any[]>([]);
+  const [webhooks, setWebhooks] = useState<any[]>([]);
+  const [newKeyName, setNewKeyName] = useState("");
+  const [showNewKey, setShowNewKey] = useState<string | null>(null);
+  const [newWebhookUrl, setNewWebhookUrl] = useState("");
+  const [newWebhookEvents, setNewWebhookEvents] = useState<string[]>([]);
+  const [newWebhookDesc, setNewWebhookDesc] = useState("");
+  
+  // Information tab states
+  const [newEmail, setNewEmail] = useState("");
+  const [emailPassword, setEmailPassword] = useState("");
+  const [emailCode, setEmailCode] = useState("");
+  const [newPassword, setNewPassword] = useState("");
+  const [confirmPassword, setConfirmPassword] = useState("");
+  const [passwordCode, setPasswordCode] = useState("");
+  const [showNewPassword, setShowNewPassword] = useState(false);
+  const [showConfirmPassword, setShowConfirmPassword] = useState(false);
+  const [isChangingEmail, setIsChangingEmail] = useState(false);
+  const [isChangingPassword, setIsChangingPassword] = useState(false);
   
   // Billing states
   const [subscription, setSubscription] = useState<Subscription | null>(null);
@@ -250,6 +271,9 @@ const ProfileModal = ({ isOpen, onClose }: ProfileModalProps) => {
         loadSubaccounts();
       } else if (activeTab === "billing") {
         loadSubscription();
+      } else if (activeTab === "integrations") {
+        loadApiKeys();
+        loadWebhooks();
       }
     }
   }, [isOpen, activeTab]);
@@ -267,6 +291,115 @@ const ProfileModal = ({ isOpen, onClose }: ProfileModalProps) => {
     } catch (error) {
       console.error('Error al cargar subcuentas:', error);
     }
+  };
+
+  const WEBHOOK_EVENT_OPTIONS = [
+    'new_client', 'client_updated', 'client_deleted',
+    'contract_generated', 'signature_completed', 'signature_expired',
+    'calendar_event_created', 'calendar_event_updated', 'calendar_event_deleted',
+    'file_uploaded', 'file_deleted',
+    'invoice_created', 'invoice_updated',
+  ];
+
+  const loadApiKeys = async () => {
+    try {
+      const accountId = sessionStorage.getItem('accountId');
+      if (!accountId) return;
+      const res = await authFetch(`${API_URL}/integrations/keys?accountId=${accountId}`);
+      if (res.ok) setApiKeys(await res.json());
+    } catch { /* silent */ }
+  };
+
+  const loadWebhooks = async () => {
+    try {
+      const accountId = sessionStorage.getItem('accountId');
+      if (!accountId) return;
+      const res = await authFetch(`${API_URL}/integrations/webhooks?accountId=${accountId}`);
+      if (res.ok) setWebhooks(await res.json());
+    } catch { /* silent */ }
+  };
+
+  const createApiKey = async () => {
+    if (!newKeyName.trim()) return;
+    const accountId = sessionStorage.getItem('accountId');
+    try {
+      const res = await authFetch(`${API_URL}/integrations/keys`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ accountId, name: newKeyName.trim() }),
+      });
+      if (res.ok) {
+        const data = await res.json();
+        setShowNewKey(data.key);
+        setNewKeyName('');
+        loadApiKeys();
+        toast({ title: t('profile.intKeyCreated') });
+      }
+    } catch { toast({ title: t('common.error'), variant: 'destructive' }); }
+  };
+
+  const revokeApiKey = async (keyId: string) => {
+    const accountId = sessionStorage.getItem('accountId');
+    try {
+      await authFetch(`${API_URL}/integrations/keys/${keyId}?accountId=${accountId}`, { method: 'DELETE' });
+      loadApiKeys();
+      toast({ title: t('profile.intKeyRevoked') });
+    } catch { toast({ title: t('common.error'), variant: 'destructive' }); }
+  };
+
+  const createWebhook = async () => {
+    if (!newWebhookUrl.trim() || newWebhookEvents.length === 0) return;
+    const accountId = sessionStorage.getItem('accountId');
+    try {
+      const res = await authFetch(`${API_URL}/integrations/webhooks`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ accountId, url: newWebhookUrl.trim(), events: newWebhookEvents, description: newWebhookDesc }),
+      });
+      if (res.ok) {
+        setNewWebhookUrl('');
+        setNewWebhookEvents([]);
+        setNewWebhookDesc('');
+        loadWebhooks();
+        toast({ title: t('profile.intWebhookCreated') });
+      } else {
+        const d = await res.json();
+        toast({ title: d.error || t('common.error'), variant: 'destructive' });
+      }
+    } catch { toast({ title: t('common.error'), variant: 'destructive' }); }
+  };
+
+  const deleteWebhook = async (whId: string) => {
+    const accountId = sessionStorage.getItem('accountId');
+    try {
+      await authFetch(`${API_URL}/integrations/webhooks/${whId}?accountId=${accountId}`, { method: 'DELETE' });
+      loadWebhooks();
+      toast({ title: t('profile.intWebhookDeleted') });
+    } catch { toast({ title: t('common.error'), variant: 'destructive' }); }
+  };
+
+  const toggleWebhook = async (wh: any) => {
+    const accountId = sessionStorage.getItem('accountId');
+    try {
+      await authFetch(`${API_URL}/integrations/webhooks/${wh.id}`, {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ accountId, isActive: !wh.isActive }),
+      });
+      loadWebhooks();
+    } catch { /* silent */ }
+  };
+
+  const testWebhook = async (whId: string) => {
+    const accountId = sessionStorage.getItem('accountId');
+    try {
+      const res = await authFetch(`${API_URL}/integrations/webhooks/${whId}/test?accountId=${accountId}`, { method: 'POST' });
+      if (res.ok) {
+        toast({ title: t('profile.intTestSent') });
+      } else {
+        toast({ title: t('profile.intTestFailed'), variant: 'destructive' });
+      }
+    } catch { toast({ title: t('profile.intTestFailed'), variant: 'destructive' }); }
   };
 
   const loadSubscription = async () => {
@@ -483,6 +616,100 @@ const ProfileModal = ({ isOpen, onClose }: ProfileModalProps) => {
     }
   };
 
+  const handleChangeEmail = async () => {
+    if (!newEmail || !emailPassword || !emailCode) {
+      toast({ title: t('profile.fillAllFields'), variant: 'destructive' });
+      return;
+    }
+
+    const accountId = sessionStorage.getItem('accountId');
+    if (!accountId) {
+      toast({ title: t('profile.errorNoAccount'), variant: 'destructive' });
+      return;
+    }
+
+    setIsChangingEmail(true);
+    try {
+      const body: any = { accountId, newEmail, password: emailPassword };
+      // Detect if it's a TOTP code (6 digits) or recovery code
+      if (/^\d{6}$/.test(emailCode)) {
+        body.totpCode = emailCode;
+      } else {
+        body.recoveryCode = emailCode;
+      }
+
+      const response = await authFetch(`${API_URL}/accounts/change-email`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(body),
+      });
+
+      if (response.ok) {
+        toast({ title: t('profile.emailChanged') });
+        setNewEmail("");
+        setEmailPassword("");
+        setEmailCode("");
+      } else {
+        const data = await response.json();
+        toast({ title: data.error || t('profile.errorChangeEmail'), variant: 'destructive' });
+      }
+    } catch (error) {
+      console.error('Error:', error);
+      toast({ title: t('profile.errorChangeEmail'), variant: 'destructive' });
+    } finally {
+      setIsChangingEmail(false);
+    }
+  };
+
+  const handleChangePassword = async () => {
+    if (!newPassword || !confirmPassword || !passwordCode) {
+      toast({ title: t('profile.fillAllFields'), variant: 'destructive' });
+      return;
+    }
+
+    if (newPassword !== confirmPassword) {
+      toast({ title: t('profile.passwordsMismatch'), variant: 'destructive' });
+      return;
+    }
+
+    const accountId = sessionStorage.getItem('accountId');
+    if (!accountId) {
+      toast({ title: t('profile.errorNoAccount'), variant: 'destructive' });
+      return;
+    }
+
+    setIsChangingPassword(true);
+    try {
+      const body: any = { accountId, newPassword };
+      if (/^\d{6}$/.test(passwordCode)) {
+        body.totpCode = passwordCode;
+      } else {
+        body.recoveryCode = passwordCode;
+      }
+
+      const response = await authFetch(`${API_URL}/accounts/change-password`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(body),
+      });
+
+      if (response.ok) {
+        toast({ title: t('profile.passwordChanged') });
+        setNewPassword("");
+        setConfirmPassword("");
+        setPasswordCode("");
+      } else {
+        const data = await response.json();
+        toast({ title: data.error || t('profile.errorChangePassword'), variant: 'destructive' });
+      }
+    } catch (error) {
+      console.error('Error:', error);
+      toast({ title: t('profile.errorChangePassword'), variant: 'destructive' });
+    } finally {
+      setIsChangingPassword(false);
+    }
+  };
+
   if (!isOpen) return null;
 
   return (
@@ -521,6 +748,26 @@ const ProfileModal = ({ isOpen, onClose }: ProfileModalProps) => {
               }`}
             >
               {t('profile.subaccounts')}
+            </button>
+            <button
+              onClick={() => setActiveTab("information")}
+              className={`flex-1 md:flex-none md:w-full text-center md:text-left px-4 py-2 rounded-md text-sm font-medium transition-colors ${
+                activeTab === "information"
+                  ? "bg-primary text-primary-foreground"
+                  : "text-muted-foreground hover:bg-accent hover:text-accent-foreground"
+              }`}
+            >
+              {t('profile.information')}
+            </button>
+            <button
+              onClick={() => setActiveTab("integrations")}
+              className={`flex-1 md:flex-none md:w-full text-center md:text-left px-4 py-2 rounded-md text-sm font-medium transition-colors ${
+                activeTab === "integrations"
+                  ? "bg-primary text-primary-foreground"
+                  : "text-muted-foreground hover:bg-accent hover:text-accent-foreground"
+              }`}
+            >
+              {t('profile.integrations')}
             </button>
           </div>
 
@@ -759,6 +1006,208 @@ const ProfileModal = ({ isOpen, onClose }: ProfileModalProps) => {
                         </Button>
                       </div>
                     ))
+                  )}
+                </div>
+              </div>
+            )}
+
+            {activeTab === "information" && (
+              <div className="space-y-8">
+                <h3 className="text-lg font-semibold">{t('profile.information')}</h3>
+
+                {/* Change Email */}
+                <div className="bg-muted/50 border border-border rounded-lg p-4 space-y-3">
+                  <h4 className="font-medium">{t('profile.changeEmail')}</h4>
+                  <p className="text-xs text-muted-foreground">{t('profile.changeEmailDesc')}</p>
+                  <div>
+                    <label className="text-sm font-medium">{t('profile.newEmailLabel')}</label>
+                    <Input
+                      type="email"
+                      value={newEmail}
+                      onChange={(e) => setNewEmail(e.target.value)}
+                      placeholder={t('profile.emailPlaceholder')}
+                    />
+                  </div>
+                  <div>
+                    <label className="text-sm font-medium">{t('profile.currentPasswordLabel')}</label>
+                    <Input
+                      type="password"
+                      value={emailPassword}
+                      onChange={(e) => setEmailPassword(e.target.value)}
+                      placeholder="••••••••"
+                    />
+                  </div>
+                  <div>
+                    <label className="text-sm font-medium">{t('profile.verificationCodeLabel')}</label>
+                    <Input
+                      value={emailCode}
+                      onChange={(e) => setEmailCode(e.target.value)}
+                      placeholder={t('profile.codePlaceholder')}
+                    />
+                  </div>
+                  <Button onClick={handleChangeEmail} disabled={isChangingEmail}>
+                    {isChangingEmail ? t('profile.processing') : t('profile.changeEmail')}
+                  </Button>
+                </div>
+
+                {/* Change Password */}
+                <div className="bg-muted/50 border border-border rounded-lg p-4 space-y-3">
+                  <h4 className="font-medium">{t('profile.changePassword')}</h4>
+                  <p className="text-xs text-muted-foreground">{t('profile.changePasswordDesc')}</p>
+                  <div>
+                    <label className="text-sm font-medium">{t('profile.newPasswordLabel')}</label>
+                    <div className="relative">
+                      <Input
+                        type={showNewPassword ? "text" : "password"}
+                        value={newPassword}
+                        onChange={(e) => setNewPassword(e.target.value)}
+                        placeholder="••••••••"
+                      />
+                      <button
+                        type="button"
+                        onClick={() => setShowNewPassword(!showNewPassword)}
+                        className="absolute right-3 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground"
+                      >
+                        {showNewPassword ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
+                      </button>
+                    </div>
+                  </div>
+                  <div>
+                    <label className="text-sm font-medium">{t('profile.confirmPasswordLabel')}</label>
+                    <div className="relative">
+                      <Input
+                        type={showConfirmPassword ? "text" : "password"}
+                        value={confirmPassword}
+                        onChange={(e) => setConfirmPassword(e.target.value)}
+                        placeholder="••••••••"
+                      />
+                      <button
+                        type="button"
+                        onClick={() => setShowConfirmPassword(!showConfirmPassword)}
+                        className="absolute right-3 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground"
+                      >
+                        {showConfirmPassword ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
+                      </button>
+                    </div>
+                  </div>
+                  <div>
+                    <label className="text-sm font-medium">{t('profile.verificationCodeLabel')}</label>
+                    <Input
+                      value={passwordCode}
+                      onChange={(e) => setPasswordCode(e.target.value)}
+                      placeholder={t('profile.codePlaceholder')}
+                    />
+                  </div>
+                  <Button onClick={handleChangePassword} disabled={isChangingPassword}>
+                    {isChangingPassword ? t('profile.processing') : t('profile.changePassword')}
+                  </Button>
+                </div>
+              </div>
+            )}
+
+            {activeTab === "integrations" && (
+              <div className="space-y-8">
+                <h3 className="text-lg font-semibold">{t('profile.integrations')}</h3>
+
+                {/* API Keys */}
+                <div className="bg-muted/50 border border-border rounded-lg p-4 space-y-4">
+                  <div className="flex items-center justify-between">
+                    <h4 className="font-medium flex items-center gap-2"><Key className="h-4 w-4" />{t('profile.intApiKeys')}</h4>
+                  </div>
+                  <p className="text-xs text-muted-foreground">{t('profile.intApiKeysDesc')}</p>
+
+                  {showNewKey && (
+                    <div className="bg-green-500/10 border border-green-500/30 rounded p-3 space-y-2">
+                      <p className="text-xs font-medium text-green-400">{t('profile.intKeyOnce')}</p>
+                      <div className="flex items-center gap-2">
+                        <code className="text-xs bg-background px-2 py-1 rounded flex-1 break-all">{showNewKey}</code>
+                        <Button size="sm" variant="ghost" onClick={() => { navigator.clipboard.writeText(showNewKey); toast({ title: t('profile.intKeyCopied') }); }}>
+                          <Copy className="h-3 w-3" />
+                        </Button>
+                      </div>
+                      <Button size="sm" variant="outline" onClick={() => setShowNewKey('')}>{t('common.close')}</Button>
+                    </div>
+                  )}
+
+                  <div className="flex gap-2">
+                    <Input placeholder={t('profile.intKeyName')} value={newKeyName} onChange={(e) => setNewKeyName(e.target.value)} className="flex-1" />
+                    <Button onClick={createApiKey} size="sm" disabled={!newKeyName.trim()}>{t('profile.intCreateKey')}</Button>
+                  </div>
+
+                  {apiKeys.length === 0 ? (
+                    <p className="text-sm text-muted-foreground text-center py-2">{t('profile.intNoKeys')}</p>
+                  ) : (
+                    <div className="space-y-2">
+                      {apiKeys.map((k: any) => (
+                        <div key={k._id || k.id} className="flex items-center justify-between bg-background rounded p-2 text-sm">
+                          <div>
+                            <span className="font-medium">{k.name}</span>
+                            <span className="text-muted-foreground ml-2 text-xs">{k.keyPrefix}••••••</span>
+                          </div>
+                          <div className="flex items-center gap-2">
+                            <span className="text-xs text-muted-foreground">{new Date(k.createdAt).toLocaleDateString()}</span>
+                            <Button size="sm" variant="ghost" className="text-destructive h-7 px-2" onClick={() => revokeApiKey(k._id || k.id)}><X className="h-3 w-3" /></Button>
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+                  )}
+                </div>
+
+                {/* Webhooks */}
+                <div className="bg-muted/50 border border-border rounded-lg p-4 space-y-4">
+                  <div className="flex items-center justify-between">
+                    <h4 className="font-medium flex items-center gap-2"><Webhook className="h-4 w-4" />{t('profile.intWebhooks')}</h4>
+                  </div>
+                  <p className="text-xs text-muted-foreground">{t('profile.intWebhooksDesc')}</p>
+
+                  <div className="space-y-2">
+                    <Input placeholder="https://hooks.zapier.com/..." value={newWebhookUrl} onChange={(e) => setNewWebhookUrl(e.target.value)} />
+                    <Input placeholder={t('profile.intWebhookDescPlaceholder')} value={newWebhookDesc} onChange={(e) => setNewWebhookDesc(e.target.value)} />
+                    <div className="flex flex-wrap gap-2">
+                      {WEBHOOK_EVENT_OPTIONS.map(ev => (
+                        <button
+                          key={ev}
+                          onClick={() => setNewWebhookEvents(prev => prev.includes(ev) ? prev.filter(e => e !== ev) : [...prev, ev])}
+                          className={`text-xs px-2 py-1 rounded border ${newWebhookEvents.includes(ev) ? 'bg-primary text-primary-foreground border-primary' : 'bg-background border-border text-muted-foreground'}`}
+                        >
+                          {ev.replace(/_/g, ' ')}
+                        </button>
+                      ))}
+                    </div>
+                    <Button onClick={createWebhook} size="sm" disabled={!newWebhookUrl.trim() || newWebhookEvents.length === 0}>{t('profile.intCreateWebhook')}</Button>
+                  </div>
+
+                  {webhooks.length === 0 ? (
+                    <p className="text-sm text-muted-foreground text-center py-2">{t('profile.intNoWebhooks')}</p>
+                  ) : (
+                    <div className="space-y-2">
+                      {webhooks.map((wh: any) => (
+                        <div key={wh._id || wh.id} className="bg-background rounded p-3 space-y-2">
+                          <div className="flex items-center justify-between">
+                            <div className="flex-1 min-w-0">
+                              <p className="text-sm font-medium truncate">{wh.url}</p>
+                              {wh.description && <p className="text-xs text-muted-foreground">{wh.description}</p>}
+                            </div>
+                            <div className="flex items-center gap-1 ml-2">
+                              <button
+                                onClick={() => toggleWebhook(wh)}
+                                className={`w-8 h-4 rounded-full transition-colors relative ${wh.isActive ? 'bg-green-500' : 'bg-muted-foreground/30'}`}
+                              >
+                                <span className={`absolute top-0.5 w-3 h-3 rounded-full bg-white transition-transform ${wh.isActive ? 'left-4' : 'left-0.5'}`} />
+                              </button>
+                              <Button size="sm" variant="ghost" className="h-7 px-2" onClick={() => testWebhook(wh._id || wh.id)} title="Test">⚡</Button>
+                              <Button size="sm" variant="ghost" className="text-destructive h-7 px-2" onClick={() => deleteWebhook(wh._id || wh.id)}><X className="h-3 w-3" /></Button>
+                            </div>
+                          </div>
+                          <div className="flex flex-wrap gap-1">
+                            {wh.events?.map((ev: string) => (
+                              <span key={ev} className="text-xs bg-muted px-1.5 py-0.5 rounded">{ev.replace(/_/g, ' ')}</span>
+                            ))}
+                          </div>
+                        </div>
+                      ))}
+                    </div>
                   )}
                 </div>
               </div>

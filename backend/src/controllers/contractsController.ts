@@ -4,6 +4,8 @@ import path from 'path';
 import { fileURLToPath } from 'url';
 import { analyzeContractPdf } from '../services/contractPdfService.js';
 import { Contract } from '../models/Contract.js';
+import { sanitizeFilename } from '../utils/sanitizeFilename.js';
+import { verifyOwnership } from '../middleware/auth.js';
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
@@ -16,6 +18,7 @@ export const getContracts = async (req: Request, res: Response) => {
     if (!accountId) {
       return res.status(400).json({ error: 'accountId es requerido' });
     }
+    if (!verifyOwnership(req, accountId as string)) return res.status(403).json({ error: 'Acceso denegado' });
     
     // Filtrar por cuenta principal
     const filteredContracts = await Contract.find({ accountId });
@@ -44,6 +47,7 @@ export const createContract = async (req: Request, res: Response) => {
     if (!accountId) {
       return res.status(400).json({ error: 'accountId es requerido' });
     }
+    if (!verifyOwnership(req, accountId as string)) return res.status(403).json({ error: 'Acceso denegado' });
 
     const newId = Date.now().toString();
 
@@ -51,13 +55,13 @@ export const createContract = async (req: Request, res: Response) => {
       _id: newId,
       name,
       summary: summary || '',
-      fileName: file.originalname,
+      fileName: sanitizeFilename(file.originalname),
       filePath: `uploads/${file.filename}`,
       accountId
     });
 
     // Analizar PDF en background (extraer texto)
-    analyzeContractPdf(newId, file.path, file.originalname)
+    analyzeContractPdf(newId, file.path, sanitizeFilename(file.originalname))
       .catch(err => console.error('Error analizando PDF en background:', err));
 
     res.status(201).json(newContract.toJSON());
@@ -75,6 +79,7 @@ export const getContractFile = async (req: Request, res: Response) => {
     if (!contract) {
       return res.status(404).json({ error: 'Contrato no encontrado' });
     }
+    if (!verifyOwnership(req, contract.accountId)) return res.status(403).json({ error: 'Acceso denegado' });
 
     const filePath = path.join(__dirname, '../..', contract.filePath);
     
@@ -100,6 +105,7 @@ export const deleteContract = async (req: Request, res: Response) => {
     if (!contract) {
       return res.status(404).json({ error: 'Contrato no encontrado' });
     }
+    if (!verifyOwnership(req, contract.accountId)) return res.status(403).json({ error: 'Acceso denegado' });
 
     // Eliminar archivo físico
     const filePath = path.join(__dirname, '../..', contract.filePath);

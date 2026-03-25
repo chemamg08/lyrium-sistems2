@@ -34,7 +34,7 @@ import {
 } from "@/components/ui/alert-dialog";
 import { Checkbox } from "@/components/ui/checkbox";
 import { useToast } from "@/hooks/use-toast";
-import { Send, Trash2, Plus, Mail, Settings, Calculator, StopCircle, Search, Check, ChevronsUpDown, ChevronDown, X, Info, Download } from "lucide-react";
+import { Send, Trash2, Plus, Mail, Settings, Calculator, StopCircle, Search, Check, ChevronsUpDown, ChevronDown, X, Info, Download, ReceiptText } from "lucide-react";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import {
   Command,
@@ -49,7 +49,7 @@ import { useTranslation } from "react-i18next";
 import { useStreamingChat } from "@/hooks/useStreamingChat";
 import { authFetch } from '../lib/authFetch';
 
-const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:3000/api';
+const API_URL = import.meta.env.VITE_API_URL;
 
 interface Client {
   id: string;
@@ -214,12 +214,30 @@ interface CalcResult {
   currency?: string;
 }
 
-const EMAIL_PLATFORMS = {
+interface SavedCalculationItem {
+  id: string;
+  label: string;
+  createdAt: string;
+}
+
+interface ObligationModelOption {
+  code: string;
+  name: string;
+  periodType: "monthly" | "quarterly" | "yearly" | "custom";
+}
+
+const EMAIL_PLATFORMS: Record<string, { name: string; server: string; port: number }> = {
   gmail: { name: "Gmail", server: "smtp.gmail.com", port: 587 },
-  outlook: { name: "Outlook", server: "smtp-mail.outlook.com", port: 587 },
+  outlook: { name: "Outlook / Hotmail", server: "smtp-mail.outlook.com", port: 587 },
   yahoo: { name: "Yahoo", server: "smtp.mail.yahoo.com", port: 465 },
   office365: { name: "Office 365", server: "smtp.office365.com", port: 587 },
   icloud: { name: "iCloud", server: "smtp.mail.me.com", port: 587 },
+  zoho: { name: "Zoho", server: "smtp.zoho.com", port: 587 },
+  hostinger: { name: "Hostinger", server: "smtp.hostinger.com", port: 465 },
+  ionos: { name: "IONOS", server: "smtp.ionos.es", port: 587 },
+  ovh: { name: "OVH", server: "ssl0.ovh.net", port: 465 },
+  godaddy: { name: "GoDaddy", server: "smtpout.secureserver.net", port: 465 },
+  custom: { name: "Custom / Personalizado", server: "", port: 587 },
 };
 
 export default function FiscalAdvisory() {
@@ -310,6 +328,14 @@ export default function FiscalAdvisory() {
   const [calcLoading, setCalcLoading] = useState(false);
   const [showDesglose, setShowDesglose] = useState(false);
   const [showAdvanced, setShowAdvanced] = useState(false);
+  const [showObligationDialog, setShowObligationDialog] = useState(false);
+  const [savedCalculations, setSavedCalculations] = useState<SavedCalculationItem[]>([]);
+  const [obligationModels, setObligationModels] = useState<ObligationModelOption[]>([]);
+  const [selectedObligationCalculationId, setSelectedObligationCalculationId] = useState("");
+  const [selectedObligationModelCode, setSelectedObligationModelCode] = useState("");
+  const [obligationPeriod, setObligationPeriod] = useState("");
+  const [creatingObligation, setCreatingObligation] = useState(false);
+  const [isBetaModalOpen, setIsBetaModalOpen] = useState(false);
 
   // Real-time calculation (debounced)
   useEffect(() => {
@@ -764,6 +790,7 @@ export default function FiscalAdvisory() {
           resultado: calcResult?.total,
           etiquetaTotal: calcResult?.etiquetaTotal,
           desglose: calcResult?.desglose,
+          accountId,
         }),
       });
       if (res.ok) {
@@ -779,13 +806,123 @@ export default function FiscalAdvisory() {
   };
 
   const handlePlatformChange = (platform: string) => {
-    const platformConfig = EMAIL_PLATFORMS[platform as keyof typeof EMAIL_PLATFORMS];
-    setEmailConfig({
-      ...emailConfig,
-      platform,
-      smtpServer: platformConfig.server,
-      smtpPort: platformConfig.port,
-    });
+    const platformConfig = EMAIL_PLATFORMS[platform];
+    if (platform === 'custom') {
+      setEmailConfig({ ...emailConfig, platform });
+    } else {
+      setEmailConfig({
+        ...emailConfig,
+        platform,
+        smtpServer: platformConfig.server,
+        smtpPort: platformConfig.port,
+      });
+    }
+  };
+
+  const defaultPeriodForModel = (periodType: "monthly" | "quarterly" | "yearly" | "custom") => {
+    const now = new Date();
+    const year = now.getFullYear();
+    if (periodType === "yearly") return `Y-${year}`;
+    if (periodType === "monthly") {
+      const month = String(now.getMonth() + 1).padStart(2, "0");
+      return `M${month}-${year}`;
+    }
+    const month = now.getMonth() + 1;
+    const quarter = month <= 3 ? "T1" : month <= 6 ? "T2" : month <= 9 ? "T3" : "T4";
+    return `${quarter}-${year}`;
+  };
+
+  const openObligationDialog = async () => {
+    if (!selectedCalcClient) {
+      toast({ title: t('common.error'), description: 'Selecciona un cliente primero', variant: 'destructive' });
+      return;
+    }
+
+    try {
+      const clientType = selectedCalcClient.clientType || 'asalariado';
+      const countryCode = String(sessionStorage.getItem('country') || '').toUpperCase().trim();
+      if (!countryCode) {
+        toast({
+          title: t('common.error'),
+          description: 'La cuenta no tiene pais configurado. Completa el pais en la cuenta para crear obligaciones.',
+          variant: 'destructive',
+        });
+        return;
+      }
+      const [calcRes, modelRes] = await Promise.all([
+        authFetch(`${API_URL}/calculos?clientId=${selectedCalcClient.id}&accountId=${accountId}`),
+        authFetch(`${API_URL}/tax-compliance/models/${countryCode}?clientType=${encodeURIComponent(clientType)}`, {
+          headers: { 'x-account-id': accountId },
+        }),
+      ]);
+
+      if (calcRes.ok) {
+        const calcData = await calcRes.json() as SavedCalculationItem[];
+        setSavedCalculations(calcData || []);
+      } else {
+        setSavedCalculations([]);
+      }
+
+      if (modelRes.ok) {
+        const modelData = await modelRes.json() as ObligationModelOption[];
+        setObligationModels(modelData || []);
+        const defaultModelCode = modelData?.[0]?.code || '';
+        setSelectedObligationModelCode(defaultModelCode);
+        if (modelData?.[0]) {
+          setObligationPeriod(defaultPeriodForModel(modelData[0].periodType));
+        } else {
+          setObligationPeriod('');
+        }
+      } else {
+        setObligationModels([]);
+      }
+
+      setSelectedObligationCalculationId('');
+      setShowObligationDialog(true);
+    } catch (error) {
+      console.error('Error opening obligation dialog:', error);
+      toast({ title: t('common.error'), description: 'No se pudo preparar la creacion de obligacion', variant: 'destructive' });
+    }
+  };
+
+  const createTaxObligation = async () => {
+    if (!selectedObligationCalculationId || !selectedObligationModelCode) {
+      toast({ title: t('common.error'), description: 'Selecciona calculo y modelo fiscal', variant: 'destructive' });
+      return;
+    }
+    setCreatingObligation(true);
+    try {
+      const res = await authFetch(`${API_URL}/tax-compliance/obligations`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'x-account-id': accountId,
+        },
+        body: JSON.stringify({
+          calculationId: selectedObligationCalculationId,
+          modelCode: selectedObligationModelCode,
+          period: obligationPeriod,
+        }),
+      });
+      if (!res.ok) {
+        let message = 'No se pudo crear la obligacion';
+        try {
+          const payload = await res.json() as { error?: string };
+          if (payload?.error) message = payload.error;
+        } catch {
+          // keep fallback
+        }
+        throw new Error(message);
+      }
+
+      setShowObligationDialog(false);
+      toast({ title: 'Obligacion creada', description: 'Ya disponible en Tax Compliance.' });
+    } catch (error: any) {
+      console.error('Error creating obligation:', error);
+      toast({ title: t('common.error'), description: error?.message || 'No se pudo crear la obligacion', variant: 'destructive' });
+    } finally {
+      setCreatingObligation(false);
+    }
   };
 
   return (
@@ -815,7 +952,12 @@ export default function FiscalAdvisory() {
             <CardHeader>
               <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4">
                 <div>
-                  <CardTitle>{t('fiscal.chatTitle')}</CardTitle>
+                  <div className="flex items-center gap-2">
+                    <CardTitle>{t('fiscal.chatTitle')}</CardTitle>
+                    <Button size="sm" variant="outline" onClick={() => setIsBetaModalOpen(true)}>
+                      {t('fiscal.beta.button')}
+                    </Button>
+                  </div>
                   <CardDescription>
                     {t('fiscal.chatDesc')}
                   </CardDescription>
@@ -888,6 +1030,15 @@ export default function FiscalAdvisory() {
                     >
                       <Calculator className="h-3.5 w-3.5" />
                       {t('fiscal.infoSection')}
+                    </button>
+                  )}
+                  {selectedCalcClient && (
+                    <button
+                      onClick={() => { void openObligationDialog(); }}
+                      className="flex items-center gap-1.5 px-3 py-1.5 border border-border rounded-md text-sm font-medium hover:bg-accent transition-colors"
+                    >
+                      <ReceiptText className="h-3.5 w-3.5" />
+                      Tax Compliance
                     </button>
                   )}
                   <div className="relative">
@@ -1334,10 +1485,34 @@ export default function FiscalAdvisory() {
                   ))}
                 </SelectContent>
               </Select>
-              <p className="text-xs text-muted-foreground mt-1">
-                Servidor: {emailConfig.smtpServer} | Puerto: {emailConfig.smtpPort}
-              </p>
+              {emailConfig.platform !== 'custom' && (
+                <p className="text-xs text-muted-foreground mt-1">
+                  Servidor: {emailConfig.smtpServer} | Puerto: {emailConfig.smtpPort}
+                </p>
+              )}
             </div>
+
+            {emailConfig.platform === 'custom' && (
+              <div className="grid grid-cols-2 gap-3">
+                <div>
+                  <Label>SMTP Server</Label>
+                  <Input
+                    value={emailConfig.smtpServer}
+                    onChange={(e) => setEmailConfig({ ...emailConfig, smtpServer: e.target.value })}
+                    placeholder="smtp.example.com"
+                  />
+                </div>
+                <div>
+                  <Label>Puerto SMTP</Label>
+                  <Input
+                    type="number"
+                    value={emailConfig.smtpPort}
+                    onChange={(e) => setEmailConfig({ ...emailConfig, smtpPort: parseInt(e.target.value) || 587 })}
+                    placeholder="587"
+                  />
+                </div>
+              </div>
+            )}
 
             <div>
               <Label>{t('fiscal.emailUser')}</Label>
@@ -1371,6 +1546,85 @@ export default function FiscalAdvisory() {
               {t('common.cancel')}
             </Button>
             <Button onClick={handleSaveEmailConfig}>{t('common.save')}</Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* Tax Obligation Dialog */}
+      <Dialog open={showObligationDialog} onOpenChange={setShowObligationDialog}>
+        <DialogContent className="max-w-[95vw] md:max-w-lg max-h-[85vh] overflow-y-auto">
+          <DialogHeader>
+            <DialogTitle>Crear obligacion fiscal</DialogTitle>
+            <DialogDescription>
+              Convierte un calculo guardado en una obligacion trazable de Tax Compliance.
+            </DialogDescription>
+          </DialogHeader>
+
+          <div className="space-y-4">
+            <div>
+              <Label>Calculo guardado</Label>
+              <Select value={selectedObligationCalculationId} onValueChange={setSelectedObligationCalculationId}>
+                <SelectTrigger>
+                  <SelectValue placeholder="Selecciona un calculo" />
+                </SelectTrigger>
+                <SelectContent>
+                  {savedCalculations.map((calc) => (
+                    <SelectItem key={calc.id} value={calc.id}>
+                      {calc.label} • {new Date(calc.createdAt).toLocaleDateString(i18n.language)}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+
+            <div>
+              <Label>Modelo fiscal</Label>
+              <Select
+                value={selectedObligationModelCode}
+                onValueChange={(value) => {
+                  setSelectedObligationModelCode(value);
+                  const selected = obligationModels.find((m) => m.code === value);
+                  if (selected) setObligationPeriod(defaultPeriodForModel(selected.periodType));
+                }}
+              >
+                <SelectTrigger>
+                  <SelectValue placeholder="Selecciona un modelo" />
+                </SelectTrigger>
+                <SelectContent>
+                  {obligationModels.map((model) => (
+                    <SelectItem key={model.code} value={model.code}>
+                      {model.code} - {model.name}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+
+            <div>
+              <Label>Periodo</Label>
+              <Input value={obligationPeriod} onChange={(e) => setObligationPeriod(e.target.value)} placeholder="T1-2026" />
+            </div>
+          </div>
+
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setShowObligationDialog(false)}>
+              {t('common.cancel')}
+            </Button>
+            <Button onClick={() => { void createTaxObligation(); }} disabled={creatingObligation}>
+              {creatingObligation ? 'Creando...' : 'Crear obligacion'}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      <Dialog open={isBetaModalOpen} onOpenChange={setIsBetaModalOpen}>
+        <DialogContent className="max-w-lg">
+          <DialogHeader>
+            <DialogTitle>{t('fiscal.beta.title')}</DialogTitle>
+            <DialogDescription>{t('fiscal.beta.description')}</DialogDescription>
+          </DialogHeader>
+          <DialogFooter>
+            <Button onClick={() => setIsBetaModalOpen(false)}>{t('common.close')}</Button>
           </DialogFooter>
         </DialogContent>
       </Dialog>

@@ -1,4 +1,4 @@
-﻿import OpenAI from 'openai';
+import OpenAI from 'openai';
 import { Response } from 'express';
 import { searchWeb } from './tavilyService.js';
 import { buildSpecialtiesSystemPrompt } from './specialtiesService.js';
@@ -9,6 +9,9 @@ import { fileURLToPath } from 'url';
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = dirname(__filename);
+
+import { AI_MODEL } from '../config/aiModel.js';
+export { AI_MODEL };
 
 let _client: OpenAI | null = null;
 function getClient(): OpenAI {
@@ -70,7 +73,9 @@ DEBES PREGUNTAR AL ABOGADO:
 
 Debes ser preciso, profesional y crítico. Si detectas alguna incoherencia, señálala claramente y sugiere cómo corregirla.
 
-IMPORTANTE: Tus respuestas NO deben exceder las 300 palabras. Sé conciso y directo.`;
+IMPORTANTE: Tus respuestas NO deben exceder las 500 palabras. Sé conciso y directo.
+
+IDIOMA: Responde SIEMPRE en el mismo idioma en que el usuario te escriba.`;
 
 const STRATEGY_EXTRACTION_PROMPT = `Analiza la conversación y extrae la estrategia de defensa en formato JSON estructurado.
 
@@ -99,7 +104,9 @@ Cuando el cliente te pregunte sobre documentos o archivos que ha subido, debes u
 
 IMPORTANTE: Al inicio de cada conversación, informa al usuario de que también puedes responder preguntas sobre los archivos y documentos que tenga subidos en su perfil de cliente.
 
-Recuerda que no puedes dar asesoramiento legal definitivo, pero sí orientación general.`;
+Recuerda que no puedes dar asesoramiento legal definitivo, pero sí orientación general.
+
+IDIOMA: Responde SIEMPRE en el mismo idioma en que el usuario te escriba.`;
 
 const ASSISTANT_SYSTEM_PROMPT = `Eres Lyra, asistente IA del bufete Lyrium Systems.
 
@@ -112,10 +119,11 @@ Objetivos:
 Reglas:
 - Si no hay suficiente contexto, pide datos concretos antes de concluir.
 - No inventes normativa ni hechos no proporcionados.
-- Sé conciso: máximo 200 palabras por respuesta, salvo que el usuario pida más detalle.
+- Sé conciso: máximo 300 palabras por respuesta, pero extiéndete si la pregunta lo requiere.
 - Usa máximo 4-5 puntos en listas y no más de 2 secciones.
 - No des asesoramiento legal definitivo; ofrece orientación informativa.
-- Tienes acceso a información actualizada de internet para cada pregunta inicial. Cuando uses datos de búsqueda web, indícalo brevemente.`;
+- Tienes acceso a información actualizada de internet para cada pregunta inicial. Cuando uses datos de búsqueda web, indícalo brevemente.
+- Responde SIEMPRE en el mismo idioma en que el usuario te escriba.`;
 
 const WRITING_REVIEW_SYSTEM_PROMPT = `Eres un experto en redacción legal. Tu función es revisar textos legales y sugerir mejoras.
 
@@ -125,7 +133,7 @@ Analiza el texto y identifica segmentos que puedan mejorarse en términos de:
 3. Estructura y orden lógico
 4. Eliminación de ambigüedades
 5. Formalidad adecuada
-6. Verificación de exactitud factual: revisa que las cifras, cálculos matemáticos, fechas, referencias normativas y datos mencionados sean coherentes y correctos. Si detectas un cálculo incorrecto (por ejemplo, una multiplicación errónea), señálalo como sugerencia con el valor correcto.
+6. Verificación de exactitud factual: revisa que las cifras, cálculos matemáticos, fechas, referencias normativas y datos mencionados sean coherentes y correctos. Si detectas un cálculo incorrecto (por ejemplo, una multiplicación errónea), señlalo como sugerencia con el valor correcto.
 
 IMPORTANTE: Debes responder ÚNICAMENTE con un JSON válido (sin markdown, sin bloques de código) con el siguiente formato:
 {
@@ -167,7 +175,7 @@ export async function callDefenseAI(messages: Message[], specialties: string[] =
     }
 
     const response = await getClient().chat.completions.create({
-      model: 'Qwen/Qwen3-235B-A22B-Instruct-2507',
+      model: AI_MODEL,
       messages: [
         ...systemMessages,
         ...messages
@@ -178,7 +186,7 @@ export async function callDefenseAI(messages: Message[], specialties: string[] =
 
     return response.choices[0].message.content || 'Lo siento, no pude generar una respuesta.';
   } catch (error) {
-    console.error('Error llamando a AtlasCloud AI:', error);
+    console.error('Error llamando a AtlasCloud AI (defense):', (error as any)?.message || 'Unknown error');
     throw new Error('Error al comunicarse con el servicio de IA');
   }
 }
@@ -200,7 +208,7 @@ export async function extractDefenseStrategy(messages: Message[]): Promise<Strat
       .join('\n\n');
 
     const response = await getClient().chat.completions.create({
-      model: 'Qwen/Qwen3-235B-A22B-Instruct-2507',
+      model: AI_MODEL,
       messages: [
         { role: 'system', content: STRATEGY_EXTRACTION_PROMPT },
         { role: 'user', content: `Extrae la estrategia de esta conversación:\n\n${conversationText}` }
@@ -223,7 +231,7 @@ export async function extractDefenseStrategy(messages: Message[]): Promise<Strat
         recomendaciones: parsed.recomendaciones || []
       };
     } catch (parseError) {
-      console.error('Error al parsear extracción de estrategia:', content);
+      console.error('Error al parsear extracción de estrategia (respuesta truncada):', content.substring(0, 200));
       return {
         title: 'Estrategia de Defensa',
         lineasDefensa: [],
@@ -235,7 +243,7 @@ export async function extractDefenseStrategy(messages: Message[]): Promise<Strat
       };
     }
   } catch (error) {
-    console.error('Error extrayendo estrategia:', error);
+    console.error('Error extrayendo estrategia:', (error as any)?.message || 'Unknown error');
     throw new Error('Error al extraer estrategia de defensa');
   }
 }
@@ -286,7 +294,7 @@ export async function callClientAI(messages: Message[], documentsContext?: strin
     }
 
     const response = await getClient().chat.completions.create({
-      model: 'Qwen/Qwen3-235B-A22B-Instruct-2507',
+      model: AI_MODEL,
       messages: [
         ...systemMessages,
         ...messages
@@ -297,7 +305,7 @@ export async function callClientAI(messages: Message[], documentsContext?: strin
 
     return response.choices[0].message.content || 'Lo siento, no pude generar una respuesta.';
   } catch (error) {
-    console.error('Error llamando a AtlasCloud AI:', error);
+    console.error('Error llamando a AtlasCloud AI (client):', (error as any)?.message || 'Unknown error');
     throw new Error('Error al comunicarse con el servicio de IA');
   }
 }
@@ -313,7 +321,7 @@ async function needsTaxCalculation(messages: Message[]): Promise<boolean> {
     if (!lastUserMessage) return false;
 
     const response = await getClient().chat.completions.create({
-      model: 'Qwen/Qwen3-235B-A22B-Instruct-2507',
+      model: AI_MODEL,
       messages: [
         {
           role: 'system',
@@ -327,7 +335,8 @@ async function needsTaxCalculation(messages: Message[]): Promise<boolean> {
 
     const answer = (response.choices[0].message.content || '').trim().toLowerCase();
     return answer.startsWith('yes');
-  } catch {
+  } catch (err) {
+    console.warn('needsTaxCalculation check failed:', (err as any)?.message || 'Unknown error');
     return false;
   }
 }
@@ -357,7 +366,7 @@ async function needsWebSearch(messages: Message[]): Promise<boolean> {
     if (!lastUserMessage) return false;
 
     const response = await getClient().chat.completions.create({
-      model: 'Qwen/Qwen3-235B-A22B-Instruct-2507',
+      model: AI_MODEL,
       messages: [
         {
           role: 'system',
@@ -371,7 +380,8 @@ async function needsWebSearch(messages: Message[]): Promise<boolean> {
 
     const answer = (response.choices[0].message.content || '').trim().toLowerCase();
     return answer.startsWith('yes');
-  } catch {
+  } catch (err) {
+    console.warn('needsWebSearch check failed:', (err as any)?.message || 'Unknown error');
     return false;
   }
 }
@@ -406,7 +416,7 @@ export async function callAssistantAI(messages: Message[], specialties: string[]
     }
 
     const response = await getClient().chat.completions.create({
-      model: 'Qwen/Qwen3-235B-A22B-Instruct-2507',
+      model: AI_MODEL,
       messages: [
         ...systemMessages,
         ...messages
@@ -417,7 +427,7 @@ export async function callAssistantAI(messages: Message[], specialties: string[]
 
     return response.choices[0].message.content || 'Lo siento, no pude generar una respuesta.';
   } catch (error) {
-    console.error('Error llamando a AtlasCloud AI:', error);
+    console.error('Error llamando a AtlasCloud AI (assistant):', (error as any)?.message || 'Unknown error');
     throw new Error('Error al comunicarse con el servicio de IA');
   }
 }
@@ -435,15 +445,22 @@ interface ReviewResponse {
 export async function reviewLegalText(text: string, country?: string): Promise<ReviewResponse> {
   try {
     const countryContext = country ? `\nEl país del usuario es: ${country}. Aplica la normativa y terminología legal de ese país al revisar el texto.` : '';
-    const response = await getClient().chat.completions.create({
-      model: 'Qwen/Qwen3-235B-A22B-Instruct-2507',
-      messages: [
-        { role: 'system', content: `${buildIdentityContext()}\n\n${WRITING_REVIEW_SYSTEM_PROMPT}${countryContext}` },
-        { role: 'user', content: `Revisa el siguiente texto legal y proporciona sugerencias de mejora:\n\n${text}` }
-      ],
-      max_tokens: 2000,
-      temperature: 0.3
-    });
+    const abortController = new AbortController();
+    const timeout = setTimeout(() => abortController.abort(), 180000);
+    let response;
+    try {
+      response = await getClient().chat.completions.create({
+        model: AI_MODEL,
+        messages: [
+          { role: 'system', content: `${buildIdentityContext()}\n\n${WRITING_REVIEW_SYSTEM_PROMPT}${countryContext}` },
+          { role: 'user', content: `Revisa el siguiente texto legal y proporciona sugerencias de mejora:\n\n${text}` }
+        ],
+        max_tokens: 2000,
+        temperature: 0.3
+      }, { signal: abortController.signal });
+    } finally {
+      clearTimeout(timeout);
+    }
 
     const content = response.choices[0].message.content || '{"suggestions": []}';
     
@@ -452,11 +469,11 @@ export async function reviewLegalText(text: string, country?: string): Promise<R
       const parsed = JSON.parse(content);
       return parsed;
     } catch (parseError) {
-      console.error('Error al parsear respuesta de IA:', content);
+      console.error('Error al parsear respuesta de IA (respuesta truncada):', content.substring(0, 200));
       return { suggestions: [] };
     }
   } catch (error) {
-    console.error('Error llamando a AtlasCloud AI para revisión:', error);
+    console.error('Error llamando a AtlasCloud AI (review):', (error as any)?.message || 'Unknown error');
     throw new Error('Error al comunicarse con el servicio de IA');
   }
 }
@@ -479,7 +496,7 @@ function buildFiscalSystemPrompt(countryName?: string): string {
     + `1. **Impuesto sobre la Renta / Income Tax**: Tramos, deducciones personales y familiares, reducciones, retenciones, mínimo personal/familiar, rendimientos del trabajo, capital, actividades económicas en ${cn}.\n`
     + `2. **Impuesto de Sociedades / Corporate Tax**: Tipo general y reducidos, bases imponibles negativas, reservas de capitalización/nivelación, incentivos para pymes, doble imposición, pagos fraccionados en ${cn}.\n`
     + `3. **IVA / VAT / GST / Impuestos indirectos**: Tipos impositivos, exenciones, prorrata, régimen simplificado, operaciones intracomunitarias, importación/exportación, regularizaciones en ${cn}.\n`
-    + `4. **Cotizaciones sociales / Social Security**: Bases de cotización, cuotas de empleado y empleador, regímenes especiales (autónomos, agrarios, domésticos), bonificaciones en ${cn}.\n`
+    + `4. **Cotizaciones sociales / Social Security**: Bases de cotización, cuotas de empleado y empleador, regímenes especiales (autónomos, agrarios, domásticos), bonificaciones en ${cn}.\n`
     + `5. **Planificación y optimización fiscal legal**: Estrategias de diferimiento, elección de forma jurídica, planificación de inversiones, aplicación de convenios de doble imposición, regímenes especiales (startup, ZEC, patent box) en ${cn}.\n`
     + `6. **Calendario fiscal**: Plazos de presentación de declaraciones, pagos fraccionados, resúmenes anuales, obligaciones informativas según ${agencyRef}.\n`
     + `7. **Obligaciones formales**: Libros registro, facturación electrónica, modelos tributarios, censos, retenciones, informativas según la normativa de ${cn}.\n`
@@ -488,7 +505,7 @@ function buildFiscalSystemPrompt(countryName?: string): string {
 
     + `\n## NORMATIVA VIGENTE\n`
     + `- Aplica SIEMPRE la normativa fiscal vigente del año ${new Date().getFullYear()}. No uses datos, tipos impositivos ni tramos de años anteriores salvo que el usuario lo pida expresamente.\n`
-    + `- Si tienes datos de tipos impositivos proporcionados como contexto, úsalos como referencia principal.\n`
+    + `- Si tienes datos de tipos impositivos proporcionados como contexto, Úsalos como referencia principal.\n`
 
     + `\n## SIMULACIÓN DE CÁLCULOS\n`
     + `Cuando el usuario pida un cálculo fiscal:\n`
@@ -554,7 +571,7 @@ Utiliza esta información para personalizar tus respuestas y sugerencias.`;
     }
 
     const response = await getClient().chat.completions.create({
-      model: 'Qwen/Qwen3-235B-A22B-Instruct-2507',
+      model: AI_MODEL,
       messages: [
         { role: 'system', content: systemPrompt },
         ...messages
@@ -565,7 +582,7 @@ Utiliza esta información para personalizar tus respuestas y sugerencias.`;
 
     return response.choices[0].message.content || 'Lo siento, no pude generar una respuesta.';
   } catch (error) {
-    console.error('Error llamando a AtlasCloud AI para asesoramiento fiscal:', error);
+    console.error('Error llamando a AtlasCloud AI (fiscal):', (error as any)?.message || 'Unknown error');
     throw new Error('Error al comunicarse con el servicio de IA');
   }
 }
@@ -581,7 +598,8 @@ export async function streamAIResponse(
   systemMessages: { role: string; content: string }[],
   userMessages: { role: string; content: string }[],
   maxTokens: number,
-  temperature: number = 0.3
+  temperature: number = 0.3,
+  metadata?: Record<string, unknown>
 ): Promise<string> {
   // Set SSE headers
   res.setHeader('Content-Type', 'text/event-stream');
@@ -591,10 +609,19 @@ export async function streamAIResponse(
   res.flushHeaders();
 
   let fullText = '';
+  let clientDisconnected = false;
+
+  res.on('close', () => { clientDisconnected = true; });
+
+  const safeWrite = (data: string) => {
+    if (!clientDisconnected) {
+      try { res.write(data); } catch { clientDisconnected = true; }
+    }
+  };
 
   try {
     const stream = await getClient().chat.completions.create({
-      model: 'Qwen/Qwen3-235B-A22B-Instruct-2507',
+      model: AI_MODEL,
       messages: [...systemMessages, ...userMessages] as any,
       max_tokens: maxTokens,
       temperature,
@@ -605,32 +632,37 @@ export async function streamAIResponse(
       const delta = chunk.choices[0]?.delta?.content;
       if (delta) {
         fullText += delta;
-        res.write(`data: ${JSON.stringify({ token: delta })}\n\n`);
+        safeWrite(`data: ${JSON.stringify({ token: delta })}\n\n`);
       }
     }
   } catch (err) {
-    console.error('Streaming AI error:', err);
+    console.error('Streaming AI error:', (err as any)?.message || 'Unknown error');
     if (!fullText) {
-      res.write(`data: ${JSON.stringify({ error: 'Error al comunicarse con el servicio de IA' })}\n\n`);
+      safeWrite(`data: ${JSON.stringify({ error: 'Error al comunicarse con el servicio de IA' })}\n\n`);
     }
   }
 
-  res.write(`data: ${JSON.stringify({ done: true })}\n\n`);
-  res.end();
+  if (metadata) {
+    safeWrite(`data: ${JSON.stringify(metadata)}\n\n`);
+  }
+  safeWrite(`data: ${JSON.stringify({ done: true })}\n\n`);
+  if (!clientDisconnected) { try { res.end(); } catch { /* already closed */ } }
 
   return fullText || 'Lo siento, no pude generar una respuesta.';
 }
 
 // ==================== STREAMING VARIANTS ====================
 
-export async function streamDefenseAI(res: Response, messages: Message[], specialties: string[] = [], legalCountryContext?: string, country?: string): Promise<string> {
+export async function streamDefenseAI(res: Response, messages: Message[], specialties: string[] = [], legalCountryContext?: string, country?: string, ragContext?: string, ragFound?: boolean): Promise<string> {
   const identityContext = buildIdentityContext();
   const specialtiesPrompt = buildSpecialtiesSystemPrompt(specialties);
   const systemContent = specialtiesPrompt
     ? `${DEFENSE_SYSTEM_PROMPT}\n\n${identityContext}\n\n${specialtiesPrompt}`
     : `${DEFENSE_SYSTEM_PROMPT}\n\n${identityContext}`;
   const systemMessages: {role: string; content: string}[] = [{ role: 'system', content: systemContent }];
+  if (country) systemMessages.push({ role: 'system', content: `La cuenta del usuario está en ${getCountryName(country)}. Cuando menciones jurisdicción, normativa o legislación, refiere siempre a la de ${getCountryName(country)}.` });
   if (legalCountryContext) systemMessages.push({ role: 'system', content: legalCountryContext });
+  if (ragContext) systemMessages.push({ role: 'system', content: ragContext });
   const defenseSearch = !!legalCountryContext || await needsWebSearch(messages);
   if (defenseSearch) {
     const lastUserMsg = [...messages].reverse().find(m => m.role === 'user');
@@ -640,7 +672,7 @@ export async function streamDefenseAI(res: Response, messages: Message[], specia
       if (webContext) systemMessages.push({ role: 'system', content: webContext });
     }
   }
-  return streamAIResponse(res, systemMessages, messages as any, 1000, 0.2);
+  return streamAIResponse(res, systemMessages, messages as any, 1000, 0.2, ragFound ? { ragEnhanced: true } : undefined);
 }
 
 export async function streamClientAI(res: Response, messages: Message[], documentsContext?: string, specialties: string[] = [], legalCountryContext?: string, country?: string): Promise<string> {
@@ -649,6 +681,7 @@ export async function streamClientAI(res: Response, messages: Message[], documen
   const systemMessages: {role: string; content: string}[] = [
     { role: 'system', content: `${CLIENT_SYSTEM_PROMPT}\n\n${identityContext}` }
   ];
+  if (country) systemMessages.push({ role: 'system', content: `La cuenta del usuario está en ${getCountryName(country)}. Cuando menciones jurisdicción, normativa o legislación, refiere siempre a la de ${getCountryName(country)}.` });
   if (specialtiesPrompt) systemMessages.push({ role: 'system', content: specialtiesPrompt });
   if (documentsContext) {
     systemMessages.push({ role: 'system', content: `DOCUMENTOS DEL CLIENTE:\n\n${documentsContext}\n\nUtiliza esta información cuando el cliente pregunte sobre sus documentos o casos relacionados.` });
@@ -667,10 +700,11 @@ export async function streamClientAI(res: Response, messages: Message[], documen
   return streamAIResponse(res, systemMessages, messages as any, 800, 0.3);
 }
 
-export async function streamAssistantAI(res: Response, messages: Message[], specialties: string[] = [], legalCountryContext?: string, country?: string, fileContext?: string): Promise<string> {
+export async function streamAssistantAI(res: Response, messages: Message[], specialties: string[] = [], legalCountryContext?: string, country?: string, fileContext?: string, ragContext?: string, ragFound?: boolean): Promise<string> {
   const identityContext = buildIdentityContext();
   const specialtiesPrompt = buildSpecialtiesSystemPrompt(specialties);
   const systemMessages: {role: string; content: string}[] = [{ role: 'system', content: `${ASSISTANT_SYSTEM_PROMPT}\n\n${identityContext}` }];
+  if (country) systemMessages.push({ role: 'system', content: `La cuenta del usuario está en ${getCountryName(country)}. Cuando menciones jurisdicción, normativa o legislación, refiere siempre a la de ${getCountryName(country)}.` });
   if (specialtiesPrompt) systemMessages.push({ role: 'system', content: specialtiesPrompt });
   if (legalCountryContext) systemMessages.push({ role: 'system', content: legalCountryContext });
   if (fileContext) {
@@ -686,7 +720,8 @@ export async function streamAssistantAI(res: Response, messages: Message[], spec
       if (webContext) systemMessages.push({ role: 'system', content: webContext });
     }
   }
-  return streamAIResponse(res, systemMessages, messages as any, 1500, 0.3);
+  if (ragContext) systemMessages.push({ role: 'system', content: ragContext });
+  return streamAIResponse(res, systemMessages, messages as any, 1500, 0.3, ragFound ? { ragEnhanced: true } : undefined);
 }
 
 export async function streamFiscalAI(res: Response, profile: any, messages: Message[], specialties: string[] = [], legalCountryContext?: string, clientContext?: string, countryName?: string, countryCode?: string): Promise<string> {

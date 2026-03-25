@@ -1,0 +1,125 @@
+{
+  "country": "Paraguay",
+  "code": "PY",
+  "year": 2026,
+  "currency": "PYG",
+  "incomeTax": {
+    "brackets": [
+      {
+        "from": 0,
+        "to": 50000000,
+        "rate": 8
+      },
+      {
+        "from": 50000000,
+        "to": null,
+        "rate": 10
+      }
+    ],
+    "personalAllowance": 36000000,
+    "notes": "IRP (Impuesto a la Renta Personal). No tax below 36 monthly min wages."
+  },
+  "corporateTax": {
+    "standard": 10,
+    "small": 10,
+    "smallThreshold": 0
+  },
+  "vat": {
+    "standard": 10,
+    "reduced": 5,
+    "superReduced": 0
+  },
+  "socialSecurity": {
+    "employee": 9,
+    "employer": 16.5,
+    "selfEmployed": 25.5
+  },
+  "fields": {
+    "asalariado": {
+      "basic": [
+        {
+          "key": "salarioBruto",
+          "label": "Salario bruto anual (PYG)"
+        },
+        {
+          "key": "retencionesEmpresa",
+          "label": "IRP retenido (PYG)"
+        }
+      ],
+      "advanced": [
+        {
+          "key": "cotizacionesSS",
+          "label": "Aportes IPS (PYG)"
+        }
+      ]
+    },
+    "autonomo": {
+      "basic": [
+        {
+          "key": "facturacionTotal",
+          "label": "Ingresos brutos (PYG)"
+        },
+        {
+          "key": "gastosDeducibles",
+          "label": "Gastos deducibles (PYG)"
+        },
+        {
+          "key": "ivaRepercutido",
+          "label": "IVA débito (PYG)"
+        },
+        {
+          "key": "ivaSoportado",
+          "label": "IVA crédito (PYG)"
+        }
+      ],
+      "advanced": []
+    },
+    "empresa": {
+      "basic": [
+        {
+          "key": "ingresosTotal",
+          "label": "Ingresos brutos (PYG)"
+        },
+        {
+          "key": "gastosTotal",
+          "label": "Gastos deducibles (PYG)"
+        },
+        {
+          "key": "ivaRepercutidoEmp",
+          "label": "IVA débito (PYG)"
+        },
+        {
+          "key": "ivaSoportadoEmp",
+          "label": "IVA crédito (PYG)"
+        }
+      ],
+      "advanced": []
+    }
+  },
+  "clientForm": {
+    "taxIdLabel": "RUC / CI",
+    "taxIdCompanyLabel": "RUC",
+    "taxIdPlaceholder": "ej. 80012345-6",
+    "regionLabel": "Departamento",
+    "regions": [
+      "Alto Paraguay",
+      "Alto Paraná",
+      "Amambay",
+      "Asunción",
+      "Boquerón",
+      "Caaguazú",
+      "Caazapá",
+      "Canindeyú",
+      "Central",
+      "Concepción",
+      "Cordillera",
+      "Guairá",
+      "Itapúa",
+      "Misiones",
+      "Ñeembucú",
+      "Paraguarí",
+      "Presidente Hayes",
+      "San Pedro"
+    ]
+  }
+}

@@ -1,7 +1,7 @@
 import { useRef, useState, useCallback } from 'react';
 import { authFetch } from '../lib/authFetch';
 
-const API = import.meta.env.VITE_API_URL ?? 'http://localhost:3000/api';
+const API = import.meta.env.VITE_API_URL;
 
 interface StreamOptions {
   /** Full URL path after /api, e.g. "/assistant/chat/message/stream" */
@@ -27,12 +27,21 @@ export function useStreamingChat() {
   const [streamingText, setStreamingText] = useState('');
   const [isStreaming, setIsStreaming] = useState(false);
   const [isSaving, setIsSaving] = useState(false);
+  const [isContractGeneration, setIsContractGeneration] = useState(false);
+  const contractDetectedRef = useRef(false);
   const abortRef = useRef<AbortController | null>(null);
+
+  const resetContractGeneration = useCallback(() => {
+    setIsContractGeneration(false);
+    contractDetectedRef.current = false;
+  }, []);
 
   const cancelStream = useCallback(() => {
     abortRef.current?.abort();
     abortRef.current = null;
     setIsStreaming(false);
+    setIsContractGeneration(false);
+    contractDetectedRef.current = false;
   }, []);
 
   const startStream = useCallback(async (opts: StreamOptions) => {
@@ -45,8 +54,11 @@ export function useStreamingChat() {
     setStreamingText('');
     setIsStreaming(true);
     setIsSaving(false);
+    setIsContractGeneration(false);
+    contractDetectedRef.current = false;
 
     let accumulated = '';
+    let ragEnhanced = false;
 
     try {
       const res = await authFetch(`${API}${opts.endpoint}`, {
@@ -86,23 +98,34 @@ export function useStreamingChat() {
             const parsed = JSON.parse(jsonStr);
             if (parsed.done) {
               // Stream complete
+              if (ragEnhanced) accumulated += '\n<!-- rag-enhanced -->';
               setIsStreaming(false);
               setIsSaving(false);
               opts.onDone?.(accumulated);
               return accumulated;
+            }
+            if (parsed.ragEnhanced) {
+              ragEnhanced = true;
             }
             if (parsed.saving) {
               setIsSaving(true);
             }
             if (parsed.token) {
               accumulated += parsed.token;
-              // Si la IA está generando un contrato, solo mostrar el texto introductorio
-              // (lo que va antes del comando), no el cuerpo del contrato
+              // Si la IA está generando un contrato, activar modo generación
               const contractIdx = accumulated.indexOf('[GENERAR_CONTRATO_COMPLETO]');
-              let displayText = contractIdx !== -1 ? accumulated.slice(0, contractIdx) : accumulated;
-              // Strip [OFFER_PDF] marker from display (handled by component)
-              displayText = displayText.replace(/\[OFFER_PDF\]/g, '');
-              setStreamingText(displayText);
+              if (contractIdx !== -1) {
+                if (!contractDetectedRef.current) {
+                  contractDetectedRef.current = true;
+                  setIsContractGeneration(true);
+                  setStreamingText('');
+                }
+              } else {
+                let displayText = accumulated;
+                // Strip [OFFER_PDF] marker from display (handled by component)
+                displayText = displayText.replace(/\[OFFER_PDF\]/g, '');
+                setStreamingText(displayText);
+              }
             }
             if (parsed.error) {
               console.error('Stream error from server:', parsed.error);
@@ -114,6 +137,7 @@ export function useStreamingChat() {
       }
 
       // If we get here without a done signal, still finish
+      if (ragEnhanced) accumulated += '\n<!-- rag-enhanced -->';
       setIsStreaming(false);
       setIsSaving(false);
       if (accumulated) opts.onDone?.(accumulated);
@@ -131,5 +155,5 @@ export function useStreamingChat() {
     }
   }, []);
 
-  return { streamingText, isStreaming, isSaving, startStream, cancelStream };
+  return { streamingText, isStreaming, isSaving, isContractGeneration, startStream, cancelStream, resetContractGeneration };
 }

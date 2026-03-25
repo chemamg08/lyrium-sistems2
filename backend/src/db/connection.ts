@@ -12,7 +12,6 @@ export async function connectDB(): Promise<void> {
     await mongoose.connect(MONGODB_URI, {
       dbName: 'lyrium',
     });
-    console.log('✅ Conectado a MongoDB Atlas');
   } catch (error) {
     console.error('❌ Error al conectar con MongoDB:', error);
     process.exit(1);

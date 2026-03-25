@@ -1,0 +1,176 @@
+{
+  "country": "Singapore",
+  "code": "SG",
+  "year": 2026,
+  "currency": "SGD",
+  "incomeTax": {
+    "brackets": [
+      {
+        "from": 0,
+        "to": 20000,
+        "rate": 0
+      },
+      {
+        "from": 20000,
+        "to": 30000,
+        "rate": 2
+      },
+      {
+        "from": 30000,
+        "to": 40000,
+        "rate": 3.5
+      },
+      {
+        "from": 40000,
+        "to": 80000,
+        "rate": 7
+      },
+      {
+        "from": 80000,
+        "to": 120000,
+        "rate": 11.5
+      },
+      {
+        "from": 120000,
+        "to": 160000,
+        "rate": 15
+      },
+      {
+        "from": 160000,
+        "to": 200000,
+        "rate": 18
+      },
+      {
+        "from": 200000,
+        "to": 240000,
+        "rate": 19
+      },
+      {
+        "from": 240000,
+        "to": 280000,
+        "rate": 19.5
+      },
+      {
+        "from": 280000,
+        "to": 320000,
+        "rate": 20
+      },
+      {
+        "from": 320000,
+        "to": 500000,
+        "rate": 22
+      },
+      {
+        "from": 500000,
+        "to": 1000000,
+        "rate": 23
+      },
+      {
+        "from": 1000000,
+        "to": null,
+        "rate": 24
+      }
+    ],
+    "personalAllowance": 20000,
+    "notes": "Resident tax rates YA2025. No capital gains tax. Territorial basis."
+  },
+  "corporateTax": {
+    "standard": 17,
+    "small": 17,
+    "smallThreshold": 0
+  },
+  "vat": {
+    "standard": 9,
+    "reduced": 0,
+    "superReduced": 0
+  },
+  "socialSecurity": {
+    "employee": 20,
+    "employer": 17,
+    "selfEmployed": 0
+  },
+  "fields": {
+    "asalariado": {
+      "basic": [
+        {
+          "key": "salarioBruto",
+          "label": "Gross annual income (SGD)"
+        },
+        {
+          "key": "retencionesEmpresa",
+          "label": "Tax withheld (SGD)"
+        }
+      ],
+      "advanced": [
+        {
+          "key": "cotizacionesSS",
+          "label": "CPF employee contribution (SGD)"
+        },
+        {
+          "key": "deduccionesAuto",
+          "label": "Personal reliefs & deductions (SGD)"
+        }
+      ]
+    },
+    "autonomo": {
+      "basic": [
+        {
+          "key": "facturacionTotal",
+          "label": "Gross revenue (SGD)"
+        },
+        {
+          "key": "gastosDeducibles",
+          "label": "Deductible expenses (SGD)"
+        },
+        {
+          "key": "ivaRepercutido",
+          "label": "GST collected (SGD)"
+        },
+        {
+          "key": "ivaSoportado",
+          "label": "GST on purchases (SGD)"
+        }
+      ],
+      "advanced": []
+    },
+    "empresa": {
+      "basic": [
+        {
+          "key": "ingresosTotal",
+          "label": "Gross revenue (SGD)"
+        },
+        {
+          "key": "gastosTotal",
+          "label": "Deductible expenses (SGD)"
+        },
+        {
+          "key": "ivaRepercutidoEmp",
+          "label": "GST output (SGD)"
+        },
+        {
+          "key": "ivaSoportadoEmp",
+          "label": "GST input (SGD)"
+        }
+      ],
+      "advanced": [
+        {
+          "key": "basesNegAnter",
+          "label": "Unutilised losses (SGD)"
+        }
+      ]
+    }
+  },
+  "clientForm": {
+    "taxIdLabel": "NRIC / FIN",
+    "taxIdCompanyLabel": "UEN",
+    "taxIdPlaceholder": "e.g. S1234567D",
+    "regionLabel": "District",
+    "regions": [
+      "Central",
+      "East",
+      "North",
+      "North-East",
+      "West"
+    ]
+  }
+}

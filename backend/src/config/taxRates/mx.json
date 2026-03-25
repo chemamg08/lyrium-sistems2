@@ -1,0 +1,214 @@
+{
+  "country": "México / Mexico",
+  "code": "MX",
+  "year": 2026,
+  "currency": "MXN",
+  "incomeTax": {
+    "brackets": [
+      {
+        "from": 0,
+        "to": 8952,
+        "rate": 1.92
+      },
+      {
+        "from": 8952,
+        "to": 75984,
+        "rate": 6.4
+      },
+      {
+        "from": 75984,
+        "to": 133536,
+        "rate": 10.88
+      },
+      {
+        "from": 133536,
+        "to": 155229,
+        "rate": 16.0
+      },
+      {
+        "from": 155229,
+        "to": 185852,
+        "rate": 17.92
+      },
+      {
+        "from": 185852,
+        "to": 374837,
+        "rate": 21.36
+      },
+      {
+        "from": 374837,
+        "to": 590796,
+        "rate": 23.52
+      },
+      {
+        "from": 590796,
+        "to": 1127926,
+        "rate": 30.0
+      },
+      {
+        "from": 1127926,
+        "to": 1503902,
+        "rate": 32.0
+      },
+      {
+        "from": 1503902,
+        "to": 4511707,
+        "rate": 34.0
+      },
+      {
+        "from": 4511707,
+        "to": null,
+        "rate": 35.0
+      }
+    ],
+    "personalAllowance": 0,
+    "notes": "ISR progressive brackets. Employers withhold monthly. Annual return due April."
+  },
+  "corporateTax": {
+    "standard": 30,
+    "small": 30,
+    "smallThreshold": 0
+  },
+  "vat": {
+    "standard": 16,
+    "reduced": 0,
+    "superReduced": 0
+  },
+  "socialSecurity": {
+    "employee": 2.78,
+    "employer": 26.5,
+    "selfEmployed": 29.28
+  },
+  "fields": {
+    "asalariado": {
+      "basic": [
+        {
+          "key": "salarioBruto",
+          "label": "Salario bruto anual (MXN)"
+        },
+        {
+          "key": "retencionesEmpresa",
+          "label": "ISR retenido por empleador (MXN)"
+        }
+      ],
+      "advanced": [
+        {
+          "key": "cotizacionesSS",
+          "label": "Cuotas IMSS trabajador (MXN)"
+        },
+        {
+          "key": "deduccionesAuto",
+          "label": "Deducciones personales (médicos, colegiaturas, etc.) (MXN)"
+        },
+        {
+          "key": "capitalMobiliario",
+          "label": "Ingresos por intereses / dividendos (MXN)"
+        },
+        {
+          "key": "capitalInmobiliario",
+          "label": "Ingresos por arrendamiento (MXN)"
+        }
+      ]
+    },
+    "autonomo": {
+      "basic": [
+        {
+          "key": "facturacionTotal",
+          "label": "Ingresos facturados anuales (MXN)"
+        },
+        {
+          "key": "gastosDeducibles",
+          "label": "Gastos deducibles (MXN)"
+        },
+        {
+          "key": "ivaRepercutido",
+          "label": "IVA cobrado (MXN)"
+        },
+        {
+          "key": "ivaSoportado",
+          "label": "IVA pagado acreditable (MXN)"
+        }
+      ],
+      "advanced": [
+        {
+          "key": "pagosFracc130",
+          "label": "Pagos provisionales ISR realizados (MXN)"
+        },
+        {
+          "key": "amortizaciones",
+          "label": "Depreciaciones (MXN)"
+        }
+      ]
+    },
+    "empresa": {
+      "basic": [
+        {
+          "key": "ingresosTotal",
+          "label": "Ingresos acumulables (MXN)"
+        },
+        {
+          "key": "gastosTotal",
+          "label": "Deducciones autorizadas (MXN)"
+        },
+        {
+          "key": "ivaRepercutidoEmp",
+          "label": "IVA trasladado (MXN)"
+        },
+        {
+          "key": "ivaSoportadoEmp",
+          "label": "IVA acreditable (MXN)"
+        }
+      ],
+      "advanced": [
+        {
+          "key": "basesNegAnter",
+          "label": "Pérdidas fiscales de ejercicios anteriores (MXN)"
+        },
+        {
+          "key": "pagosFracc202",
+          "label": "Pagos provisionales ISR (MXN)"
+        }
+      ]
+    }
+  },
+  "clientForm": {
+    "taxIdLabel": "RFC",
+    "taxIdCompanyLabel": "RFC Persona Moral",
+    "taxIdPlaceholder": "ej. XAXX010101000",
+    "regionLabel": "Estado",
+    "regions": [
+      "Aguascalientes",
+      "Baja California",
+      "Baja California Sur",
+      "Campeche",
+      "Chiapas",
+      "Chihuahua",
+      "Ciudad de México",
+      "Coahuila",
+      "Colima",
+      "Durango",
+      "Estado de México",
+      "Guanajuato",
+      "Guerrero",
+      "Hidalgo",
+      "Jalisco",
+      "Michoacán",
+      "Morelos",
+      "Nayarit",
+      "Nuevo León",
+      "Oaxaca",
+      "Puebla",
+      "Querétaro",
+      "Quintana Roo",
+      "San Luis Potosí",
+      "Sinaloa",
+      "Sonora",
+      "Tabasco",
+      "Tamaulipas",
+      "Tlaxcala",
+      "Veracruz",
+      "Yucatán",
+      "Zacatecas"
+    ]
+  }
+}

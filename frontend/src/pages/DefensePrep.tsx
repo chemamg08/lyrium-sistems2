@@ -1,5 +1,5 @@
 import { useState, useEffect, useRef } from "react";
-import { X, Download, Upload, ChevronRight, Send, Paperclip, BookMarked, StopCircle, MessageSquare, Plus, Search, Pencil, Check, Trash2, FileText, Info } from "lucide-react";
+import { X, Download, Upload, ChevronRight, Send, Paperclip, BookMarked, StopCircle, MessageSquare, Plus, Search, Pencil, Check, Trash2, FileText, Info, Brain, FolderOpen } from "lucide-react";
 import ReactMarkdown from "react-markdown";
 import { useTranslation } from "react-i18next";
 import { useToast } from "@/components/ui/use-toast";
@@ -50,7 +50,7 @@ interface SavedStrategy {
   };
 }
 
-const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:3000/api';
+const API_URL = import.meta.env.VITE_API_URL;
 const ACTIVE_DEFENSE_CHAT_KEY = 'activeDefenseChatId';
 
 const DefensePrep = () => {
@@ -73,6 +73,8 @@ const DefensePrep = () => {
   const [isDraggingOver, setIsDraggingOver] = useState(false);
   const [isUploadingPdf, setIsUploadingPdf] = useState<string | null>(null); // nombre del archivo
   const [attachedPdf, setAttachedPdf] = useState<{ filename: string; text: string } | null>(null);
+  const [ragEnabled, setRagEnabled] = useState(false);
+  const [hasImproveAI, setHasImproveAI] = useState(false);
   const endRef = useRef<HTMLDivElement>(null);
   const activeChatIdRef = useRef<string | null>(null);
 
@@ -84,6 +86,8 @@ const DefensePrep = () => {
   const [editingChatId, setEditingChatId] = useState<string | null>(null);
   const [editingTitle, setEditingTitle] = useState("");
   const [showInfoModal, setShowInfoModal] = useState(false);
+  const [isPollingForResponse, setIsPollingForResponse] = useState(false);
+  const pollingRef = useRef<ReturnType<typeof setInterval> | null>(null);
 
   // Mantener ref sincronizado con el estado para evitar stale closures
   useEffect(() => { activeChatIdRef.current = activeChatId; }, [activeChatId]);
@@ -91,6 +95,16 @@ const DefensePrep = () => {
   useEffect(() => {
     initDefenseChats();
     loadClients();
+    const accId = sessionStorage.getItem('accountId');
+    if (accId) {
+      const cached = sessionStorage.getItem('hasImproveAI');
+      if (cached !== null) {
+        setHasImproveAI(cached === 'true');
+      } else {
+        authFetch(`${API_URL}/improve-ai/has-files?accountId=${accId}`)
+          .then(r => r.json()).then(d => { setHasImproveAI(d.hasFiles); sessionStorage.setItem('hasImproveAI', String(d.hasFiles)); }).catch(() => {});
+      }
+    }
   }, []);
 
   useEffect(() => {
@@ -103,7 +117,40 @@ const DefensePrep = () => {
       loadDefenseChat(activeChatId);
       loadSavedStrategies(activeChatId);
       sessionStorage.setItem(ACTIVE_DEFENSE_CHAT_KEY, activeChatId);
+
+      // Detectar si hay un stream en curso (componente fue remontado)
+      const streamingFlag = sessionStorage.getItem(`streaming_defense_${activeChatId}`);
+      if (streamingFlag) {
+        const expectedMsgCount = parseInt(streamingFlag, 10);
+        setIsPollingForResponse(true);
+        setIsLoading(true);
+        if (pollingRef.current) clearInterval(pollingRef.current);
+        pollingRef.current = setInterval(async () => {
+          try {
+            const accountId = sessionStorage.getItem('accountId');
+            if (!accountId) return;
+            const res = await authFetch(`${API_URL}/defense-chat?accountId=${accountId}&chatId=${activeChatId}`);
+            if (res.ok) {
+              const data = await res.json();
+              const msgs: Message[] = data.messages || [];
+              if (msgs.length > expectedMsgCount) {
+                // La respuesta de la IA ya está en BD
+                setMessages(msgs);
+                setIsPollingForResponse(false);
+                setIsLoading(false);
+                sessionStorage.removeItem(`streaming_defense_${activeChatId}`);
+                if (pollingRef.current) { clearInterval(pollingRef.current); pollingRef.current = null; }
+                loadSavedStrategies(activeChatId);
+                initDefenseChats();
+              }
+            }
+          } catch { /* ignore polling errors */ }
+        }, 2000);
+      }
     }
+    return () => {
+      if (pollingRef.current) { clearInterval(pollingRef.current); pollingRef.current = null; }
+    };
   }, [activeChatId]);
 
   // Inicializar chats de defensa
@@ -303,21 +350,30 @@ const DefensePrep = () => {
     }
     setInput("");
     setIsLoading(true);
+    const currentMsgCount = messages.length + 1; // +1 por el mensaje user que estamos a punto de añadir
     setMessages(prev => [...prev, {
       id: Date.now().toString(),
       role: 'user',
       content: userContent
     }]);
 
+    // Marcar que hay un stream en curso para este chat
+    sessionStorage.setItem(`streaming_defense_${activeChatId}`, String(currentMsgCount));
+
     try {
       await defStartStream({
         endpoint: "/defense-chat/message/stream",
-        body: { content: userContent, accountId, chatId: activeChatId },
+        body: { content: userContent, accountId, chatId: activeChatId, ...(ragEnabled ? { ragEnabled: true } : {}) },
         onDone: async (fullText) => {
+          // Limpiar flag de streaming (funciona incluso si el componente fue desmontado)
+          const doneChatId = activeChatIdRef.current;
+          if (doneChatId) sessionStorage.removeItem(`streaming_defense_${doneChatId}`);
+
+          const content = ragEnabled ? `${fullText}\n<!-- rag-enhanced -->` : fullText;
           setMessages(prev => [...prev, {
             id: `ai-${Date.now()}`,
             role: 'assistant',
-            content: fullText
+            content
           }]);
           setIsLoading(false);
           initDefenseChats();
@@ -724,7 +780,10 @@ const DefensePrep = () => {
               </div>
             </div>
           )}
-          {messages.map((msg) => (
+          {messages.map((msg) => {
+            const isRagEnhanced = msg.role === 'assistant' && msg.content.includes('<!-- rag-enhanced -->');
+            const displayContent = isRagEnhanced ? msg.content.replace(/\n?<!-- rag-enhanced -->/g, '') : msg.content;
+            return (
             <div
               key={msg.id}
               className={`flex ${msg.role === "user" ? "justify-end" : "justify-start"}`}
@@ -736,11 +795,18 @@ const DefensePrep = () => {
                     : "bg-chat-ai text-chat-ai-foreground"
                 }`}
               >
-                <ReactMarkdown>{msg.content}</ReactMarkdown>
+                <ReactMarkdown>{displayContent}</ReactMarkdown>
+                {isRagEnhanced && (
+                  <div className="flex items-center justify-end gap-1 mt-2 pt-1.5 border-t border-border/30 not-prose">
+                    <FolderOpen className="h-3 w-3 text-primary/60" />
+                    <span className="text-[10px] text-muted-foreground">{t('improveAI.ragUsed')}</span>
+                  </div>
+                )}
               </div>
             </div>
-          ))}
-          {isLoading && !defIsStreaming && (
+            );
+          })}
+          {(isLoading || isPollingForResponse) && !defIsStreaming && (
             <div className="flex justify-start">
               <div className="bg-chat-ai text-chat-ai-foreground rounded-lg px-4 py-3 text-sm">
                 <span className="inline-block animate-pulse">{t('defense.analyzing')}</span>
@@ -784,6 +850,15 @@ const DefensePrep = () => {
             </div>
           )}
           <div className="flex items-end gap-2">
+            {hasImproveAI && (
+              <button
+                onClick={() => setRagEnabled(!ragEnabled)}
+                className={`p-2 rounded-md transition-colors shrink-0 ${ragEnabled ? 'bg-primary/20 text-primary' : 'hover:bg-accent text-muted-foreground hover:text-foreground'}`}
+                title={t('improveAI.ragToggle')}
+              >
+                <Brain className="h-5 w-5" />
+              </button>
+            )}
             <textarea
               value={input}
               rows={1}

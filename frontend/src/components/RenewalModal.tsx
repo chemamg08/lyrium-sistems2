@@ -10,7 +10,7 @@ import { authFetch } from '../lib/authFetch';
 
 const stripeKey = import.meta.env.VITE_STRIPE_PUBLISHABLE_KEY as string | undefined;
 const stripePromise = stripeKey ? loadStripe(stripeKey) : null;
-const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:3000/api';
+const API_URL = import.meta.env.VITE_API_URL;
 
 interface RenewalModalProps {
   isOpen: boolean;
@@ -204,19 +204,19 @@ const RenewalModal = ({ isOpen, onClose, onSuccess, accountId, userEmail }: Rene
   const PLANS: PlanConfig[] = [
     {
       id: 'starter',
-      name: 'Plan Starter',
+      name: t('profile.planStarter'),
       monthlyPrice: 250,
       annualPrice: 2700,
       maxSubaccounts: 4,
-      features: ['Hasta 4 subcuentas', 'Todas las funcionalidades', 'Soporte prioritario']
+      features: [t('profile.featureUpTo4'), t('profile.featureAllFeatures'), t('profile.featurePrioritySupport')]
     },
     {
       id: 'advanced',
-      name: 'Plan Avanzado',
+      name: t('profile.planAdvanced'),
       monthlyPrice: 350,
       annualPrice: 3700,
       maxSubaccounts: 10,
-      features: ['Hasta 10 subcuentas', 'Todas las funcionalidades', 'Soporte prioritario']
+      features: [t('profile.featureUpTo10'), t('profile.featureAllFeatures'), t('profile.featurePrioritySupport')]
     }
   ];
 

@@ -5,6 +5,7 @@ import { fileURLToPath } from 'url';
 import OpenAI from 'openai';
 import { ChatType, getChatSpecialties, isChatGeneral } from './specialtiesService.js';
 import { Account } from '../models/Account.js';
+import { AI_MODEL } from '../config/aiModel.js';
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
@@ -195,7 +196,7 @@ function getEffectiveSpecialtiesLocal(chatType: ChatType | undefined, query: str
 }
 
 const ATLAS_BASE_URL = 'https://api.atlascloud.ai/v1';
-const MISTRAL_RERANK_MODEL = process.env.MISTRAL_RERANK_MODEL || 'Qwen/Qwen3-235B-A22B-Instruct-2507';
+const MISTRAL_RERANK_MODEL = process.env.MISTRAL_RERANK_MODEL || AI_MODEL;
 const MISTRAL_EMBEDDING_MODEL = process.env.MISTRAL_EMBEDDING_MODEL || 'text-embedding-3-small';
 
 // Rerank desactivado por defecto (lento, poco efectivo)
@@ -230,6 +231,7 @@ function getMistralClient(): OpenAI | null {
 }
 
 const embeddingCacheMemory = new Map<string, number[]>();
+const EMBEDDING_CACHE_MAX_SIZE = 500;
 const embeddingCacheLoaded = new Set<string>();
 
 function parseNumber(value: string | undefined, fallback: number): number {
@@ -456,13 +458,6 @@ async function loadKnowledgeInMemory(country: string): Promise<InMemoryKnowledge
   knowledgeCache.set(countryKey, inMemory);
   
   // Log siempre visible al cargar conocimiento legal
-  console.log(`\n══════════════════════════════════════════════════════════════`);
-  console.log(`✅ LEGAL KNOWLEDGE LOADED IN MEMORY`);
-  console.log(`   País: ${countryKey}`);
-  console.log(`   Chunks: ${chunks.length.toLocaleString()}`);
-  console.log(`   Términos indexados: ${invertedIndex.size.toLocaleString()}`);
-  console.log(`   Timestamp: ${inMemory.loadedAt.toISOString()}`);
-  console.log(`══════════════════════════════════════════════════════════════\n`);
 
   return inMemory;
 }
@@ -541,7 +536,6 @@ function detectExplicitSourceMention(query: string): { pattern: string; name: st
   // 1. Buscar menciones explícitas de normas
   for (const entry of EXPLICIT_SOURCE_MENTIONS) {
     if (entry.keywords.some(kw => normalizedQuery.includes(normalize(kw)))) {
-      console.log(`[SourceDetection] Explícito: "${entry.name}" detectado en query`);
       return { pattern: entry.sourcePattern, name: entry.name };
     }
   }
@@ -551,7 +545,6 @@ function detectExplicitSourceMention(query: string): { pattern: string; name: st
   const hasSustantivoPenal = SUSTANTIVO_PENAL_KEYWORDS.some(s => normalizedQuery.includes(normalize(s)));
   const hasProcesalPenal = PROCESAL_PENAL_KEYWORDS.some(p => normalizedQuery.includes(normalize(p)));
   
-  console.log(`[SourceDetection] Implícito: hasDelito=${hasDelito}, hasSustantivoPenal=${hasSustantivoPenal}, hasProcesalPenal=${hasProcesalPenal}`);
   
   // Si menciona un delito + prescripción/pena → priorizar Código Penal
   if (hasDelito && hasSustantivoPenal && !hasProcesalPenal) {
@@ -789,6 +782,10 @@ async function getEmbedding(text: string, country: string): Promise<number[] | n
     }
 
     embeddingCacheMemory.set(key, vector);
+    if (embeddingCacheMemory.size > EMBEDDING_CACHE_MAX_SIZE) {
+      const firstKey = embeddingCacheMemory.keys().next().value;
+      if (firstKey) embeddingCacheMemory.delete(firstKey);
+    }
     return vector;
   } catch {
     return null;
@@ -989,7 +986,6 @@ export async function getLegalContextForAccount(
   if (explicitSource) {
     sourceFilteredChunks = filterChunksBySource(allChunks, explicitSource.pattern);
     if (LOG_RETRIEVAL) {
-      console.log(`[LegalRetrieval] Detectado: "${explicitSource.name}" → pre-filtrado a ${sourceFilteredChunks.length} chunks de ${explicitSource.pattern}`);
     }
   }
 
@@ -1012,7 +1008,6 @@ export async function getLegalContextForAccount(
           : allChunks);
 
     if (filteredChunks.length === 0 && LOG_RETRIEVAL) {
-      console.log(`[LegalRetrieval] Filtro de especialidades vacío, usando todos los chunks`);
     }
 
     chunksToSearch = filteredChunks.length > 0 ? filteredChunks : allChunks;
@@ -1109,7 +1104,6 @@ export async function getLegalContextForAccount(
       chunksSearched: chunksToSearch.length,
       totalChunks: allChunks.length
     };
-    console.log(JSON.stringify(payload));
   }
 
   await persistEmbeddingCache(country).catch(() => undefined);
@@ -1146,7 +1140,13 @@ const COUNTRY_NAMES: Record<string, string> = {
   HU: 'Hungary', IE: 'Ireland', IT: 'Italy', LT: 'Lithuania',
   LU: 'Luxembourg', LV: 'Latvia', MT: 'Malta', NL: 'Netherlands',
   NO: 'Norway', PL: 'Poland', PT: 'Portugal', RO: 'Romania',
-  SE: 'Sweden', SI: 'Slovenia', SK: 'Slovakia', US: 'United States'
+  SE: 'Sweden', SI: 'Slovenia', SK: 'Slovakia', US: 'United States',
+  MX: 'Mexico', AR: 'Argentina', CO: 'Colombia', CL: 'Chile', PE: 'Peru',
+  EC: 'Ecuador', BO: 'Bolivia', PY: 'Paraguay',
+  UY: 'Uruguay', PA: 'Panama', DO: 'Dominican Republic',
+  CR: 'Costa Rica', GT: 'Guatemala', HN: 'Honduras', SV: 'El Salvador',
+  NI: 'Nicaragua', BR: 'Brazil', MC: 'Monaco', LI: 'Liechtenstein',
+  NZ: 'New Zealand', SG: 'Singapore',
 };
 
 export function getCountryName(code: string): string {

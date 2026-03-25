@@ -47,13 +47,14 @@ import {
   Plus,
   Trash2,
   FileDown,
+  Loader2,
 } from "lucide-react";
 import html2pdf from "html2pdf.js";
 import { useToast } from "@/hooks/use-toast";
 import { useTranslation } from "react-i18next";
 import { authFetch } from '../lib/authFetch';
 
-const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:3000/api';
+const API_URL = import.meta.env.VITE_API_URL;
 
 interface WritingText {
   id: string;
@@ -75,12 +76,19 @@ interface SuggestionWithPosition extends TextSuggestion {
   end: number;
 }
 
+// ── Estado a nivel de módulo para que la revisión sobreviva a la navegación ──
+let _reviewPromise: Promise<any> | null = null;
+let _reviewResults: TextSuggestion[] | null = null;
+let _reviewInProgress = false;
+let _reviewAbort: AbortController | null = null;
+
 const WritingReview = () => {
   const navigate = useNavigate();
   const { t } = useTranslation();
   const [texts, setTexts] = useState<WritingText[]>([]);
   const [currentTextId, setCurrentTextId] = useState<string | null>(null);
   const [isReviewing, setIsReviewing] = useState(false);
+  const [isSaving, setIsSaving] = useState(false);
   const [suggestions, setSuggestions] = useState<SuggestionWithPosition[]>([]);
   const [selectedSuggestion, setSelectedSuggestion] = useState<SuggestionWithPosition | null>(null);
   const [showSuggestionDialog, setShowSuggestionDialog] = useState(false);
@@ -144,6 +152,15 @@ const WritingReview = () => {
     }
     
     loadTexts();
+
+    // Si volvemos y hay una revisión en curso, restaurar estado
+    if (_reviewInProgress) {
+      setIsReviewing(true);
+    }
+
+    return () => {
+      // NO abortamos la revisión al desmontar — debe seguir en segundo plano
+    };
   }, [navigate, toast]);
 
   useEffect(() => {
@@ -162,6 +179,49 @@ const WritingReview = () => {
       editor.commands.unsetHighlight();
     }
   }, [suggestions, editor]);
+
+  // Restaurar resultados de revisión pendiente tras remount
+  useEffect(() => {
+    if (!editor) return;
+    let cancelled = false;
+
+    const restore = async () => {
+      // Si hay una revisión en curso, esperar a que termine
+      if (_reviewPromise) {
+        setIsReviewing(true);
+        try {
+          await _reviewPromise;
+        } catch {
+          // error ya manejado en handleReview
+        }
+      }
+      if (cancelled) return;
+
+      // Si hay resultados almacenados, aplicar highlights
+      if (_reviewResults && _reviewResults.length > 0) {
+        const withPos: SuggestionWithPosition[] = [];
+        for (const s of _reviewResults) {
+          const range = findPmRange(s.original);
+          if (range) {
+            withPos.push({ ...s, start: range.from, end: range.to });
+          }
+        }
+        if (cancelled) return;
+        setSuggestions(withPos);
+        withPos.forEach((sug) => {
+          editor.chain()
+            .focus()
+            .setTextSelection({ from: sug.start, to: sug.end })
+            .setHighlight({ color: "#fef08a" })
+            .run();
+        });
+        setIsReviewing(false);
+      }
+    };
+
+    restore();
+    return () => { cancelled = true; };
+  }, [editor]);
 
   const loadTexts = async () => {
     try {
@@ -206,6 +266,7 @@ const WritingReview = () => {
   };
 
   const handleSave = async () => {
+    if (isSaving) return;
     const accountId = sessionStorage.getItem("accountId");
     console.log("handleSave - accountId:", accountId);
     console.log("handleSave - currentTextId:", currentTextId);
@@ -218,6 +279,8 @@ const WritingReview = () => {
       });
       return;
     }
+
+    setIsSaving(true);
 
     const content = editor?.getHTML() || "";
 
@@ -260,6 +323,8 @@ const WritingReview = () => {
         description: "No se pudo guardar el texto",
         variant: "destructive",
       });
+    } finally {
+      setIsSaving(false);
     }
   };
 
@@ -331,6 +396,9 @@ const WritingReview = () => {
     }
   };
 
+  // Normaliza whitespace para matching difuso
+  const normalizeWs = (s: string) => s.replace(/\s+/g, ' ').trim();
+
   // Mapea cada carácter del texto a su posición ProseMirror exacta.
   const findPmRange = (searchText: string): { from: number; to: number } | null => {
     if (!editor) return null;
@@ -343,12 +411,43 @@ const WritingReview = () => {
       }
     });
     const plain = chars.map(c => c.char).join('');
-    const idx = plain.indexOf(searchText);
-    if (idx === -1) return null;
-    return {
-      from: chars[idx].pmPos,
-      to: chars[idx + searchText.length - 1].pmPos + 1,
-    };
+
+    // Intento 1: match exacto
+    let idx = plain.indexOf(searchText);
+    if (idx !== -1) {
+      return { from: chars[idx].pmPos, to: chars[idx + searchText.length - 1].pmPos + 1 };
+    }
+
+    // Intento 2: match con whitespace normalizado
+    const normSearch = normalizeWs(searchText);
+    const normPlain = normalizeWs(plain);
+    const normIdx = normPlain.indexOf(normSearch);
+    if (normIdx === -1) return null;
+
+    // Mapear posición normalizada de vuelta al plain original
+    let origPos = 0;
+    let normPos = 0;
+    const plainTrimmed = plain.replace(/^\s+/, '');
+    const leadingSpaces = plain.length - plainTrimmed.length;
+    origPos = leadingSpaces;
+    for (let n = 0; n < normIdx; n++) {
+      if (normPlain[n] === ' ') {
+        while (origPos < plain.length && /\s/.test(plain[origPos])) origPos++;
+        // retroceder 1 porque el espacio normalizado consume el grupo
+      }
+      origPos++;
+    }
+    // Ahora buscar searchText en el plain desde origPos con tolerancia de whitespace
+    // Alternativa más robusta: buscar con indexOf desde la posición estimada
+    const nearby = plain.substring(Math.max(0, origPos - 5));
+    const nearbyIdx = nearby.indexOf(searchText.trim());
+    if (nearbyIdx !== -1) {
+      const finalIdx = Math.max(0, origPos - 5) + nearbyIdx;
+      const trimmed = searchText.trim();
+      return { from: chars[finalIdx].pmPos, to: chars[finalIdx + trimmed.length - 1].pmPos + 1 };
+    }
+
+    return null;
   };
 
   const handleReview = async () => {
@@ -362,23 +461,45 @@ const WritingReview = () => {
       return;
     }
 
+    // Abort any previous review in progress
+    if (_reviewAbort) _reviewAbort.abort();
+    const controller = new AbortController();
+    _reviewAbort = controller;
+    _reviewResults = null;
+    _reviewInProgress = true;
+
     setIsReviewing(true);
     setSuggestions([]);
 
-    try {
+    const doReview = async () => {
       const response = await authFetch(`${API_URL}/writing-texts/review`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ text, accountId: sessionStorage.getItem('accountId') || undefined }),
+        signal: controller.signal,
       });
 
       if (response.ok) {
         const data = await response.json();
-        
         if (data.suggestions && data.suggestions.length > 0) {
+          _reviewResults = data.suggestions;
+          return data.suggestions as TextSuggestion[];
+        }
+      }
+      return [];
+    };
+
+    _reviewPromise = doReview();
+
+    try {
+      const rawSuggestions = await _reviewPromise;
+
+      // Aplicar highlights solo si el editor sigue vivo (componente montado)
+      if (editor && !editor.isDestroyed) {
+        if (rawSuggestions.length > 0) {
           const suggestionsWithPos: SuggestionWithPosition[] = [];
           
-          for (const suggestion of data.suggestions) {
+          for (const suggestion of rawSuggestions) {
             const range = findPmRange(suggestion.original);
             if (range) {
               suggestionsWithPos.push({
@@ -391,9 +512,8 @@ const WritingReview = () => {
 
           setSuggestions(suggestionsWithPos);
           
-          // Marcar los textos con highlight usando posiciones PM directas
           suggestionsWithPos.forEach((sug) => {
-            editor?.chain()
+            editor.chain()
               .focus()
               .setTextSelection({ from: sug.start, to: sug.end })
               .setHighlight({ color: "#fef08a" })
@@ -411,7 +531,10 @@ const WritingReview = () => {
           });
         }
       }
-    } catch (error) {
+      // Si el editor está destruido, los resultados quedan en _reviewResults
+      // y se restaurarán al remontar el componente (useEffect de editor)
+    } catch (error: any) {
+      if (error?.name === 'AbortError') return;
       console.error("Error al revisar texto:", error);
       toast({
         title: "Error",
@@ -419,6 +542,9 @@ const WritingReview = () => {
         variant: "destructive",
       });
     } finally {
+      _reviewInProgress = false;
+      _reviewPromise = null;
+      if (_reviewAbort === controller) _reviewAbort = null;
       setIsReviewing(false);
     }
   };
@@ -438,11 +564,13 @@ const WritingReview = () => {
     // Recalcular posiciones PM del resto de sugerencias (el doc ha cambiado)
     setSuggestions((prev) => {
       const remaining = prev.filter((s) => s !== suggestion);
-      return remaining.map((s) => {
-        const range = findPmRange(s.original);
-        if (!range) return s;
-        return { ...s, start: range.from, end: range.to };
-      });
+      return remaining
+        .map((s) => {
+          const range = findPmRange(s.original);
+          if (!range) return null;
+          return { ...s, start: range.from, end: range.to };
+        })
+        .filter((s): s is SuggestionWithPosition => s !== null);
     });
     setSelectedSuggestion(null);
     setShowSuggestionDialog(false);
@@ -614,13 +742,13 @@ const WritingReview = () => {
             </SelectContent>
           </Select>
 
-          <Button onClick={handleSave} variant="default">
+          <Button onClick={handleSave} variant="default" disabled={isSaving}>
             <Save className="h-4 w-4 mr-2" />
             {t('writing.saveBtn')}
           </Button>
 
-          <Button onClick={handleReview} variant="secondary" disabled={isReviewing}>
-            <Search className="h-4 w-4 mr-2" />
+          <Button onClick={handleReview} variant="secondary" disabled={isReviewing || isSaving}>
+            {isReviewing ? <Loader2 className="h-4 w-4 mr-2 animate-spin" /> : <Search className="h-4 w-4 mr-2" />}
             {isReviewing ? t('writing.reviewing') : t('writing.reviewBtn')}
           </Button>
 
@@ -769,26 +897,38 @@ const WritingReview = () => {
           <div 
             className="bg-white min-h-[350px] md:min-h-[600px] shadow-lg rounded-lg border border-border"
             onMouseDown={(e) => {
+              if (!editor || suggestions.length === 0) return;
               const target = e.target as HTMLElement;
-              
-              // TipTap usa la clase 'mark' para los highlights
               const highlight = target.closest('mark');
-              
-              if (highlight) {
-                e.preventDefault(); // evita que TipTap entre en modo edición al pulsar
-                const text = highlight.textContent || "";
-                
-                // Buscar la sugerencia que coincide con el texto marcado
-                const suggestion = suggestions.find((s) => {
-                  const normalized = s.original.trim();
-                  const clickedText = text.trim();
-                  return normalized === clickedText || s.original.includes(clickedText) || clickedText.includes(s.original);
-                });
-                
-                if (suggestion) {
-                  setSelectedSuggestion(suggestion);
-                  setShowSuggestionDialog(true);
+              if (!highlight) return;
+
+              // Método principal: posición ProseMirror exacta del clic
+              const coords = { left: e.clientX, top: e.clientY };
+              const pmPos = editor.view.posAtCoords(coords);
+
+              let matched: SuggestionWithPosition | undefined;
+
+              if (pmPos) {
+                matched = suggestions.find(
+                  (s) => pmPos.pos >= s.start && pmPos.pos < s.end,
+                );
+              }
+
+              // Fallback DOM: si posAtCoords no dio match, buscar por texto
+              if (!matched) {
+                const clickedText = (highlight.textContent || "").trim();
+                if (clickedText) {
+                  matched = suggestions.find((s) => {
+                    const orig = s.original.trim();
+                    return orig === clickedText || orig.includes(clickedText) || clickedText.includes(orig);
+                  });
                 }
+              }
+
+              if (matched) {
+                e.preventDefault();
+                setSelectedSuggestion(matched);
+                setShowSuggestionDialog(true);
               }
             }}
           >
@@ -799,7 +939,7 @@ const WritingReview = () => {
 
       {/* Dialog para mostrar sugerencias */}
       <Dialog open={showSuggestionDialog} onOpenChange={setShowSuggestionDialog}>
-        <DialogContent className="sm:max-w-[500px]">
+        <DialogContent className="sm:max-w-[500px] max-h-[80vh] overflow-y-auto">
           <DialogHeader>
             <DialogTitle>{t('writing.suggestionTitle')}</DialogTitle>
             <DialogDescription>

@@ -1,0 +1,108 @@
+{
+  "country": "Monaco",
+  "code": "MC",
+  "year": 2026,
+  "currency": "EUR",
+  "incomeTax": {
+    "brackets": [
+      {
+        "from": 0,
+        "to": null,
+        "rate": 0
+      }
+    ],
+    "personalAllowance": 0,
+    "notes": "No personal income tax for residents (except French nationals who pay French rates). Corporate tax 25% for companies with >25% revenue outside Monaco."
+  },
+  "corporateTax": {
+    "standard": 25,
+    "small": 25,
+    "smallThreshold": 0
+  },
+  "vat": {
+    "standard": 20,
+    "reduced": 10,
+    "superReduced": 5.5
+  },
+  "socialSecurity": {
+    "employee": 13.85,
+    "employer": 35,
+    "selfEmployed": 0
+  },
+  "fields": {
+    "asalariado": {
+      "basic": [
+        {
+          "key": "salarioBruto",
+          "label": "Salaire brut annuel (EUR)"
+        },
+        {
+          "key": "retencionesEmpresa",
+          "label": "Retenue employeur (EUR)"
+        }
+      ],
+      "advanced": [
+        {
+          "key": "cotizacionesSS",
+          "label": "Cotisations sociales salarié (EUR)"
+        }
+      ]
+    },
+    "autonomo": {
+      "basic": [
+        {
+          "key": "facturacionTotal",
+          "label": "Chiffre d'affaires (EUR)"
+        },
+        {
+          "key": "gastosDeducibles",
+          "label": "Charges déductibles (EUR)"
+        },
+        {
+          "key": "ivaRepercutido",
+          "label": "TVA collectée (EUR)"
+        },
+        {
+          "key": "ivaSoportado",
+          "label": "TVA déductible (EUR)"
+        }
+      ],
+      "advanced": []
+    },
+    "empresa": {
+      "basic": [
+        {
+          "key": "ingresosTotal",
+          "label": "Chiffre d'affaires (EUR)"
+        },
+        {
+          "key": "gastosTotal",
+          "label": "Charges déductibles (EUR)"
+        },
+        {
+          "key": "ivaRepercutidoEmp",
+          "label": "TVA collectée (EUR)"
+        },
+        {
+          "key": "ivaSoportadoEmp",
+          "label": "TVA déductible (EUR)"
+        }
+      ],
+      "advanced": []
+    }
+  },
+  "clientForm": {
+    "taxIdLabel": "NIS",
+    "taxIdCompanyLabel": "RCI",
+    "taxIdPlaceholder": "ej. 99S12345",
+    "regionLabel": "Quartier",
+    "regions": [
+      "Monaco-Ville",
+      "Monte-Carlo",
+      "La Condamine",
+      "Fontvieille",
+      "Larvotto",
+      "Moneghetti"
+    ]
+  }
+}

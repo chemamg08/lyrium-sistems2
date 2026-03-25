@@ -25,7 +25,7 @@ interface ContractChat {
   hasGeneratedContract?: boolean;
 }
 
-const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:3000/api';
+const API_URL = import.meta.env.VITE_API_URL;
 
 const Contracts = () => {
   const { t } = useTranslation();
@@ -108,20 +108,6 @@ const Contracts = () => {
   }, [selectedContract]);
 
   // Cargar chats cuando cambie el contrato seleccionado
-  useEffect(() => {
-    if (selectedContract) {
-      // Verificar si hay un chat guardado en sessionStorage
-      const savedChatId = sessionStorage.getItem(`currentChat_${selectedContract.id}`);
-      if (savedChatId) {
-        setCurrentChatId(savedChatId);
-      } else {
-        setCurrentChatId(null);
-      }
-    } else {
-      setCurrentChatId(null);
-    }
-  }, [selectedContract]);
-
   // Guardar chat actual en sessionStorage cada vez que cambie
   useEffect(() => {
     if (selectedContract && currentChatId) {
@@ -664,7 +650,7 @@ const Contracts = () => {
         <button
           onClick={() => setShowHowToModal(true)}
           className="p-1.5 rounded-md hover:bg-accent text-muted-foreground hover:text-primary transition-colors"
-          title="¿Cómo funciona el generador de contratos?"
+          title={t('contracts.howItWorksTitle')}
         >
           <Info className="h-4 w-4" />
         </button>
@@ -714,7 +700,7 @@ const Contracts = () => {
                   !selectedContract ? 'bg-accent' : ''
                 }`}
               >
-                <span className="block truncate font-medium text-foreground">ðŸ“„ {t('contracts.directAnalysis')}</span>
+                <span className="block truncate font-medium text-foreground">📄 {t('contracts.directAnalysis')}</span>
                 <span className="text-[10px] text-muted-foreground">{t('contracts.directAnalysisDesc')}</span>
               </button>
               
@@ -729,6 +715,8 @@ const Contracts = () => {
                     <button
                       key={c.id}
                       onClick={() => {
+                        const savedChatId = sessionStorage.getItem(`currentChat_${c.id}`);
+                        setCurrentChatId(savedChatId || null);
                         setSelectedContract(c);
                         setShowSelector(false);
                       }}
@@ -818,31 +806,31 @@ const Contracts = () => {
             <div className="flex items-center justify-between mb-4">
               <div className="flex items-center gap-2">
                 <Info className="h-5 w-5 text-primary" />
-                <h2 className="text-base font-semibold text-foreground">¿Cómo funciona el generador de contratos?</h2>
+                <h2 className="text-base font-semibold text-foreground">{t('contracts.howItWorksTitle')}</h2>
               </div>
               <button onClick={() => setShowHowToModal(false)} className="p-1 hover:bg-accent rounded"><X className="h-4 w-4" /></button>
             </div>
             <div className="space-y-4 text-sm text-muted-foreground">
-              <p>Lyra puede generar contratos de dos formas:</p>
+              <p>{t('contracts.howItWorksIntro')}</p>
               <div className="space-y-2">
                 <div className="flex gap-3 bg-accent/50 rounded-md p-3">
                   <span className="text-primary font-bold mt-0.5">A</span>
                   <div>
-                    <p className="font-medium text-foreground">Con contrato base</p>
-                    <p className="text-xs mt-0.5">Sube un PDF existente. Lyra lo analiza, detecta los campos vacíos y te guía para completarlos uno a uno.</p>
+                    <p className="font-medium text-foreground">{t('contracts.howItWorksOptionA')}</p>
+                    <p className="text-xs mt-0.5">{t('contracts.howItWorksOptionADesc')}</p>
                   </div>
                 </div>
                 <div className="flex gap-3 bg-accent/50 rounded-md p-3">
                   <span className="text-primary font-bold mt-0.5">B</span>
                   <div>
-                    <p className="font-medium text-foreground">Desde cero</p>
-                    <p className="text-xs mt-0.5">Sin contrato base, Lyra te preguntará el tipo de contrato y el país, y recopilará todos los datos legalmente necesarios antes de redactarlo.</p>
+                    <p className="font-medium text-foreground">{t('contracts.howItWorksOptionB')}</p>
+                    <p className="text-xs mt-0.5">{t('contracts.howItWorksOptionBDesc')}</p>
                   </div>
                 </div>
               </div>
               <div className="border-t border-border pt-3 flex gap-2 items-start">
                 <span className="text-lg leading-none">📥</span>
-                <p>Cuando Lyra haya recopilado toda la información, generará el contrato automáticamente. En ese momento aparecerá un <span className="text-foreground font-medium">botón de descarga</span> en el mensaje para obtener el PDF listo para firmar.</p>
+                <p>{t('contracts.howItWorksDownloadPre')} <span className="text-foreground font-medium">{t('contracts.howItWorksDownloadBtn')}</span> {t('contracts.howItWorksDownloadPost')}</p>
               </div>
             </div>
           </div>

@@ -1,0 +1,111 @@
+{
+  "country": "Bolivia",
+  "code": "BO",
+  "year": 2026,
+  "currency": "BOB",
+  "incomeTax": {
+    "brackets": [
+      {
+        "from": 0,
+        "to": null,
+        "rate": 13
+      }
+    ],
+    "personalAllowance": 0,
+    "notes": "RC-IVA flat 13% on employment income above 4 minimum wages deduction. IUE for businesses."
+  },
+  "corporateTax": {
+    "standard": 25,
+    "small": 25,
+    "smallThreshold": 0
+  },
+  "vat": {
+    "standard": 13,
+    "reduced": 0,
+    "superReduced": 0
+  },
+  "socialSecurity": {
+    "employee": 12.71,
+    "employer": 16.71,
+    "selfEmployed": 0
+  },
+  "fields": {
+    "asalariado": {
+      "basic": [
+        {
+          "key": "salarioBruto",
+          "label": "Sueldo bruto anual (BOB)"
+        },
+        {
+          "key": "retencionesEmpresa",
+          "label": "RC-IVA retenido (BOB)"
+        }
+      ],
+      "advanced": [
+        {
+          "key": "cotizacionesSS",
+          "label": "Aportes AFP + salud (BOB)"
+        }
+      ]
+    },
+    "autonomo": {
+      "basic": [
+        {
+          "key": "facturacionTotal",
+          "label": "Ingresos brutos (BOB)"
+        },
+        {
+          "key": "gastosDeducibles",
+          "label": "Gastos deducibles (BOB)"
+        },
+        {
+          "key": "ivaRepercutido",
+          "label": "IVA débito fiscal (BOB)"
+        },
+        {
+          "key": "ivaSoportado",
+          "label": "IVA crédito fiscal (BOB)"
+        }
+      ],
+      "advanced": []
+    },
+    "empresa": {
+      "basic": [
+        {
+          "key": "ingresosTotal",
+          "label": "Ingresos brutos (BOB)"
+        },
+        {
+          "key": "gastosTotal",
+          "label": "Gastos deducibles (BOB)"
+        },
+        {
+          "key": "ivaRepercutidoEmp",
+          "label": "IVA débito fiscal (BOB)"
+        },
+        {
+          "key": "ivaSoportadoEmp",
+          "label": "IVA crédito fiscal (BOB)"
+        }
+      ],
+      "advanced": []
+    }
+  },
+  "clientForm": {
+    "taxIdLabel": "NIT / CI",
+    "taxIdCompanyLabel": "NIT",
+    "taxIdPlaceholder": "ej. 1234567",
+    "regionLabel": "Departamento",
+    "regions": [
+      "Beni",
+      "Chuquisaca",
+      "Cochabamba",
+      "La Paz",
+      "Oruro",
+      "Pando",
+      "Potosí",
+      "Santa Cruz",
+      "Tarija"
+    ]
+  }
+}

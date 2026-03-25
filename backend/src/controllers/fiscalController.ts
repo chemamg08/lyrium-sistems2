@@ -1,6 +1,6 @@
 import { Request, Response } from 'express';
 import { sendEmail, getEmailConfig, saveEmailConfig } from '../services/emailService.js';
-import { callFiscalAI, streamFiscalAI, getAiClient } from '../services/aiService.js';
+import { callFiscalAI, streamFiscalAI, getAiClient, AI_MODEL } from '../services/aiService.js';
 import { generateFiscalReportPDF } from '../services/pdfService.js';
 import { getAccountSpecialties } from '../services/specialtiesService.js';
 import { getLegalContextForAccount, buildCountryLegalSystemPrompt , getAccountCountry } from '../services/legalKnowledgeService.js';
@@ -10,6 +10,7 @@ import { FiscalAlert } from '../models/FiscalAlert.js';
 import { FiscalChat } from '../models/FiscalChat.js';
 import { Calculation } from '../models/Calculation.js';
 import { Client } from '../models/Client.js';
+import { verifyOwnership } from '../middleware/auth.js';
 
 // Country code → name map for fiscal AI
 const COUNTRY_NAMES: Record<string, string> = {
@@ -18,7 +19,15 @@ const COUNTRY_NAMES: Record<string, string> = {
   CZ: 'República Checa', SK: 'Eslovaquia', HU: 'Hungría', HR: 'Croacia',
   DK: 'Dinamarca', SE: 'Suecia', NO: 'Noruega', FI: 'Finlandia',
   IE: 'Irlanda', LU: 'Luxemburgo', CY: 'Chipre', MT: 'Malta',
-  LV: 'Letonia', AU: 'Australia', CA: 'Canadá', GB: 'Reino Unido',
+  LV: 'Letonia', LT: 'Lituania', EE: 'Estonia', SI: 'Eslovenia',
+  BG: 'Bulgaria', RO: 'Rumanía', GR: 'Grecia',
+  AU: 'Australia', CA: 'Canadá', GB: 'Reino Unido', US: 'Estados Unidos',
+  MX: 'México', AR: 'Argentina', CO: 'Colombia', CL: 'Chile', PE: 'Perú',
+  EC: 'Ecuador', BO: 'Bolivia', PY: 'Paraguay',
+  UY: 'Uruguay', PA: 'Panamá', DO: 'República Dominicana',
+  CR: 'Costa Rica', GT: 'Guatemala', HN: 'Honduras', SV: 'El Salvador',
+  NI: 'Nicaragua', BR: 'Brasil', MC: 'Mónaco', LI: 'Liechtenstein',
+  NZ: 'Nueva Zelanda', SG: 'Singapur',
 };
 
 function getCountryName(code: string): string {
@@ -33,6 +42,7 @@ export async function getAllProfiles(req: Request, res: Response) {
     if (!accountId) {
       return res.status(400).json({ error: 'Account ID is required' });
     }
+    if (!verifyOwnership(req, accountId)) return res.status(403).json({ error: 'Acceso denegado' });
 
     const profiles = await FiscalProfile.find({ accountId });
     res.json(profiles.map(p => p.toJSON()));
@@ -50,6 +60,7 @@ export async function getProfileByClientId(req: Request, res: Response) {
     if (!accountId) {
       return res.status(400).json({ error: 'Account ID is required' });
     }
+    if (!verifyOwnership(req, accountId)) return res.status(403).json({ error: 'Acceso denegado' });
 
     const profile = await FiscalProfile.findOne({ clientId, accountId });
     
@@ -70,6 +81,7 @@ export async function createOrUpdateProfile(req: Request, res: Response) {
     if (!accountId) {
       return res.status(400).json({ error: 'Account ID is required' });
     }
+    if (!verifyOwnership(req, accountId)) return res.status(403).json({ error: 'Acceso denegado' });
 
     const now = new Date().toISOString();
     const existing = await FiscalProfile.findOne({
@@ -79,14 +91,16 @@ export async function createOrUpdateProfile(req: Request, res: Response) {
 
     if (existing) {
       // Update existing profile
-      Object.assign(existing, req.body, { accountId, updatedAt: now });
+      const { _id: _ignoreId, accountId: _ignoreAcct, __proto__: _ignoreProto, constructor: _ignoreCtor, ...safeBody } = req.body;
+      Object.assign(existing, safeBody, { accountId, updatedAt: now });
       await existing.save();
       res.json(existing.toJSON());
     } else {
       // Create new profile
+      const { _id: _i2, accountId: _a2, __proto__: _p2, constructor: _c2, ...safeCreateBody } = req.body;
       const newProfile = await FiscalProfile.create({
         _id: Date.now().toString(),
-        ...req.body,
+        ...safeCreateBody,
         accountId,
         createdAt: now,
         updatedAt: now,
@@ -107,6 +121,7 @@ export async function deleteProfile(req: Request, res: Response) {
     if (!accountId) {
       return res.status(400).json({ error: 'Account ID is required' });
     }
+    if (!verifyOwnership(req, accountId)) return res.status(403).json({ error: 'Acceso denegado' });
 
     await FiscalProfile.deleteOne({ _id: id, accountId });
     res.json({ success: true });
@@ -124,6 +139,7 @@ export async function getAllAlerts(req: Request, res: Response) {
     if (!accountId) {
       return res.status(400).json({ error: 'Account ID is required' });
     }
+    if (!verifyOwnership(req, accountId)) return res.status(403).json({ error: 'Acceso denegado' });
 
     const alerts = await FiscalAlert.find({ accountId });
     res.json(alerts.map(a => a.toJSON()));
@@ -141,6 +157,7 @@ export async function getAlertById(req: Request, res: Response) {
     if (!accountId) {
       return res.status(400).json({ error: 'Account ID is required' });
     }
+    if (!verifyOwnership(req, accountId)) return res.status(403).json({ error: 'Acceso denegado' });
 
     const alert = await FiscalAlert.findOne({ _id: id, accountId });
     
@@ -161,11 +178,13 @@ export async function createAlert(req: Request, res: Response) {
     if (!accountId) {
       return res.status(400).json({ error: 'Account ID is required' });
     }
+    if (!verifyOwnership(req, accountId)) return res.status(403).json({ error: 'Acceso denegado' });
 
     const now = new Date().toISOString();
+    const { _id: _i3, accountId: _a3, __proto__: _p3, constructor: _c3, ...safeAlertBody } = req.body;
     const newAlert = await FiscalAlert.create({
       _id: Date.now().toString(),
-      ...req.body,
+      ...safeAlertBody,
       accountId,
       estado: 'pendiente',
       createdAt: now,
@@ -187,6 +206,7 @@ export async function updateAlert(req: Request, res: Response) {
     if (!accountId) {
       return res.status(400).json({ error: 'Account ID is required' });
     }
+    if (!verifyOwnership(req, accountId)) return res.status(403).json({ error: 'Acceso denegado' });
 
     const alert = await FiscalAlert.findOne({ _id: id, accountId });
     
@@ -195,7 +215,8 @@ export async function updateAlert(req: Request, res: Response) {
     }
 
     const now = new Date().toISOString();
-    Object.assign(alert, req.body, { _id: id, accountId, updatedAt: now });
+    const { _id: _ignoreId, accountId: _ignoreAcct, __proto__: _ignoreProto, constructor: _ignoreCtor, ...safeBody } = req.body;
+    Object.assign(alert, safeBody, { _id: id, accountId, updatedAt: now });
     await alert.save();
 
     res.json(alert.toJSON());
@@ -213,6 +234,7 @@ export async function deleteAlert(req: Request, res: Response) {
     if (!accountId) {
       return res.status(400).json({ error: 'Account ID is required' });
     }
+    if (!verifyOwnership(req, accountId)) return res.status(403).json({ error: 'Acceso denegado' });
 
     await FiscalAlert.deleteOne({ _id: id, accountId });
     res.json({ success: true });
@@ -230,6 +252,7 @@ export async function sendAlertNow(req: Request, res: Response) {
     if (!accountId) {
       return res.status(400).json({ error: 'Account ID is required' });
     }
+    if (!verifyOwnership(req, accountId)) return res.status(403).json({ error: 'Acceso denegado' });
 
     const alert = await FiscalAlert.findOne({ _id: id, accountId });
     
@@ -271,6 +294,7 @@ export async function reviewTodayAlerts(req: Request, res: Response) {
     if (!accountId) {
       return res.status(400).json({ error: 'Account ID is required' });
     }
+    if (!verifyOwnership(req, accountId)) return res.status(403).json({ error: 'Acceso denegado' });
 
     const alerts = await FiscalAlert.find({ accountId });
 
@@ -334,6 +358,7 @@ export async function getEmailConfigHandler(req: Request, res: Response) {
     if (!accountId) {
       return res.status(400).json({ error: 'Account ID is required' });
     }
+    if (!verifyOwnership(req, accountId)) return res.status(403).json({ error: 'Acceso denegado' });
 
     const config = await getEmailConfig(accountId);
     if (!config) {
@@ -353,10 +378,12 @@ export async function saveEmailConfigHandler(req: Request, res: Response) {
     if (!accountId) {
       return res.status(400).json({ error: 'Account ID is required' });
     }
+    if (!verifyOwnership(req, accountId)) return res.status(403).json({ error: 'Acceso denegado' });
 
+    const { accountId: _a4, __proto__: _p4, constructor: _c4, ...safeConfigBody } = req.body;
     const config = {
       accountId,
-      ...req.body,
+      ...safeConfigBody,
     };
 
     await saveEmailConfig(config);
@@ -378,6 +405,7 @@ export async function getAccountChat(req: Request, res: Response) {
     if (!accountId) {
       return res.status(400).json({ error: 'Account ID is required' });
     }
+    if (!verifyOwnership(req, accountId)) return res.status(403).json({ error: 'Acceso denegado' });
 
     let chat = await FiscalChat.findOne({ clientId, accountId });
     
@@ -411,6 +439,7 @@ export async function sendAccountMessage(req: Request, res: Response) {
     if (!accountId || !message) {
       return res.status(400).json({ error: 'Account ID and message are required' });
     }
+    if (!verifyOwnership(req, accountId)) return res.status(403).json({ error: 'Acceso denegado' });
 
     let chat = await FiscalChat.findOne({ clientId, accountId });
     
@@ -473,6 +502,7 @@ export async function clearAccountChat(req: Request, res: Response) {
     if (!accountId) {
       return res.status(400).json({ error: 'Account ID is required' });
     }
+    if (!verifyOwnership(req, accountId)) return res.status(403).json({ error: 'Acceso denegado' });
 
     const chat = await FiscalChat.findOne({ clientId, accountId });
     
@@ -497,6 +527,7 @@ export async function getChatByClientId(req: Request, res: Response) {
     if (!accountId) {
       return res.status(400).json({ error: 'Account ID is required' });
     }
+    if (!verifyOwnership(req, accountId)) return res.status(403).json({ error: 'Acceso denegado' });
 
     let chat = await FiscalChat.findOne({ clientId, accountId });
     
@@ -529,6 +560,7 @@ export async function sendMessage(req: Request, res: Response) {
     if (!accountId || !message) {
       return res.status(400).json({ error: 'Account ID and message are required' });
     }
+    if (!verifyOwnership(req, accountId)) return res.status(403).json({ error: 'Acceso denegado' });
 
     // Get fiscal profile for context
     const profile = await FiscalProfile.findOne({ clientId, accountId });
@@ -598,6 +630,7 @@ export async function clearChat(req: Request, res: Response) {
     if (!accountId) {
       return res.status(400).json({ error: 'Account ID is required' });
     }
+    if (!verifyOwnership(req, accountId)) return res.status(403).json({ error: 'Acceso denegado' });
 
     const chat = await FiscalChat.findOne({ clientId, accountId });
     
@@ -624,6 +657,7 @@ export async function listFiscalChats(req: Request, res: Response) {
     if (!accountId) {
       return res.status(400).json({ error: 'Account ID is required' });
     }
+    if (!verifyOwnership(req, accountId)) return res.status(403).json({ error: 'Acceso denegado' });
 
     const isGeneral = !clientIdParam || clientIdParam === 'null' || clientIdParam === '';
     let filter: any = { accountId };
@@ -668,6 +702,7 @@ export async function createFiscalChat(req: Request, res: Response) {
     if (!accountId) {
       return res.status(400).json({ error: 'Account ID is required' });
     }
+    if (!verifyOwnership(req, accountId)) return res.status(403).json({ error: 'Acceso denegado' });
 
     const effectiveClientId: string = clientId || 'general';
     const dateStr = new Date().toLocaleDateString('es-ES');
@@ -719,6 +754,7 @@ export async function getFiscalChatById(req: Request, res: Response) {
     if (!accountId) {
       return res.status(400).json({ error: 'Account ID is required' });
     }
+    if (!verifyOwnership(req, accountId)) return res.status(403).json({ error: 'Acceso denegado' });
 
     const chat = await FiscalChat.findOne({ _id: id, accountId });
 
@@ -740,6 +776,7 @@ export async function deleteFiscalChat(req: Request, res: Response) {
     if (!accountId) {
       return res.status(400).json({ error: 'Account ID is required' });
     }
+    if (!verifyOwnership(req, accountId)) return res.status(403).json({ error: 'Acceso denegado' });
 
     const result = await FiscalChat.deleteOne({ _id: id, accountId });
 
@@ -763,6 +800,7 @@ export async function sendFiscalChatMessage(req: Request, res: Response) {
     if (!accountId || !message) {
       return res.status(400).json({ error: 'Account ID and message are required' });
     }
+    if (!verifyOwnership(req, accountId)) return res.status(403).json({ error: 'Acceso denegado' });
 
     const chat = await FiscalChat.findOne({ _id: id, accountId });
 
@@ -899,6 +937,7 @@ export async function streamFiscalChatMessage(req: Request, res: Response) {
     const { id } = req.params;
     const { message } = req.body;
     if (!accountId || !message) return res.status(400).json({ error: 'Account ID and message are required' });
+    if (!verifyOwnership(req, accountId)) return res.status(403).json({ error: 'Acceso denegado' });
 
     const chat = await FiscalChat.findOne({ _id: id, accountId });
     if (!chat) return res.status(404).json({ error: 'Chat not found' });
@@ -1032,6 +1071,7 @@ export async function exportFiscalChatPDF(req: Request, res: Response) {
     const { id } = req.params;
     const accountId = (req.headers['x-account-id'] as string) || (req.query.accountId as string);
     if (!accountId) return res.status(401).json({ error: 'No account ID provided' });
+    if (!verifyOwnership(req, accountId)) return res.status(403).json({ error: 'Acceso denegado' });
 
     // Load chat
     const chat = await FiscalChat.findOne({ _id: id, accountId });
@@ -1090,7 +1130,7 @@ IMPORTANTE:
     ];
 
     const response = await getAiClient().chat.completions.create({
-      model: 'Qwen/Qwen3-235B-A22B-Instruct-2507',
+      model: AI_MODEL,
       messages: [
         { role: 'system', content: `Eres un asistente que extrae datos fiscales de conversaciones y los devuelve en JSON estructurado. País: ${countryName}. Responde SOLO con JSON válido, sin ningún otro texto, sin bloques de código markdown.` },
         ...messages

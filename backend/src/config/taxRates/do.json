@@ -1,0 +1,149 @@
+{
+  "country": "República Dominicana / Dominican Republic",
+  "code": "DO",
+  "year": 2026,
+  "currency": "DOP",
+  "incomeTax": {
+    "brackets": [
+      {
+        "from": 0,
+        "to": 416220,
+        "rate": 0
+      },
+      {
+        "from": 416220,
+        "to": 624329,
+        "rate": 15
+      },
+      {
+        "from": 624329,
+        "to": 867123,
+        "rate": 20
+      },
+      {
+        "from": 867123,
+        "to": null,
+        "rate": 25
+      }
+    ],
+    "personalAllowance": 416220,
+    "notes": "ISR progressive. Annual exempt amount adjusted by inflation."
+  },
+  "corporateTax": {
+    "standard": 27,
+    "small": 27,
+    "smallThreshold": 0
+  },
+  "vat": {
+    "standard": 18,
+    "reduced": 16,
+    "superReduced": 0
+  },
+  "socialSecurity": {
+    "employee": 5.91,
+    "employer": 14.01,
+    "selfEmployed": 0
+  },
+  "fields": {
+    "asalariado": {
+      "basic": [
+        {
+          "key": "salarioBruto",
+          "label": "Salario bruto anual (DOP)"
+        },
+        {
+          "key": "retencionesEmpresa",
+          "label": "ISR retenido (DOP)"
+        }
+      ],
+      "advanced": [
+        {
+          "key": "cotizacionesSS",
+          "label": "Aportes TSS trabajador (DOP)"
+        }
+      ]
+    },
+    "autonomo": {
+      "basic": [
+        {
+          "key": "facturacionTotal",
+          "label": "Ingresos brutos (DOP)"
+        },
+        {
+          "key": "gastosDeducibles",
+          "label": "Gastos deducibles (DOP)"
+        },
+        {
+          "key": "ivaRepercutido",
+          "label": "ITBIS cobrado (DOP)"
+        },
+        {
+          "key": "ivaSoportado",
+          "label": "ITBIS adelantado (DOP)"
+        }
+      ],
+      "advanced": []
+    },
+    "empresa": {
+      "basic": [
+        {
+          "key": "ingresosTotal",
+          "label": "Ingresos brutos (DOP)"
+        },
+        {
+          "key": "gastosTotal",
+          "label": "Gastos y costos (DOP)"
+        },
+        {
+          "key": "ivaRepercutidoEmp",
+          "label": "ITBIS cobrado (DOP)"
+        },
+        {
+          "key": "ivaSoportadoEmp",
+          "label": "ITBIS pagado (DOP)"
+        }
+      ],
+      "advanced": []
+    }
+  },
+  "clientForm": {
+    "taxIdLabel": "RNC / Cédula",
+    "taxIdCompanyLabel": "RNC",
+    "taxIdPlaceholder": "ej. 101-12345-6",
+    "regionLabel": "Provincia",
+    "regions": [
+      "Azua",
+      "Bahoruco",
+      "Barahona",
+      "Dajabón",
+      "Distrito Nacional",
+      "Duarte",
+      "El Seibo",
+      "Elías Piña",
+      "Espaillat",
+      "Hato Mayor",
+      "Hermanas Mirabal",
+      "Independencia",
+      "La Altagracia",
+      "La Romana",
+      "La Vega",
+      "María Trinidad Sánchez",
+      "Monseñor Nouel",
+      "Monte Cristi",
+      "Monte Plata",
+      "Pedernales",
+      "Peravia",
+      "Puerto Plata",
+      "Samaná",
+      "San Cristóbal",
+      "San José de Ocoa",
+      "San Juan",
+      "San Pedro de Macorís",
+      "Sánchez Ramírez",
+      "Santiago",
+      "Santiago Rodríguez",
+      "Santo Domingo",
+      "Valverde"
+    ]
+  }
+}

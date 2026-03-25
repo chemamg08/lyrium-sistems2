@@ -29,15 +29,18 @@ import et from './i18n/et.json';
 const COUNTRY_LANGUAGE_MAP: Record<string, string> = {
   // Spanish
   ES: 'es', AD: 'es', MX: 'es', AR: 'es', CO: 'es',
-  UY: 'es', PA: 'es', DO: 'es',
+  UY: 'es', PA: 'es', DO: 'es', CL: 'es', PE: 'es',
+  EC: 'es', BO: 'es', PY: 'es', CR: 'es',
+  GT: 'es', HN: 'es', SV: 'es', NI: 'es',
   // English
   GB: 'en', AU: 'en', CA: 'en', IE: 'en', MT: 'en', CY: 'en', US: 'en',
+  NZ: 'en', SG: 'en',
   // Portuguese
   PT: 'pt', BR: 'pt',
   // French
-  FR: 'fr', BE: 'fr', LU: 'fr',
+  FR: 'fr', BE: 'fr', LU: 'fr', MC: 'fr',
   // German
-  DE: 'de', AT: 'de',
+  DE: 'de', AT: 'de', LI: 'de',
   // Others
   IT: 'it',
   NL: 'nl',

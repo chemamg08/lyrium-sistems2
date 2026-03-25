@@ -1,0 +1,70 @@
+{
+  "countryCode": "ES",
+  "countryName": "Espana",
+  "models": [
+    {
+      "code": "303",
+      "name": "IVA - Autoliquidacion",
+      "periodType": "quarterly",
+      "defaultCurrency": "EUR",
+      "portalUrl": "https://sede.agenciatributaria.gob.es/",
+      "deadlines": {
+        "T1": "04-20",
+        "T2": "07-20",
+        "T3": "10-20",
+        "T4": "01-30"
+      },
+      "applicableTo": ["autonomo", "empresa"]
+    },
+    {
+      "code": "130",
+      "name": "IRPF - Pago Fraccionado",
+      "periodType": "quarterly",
+      "defaultCurrency": "EUR",
+      "portalUrl": "https://sede.agenciatributaria.gob.es/",
+      "deadlines": {
+        "T1": "04-20",
+        "T2": "07-20",
+        "T3": "10-20",
+        "T4": "01-30"
+      },
+      "applicableTo": ["autonomo"]
+    },
+    {
+      "code": "200",
+      "name": "Impuesto sobre Sociedades",
+      "periodType": "yearly",
+      "defaultCurrency": "EUR",
+      "portalUrl": "https://sede.agenciatributaria.gob.es/",
+      "deadlines": {
+        "Y": "07-25"
+      },
+      "applicableTo": ["empresa"]
+    },
+    {
+      "code": "111",
+      "name": "Retenciones e ingresos a cuenta",
+      "periodType": "quarterly",
+      "defaultCurrency": "EUR",
+      "portalUrl": "https://sede.agenciatributaria.gob.es/",
+      "deadlines": {
+        "T1": "04-20",
+        "T2": "07-20",
+        "T3": "10-20",
+        "T4": "01-30"
+      },
+      "applicableTo": ["autonomo", "empresa"]
+    },
+    {
+      "code": "390",
+      "name": "IVA - Resumen anual",
+      "periodType": "yearly",
+      "defaultCurrency": "EUR",
+      "portalUrl": "https://sede.agenciatributaria.gob.es/",
+      "deadlines": {
+        "Y": "01-30"
+      },
+      "applicableTo": ["autonomo", "empresa"]
+    }
+  ]
+}

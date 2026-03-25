@@ -5,6 +5,7 @@ import { getAccountSpecialties } from '../services/specialtiesService.js';
 import { getLegalContextForAccount, buildCountryLegalSystemPrompt, getAccountCountry } from '../services/legalKnowledgeService.js';
 import { hasLegalIntent } from '../services/legalIntentService.js';
 import { AssistantChat } from '../models/AssistantChat.js';
+import { verifyOwnership } from '../middleware/auth.js';
 
 // ── Subir archivo y extraer texto ──────────────────────────────────────────
 export const uploadAssistantFile = async (req: Request, res: Response) => {
@@ -55,6 +56,7 @@ export const getAssistantChats = async (req: Request, res: Response) => {
     if (!accountId || typeof accountId !== 'string') {
       return res.status(400).json({ error: 'accountId es requerido' });
     }
+    if (!verifyOwnership(req, accountId)) return res.status(403).json({ error: 'Acceso denegado' });
 
     const listFilter: any = { accountId };
     const user = (req as any).user;
@@ -85,6 +87,7 @@ export const getAssistantChat = async (req: Request, res: Response) => {
     if (!accountId || typeof accountId !== 'string') {
       return res.status(400).json({ error: 'accountId es requerido' });
     }
+    if (!verifyOwnership(req, accountId)) return res.status(403).json({ error: 'Acceso denegado' });
 
     let chat;
     const user = (req as any).user;
@@ -123,6 +126,7 @@ export const createAssistantChat = async (req: Request, res: Response) => {
     if (!accountId || typeof accountId !== 'string') {
       return res.status(400).json({ error: 'accountId es requerido' });
     }
+    if (!verifyOwnership(req, accountId)) return res.status(403).json({ error: 'Acceso denegado' });
 
     const count = await AssistantChat.countDocuments({ accountId });
 
@@ -155,6 +159,7 @@ export const sendAssistantMessage = async (req: Request, res: Response) => {
     if (!accountId || typeof accountId !== 'string') {
       return res.status(400).json({ error: 'accountId es requerido' });
     }
+    if (!verifyOwnership(req, accountId)) return res.status(403).json({ error: 'Acceso denegado' });
 
     if (!content || typeof content !== 'string' || !content.trim()) {
       return res.status(400).json({ error: 'content es requerido' });
@@ -224,6 +229,7 @@ export const streamAssistantMessage = async (req: Request, res: Response) => {
   try {
     const { accountId, chatId, content, fileContext } = req.body;
     if (!accountId || typeof accountId !== 'string') return res.status(400).json({ error: 'accountId es requerido' });
+    if (!verifyOwnership(req, accountId)) return res.status(403).json({ error: 'Acceso denegado' });
     if (!content || typeof content !== 'string' || !content.trim()) return res.status(400).json({ error: 'content es requerido' });
 
     let accountChat = chatId
@@ -254,10 +260,24 @@ export const streamAssistantMessage = async (req: Request, res: Response) => {
     }
 
     const aiMessages = accountChat.messages.map((m) => ({ role: m.role, content: m.content }));
-    const fullText = await streamAssistantAI(res, aiMessages, selectedSpecialties, legalCountryPrompt || undefined, accountCountry, fileContext || undefined);
+
+    // RAG: Search improve AI files if ragEnabled
+    let ragContext: string | undefined;
+    let ragFound = false;
+    if (req.body.ragEnabled) {
+      const { searchImproveAIContext } = await import('../services/ragService.js');
+      const ragResult = await searchImproveAIContext(accountId, aiMessages);
+      if (ragResult.found) {
+        ragContext = ragResult.context;
+        ragFound = true;
+      }
+    }
+
+    const fullText = await streamAssistantAI(res, aiMessages, selectedSpecialties, legalCountryPrompt || undefined, accountCountry, fileContext || undefined, ragContext, ragFound);
 
     // Save assistant message after stream completes
-    const assistantMessage: Message = { id: (Date.now() + 1).toString(), role: 'assistant', content: fullText };
+    const assistantContent = ragFound ? `${fullText}\n<!-- rag-enhanced -->` : fullText;
+    const assistantMessage: Message = { id: (Date.now() + 1).toString(), role: 'assistant', content: assistantContent };
     accountChat.messages.push(assistantMessage);
     await accountChat.save();
   } catch (error) {
@@ -275,6 +295,7 @@ export const deleteAssistantChat = async (req: Request, res: Response) => {
     if (!chatId || !accountId || typeof accountId !== 'string') {
       return res.status(400).json({ error: 'chatId y accountId son requeridos' });
     }
+    if (!verifyOwnership(req, accountId)) return res.status(403).json({ error: 'Acceso denegado' });
 
     const result = await AssistantChat.deleteOne({ _id: chatId, accountId });
 
@@ -293,6 +314,7 @@ export const deleteAssistantChat = async (req: Request, res: Response) => {
 export const clearAssistantChat = async (req: Request, res: Response) => {
   try {
     const { accountId } = req.params;
+    if (!verifyOwnership(req, accountId)) return res.status(403).json({ error: 'Acceso denegado' });
 
     await AssistantChat.deleteMany({ accountId });
 

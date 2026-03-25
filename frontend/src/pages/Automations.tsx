@@ -1,6 +1,7 @@
 import {
   Mail, MessageCircle, Calendar, ArrowLeft, Send, Paperclip, Search,
-  MoreVertical, Users, HelpCircle, X, Plus, Trash2, Eye, Upload, PauseCircle, PanelLeft, Pencil
+  MoreVertical, Users, HelpCircle, X, Plus, Trash2, Eye, Upload, PauseCircle, PanelLeft, Pencil,
+  FolderOpen, Copy, Check, ChevronDown, FileText, Image, Download, ChevronRight, Settings2
 } from "lucide-react";
 import { useState, useEffect, useRef, DragEvent } from "react";
 import { useTranslation } from "react-i18next";
@@ -12,17 +13,23 @@ import timeGridPlugin from '@fullcalendar/timegrid';
 import interactionPlugin from '@fullcalendar/interaction';
 import allLocales from '@fullcalendar/core/locales-all';
 
-const API = `${import.meta.env.VITE_API_URL || 'http://localhost:3000/api'}/automatizaciones`;
-const CALENDAR_API = `${import.meta.env.VITE_API_URL || 'http://localhost:3000/api'}/calendar`;
+const API = `${import.meta.env.VITE_API_URL}/automatizaciones`;
+const CALENDAR_API = `${import.meta.env.VITE_API_URL}/calendar`;
 
 interface Especialidad { id: string; nombre: string; descripcion: string; createdAt: string; }
 interface CuentaCorreo { id: string; plataforma: string; correo: string; password: string; createdAt: string; }
 interface Documento { id: string; nombre: string; filename: string; uploadedAt: string; }
 interface Subcuenta { id: string; name: string; email: string; }
-interface EmailMessage { id: string; from: string; text: string; time: string; sent: boolean; }
+interface EmailAttachment { id: string; filename: string; originalName: string; mimeType: string; size: number; }
+interface EmailMessage { id: string; from: string; text: string; time: string; sent: boolean; attachments?: EmailAttachment[]; }
 interface EmailConversation {
   id: string; contactName: string; contactEmail: string; subject: string;
   messages: EmailMessage[]; lastMessageTime: string; unread: number; autoClientId?: string; autoReplyPaused?: boolean;
+}
+interface EmailFolder {
+  id: string;
+  name: string;
+  conversationIds: string[];
 }
 interface AutoData {
   especialidades: Especialidad[];
@@ -35,6 +42,10 @@ interface AutoData {
   autoAssignEnabled: boolean;
   emailConversations: EmailConversation[];
   pendingConsultas: any[];
+  emailFolders: EmailFolder[];
+  respondConsultasGenerales?: boolean;
+  respondSolicitudesServicio?: boolean;
+  soloContactosConocidos?: boolean;
 }
 
 const PLATFORMS = [
@@ -43,6 +54,11 @@ const PLATFORMS = [
   { value: "yahoo", label: "Yahoo" },
   { value: "icloud", label: "iCloud" },
   { value: "zoho", label: "Zoho" },
+  { value: "hostinger", label: "Hostinger" },
+  { value: "ionos", label: "IONOS" },
+  { value: "ovh", label: "OVH" },
+  { value: "godaddy", label: "GoDaddy" },
+  { value: "custom", label: "Custom / Personalizado" },
 ];
 
 const whatsappContacts = [
@@ -98,6 +114,14 @@ function SwitchBox({ active, onChange, label }: { active: boolean; onChange: (v:
 
 type View = "main" | "email" | "whatsapp" | "calendar";
 
+// Format ISO or legacy time strings to local HH:MM
+function formatTime(raw: string): string {
+  if (!raw) return '';
+  const d = new Date(raw);
+  if (!isNaN(d.getTime())) return d.toLocaleTimeString(undefined, { hour: '2-digit', minute: '2-digit' });
+  return raw; // fallback for old "HH:MM" strings
+}
+
 const Automations = () => {
   const { t, i18n } = useTranslation();
   const isMobile = useIsMobile();
@@ -107,10 +131,11 @@ const Automations = () => {
   const [selectedWAContact, setSelectedWAContact] = useState<number>(1);
   const [messageInput, setMessageInput] = useState("");
   const [accountId, setAccountId] = useState("");
+  const [calendarUserId, setCalendarUserId] = useState("");
   const [autoData, setAutoData] = useState<AutoData>({
     especialidades: [], cuentasCorreo: [], correosConsultas: [],
     documentos: [], switchActivo: false, subcuentaEspecialidades: {}, sortByCarga: false, autoAssignEnabled: false,
-    emailConversations: [], pendingConsultas: [],
+    emailConversations: [], pendingConsultas: [], emailFolders: [],
   });
   const [subcuentas, setSubcuentas] = useState<Subcuenta[]>([]);
   const [showAsignacion, setShowAsignacion] = useState(false);
@@ -124,7 +149,7 @@ const Automations = () => {
   const [showAddCuenta, setShowAddCuenta] = useState(false);
   const [showAddCorreo, setShowAddCorreo] = useState(false);
   const [espForm, setEspForm] = useState({ nombre: "", descripcion: "" });
-  const [cuentaForm, setCuentaForm] = useState({ plataforma: "gmail", correo: "", password: "" });
+  const [cuentaForm, setCuentaForm] = useState({ plataforma: "gmail", correo: "", password: "", customSmtpHost: "", customSmtpPort: 587, customImapHost: "", customImapPort: 993 });
   const [correoInput, setCorreoInput] = useState("");
   const [dragOver, setDragOver] = useState(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
@@ -134,22 +159,51 @@ const Automations = () => {
   const [calendarEvents, setCalendarEvents] = useState<any[]>([]);
   const [calendarLoading, setCalendarLoading] = useState(false);
   const [showAddEventForm, setShowAddEventForm] = useState(false);
-  const [eventForm, setEventForm] = useState({ title: '', date: '', startTime: '', endTime: '', description: '', allDay: false });
+  const [editingEventId, setEditingEventId] = useState<string | null>(null);
+  const [eventForm, setEventForm] = useState({ title: '', date: '', startTime: '', endTime: '', description: '', allDay: false, recurrence: '', colorId: '' });
   const [showConfirmDisconnect, setShowConfirmDisconnect] = useState(false);
   const [confirmDeleteEventId, setConfirmDeleteEventId] = useState<string | null>(null);
-  const [selectedEventDetail, setSelectedEventDetail] = useState<{ id: string; title: string; description?: string; start: Date | null; allDay: boolean } | null>(null);
+  const [selectedEventDetail, setSelectedEventDetail] = useState<{ id: string; title: string; description?: string; start: Date | null; end: Date | null; allDay: boolean; colorId?: string; recurrence?: string[] } | null>(null);
+  const [showSeleccion, setShowSeleccion] = useState(false);
+  const [emailFilter, setEmailFilter] = useState<'all' | 'manual' | 'auto'>('all');
+  const [emailSearch, setEmailSearch] = useState('');
+  const [showFolderPanel, setShowFolderPanel] = useState(false);
+  const [newFolderName, setNewFolderName] = useState('');
+  const [folderFilter, setFolderFilter] = useState('');
+  const [dragConvId, setDragConvId] = useState<string | null>(null);
+  const [copiedMsgId, setCopiedMsgId] = useState<string | null>(null);
+  const folderInputRef = useRef<HTMLInputElement>(null);
+  const [folderDropdownOpen, setFolderDropdownOpen] = useState(false);
+  const folderDropdownRef = useRef<HTMLDivElement>(null);
+  const [pendingFiles, setPendingFiles] = useState<File[]>([]);
+  const emailFileInputRef = useRef<HTMLInputElement>(null);
+  const [expandedFolderId, setExpandedFolderId] = useState<string | null>(null);
+  const [chatDragOver, setChatDragOver] = useState(false);
+  const [isSending, setIsSending] = useState(false);
+  const [userEmail, setUserEmail] = useState('');
 
   useEffect(() => {
     const accId = sessionStorage.getItem("accountId") || "";
     setAccountId(accId);
+    setCalendarUserId(sessionStorage.getItem("userId") || accId);
+    setUserEmail(sessionStorage.getItem("userEmail") || "");
   }, []);
 
-  const loadData = async (accId: string) => {
+  // Close folder dropdown on click outside
+  useEffect(() => {
+    const handler = (e: MouseEvent) => {
+      if (folderDropdownRef.current && !folderDropdownRef.current.contains(e.target as Node)) setFolderDropdownOpen(false);
+    };
+    document.addEventListener('mousedown', handler);
+    return () => document.removeEventListener('mousedown', handler);
+  }, []);
+
+  const loadData = async (accId: string, signal?: AbortSignal) => {
     if (!accId) return;
     try {
       const [d, s] = await Promise.all([
-        authFetch(`${API}?accountId=${accId}`),
-        authFetch(`${API}/subcuentas?accountId=${accId}`),
+        authFetch(`${API}?accountId=${accId}`, { signal }),
+        authFetch(`${API}/subcuentas?accountId=${accId}`, { signal }),
       ]);
       if (d.ok) {
         const data = await d.json();
@@ -157,6 +211,7 @@ const Automations = () => {
         if (!data.pendingConsultas) data.pendingConsultas = [];
         if (!data.subcuentaEspecialidades) data.subcuentaEspecialidades = {};
         if (!data.especialidades) data.especialidades = [];
+        if (!data.emailFolders) data.emailFolders = [];
         setAutoData(data);
         // Auto-select first conversation (functional update avoids stale closure)
         if (data.emailConversations.length > 0) {
@@ -164,7 +219,10 @@ const Automations = () => {
         }
       }
       if (s.ok) setSubcuentas(await s.json());
-    } catch { /* backend offline */ }
+    } catch (err: any) {
+      if (err?.name === 'AbortError') return;
+      /* backend offline */
+    }
   };
 
   useEffect(() => { if (accountId) loadData(accountId); }, [accountId]);
@@ -172,10 +230,11 @@ const Automations = () => {
   // Auto-refresh conversations every 10 seconds
   useEffect(() => {
     if (!accountId) return;
+    const controller = new AbortController();
     const interval = setInterval(() => {
-      loadData(accountId);
+      loadData(accountId, controller.signal);
     }, 10000);
-    return () => clearInterval(interval);
+    return () => { controller.abort(); clearInterval(interval); };
   }, [accountId]);
 
   // Auto-scroll to bottom when messages change
@@ -215,10 +274,10 @@ const Automations = () => {
 
   // Load calendar status when entering calendar view
   useEffect(() => {
-    if (view === 'calendar' && accountId) {
-      loadCalendarStatus(accountId);
+    if (view === 'calendar' && calendarUserId) {
+      loadCalendarStatus(calendarUserId);
     }
-  }, [view, accountId]);
+  }, [view, calendarUserId]);
 
   const loadCalendarStatus = async (accId: string) => {
     if (!accId) return;
@@ -228,13 +287,13 @@ const Automations = () => {
         const data = await res.json();
         setCalendarConnected(data.connected);
         setCalendarEmail(data.email || '');
-        if (data.connected) loadCalendarEvents(accId);
+        if (data.connected) loadCalendarEvents(accId, true);
       }
     } catch { /* offline */ }
   };
 
-  const loadCalendarEvents = async (accId: string) => {
-    setCalendarLoading(true);
+  const loadCalendarEvents = async (accId: string, showLoading = false) => {
+    if (showLoading) setCalendarLoading(true);
     try {
       const res = await authFetch(`${CALENDAR_API}/events?accountId=${accId}`);
       if (res.ok) {
@@ -242,13 +301,13 @@ const Automations = () => {
         setCalendarEvents(data.events || []);
       }
     } catch { /* offline */ }
-    setCalendarLoading(false);
+    if (showLoading) setCalendarLoading(false);
   };
 
   const handleConnectCalendar = async () => {
     setCalendarLoading(true);
     try {
-      const res = await authFetch(`${CALENDAR_API}/auth-url?accountId=${accountId}`);
+      const res = await authFetch(`${CALENDAR_API}/auth-url?accountId=${calendarUserId}`);
       if (res.ok) {
         const { url } = await res.json();
         window.location.href = url;
@@ -263,7 +322,7 @@ const Automations = () => {
       await authFetch(`${CALENDAR_API}/disconnect`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ accountId }),
+        body: JSON.stringify({ accountId: calendarUserId }),
       });
       setCalendarConnected(false);
       setCalendarEmail('');
@@ -271,9 +330,22 @@ const Automations = () => {
     } catch { /* offline */ }
   };
 
+  const GOOGLE_COLOR_MAP: Record<string, string> = {
+    '1': '#7986cb', '2': '#33b679', '3': '#8e24aa', '4': '#e67c73',
+    '5': '#f6bf26', '6': '#f4511e', '7': '#039be5', '8': '#616161',
+    '9': '#3f51b5', '10': '#0b8043', '11': '#d50000',
+  };
+
+  const resetEventForm = () => {
+    setEventForm({ title: '', date: '', startTime: '', endTime: '', description: '', allDay: false, recurrence: '', colorId: '' });
+    setEditingEventId(null);
+  };
+
+  const [savingEvent, setSavingEvent] = useState(false);
+
   const handleAddEvent = async () => {
     if (!eventForm.title || !eventForm.date) return;
-    setCalendarLoading(true);
+    setSavingEvent(true);
     try {
       let startDateTime = eventForm.date;
       let endDateTime = eventForm.date;
@@ -281,24 +353,56 @@ const Automations = () => {
         startDateTime = `${eventForm.date}T${eventForm.startTime}:00`;
         endDateTime = `${eventForm.date}T${eventForm.endTime || eventForm.startTime}:00`;
       }
-      const res = await authFetch(`${CALENDAR_API}/events`, {
-        method: 'POST',
+      const body: any = { accountId: calendarUserId, title: eventForm.title, description: eventForm.description, startDateTime, endDateTime, allDay: eventForm.allDay };
+      if (eventForm.recurrence) body.recurrence = eventForm.recurrence;
+      if (eventForm.colorId) body.colorId = eventForm.colorId;
+
+      const url = editingEventId ? `${CALENDAR_API}/events/${editingEventId}` : `${CALENDAR_API}/events`;
+      const method = editingEventId ? 'PUT' : 'POST';
+      const res = await authFetch(url, {
+        method,
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ accountId, title: eventForm.title, description: eventForm.description, startDateTime, endDateTime, allDay: eventForm.allDay }),
+        body: JSON.stringify(body),
       });
       if (res.ok) {
         setShowAddEventForm(false);
-        setEventForm({ title: '', date: '', startTime: '', endTime: '', description: '', allDay: false });
-        await loadCalendarEvents(accountId);
+        resetEventForm();
+        await loadCalendarEvents(calendarUserId);
+      } else {
+        const errData = await res.json().catch(() => null);
+        console.error('Calendar event error:', res.status, errData);
       }
-    } catch { /* offline */ }
-    setCalendarLoading(false);
+    } catch (err) { console.error('Calendar event network error:', err); }
+    setSavingEvent(false);
+  };
+
+  const handleEditEvent = (detail: typeof selectedEventDetail) => {
+    if (!detail) return;
+    const startDate = detail.start ? new Date(detail.start) : null;
+    const endDate = detail.end ? new Date(detail.end) : null;
+    const dateStr = startDate ? startDate.toISOString().split('T')[0] : '';
+    const startTime = !detail.allDay && startDate ? startDate.toTimeString().slice(0, 5) : '';
+    const endTime = !detail.allDay && endDate ? endDate.toTimeString().slice(0, 5) : '';
+    const rrule = detail.recurrence?.[0] || '';
+    setEventForm({
+      title: detail.title,
+      date: dateStr,
+      startTime,
+      endTime,
+      description: detail.description || '',
+      allDay: detail.allDay,
+      recurrence: rrule,
+      colorId: detail.colorId || '',
+    });
+    setEditingEventId(detail.id);
+    setSelectedEventDetail(null);
+    setShowAddEventForm(true);
   };
 
   const handleDeleteEvent = async (eventId: string) => {
     setConfirmDeleteEventId(null);
     try {
-      const res = await authFetch(`${CALENDAR_API}/events/${eventId}?accountId=${accountId}`, { method: 'DELETE' });
+      const res = await authFetch(`${CALENDAR_API}/events/${eventId}?accountId=${calendarUserId}`, { method: 'DELETE' });
       if (res.ok) setCalendarEvents(prev => prev.filter((e: any) => e.id !== eventId));
     } catch { /* offline */ }
   };
@@ -323,7 +427,7 @@ const Automations = () => {
   const saveCuenta = async () => {
     if (!cuentaForm.correo.trim()) return;
     await api("POST", "/cuentas-correo", cuentaForm);
-    setCuentaForm({ plataforma: "gmail", correo: "", password: "" }); setShowAddCuenta(false); reload();
+    setCuentaForm({ plataforma: "gmail", correo: "", password: "", customSmtpHost: "", customSmtpPort: 587, customImapHost: "", customImapPort: 993 }); setShowAddCuenta(false); reload();
   };
   const deleteCuenta = async (id: string) => { await api("DELETE", `/cuentas-correo/${id}?accountId=${accountId}`); reload(); };
 
@@ -349,27 +453,53 @@ const Automations = () => {
   const toggleSwitch = async () => { await api("PUT", "/switch", { switchActivo: !autoData.switchActivo }); reload(); };
   const toggleSortByCarga = async () => { await api("PUT", "/sort-by-carga", { sortByCarga: !autoData.sortByCarga }); reload(); };
   const toggleAutoAssign = async () => { await api("PUT", "/auto-assign-enabled", { autoAssignEnabled: !autoData.autoAssignEnabled }); reload(); };
+  const toggleSeleccion = async (field: 'respondConsultasGenerales' | 'respondSolicitudesServicio' | 'soloContactosConocidos') => {
+    const current = field === 'soloContactosConocidos' ? (autoData[field] ?? false) : (autoData[field] ?? true);
+    await api("PUT", "/email-selection", { [field]: !current });
+    reload();
+  };
   const sendManualMessage = async () => {
     const conv = autoData.emailConversations.find(c => c.id === selectedEmailConv);
-    if (!messageInput.trim() || !selectedEmailConv || !conv?.autoReplyPaused) return;
+    if (!selectedEmailConv || !conv?.autoReplyPaused || isSending) return;
     const text = messageInput.trim();
+    if (!text && pendingFiles.length === 0) return;
+    setIsSending(true);
     setMessageInput("");
+    const filesToSend = [...pendingFiles];
+    setPendingFiles([]);
     try {
-      await authFetch(`${API}/conversations/${selectedEmailConv}/send`, {
+      const formData = new FormData();
+      formData.append('accountId', accountId);
+      formData.append('conversationId', selectedEmailConv);
+      formData.append('text', text);
+      for (const file of filesToSend) {
+        formData.append('files', file);
+      }
+      const res = await authFetch(`${API}/conversations/${selectedEmailConv}/send`, {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ accountId, conversationId: selectedEmailConv, text }),
+        body: formData,
       });
+      const result = await res.json();
+      const sentAttachments: EmailAttachment[] = result.attachments || [];
       setAutoData(prev => ({
         ...prev,
         emailConversations: prev.emailConversations.map(c =>
           c.id === selectedEmailConv ? {
             ...c,
-            messages: [...c.messages, { id: Date.now().toString(), from: 'me', text, time: new Date().toLocaleTimeString('es-ES', { hour: '2-digit', minute: '2-digit' }), sent: true }],
+            messages: [...c.messages, {
+              id: Date.now().toString(),
+              from: 'me',
+              text,
+              time: new Date().toISOString(),
+              sent: true,
+              attachments: sentAttachments,
+            }],
           } : c
         ),
       }));
-    } catch { /* error */ }
+    } catch { /* error */ } finally {
+      setIsSending(false);
+    }
   };
   const toggleConvAutoReply = async (convId: string, paused: boolean) => {
     try {
@@ -388,6 +518,86 @@ const Automations = () => {
   };
   const setSubcuentaEsp = async (subcuentaId: string, especialidadId: string) => {
     await api("PUT", "/subcuenta-especialidad", { subcuentaId, especialidadId }); reload();
+  };
+
+  // Folder CRUD
+  const createFolder = async () => {
+    if (!newFolderName.trim()) return;
+    try {
+      const res = await authFetch(`${API}/email-folders`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ accountId, name: newFolderName.trim() }),
+      });
+      if (res.ok) {
+        const { folder } = await res.json();
+        setAutoData(prev => ({ ...prev, emailFolders: [...prev.emailFolders, folder] }));
+        setNewFolderName('');
+      }
+    } catch { /* error */ }
+  };
+  const deleteFolder = async (folderId: string) => {
+    try {
+      await authFetch(`${API}/email-folders/${folderId}?accountId=${accountId}`, { method: 'DELETE' });
+      setAutoData(prev => ({ ...prev, emailFolders: prev.emailFolders.filter(f => f.id !== folderId) }));
+      if (folderFilter === folderId) setFolderFilter('');
+    } catch { /* error */ }
+  };
+  const assignToFolder = async (folderId: string, conversationId: string) => {
+    try {
+      await authFetch(`${API}/email-folders/assign`, {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ accountId, folderId, conversationId }),
+      });
+      setAutoData(prev => ({
+        ...prev,
+        emailFolders: prev.emailFolders.map(f => ({
+          ...f,
+          conversationIds: f.id === folderId
+            ? [...f.conversationIds.filter(id => id !== conversationId), conversationId]
+            : f.conversationIds.filter(id => id !== conversationId),
+        })),
+      }));
+    } catch { /* error */ }
+  };
+  const removeFromFolder = async (folderId: string, conversationId: string) => {
+    try {
+      await authFetch(`${API}/email-folders/remove`, {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ accountId, folderId, conversationId }),
+      });
+      setAutoData(prev => ({
+        ...prev,
+        emailFolders: prev.emailFolders.map(f =>
+          f.id === folderId ? { ...f, conversationIds: f.conversationIds.filter(id => id !== conversationId) } : f
+        ),
+      }));
+    } catch { /* error */ }
+  };
+  const copyMessage = (msgId: string, text: string) => {
+    navigator.clipboard.writeText(text);
+    setCopiedMsgId(msgId);
+    setTimeout(() => setCopiedMsgId(null), 1500);
+  };
+  const formatFileSize = (bytes: number) => {
+    if (bytes < 1024) return `${bytes} B`;
+    if (bytes < 1024 * 1024) return `${(bytes / 1024).toFixed(1)} KB`;
+    return `${(bytes / (1024 * 1024)).toFixed(1)} MB`;
+  };
+  const handleEmailFileSelect = (files: FileList | null) => {
+    if (!files) return;
+    const maxSize = 10 * 1024 * 1024;
+    const validFiles = Array.from(files).filter(f => f.size <= maxSize);
+    setPendingFiles(prev => [...prev, ...validFiles].slice(0, 10));
+  };
+  const removePendingFile = (index: number) => {
+    setPendingFiles(prev => prev.filter((_, i) => i !== index));
+  };
+  const getFileIcon = (mimeType: string) => {
+    if (mimeType.startsWith('image/')) return Image;
+    return FileText;
   };
 
   const stats = { emailMessages: autoData.emailConversations.reduce((a, c) => a + c.messages.length, 0), emailConversations: autoData.emailConversations.length, emailUnread: autoData.emailConversations.reduce((a, c) => a + c.unread, 0), whatsappMessages: 1253, whatsappConversations: 89, whatsappUnread: 4 };
@@ -501,31 +711,27 @@ const Automations = () => {
                     dayMaxEvents={false}
                     events={(() => {
                       const palette = [
-                        '#6366f1', // indigo
-                        '#f59e0b', // amber
-                        '#10b981', // emerald
-                        '#ef4444', // red
-                        '#8b5cf6', // violet
-                        '#06b6d4', // cyan
-                        '#f97316', // orange
-                        '#ec4899', // pink
-                        '#84cc16', // lime
-                        '#14b8a6', // teal
+                        '#6366f1', '#f59e0b', '#10b981', '#ef4444', '#8b5cf6',
+                        '#06b6d4', '#f97316', '#ec4899', '#84cc16', '#14b8a6',
                       ];
-                      return calendarEvents.map((e: any, i: number) => ({
-                        id: e.id,
-                        title: e.summary,
-                        start: e.start?.dateTime || e.start?.date,
-                        end: e.end?.dateTime || e.end?.date,
-                        allDay: !e.start?.dateTime,
-                        backgroundColor: palette[i % palette.length],
-                        borderColor: palette[i % palette.length],
-                        textColor: '#ffffff',
-                        extendedProps: { description: e.description },
-                      }));
+                      const hashCode = (s: string) => { let h = 0; for (let i = 0; i < s.length; i++) { h = ((h << 5) - h) + s.charCodeAt(i); h |= 0; } return Math.abs(h); };
+                      return calendarEvents.map((e: any) => {
+                        const color = e.colorId ? (GOOGLE_COLOR_MAP[e.colorId] || palette[hashCode(e.id) % palette.length]) : palette[hashCode(e.id) % palette.length];
+                        return {
+                          id: e.id,
+                          title: e.summary,
+                          start: e.start?.dateTime || e.start?.date,
+                          end: e.end?.dateTime || e.end?.date,
+                          allDay: !e.start?.dateTime,
+                          backgroundColor: color,
+                          borderColor: color,
+                          textColor: '#ffffff',
+                          extendedProps: { description: e.description, colorId: e.colorId, recurrence: e.recurrence },
+                        };
+                      });
                     })()}
                     dateClick={(info) => {
-                      setEventForm(f => ({ ...f, date: info.dateStr, allDay: true }));
+                      setEventForm(f => ({ ...f, date: info.dateStr.split('T')[0], allDay: true }));
                       setShowAddEventForm(true);
                     }}
                     eventClick={(info) => {
@@ -534,7 +740,12 @@ const Automations = () => {
                         title: info.event.title,
                         description: info.event.extendedProps.description,
                         start: info.event.start,
+                        end: info.event.end,
                         allDay: info.event.allDay,
+                        location: info.event.extendedProps.location,
+                        colorId: info.event.extendedProps.colorId,
+                        recurrence: info.event.extendedProps.recurrence,
+                        attendees: info.event.extendedProps.attendees,
                       });
                     }}
                   />
@@ -544,7 +755,7 @@ const Automations = () => {
           )}
         </div>
         {showAddEventForm && (
-          <Modal title={t('automations.calendarAddEvent')} onClose={() => setShowAddEventForm(false)}>
+          <Modal title={editingEventId ? t('automations.calendarEditEvent') : t('automations.calendarAddEvent')} onClose={() => { setShowAddEventForm(false); resetEventForm(); }}>
             <div className="space-y-3">
               <div>
                 <label className="text-xs font-medium text-foreground">{t('automations.calendarEventTitle')} *</label>
@@ -574,11 +785,32 @@ const Automations = () => {
                 <label className="text-xs font-medium text-foreground">{t('automations.calendarDescription')}</label>
                 <textarea value={eventForm.description} onChange={(e) => setEventForm(f => ({ ...f, description: e.target.value }))} rows={2} className="mt-1 w-full text-xs border border-border rounded px-3 py-2 bg-background text-foreground focus:outline-none resize-none" placeholder={t('automations.calendarDescription')} />
               </div>
+              <div className="grid grid-cols-2 gap-2">
+                <div>
+                  <label className="text-xs font-medium text-foreground">{t('automations.calendarColor') || 'Color'}</label>
+                  <div className="mt-1 flex flex-wrap gap-1.5">
+                    <button type="button" onClick={() => setEventForm(f => ({ ...f, colorId: '' }))} className={`h-6 w-6 rounded-full border-2 transition-all ${!eventForm.colorId ? 'border-foreground scale-110' : 'border-transparent'}`} style={{ background: '#6366f1' }} title="Default" />
+                    {Object.entries(GOOGLE_COLOR_MAP).map(([id, hex]) => (
+                      <button key={id} type="button" onClick={() => setEventForm(f => ({ ...f, colorId: id }))} className={`h-6 w-6 rounded-full border-2 transition-all ${eventForm.colorId === id ? 'border-foreground scale-110' : 'border-transparent'}`} style={{ background: hex }} />
+                    ))}
+                  </div>
+                </div>
+                <div>
+                  <label className="text-xs font-medium text-foreground">{t('automations.calendarRecurrence')}</label>
+                  <select value={eventForm.recurrence} onChange={(e) => setEventForm(f => ({ ...f, recurrence: e.target.value }))} className="mt-1 w-full text-xs border border-border rounded px-3 py-2 bg-background text-foreground focus:outline-none">
+                    <option value="">{t('automations.calendarRecurrenceNone')}</option>
+                    <option value="RRULE:FREQ=DAILY">{t('automations.calendarRecurrenceDaily')}</option>
+                    <option value="RRULE:FREQ=WEEKLY">{t('automations.calendarRecurrenceWeekly')}</option>
+                    <option value="RRULE:FREQ=MONTHLY">{t('automations.calendarRecurrenceMonthly')}</option>
+                    <option value="RRULE:FREQ=YEARLY">{t('automations.calendarRecurrenceYearly')}</option>
+                  </select>
+                </div>
+              </div>
               <div className="flex gap-2 pt-1">
-                <button onClick={handleAddEvent} disabled={calendarLoading || !eventForm.title || !eventForm.date} className="flex-1 px-3 py-2 bg-foreground text-background rounded-md text-xs font-medium hover:opacity-90 transition-opacity disabled:opacity-50">
-                  {calendarLoading ? '...' : t('automations.calendarSave')}
+                <button onClick={handleAddEvent} disabled={savingEvent || !eventForm.title || !eventForm.date} className="flex-1 px-3 py-2 bg-foreground text-background rounded-md text-xs font-medium hover:opacity-90 transition-opacity disabled:opacity-50">
+                  {savingEvent ? '...' : t('automations.calendarSave')}
                 </button>
-                <button onClick={() => setShowAddEventForm(false)} className="px-3 py-2 border border-border rounded-md text-xs text-muted-foreground hover:text-foreground hover:bg-accent transition-colors">
+                <button onClick={() => { setShowAddEventForm(false); resetEventForm(); }} className="px-3 py-2 border border-border rounded-md text-xs text-muted-foreground hover:text-foreground hover:bg-accent transition-colors">
                   {t('automations.cancel')}
                 </button>
               </div>
@@ -598,7 +830,7 @@ const Automations = () => {
                     <p className="text-xs text-muted-foreground mt-0.5">
                       {selectedEventDetail.allDay
                         ? selectedEventDetail.start.toLocaleDateString([], { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' })
-                        : selectedEventDetail.start.toLocaleString([], { weekday: 'long', year: 'numeric', month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit' })}
+                        : `${selectedEventDetail.start.toLocaleString([], { weekday: 'long', year: 'numeric', month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit' })}${selectedEventDetail.end ? ` – ${selectedEventDetail.end.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}` : ''}`}
                     </p>
                   )}
                 </div>
@@ -611,7 +843,16 @@ const Automations = () => {
               ) : (
                 <p className="text-xs text-muted-foreground italic">{t('automations.calendarNoDescription')}</p>
               )}
+              {selectedEventDetail.recurrence && selectedEventDetail.recurrence.length > 0 && (
+                <p className="text-xs text-muted-foreground italic">{t('automations.calendarRecurringEvent')}</p>
+              )}
               <div className="flex gap-2 pt-1 border-t border-border">
+                <button
+                  onClick={() => handleEditEvent(selectedEventDetail)}
+                  className="flex items-center gap-1.5 px-3 py-2 bg-foreground/10 text-foreground border border-border rounded-md text-xs font-medium hover:bg-accent transition-all"
+                >
+                  {t('automations.calendarEditEvent')}
+                </button>
                 <button
                   onClick={() => { setConfirmDeleteEventId(selectedEventDetail.id); setSelectedEventDetail(null); }}
                   className="flex items-center gap-1.5 px-3 py-2 bg-destructive/10 text-destructive border border-destructive/30 rounded-md text-xs font-medium hover:bg-destructive hover:text-destructive-foreground transition-all"
@@ -660,8 +901,21 @@ const Automations = () => {
   }
 
   if (view === "email") {
-    const conversations = autoData.emailConversations;
-    const currentConv = conversations.find(c => c.id === selectedEmailConv);
+    const allConversations = autoData.emailConversations;
+    const conversations = allConversations.filter(c => {
+      if (folderFilter) {
+        const folder = autoData.emailFolders.find(f => f.id === folderFilter);
+        if (!folder?.conversationIds.includes(c.id)) return false;
+      }
+      if (emailFilter === 'manual' && !c.autoReplyPaused) return false;
+      if (emailFilter === 'auto' && c.autoReplyPaused) return false;
+      if (emailSearch) {
+        const q = emailSearch.toLowerCase();
+        if (!c.contactName.toLowerCase().includes(q) && !c.contactEmail.toLowerCase().includes(q) && !c.subject.toLowerCase().includes(q)) return false;
+      }
+      return true;
+    });
+    const currentConv = allConversations.find(c => c.id === selectedEmailConv);
     const currentMessages = currentConv?.messages || [];
 
     return (
@@ -679,6 +933,12 @@ const Automations = () => {
               </div>
             </div>
             <div className="flex items-center gap-2 md:gap-3 flex-wrap">
+              <button onClick={() => setShowSeleccion(true)} className="flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium rounded-md border border-border bg-card hover:bg-accent text-foreground transition-colors">
+                <Settings2 className="h-3.5 w-3.5" />{t('automations.emailSelection')}
+              </button>
+              <button onClick={() => setShowFolderPanel(!showFolderPanel)} className={`flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium rounded-md border border-border bg-card hover:bg-accent text-foreground transition-colors ${showFolderPanel ? 'ring-1 ring-ring' : ''}`}>
+                <FolderOpen className="h-3.5 w-3.5" />{t('automations.organizeFolders')}
+              </button>
               <button onClick={() => setShowAsignacion(true)} className="flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium rounded-md border border-border bg-card hover:bg-accent text-foreground transition-colors">
                 <Users className="h-3.5 w-3.5" />{t('automations.autoAssign')}
               </button>
@@ -694,21 +954,67 @@ const Automations = () => {
               <div className="fixed inset-0 z-30 bg-black/50" onClick={() => setShowConvPanel(false)} />
             )}
             <div className={`${isMobile ? `fixed left-0 top-0 z-40 h-full w-72 transition-transform duration-300 ${showConvPanel ? 'translate-x-0' : '-translate-x-full'}` : 'w-80'} border-r border-border bg-card flex flex-col`}>
-              <div className="p-3 border-b border-border">
+              <div className="p-3 border-b border-border space-y-2">
                 <div className="relative">
                   <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-3.5 w-3.5 text-muted-foreground" />
-                  <input className="w-full pl-9 pr-3 py-2 text-sm bg-muted/50 border-none rounded-md text-foreground placeholder:text-muted-foreground focus:outline-none focus:ring-1 focus:ring-ring" placeholder={t('automations.searchConversation')} />
+                  <input value={emailSearch} onChange={e => setEmailSearch(e.target.value)} className="w-full pl-9 pr-3 py-2 text-sm bg-muted/50 border-none rounded-md text-foreground placeholder:text-muted-foreground focus:outline-none focus:ring-1 focus:ring-ring" placeholder={t('automations.searchConversation')} />
                 </div>
+                <div className="flex rounded-md border border-border overflow-hidden">
+                  {(['all', 'manual', 'auto'] as const).map(f => (
+                    <button key={f} onClick={() => setEmailFilter(f)} className={`flex-1 px-2 py-1 text-[11px] font-medium transition-colors ${emailFilter === f ? 'bg-primary text-primary-foreground' : 'bg-muted/50 text-muted-foreground hover:bg-accent/50 hover:text-foreground'}`}>
+                      {t(`automations.filter${f.charAt(0).toUpperCase() + f.slice(1)}`)}
+                    </button>
+                  ))}
+                </div>
+                {autoData.emailFolders.length > 0 && (
+                  <div ref={folderDropdownRef} className="relative">
+                    <button
+                      onClick={() => setFolderDropdownOpen(!folderDropdownOpen)}
+                      className="w-full flex items-center justify-between px-3 py-1.5 text-xs rounded-md border border-border bg-muted/50 text-foreground hover:bg-accent/50 transition-colors focus:outline-none focus:ring-1 focus:ring-ring"
+                    >
+                      <div className="flex items-center gap-2 min-w-0">
+                        <FolderOpen className="h-3 w-3 text-muted-foreground shrink-0" />
+                        <span className="truncate">{folderFilter ? autoData.emailFolders.find(f => f.id === folderFilter)?.name || t('automations.allConversations') : t('automations.allConversations')}</span>
+                      </div>
+                      <ChevronDown className={`h-3 w-3 text-muted-foreground shrink-0 transition-transform duration-200 ${folderDropdownOpen ? 'rotate-180' : ''}`} />
+                    </button>
+                    {folderDropdownOpen && (
+                      <div className="absolute z-50 mt-1 w-full rounded-md border border-border bg-card shadow-lg py-1 animate-in fade-in-0 zoom-in-95 duration-150">
+                        <button
+                          onClick={() => { setFolderFilter(''); setFolderDropdownOpen(false); }}
+                          className={`w-full flex items-center gap-2 px-3 py-1.5 text-xs transition-colors ${!folderFilter ? 'bg-accent text-foreground font-medium' : 'text-foreground hover:bg-accent/50'}`}
+                        >
+                          <Mail className="h-3 w-3 text-muted-foreground" />
+                          {t('automations.allConversations')}
+                        </button>
+                        {autoData.emailFolders.map(f => (
+                          <button
+                            key={f.id}
+                            onClick={() => { setFolderFilter(f.id); setFolderDropdownOpen(false); }}
+                            className={`w-full flex items-center justify-between px-3 py-1.5 text-xs transition-colors ${folderFilter === f.id ? 'bg-accent text-foreground font-medium' : 'text-foreground hover:bg-accent/50'}`}
+                          >
+                            <div className="flex items-center gap-2 min-w-0">
+                              <FolderOpen className="h-3 w-3 text-muted-foreground shrink-0" />
+                              <span className="truncate">{f.name}</span>
+                            </div>
+                            <span className="text-[10px] text-muted-foreground shrink-0">{f.conversationIds.length}</span>
+                          </button>
+                        ))}
+                      </div>
+                    )}
+                  </div>
+                )}
               </div>
               <div className="flex-1 overflow-y-auto">
                 {conversations.length === 0 && (
                   <p className="text-xs text-muted-foreground text-center py-8">{t('automations.noEmailConversations')}</p>
                 )}
                 {conversations.map((conv) => (
-                  <button key={conv.id} onClick={() => {
+                  <button key={conv.id} draggable onDragStart={() => setDragConvId(conv.id)} onDragEnd={() => setDragConvId(null)} onClick={() => {
                     setSelectedEmailConv(conv.id);
                     if (isMobile) setShowConvPanel(false);
                     if (conv.unread > 0) {
+                      const prevUnread = conv.unread;
                       // Clear unread locally
                       setAutoData(prev => ({
                         ...prev,
@@ -716,12 +1022,19 @@ const Automations = () => {
                           c.id === conv.id ? { ...c, unread: 0 } : c
                         ),
                       }));
-                      // Persist to backend
+                      // Persist to backend — revert on failure
                       authFetch(`${API}/mark-read`, {
                         method: 'PUT',
                         headers: { 'Content-Type': 'application/json' },
                         body: JSON.stringify({ accountId, conversationId: conv.id }),
-                      }).catch(() => {});
+                      }).catch(() => {
+                        setAutoData(prev => ({
+                          ...prev,
+                          emailConversations: prev.emailConversations.map(c =>
+                            c.id === conv.id ? { ...c, unread: prevUnread } : c
+                          ),
+                        }));
+                      });
                     }
                   }}
                     className={`group w-full text-left p-3 border-b border-border/50 hover:bg-accent/50 transition-colors ${selectedEmailConv === conv.id ? "bg-accent" : ""}`}>
@@ -736,7 +1049,7 @@ const Automations = () => {
                         </div>
                       </div>
                       <div className="flex flex-col items-end gap-1 shrink-0">
-                        <span className="text-[10px] text-muted-foreground">{conv.messages[conv.messages.length - 1]?.time || ""}</span>
+                        <span className="text-[10px] text-muted-foreground">{formatTime(conv.messages[conv.messages.length - 1]?.time || "")}</span>
                         <div className="flex items-center gap-1">
                           {conv.unread > 0 && (
                             <span className="h-4 min-w-4 px-1 rounded-full bg-foreground text-background text-[10px] font-bold flex items-center justify-center">{conv.unread}</span>
@@ -792,23 +1105,85 @@ const Automations = () => {
                       <SwitchBox active={!currentConv.autoReplyPaused} onChange={() => toggleConvAutoReply(currentConv.id, !currentConv.autoReplyPaused)} label="Auto-reply" />
                     </div>
                   </div>
-                  <div className="flex-1 overflow-y-auto p-4 space-y-3">
+                  <div
+                    className={`flex-1 overflow-y-auto p-4 space-y-3 transition-colors ${chatDragOver ? 'bg-primary/5 ring-2 ring-primary/30 ring-inset' : ''}`}
+                    onDragOver={(e) => { e.preventDefault(); if (currentConv.autoReplyPaused) setChatDragOver(true); }}
+                    onDragLeave={() => setChatDragOver(false)}
+                    onDrop={(e) => {
+                      e.preventDefault();
+                      setChatDragOver(false);
+                      if (currentConv.autoReplyPaused && e.dataTransfer.files.length > 0) handleEmailFileSelect(e.dataTransfer.files);
+                    }}
+                  >
+                    {chatDragOver && (
+                      <div className="flex items-center justify-center py-8 text-primary/60 text-sm font-medium pointer-events-none">
+                        <Upload className="h-5 w-5 mr-2" />{t('automations.dropFilesHere')}
+                      </div>
+                    )}
                     {currentMessages.map((msg) => (
-                      <div key={msg.id} className={`flex ${msg.sent ? "justify-end" : "justify-start"}`}>
+                      <div key={msg.id} className={`group/msg flex ${msg.sent ? "justify-end" : "justify-start"}`}>
                         <div className={`max-w-[70%] px-3 py-2 rounded-lg text-sm ${msg.sent ? "bg-foreground text-background rounded-br-sm" : "bg-muted text-foreground rounded-bl-sm"}`}>
-                          <p>{msg.text}</p>
-                          <p className={`text-[10px] mt-1 ${msg.sent ? "text-background/60" : "text-muted-foreground"}`}>{msg.time}</p>
+                          {msg.text && <p className="whitespace-pre-wrap break-words">{msg.text}</p>}
+                          {msg.attachments && msg.attachments.length > 0 && (
+                            <div className={`${msg.text ? 'mt-2 pt-2 border-t' : ''} ${msg.sent ? 'border-background/20' : 'border-border'} space-y-1`}>
+                              {msg.attachments.map((att) => {
+                                const IconComp = getFileIcon(att.mimeType);
+                                return (
+                                  <a
+                                    key={att.id}
+                                    href={`${API}/email-attachments/${encodeURIComponent(att.filename)}`}
+                                    target="_blank"
+                                    rel="noopener noreferrer"
+                                    className={`flex items-center gap-2 px-2 py-1.5 rounded-md text-xs transition-colors ${msg.sent ? 'bg-background/10 hover:bg-background/20 text-background' : 'bg-accent/50 hover:bg-accent text-foreground'}`}
+                                  >
+                                    <IconComp className="h-3.5 w-3.5 shrink-0" />
+                                    <span className="truncate flex-1">{att.originalName}</span>
+                                    <span className="shrink-0 text-[10px] opacity-60">{formatFileSize(att.size)}</span>
+                                    <Download className="h-3 w-3 shrink-0 opacity-60" />
+                                  </a>
+                                );
+                              })}
+                            </div>
+                          )}
+                          <div className={`flex items-center justify-between mt-1 gap-2`}>
+                            <p className={`text-[10px] ${msg.sent ? "text-background/60" : "text-muted-foreground"}`}>{formatTime(msg.time)}</p>
+                            <button
+                              onClick={() => copyMessage(msg.id, msg.text)}
+                              className={`p-0.5 rounded hover:bg-black/10 dark:hover:bg-white/10 opacity-0 group-hover/msg:opacity-100 transition-opacity ${msg.sent ? "text-background/60 hover:text-background" : "text-muted-foreground hover:text-foreground"}`}
+                              title={t('automations.copyMessage')}
+                            >
+                              {copiedMsgId === msg.id ? <Check className="h-3 w-3 text-green-500" /> : <Copy className="h-3 w-3" />}
+                            </button>
+                          </div>
                         </div>
                       </div>
                     ))}
                     <div ref={messagesEndRef} />
                   </div>
                   <div className="p-3 border-t border-border bg-card">
+                    {pendingFiles.length > 0 && (
+                      <div className="flex flex-wrap gap-2 mb-2 px-1">
+                        {pendingFiles.map((file, i) => {
+                          const IconComp = getFileIcon(file.type);
+                          return (
+                            <div key={i} className="flex items-center gap-1.5 px-2 py-1 rounded-md bg-muted text-xs text-foreground max-w-[200px]">
+                              <IconComp className="h-3 w-3 shrink-0 text-muted-foreground" />
+                              <span className="truncate">{file.name}</span>
+                              <span className="shrink-0 text-[10px] text-muted-foreground">{formatFileSize(file.size)}</span>
+                              <button onClick={() => removePendingFile(i)} className="p-0.5 rounded hover:bg-destructive/10 text-muted-foreground hover:text-destructive shrink-0">
+                                <X className="h-2.5 w-2.5" />
+                              </button>
+                            </div>
+                          );
+                        })}
+                      </div>
+                    )}
+                    <input type="file" ref={emailFileInputRef} className="hidden" multiple onChange={(e) => { handleEmailFileSelect(e.target.files); e.target.value = ''; }} />
                     <div className="flex items-center gap-2">
-                      <button className="p-2 rounded-md hover:bg-accent text-muted-foreground"><Paperclip className="h-4 w-4" /></button>
+                      <button onClick={() => emailFileInputRef.current?.click()} disabled={!currentConv.autoReplyPaused} className="p-2 rounded-md hover:bg-accent text-muted-foreground disabled:opacity-50 disabled:cursor-not-allowed" title={t('automations.attachFiles')}><Paperclip className="h-4 w-4" /></button>
                       <input className="flex-1 px-3 py-2 text-sm bg-muted/50 border-none rounded-md text-foreground placeholder:text-muted-foreground focus:outline-none focus:ring-1 focus:ring-ring disabled:opacity-50 disabled:cursor-not-allowed"
                         placeholder={currentConv.autoReplyPaused ? t('automations.writeMessage') : t('automations.pauseToSend')} value={messageInput} onChange={(e) => setMessageInput(e.target.value)} onKeyDown={(e) => { if (e.key === "Enter") { e.preventDefault(); sendManualMessage(); } }} disabled={!currentConv.autoReplyPaused} />
-                      <button onClick={sendManualMessage} disabled={!currentConv.autoReplyPaused} className="p-2 rounded-md bg-foreground text-background hover:opacity-90 transition-opacity disabled:opacity-50 disabled:cursor-not-allowed"><Send className="h-4 w-4" /></button>
+                      <button onClick={sendManualMessage} disabled={!currentConv.autoReplyPaused || isSending} className="p-2 rounded-md bg-foreground text-background hover:opacity-90 transition-opacity disabled:opacity-50 disabled:cursor-not-allowed"><Send className="h-4 w-4" /></button>
                     </div>
                   </div>
                 </>
@@ -823,8 +1198,122 @@ const Automations = () => {
                 </div>
               )}
             </div>
+            {/* Folder panel */}
+            <div className={`border-l border-border bg-card flex flex-col overflow-hidden transition-all duration-300 ease-in-out ${showFolderPanel ? 'w-56 opacity-100' : 'w-0 opacity-0 border-l-0'}`}>
+              {showFolderPanel && (
+                <>
+                <div className="p-3 border-b border-border">
+                  <div className="flex items-center justify-between mb-2">
+                    <p className="text-xs font-semibold text-foreground">{t('automations.folders')}</p>
+                    <button onClick={() => {
+                      if (newFolderName.trim()) { createFolder(); }
+                      else { setNewFolderName(' '); setTimeout(() => { setNewFolderName(''); folderInputRef.current?.focus(); }, 0); }
+                    }} className="p-1.5 rounded-md bg-foreground text-background hover:opacity-90 transition-opacity" title={t('automations.createFolder')}>
+                      <Plus className="h-3 w-3" />
+                    </button>
+                  </div>
+                  <input
+                    ref={folderInputRef}
+                    value={newFolderName}
+                    onChange={(e) => setNewFolderName(e.target.value)}
+                    onKeyDown={(e) => { if (e.key === 'Enter') createFolder(); }}
+                    placeholder={t('automations.newFolder')}
+                    className="w-full px-2 py-1.5 text-xs bg-muted/50 border-none rounded-md text-foreground placeholder:text-muted-foreground focus:outline-none focus:ring-1 focus:ring-ring"
+                  />
+                </div>
+                <div className="flex-1 overflow-y-auto p-2 space-y-1">
+                  {autoData.emailFolders.length === 0 && (
+                    <p className="text-[10px] text-muted-foreground text-center py-4">{t('automations.noFolders')}</p>
+                  )}
+                  {autoData.emailFolders.map((folder) => {
+                    const isExpanded = expandedFolderId === folder.id;
+                    const folderConvs = autoData.emailConversations.filter(c => folder.conversationIds.includes(c.id));
+                    return (
+                      <div key={folder.id}>
+                        <div
+                          onDragOver={(e) => e.preventDefault()}
+                          onDrop={() => { if (dragConvId) assignToFolder(folder.id, dragConvId); }}
+                          className={`group/folder flex items-center justify-between p-2 rounded-md border border-border hover:bg-accent/50 transition-colors cursor-pointer ${dragConvId ? 'border-dashed border-primary/50' : ''}`}
+                          onClick={() => setExpandedFolderId(isExpanded ? null : folder.id)}
+                        >
+                          <div className="flex items-center gap-2 min-w-0">
+                            <ChevronRight className={`h-3 w-3 text-muted-foreground shrink-0 transition-transform duration-200 ${isExpanded ? 'rotate-90' : ''}`} />
+                            <FolderOpen className="h-3.5 w-3.5 text-muted-foreground shrink-0" />
+                            <span className="text-xs text-foreground truncate">{folder.name}</span>
+                            <span className="text-[10px] text-muted-foreground">({folder.conversationIds.length})</span>
+                          </div>
+                          <button
+                            onClick={(e) => { e.stopPropagation(); deleteFolder(folder.id); }}
+                            className="p-0.5 rounded hover:bg-destructive/10 text-muted-foreground hover:text-destructive opacity-0 group-hover/folder:opacity-100 transition-opacity"
+                          >
+                            <Trash2 className="h-3 w-3" />
+                          </button>
+                        </div>
+                        {isExpanded && (
+                          <div className="ml-3 mt-1 space-y-0.5">
+                            {folderConvs.length === 0 && (
+                              <p className="text-[10px] text-muted-foreground py-1 pl-2">{t('automations.emptyFolder')}</p>
+                            )}
+                            {folderConvs.map(conv => (
+                              <div key={conv.id} className="group/fconv flex items-center justify-between px-2 py-1 rounded-md hover:bg-accent/30 transition-colors text-xs">
+                                <div className="flex items-center gap-1.5 min-w-0 cursor-pointer" onClick={() => { setSelectedEmailConv(conv.id); setFolderFilter(''); }}>
+                                  <div className="h-5 w-5 rounded-full bg-muted flex items-center justify-center shrink-0">
+                                    <span className="text-[8px] font-semibold">{conv.contactName.split(" ").map((n) => n[0]).join("").substring(0, 2)}</span>
+                                  </div>
+                                  <div className="min-w-0">
+                                    <span className="block truncate text-foreground">{conv.contactName}</span>
+                                    <span className="block truncate text-[9px] text-muted-foreground">{conv.contactEmail}</span>
+                                  </div>
+                                </div>
+                                <button
+                                  onClick={() => removeFromFolder(folder.id, conv.id)}
+                                  className="p-0.5 rounded hover:bg-amber-500/10 text-muted-foreground hover:text-amber-600 opacity-0 group-hover/fconv:opacity-100 transition-opacity shrink-0"
+                                  title={t('automations.removeFromFolder')}
+                                >
+                                  <X className="h-2.5 w-2.5" />
+                                </button>
+                              </div>
+                            ))}
+                          </div>
+                        )}
+                      </div>
+                    );
+                  })}
+                </div>
+                </>
+              )}
+            </div>
           </div>
         </div>
+
+        {showSeleccion && (
+          <Modal title={t('automations.emailSelection')} onClose={() => setShowSeleccion(false)}>
+            <div className="space-y-4">
+              <p className="text-xs text-muted-foreground mb-4">{t('automations.emailSelectionDesc')}</p>
+              <div className="flex items-center justify-between p-3 rounded-lg border border-border bg-background">
+                <div className="flex-1 mr-3">
+                  <p className="text-sm font-medium text-foreground">{t('automations.respondConsultas')}</p>
+                  <p className="text-xs text-muted-foreground mt-0.5">{t('automations.respondConsultasDesc')}</p>
+                </div>
+                <SwitchBox active={autoData.respondConsultasGenerales !== false} onChange={() => toggleSeleccion('respondConsultasGenerales')} label="" />
+              </div>
+              <div className="flex items-center justify-between p-3 rounded-lg border border-border bg-background">
+                <div className="flex-1 mr-3">
+                  <p className="text-sm font-medium text-foreground">{t('automations.respondSolicitudes')}</p>
+                  <p className="text-xs text-muted-foreground mt-0.5">{t('automations.respondSolicitudesDesc')}</p>
+                </div>
+                <SwitchBox active={autoData.respondSolicitudesServicio !== false} onChange={() => toggleSeleccion('respondSolicitudesServicio')} label="" />
+              </div>
+              <div className="flex items-center justify-between p-3 rounded-lg border border-border bg-background">
+                <div className="flex-1 mr-3">
+                  <p className="text-sm font-medium text-foreground">{t('automations.onlyKnownContacts')}</p>
+                  <p className="text-xs text-muted-foreground mt-0.5">{t('automations.onlyKnownContactsDesc')}</p>
+                </div>
+                <SwitchBox active={autoData.soloContactosConocidos === true} onChange={() => toggleSeleccion('soloContactosConocidos')} label="" />
+              </div>
+            </div>
+          </Modal>
+        )}
 
         {showAsignacion && (
           <Modal title={t('automations.autoAssign')} onClose={() => setShowAsignacion(false)} wide>
@@ -928,6 +1417,18 @@ const Automations = () => {
                   className="w-full px-3 py-2 text-sm rounded-md border border-border bg-card text-foreground placeholder:text-muted-foreground focus:outline-none focus:ring-1 focus:ring-ring" />
                 <input type="password" placeholder={t('automations.appPassword')} value={cuentaForm.password} onChange={(e) => setCuentaForm({ ...cuentaForm, password: e.target.value })}
                   className="w-full px-3 py-2 text-sm rounded-md border border-border bg-card text-foreground placeholder:text-muted-foreground focus:outline-none focus:ring-1 focus:ring-ring" />
+                {cuentaForm.plataforma === 'custom' && (
+                  <div className="grid grid-cols-2 gap-3">
+                    <input placeholder="SMTP Host" value={cuentaForm.customSmtpHost} onChange={(e) => setCuentaForm({ ...cuentaForm, customSmtpHost: e.target.value })}
+                      className="px-3 py-2 text-sm rounded-md border border-border bg-card text-foreground placeholder:text-muted-foreground focus:outline-none focus:ring-1 focus:ring-ring" />
+                    <input type="number" placeholder="SMTP Port (587)" value={cuentaForm.customSmtpPort} onChange={(e) => setCuentaForm({ ...cuentaForm, customSmtpPort: parseInt(e.target.value) || 587 })}
+                      className="px-3 py-2 text-sm rounded-md border border-border bg-card text-foreground placeholder:text-muted-foreground focus:outline-none focus:ring-1 focus:ring-ring" />
+                    <input placeholder="IMAP Host" value={cuentaForm.customImapHost} onChange={(e) => setCuentaForm({ ...cuentaForm, customImapHost: e.target.value })}
+                      className="px-3 py-2 text-sm rounded-md border border-border bg-card text-foreground placeholder:text-muted-foreground focus:outline-none focus:ring-1 focus:ring-ring" />
+                    <input type="number" placeholder="IMAP Port (993)" value={cuentaForm.customImapPort} onChange={(e) => setCuentaForm({ ...cuentaForm, customImapPort: parseInt(e.target.value) || 993 })}
+                      className="px-3 py-2 text-sm rounded-md border border-border bg-card text-foreground placeholder:text-muted-foreground focus:outline-none focus:ring-1 focus:ring-ring" />
+                  </div>
+                )}
                 <div className="flex gap-2 justify-end">
                   <button onClick={() => setShowAddCuenta(false)} className="px-3 py-1.5 text-xs rounded-md border border-border hover:bg-accent text-muted-foreground">{t('automations.cancel')}</button>
                   <button onClick={saveCuenta} className="px-3 py-1.5 text-xs rounded-md bg-foreground text-background hover:opacity-90">{t('automations.save')}</button>

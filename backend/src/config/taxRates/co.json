@@ -1,0 +1,183 @@
+{
+  "country": "Colombia",
+  "code": "CO",
+  "year": 2026,
+  "currency": "COP",
+  "incomeTax": {
+    "brackets": [
+      {
+        "from": 0,
+        "to": 1300,
+        "rate": 0
+      },
+      {
+        "from": 1300,
+        "to": 1700,
+        "rate": 19
+      },
+      {
+        "from": 1700,
+        "to": 4100,
+        "rate": 28
+      },
+      {
+        "from": 4100,
+        "to": 8670,
+        "rate": 33
+      },
+      {
+        "from": 8670,
+        "to": 18970,
+        "rate": 35
+      },
+      {
+        "from": 18970,
+        "to": 31000,
+        "rate": 37
+      },
+      {
+        "from": 31000,
+        "to": null,
+        "rate": 39
+      }
+    ],
+    "personalAllowance": 0,
+    "notes": "Brackets in UVT (Unidad de Valor Tributario). 1 UVT ≈ COP 47,065 for 2025."
+  },
+  "corporateTax": {
+    "standard": 35,
+    "small": 35,
+    "smallThreshold": 0
+  },
+  "vat": {
+    "standard": 19,
+    "reduced": 5,
+    "superReduced": 0
+  },
+  "socialSecurity": {
+    "employee": 8,
+    "employer": 20.5,
+    "selfEmployed": 28.5
+  },
+  "fields": {
+    "asalariado": {
+      "basic": [
+        {
+          "key": "salarioBruto",
+          "label": "Salario bruto anual (COP)"
+        },
+        {
+          "key": "retencionesEmpresa",
+          "label": "Retención en la fuente (COP)"
+        }
+      ],
+      "advanced": [
+        {
+          "key": "cotizacionesSS",
+          "label": "Aportes salud + pensión empleado (COP)"
+        },
+        {
+          "key": "deduccionesAuto",
+          "label": "Deducciones (medicina prepagada, dependientes, etc.) (COP)"
+        }
+      ]
+    },
+    "autonomo": {
+      "basic": [
+        {
+          "key": "facturacionTotal",
+          "label": "Ingresos brutos anuales (COP)"
+        },
+        {
+          "key": "gastosDeducibles",
+          "label": "Costos y gastos deducibles (COP)"
+        },
+        {
+          "key": "ivaRepercutido",
+          "label": "IVA generado (COP)"
+        },
+        {
+          "key": "ivaSoportado",
+          "label": "IVA descontable (COP)"
+        }
+      ],
+      "advanced": [
+        {
+          "key": "pagosFracc130",
+          "label": "Retenciones y anticipos (COP)"
+        }
+      ]
+    },
+    "empresa": {
+      "basic": [
+        {
+          "key": "ingresosTotal",
+          "label": "Ingresos brutos (COP)"
+        },
+        {
+          "key": "gastosTotal",
+          "label": "Costos y deducciones (COP)"
+        },
+        {
+          "key": "ivaRepercutidoEmp",
+          "label": "IVA generado (COP)"
+        },
+        {
+          "key": "ivaSoportadoEmp",
+          "label": "IVA descontable (COP)"
+        }
+      ],
+      "advanced": [
+        {
+          "key": "basesNegAnter",
+          "label": "Pérdidas fiscales acumuladas (COP)"
+        },
+        {
+          "key": "pagosFracc202",
+          "label": "Anticipos de renta (COP)"
+        }
+      ]
+    }
+  },
+  "clientForm": {
+    "taxIdLabel": "NIT / Cédula",
+    "taxIdCompanyLabel": "NIT",
+    "taxIdPlaceholder": "ej. 900.123.456-7",
+    "regionLabel": "Departamento",
+    "regions": [
+      "Amazonas",
+      "Antioquia",
+      "Arauca",
+      "Atlántico",
+      "Bogotá D.C.",
+      "Bolívar",
+      "Boyacá",
+      "Caldas",
+      "Caquetá",
+      "Casanare",
+      "Cauca",
+      "Cesar",
+      "Chocó",
+      "Córdoba",
+      "Cundinamarca",
+      "Guainía",
+      "Guaviare",
+      "Huila",
+      "La Guajira",
+      "Magdalena",
+      "Meta",
+      "Nariño",
+      "Norte de Santander",
+      "Putumayo",
+      "Quindío",
+      "Risaralda",
+      "San Andrés y Providencia",
+      "Santander",
+      "Sucre",
+      "Tolima",
+      "Valle del Cauca",
+      "Vaupés",
+      "Vichada"
+    ]
+  }
+}

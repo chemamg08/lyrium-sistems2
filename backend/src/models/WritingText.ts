@@ -11,7 +11,7 @@ export interface IWritingText {
 
 const writingTextSchema = new Schema<IWritingText>({
   _id: { type: String, required: true },
-  accountId: { type: String, required: true },
+  accountId: { type: String, required: true, index: true },
   title: { type: String, required: true },
   content: { type: String, default: '' },
   createdAt: { type: String, default: () => new Date().toISOString() },

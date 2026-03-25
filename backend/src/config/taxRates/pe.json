@@ -1,0 +1,165 @@
+{
+  "country": "Perú / Peru",
+  "code": "PE",
+  "year": 2026,
+  "currency": "PEN",
+  "incomeTax": {
+    "brackets": [
+      {
+        "from": 0,
+        "to": 24150,
+        "rate": 8
+      },
+      {
+        "from": 24150,
+        "to": 96600,
+        "rate": 14
+      },
+      {
+        "from": 96600,
+        "to": 193200,
+        "rate": 17
+      },
+      {
+        "from": 193200,
+        "to": 386400,
+        "rate": 20
+      },
+      {
+        "from": 386400,
+        "to": null,
+        "rate": 30
+      }
+    ],
+    "personalAllowance": 33600,
+    "notes": "7 UIT deduction. UIT = PEN 4,800. 5th category for employees, 4th for independent."
+  },
+  "corporateTax": {
+    "standard": 29.5,
+    "small": 10,
+    "smallThreshold": 1700
+  },
+  "vat": {
+    "standard": 18,
+    "reduced": 0,
+    "superReduced": 0
+  },
+  "socialSecurity": {
+    "employee": 13,
+    "employer": 9,
+    "selfEmployed": 13
+  },
+  "fields": {
+    "asalariado": {
+      "basic": [
+        {
+          "key": "salarioBruto",
+          "label": "Remuneración bruta anual (PEN)"
+        },
+        {
+          "key": "retencionesEmpresa",
+          "label": "Retenciones 5ta categoría (PEN)"
+        }
+      ],
+      "advanced": [
+        {
+          "key": "cotizacionesSS",
+          "label": "Aportes ONP/AFP (PEN)"
+        },
+        {
+          "key": "deduccionesAuto",
+          "label": "Gastos deducibles adicionales (PEN)"
+        }
+      ]
+    },
+    "autonomo": {
+      "basic": [
+        {
+          "key": "facturacionTotal",
+          "label": "Ingresos brutos 4ta categoría (PEN)"
+        },
+        {
+          "key": "gastosDeducibles",
+          "label": "Deducción 20% + 7 UIT (PEN)"
+        },
+        {
+          "key": "ivaRepercutido",
+          "label": "IGV cobrado (PEN)"
+        },
+        {
+          "key": "ivaSoportado",
+          "label": "IGV crédito fiscal (PEN)"
+        }
+      ],
+      "advanced": [
+        {
+          "key": "pagosFracc130",
+          "label": "Pagos a cuenta mensuales (PEN)"
+        }
+      ]
+    },
+    "empresa": {
+      "basic": [
+        {
+          "key": "ingresosTotal",
+          "label": "Ingresos netos (PEN)"
+        },
+        {
+          "key": "gastosTotal",
+          "label": "Gastos deducibles (PEN)"
+        },
+        {
+          "key": "ivaRepercutidoEmp",
+          "label": "IGV débito (PEN)"
+        },
+        {
+          "key": "ivaSoportadoEmp",
+          "label": "IGV crédito (PEN)"
+        }
+      ],
+      "advanced": [
+        {
+          "key": "basesNegAnter",
+          "label": "Pérdidas tributarias arrastrables (PEN)"
+        },
+        {
+          "key": "pagosFracc202",
+          "label": "Pagos a cuenta IR (PEN)"
+        }
+      ]
+    }
+  },
+  "clientForm": {
+    "taxIdLabel": "RUC / DNI",
+    "taxIdCompanyLabel": "RUC",
+    "taxIdPlaceholder": "ej. 20123456789",
+    "regionLabel": "Departamento",
+    "regions": [
+      "Amazonas",
+      "Áncash",
+      "Apurímac",
+      "Arequipa",
+      "Ayacucho",
+      "Cajamarca",
+      "Callao",
+      "Cusco",
+      "Huancavelica",
+      "Huánuco",
+      "Ica",
+      "Junín",
+      "La Libertad",
+      "Lambayeque",
+      "Lima",
+      "Loreto",
+      "Madre de Dios",
+      "Moquegua",
+      "Pasco",
+      "Piura",
+      "Puno",
+      "San Martín",
+      "Tacna",
+      "Tumbes",
+      "Ucayali"
+    ]
+  }
+}

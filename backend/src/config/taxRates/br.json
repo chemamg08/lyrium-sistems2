@@ -1,0 +1,175 @@
+{
+  "country": "Brasil / Brazil",
+  "code": "BR",
+  "year": 2026,
+  "currency": "BRL",
+  "incomeTax": {
+    "brackets": [
+      {
+        "from": 0,
+        "to": 26963.2,
+        "rate": 0
+      },
+      {
+        "from": 26963.2,
+        "to": 33919.8,
+        "rate": 7.5
+      },
+      {
+        "from": 33919.8,
+        "to": 45012.6,
+        "rate": 15
+      },
+      {
+        "from": 45012.6,
+        "to": 55976.16,
+        "rate": 22.5
+      },
+      {
+        "from": 55976.16,
+        "to": null,
+        "rate": 27.5
+      }
+    ],
+    "personalAllowance": 26963.2,
+    "notes": "IRPF. Monthly withholding by employer. Annual return (DIRPF) due April."
+  },
+  "corporateTax": {
+    "standard": 34,
+    "small": 34,
+    "smallThreshold": 0
+  },
+  "vat": {
+    "standard": 20,
+    "reduced": 10,
+    "superReduced": 0
+  },
+  "socialSecurity": {
+    "employee": 14,
+    "employer": 28.8,
+    "selfEmployed": 20
+  },
+  "fields": {
+    "asalariado": {
+      "basic": [
+        {
+          "key": "salarioBruto",
+          "label": "Salário bruto anual (BRL)"
+        },
+        {
+          "key": "retencionesEmpresa",
+          "label": "IRRF retido (BRL)"
+        }
+      ],
+      "advanced": [
+        {
+          "key": "cotizacionesSS",
+          "label": "Contribuição INSS (BRL)"
+        },
+        {
+          "key": "deduccionesAuto",
+          "label": "Deduções (saúde, educação, dependentes) (BRL)"
+        },
+        {
+          "key": "capitalMobiliario",
+          "label": "Rendimentos de aplicações financeiras (BRL)"
+        },
+        {
+          "key": "capitalInmobiliario",
+          "label": "Rendimentos de aluguéis (BRL)"
+        }
+      ]
+    },
+    "autonomo": {
+      "basic": [
+        {
+          "key": "facturacionTotal",
+          "label": "Receita bruta anual (BRL)"
+        },
+        {
+          "key": "gastosDeducibles",
+          "label": "Despesas dedutíveis (BRL)"
+        },
+        {
+          "key": "ivaRepercutido",
+          "label": "ICMS/ISS devido (BRL)"
+        },
+        {
+          "key": "ivaSoportado",
+          "label": "Créditos tributários (BRL)"
+        }
+      ],
+      "advanced": [
+        {
+          "key": "pagosFracc130",
+          "label": "Carnê-Leão pago (BRL)"
+        }
+      ]
+    },
+    "empresa": {
+      "basic": [
+        {
+          "key": "ingresosTotal",
+          "label": "Receita bruta (BRL)"
+        },
+        {
+          "key": "gastosTotal",
+          "label": "Custos e despesas (BRL)"
+        },
+        {
+          "key": "ivaRepercutidoEmp",
+          "label": "ICMS/PIS/COFINS devido (BRL)"
+        },
+        {
+          "key": "ivaSoportadoEmp",
+          "label": "Créditos tributários (BRL)"
+        }
+      ],
+      "advanced": [
+        {
+          "key": "basesNegAnter",
+          "label": "Prejuízos acumulados (BRL)"
+        },
+        {
+          "key": "pagosFracc202",
+          "label": "IRPJ/CSLL antecipados (BRL)"
+        }
+      ]
+    }
+  },
+  "clientForm": {
+    "taxIdLabel": "CPF",
+    "taxIdCompanyLabel": "CNPJ",
+    "taxIdPlaceholder": "ej. 123.456.789-00",
+    "regionLabel": "Estado",
+    "regions": [
+      "Acre",
+      "Alagoas",
+      "Amapá",
+      "Amazonas",
+      "Bahia",
+      "Ceará",
+      "Distrito Federal",
+      "Espírito Santo",
+      "Goiás",
+      "Maranhão",
+      "Mato Grosso",
+      "Mato Grosso do Sul",
+      "Minas Gerais",
+      "Pará",
+      "Paraíba",
+      "Paraná",
+      "Pernambuco",
+      "Piauí",
+      "Rio de Janeiro",
+      "Rio Grande do Norte",
+      "Rio Grande do Sul",
+      "Rondônia",
+      "Roraima",
+      "Santa Catarina",
+      "São Paulo",
+      "Sergipe",
+      "Tocantins"
+    ]
+  }
+}

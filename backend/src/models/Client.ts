@@ -5,7 +5,17 @@ export interface IClientFile {
   name: string;
   date: string;
   filePath: string;
+  fileSize?: number;
   extractedText?: string;
+  signatureRequestId?: string;
+  signedFilePath?: string;
+}
+
+export interface ITimerEntry {
+  id: string;
+  duration: number;
+  date: string;
+  time: string;
 }
 
 export interface IClient {
@@ -22,6 +32,8 @@ export interface IClient {
   fiscalInfo: any;
   autoCreated: boolean;
   assignedSubaccountId: string;
+  notes: string;
+  timerEntries: ITimerEntry[];
 }
 
 const clientFileSchema = new Schema({
@@ -29,7 +41,17 @@ const clientFileSchema = new Schema({
   name: String,
   date: String,
   filePath: String,
+  fileSize: { type: Number, default: 0 },
   extractedText: String,
+  signatureRequestId: String,
+  signedFilePath: { type: String, default: '' },
+}, { _id: false });
+
+const timerEntrySchema = new Schema({
+  id: String,
+  duration: Number,
+  date: String,
+  time: String,
 }, { _id: false });
 
 const clientSchema = new Schema<IClient>({
@@ -41,11 +63,13 @@ const clientSchema = new Schema<IClient>({
   status: { type: String, default: 'abierto' },
   summary: { type: String, default: '' },
   files: { type: [clientFileSchema], default: [] },
-  accountId: { type: String, required: true },
+  accountId: { type: String, required: true, index: true },
   clientType: { type: String, default: 'particular' },
   fiscalInfo: { type: Schema.Types.Mixed, default: {} },
   autoCreated: { type: Boolean, default: false },
   assignedSubaccountId: { type: String, default: null },
+  notes: { type: String, default: '' },
+  timerEntries: { type: [timerEntrySchema], default: [] },
 }, { _id: false, versionKey: false });
 
 clientSchema.set('toJSON', {

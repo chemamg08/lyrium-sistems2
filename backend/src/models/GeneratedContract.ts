@@ -12,7 +12,7 @@ export interface IGeneratedContract {
 
 const generatedContractSchema = new Schema<IGeneratedContract>({
   _id: { type: String, required: true },
-  chatId: { type: String, required: true },
+  chatId: { type: String, required: true, index: true },
   contractBaseId: { type: String, default: '' },
   fileName: { type: String, required: true },
   filePath: { type: String, required: true },

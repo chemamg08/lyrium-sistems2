@@ -1,5 +1,5 @@
 import { useState, useRef, useEffect } from "react";
-import { Send, Paperclip, Loader2, X, FileText, Trash2, StopCircle } from "lucide-react";
+import { Send, Paperclip, Loader2, X, FileText, Trash2, StopCircle, Brain, FolderOpen } from "lucide-react";
 import ReactMarkdown from "react-markdown";
 import { useTranslation } from "react-i18next";
 import { useToast } from "@/components/ui/use-toast";
@@ -40,7 +40,7 @@ interface StagedUploadFile {
   size: number;
 }
 
-const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:3000/api';
+const API_URL = import.meta.env.VITE_API_URL;
 
 const DocumentSummariesChatInterface = ({
   existingChatId,
@@ -58,10 +58,23 @@ const DocumentSummariesChatInterface = ({
   const [isUploading, setIsUploading] = useState(false);
   const [isInitializing, setIsInitializing] = useState(true);
   const [isDragging, setIsDragging] = useState(false);
+  const [ragEnabled, setRagEnabled] = useState(false);
+  const [hasImproveAI, setHasImproveAI] = useState(false);
   const [pendingJobId, setPendingJobId] = useState<string | null>(null);
+  const [isPollingForResponse, setIsPollingForResponse] = useState(false);
   const endRef = useRef<HTMLDivElement>(null);
   const fileRef = useRef<HTMLInputElement>(null);
+  const chatIdRef = useRef<string | null>(null);
+  const streamPollingRef = useRef<ReturnType<typeof setInterval> | null>(null);
   const { streamingText, isStreaming, startStream, cancelStream } = useStreamingChat();
+
+  // Mantener ref sincronizado
+  useEffect(() => { chatIdRef.current = chatId; }, [chatId]);
+
+  // Limpiar polling al desmontar
+  useEffect(() => {
+    return () => { if (streamPollingRef.current) { clearInterval(streamPollingRef.current); streamPollingRef.current = null; } };
+  }, []);
 
   const getPendingJobKey = (id: string) => `summaryPendingJob_${id}`;
 
@@ -71,6 +84,16 @@ const DocumentSummariesChatInterface = ({
     } else {
       // No crear chat automáticamente, solo marcar como listo
       setIsInitializing(false);
+    }
+    const accId = sessionStorage.getItem('accountId');
+    if (accId) {
+      const cached = sessionStorage.getItem('hasImproveAI');
+      if (cached !== null) {
+        setHasImproveAI(cached === 'true');
+      } else {
+        authFetch(`${API_URL}/improve-ai/has-files?accountId=${accId}`)
+          .then(r => r.json()).then(d => { setHasImproveAI(d.hasFiles); sessionStorage.setItem('hasImproveAI', String(d.hasFiles)); }).catch(() => {});
+      }
     }
   }, [existingChatId]);
 
@@ -97,8 +120,38 @@ const DocumentSummariesChatInterface = ({
           setPendingJobId(savedJobId);
           setIsLoading(true);
         }
+
+        // Detectar si hay un stream SSE en curso (componente fue remontado)
+        const streamingFlag = sessionStorage.getItem(`streaming_summaries_${data.id}`);
+        if (streamingFlag) {
+          const expectedMsgCount = parseInt(streamingFlag, 10);
+          setIsPollingForResponse(true);
+          setIsLoading(true);
+          if (streamPollingRef.current) clearInterval(streamPollingRef.current);
+          streamPollingRef.current = setInterval(async () => {
+            try {
+              const res = await authFetch(`${API_URL}/summaries/chat/${data.id}`);
+              if (res.ok) {
+                const chatData = await res.json();
+                const msgs: Message[] = chatData.messages || [];
+                if (msgs.length > expectedMsgCount) {
+                  setMessages(msgs);
+                  setUploadedFiles(chatData.uploadedFiles || []);
+                  setIsPollingForResponse(false);
+                  setIsLoading(false);
+                  sessionStorage.removeItem(`streaming_summaries_${data.id}`);
+                  if (streamPollingRef.current) { clearInterval(streamPollingRef.current); streamPollingRef.current = null; }
+                  if (onMessagesChanged) onMessagesChanged();
+                }
+              }
+            } catch { /* ignore */ }
+          }, 2000);
+        }
       } else {
-        console.error("Error cargando chat");
+        // Chat not found (404) or access denied - clean up stale reference
+        sessionStorage.removeItem('currentSummaryChat');
+        if (onChatCreated) onChatCreated('');
+        setChatId(null);
         setIsInitializing(false);
       }
     } catch (error) {
@@ -384,13 +437,22 @@ const DocumentSummariesChatInterface = ({
 
       // Si hay mensaje de texto, enviarlo con streaming
       if (userMessage) {
+        // Marcar stream en curso
+        const currentMsgCount = messages.length + (userMessage ? 1 : 0);
+        sessionStorage.setItem(`streaming_summaries_${currentChatId}`, String(currentMsgCount));
+
         await startStream({
           endpoint: `/summaries/chat/${currentChatId}/message/stream`,
-          body: { content: userMessage },
+          body: { content: userMessage, ...(ragEnabled ? { ragEnabled: true } : {}) },
           onDone: (fullText) => {
+            // Limpiar flag de streaming
+            const doneChatId = chatIdRef.current;
+            if (doneChatId) sessionStorage.removeItem(`streaming_summaries_${doneChatId}`);
+
+            const content = ragEnabled ? `${fullText}\n<!-- rag-enhanced -->` : fullText;
             setMessages((prev) => [
               ...prev,
-              { id: `ai-${Date.now()}`, role: "assistant", content: fullText },
+              { id: `ai-${Date.now()}`, role: "assistant", content },
             ]);
             setIsLoading(false);
             if (isNewChat && onChatCreated) onChatCreated(currentChatId!);
@@ -512,20 +574,33 @@ const DocumentSummariesChatInterface = ({
             </div>
           </div>
         )}
-        {messages.map((msg) => (
+        {messages.map((msg) => {
+          const isRagEnhanced = msg.role === 'assistant' && msg.content.includes('<!-- rag-enhanced -->');
+          const displayContent = isRagEnhanced ? msg.content.replace(/\n?<!-- rag-enhanced -->/g, '') : msg.content;
+          return (
           <div
             key={msg.id}
             className={`flex ${msg.role === "user" ? "justify-end" : "justify-start"}`}
           >
             <div className="max-w-[85%] md:max-w-[70%]">
               <div
-                className={`rounded-lg px-4 py-3 text-sm leading-relaxed prose prose-sm dark:prose-invert prose-p:my-1 prose-ul:my-1 prose-ol:my-1 ${
+                className={`rounded-lg px-4 py-3 text-sm leading-relaxed ${
                   msg.role === "user"
                     ? "bg-chat-user text-chat-user-foreground"
-                    : "bg-chat-ai text-chat-ai-foreground"
+                    : "bg-chat-ai text-chat-ai-foreground prose prose-sm dark:prose-invert prose-p:my-1 prose-ul:my-1 prose-ol:my-1"
                 }`}
               >
-                <ReactMarkdown>{msg.content}</ReactMarkdown>
+                {msg.role === "assistant" ? (
+                  <ReactMarkdown>{displayContent}</ReactMarkdown>
+                ) : (
+                  msg.content
+                )}
+                {isRagEnhanced && (
+                  <div className="flex items-center justify-end gap-1 mt-2 pt-1.5 border-t border-border/30 not-prose">
+                    <FolderOpen className="h-3 w-3 text-primary/60" />
+                    <span className="text-[10px] text-muted-foreground">{t('improveAI.ragUsed')}</span>
+                  </div>
+                )}
               </div>
 
               {/* Mostrar archivos subidos en el mensaje */}
@@ -568,8 +643,9 @@ const DocumentSummariesChatInterface = ({
                 )}
             </div>
           </div>
-        ))}
-        {(isLoading || isUploading) && !isStreaming && (
+          );
+        })}
+        {(isLoading || isUploading || isPollingForResponse) && !isStreaming && (
           <div className="flex justify-start">
             <div className="bg-chat-ai text-chat-ai-foreground rounded-lg px-4 py-3">
               <Loader2 className="h-4 w-4 animate-spin" />
@@ -632,6 +708,15 @@ const DocumentSummariesChatInterface = ({
           >
             <Paperclip className="h-5 w-5" />
           </button>
+          {hasImproveAI && (
+            <button
+              onClick={() => setRagEnabled(!ragEnabled)}
+              className={`p-2 rounded-md transition-colors ${ragEnabled ? 'bg-primary/20 text-primary' : 'hover:bg-accent text-muted-foreground hover:text-foreground'}`}
+              title={t('improveAI.ragToggle')}
+            >
+              <Brain className="h-5 w-5" />
+            </button>
+          )}
           <textarea
             value={input}
             rows={1}

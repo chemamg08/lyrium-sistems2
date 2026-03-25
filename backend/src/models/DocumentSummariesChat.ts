@@ -49,7 +49,7 @@ const docSummaryMessageSchema = new Schema({
 
 const documentSummariesChatSchema = new Schema<IDocumentSummariesChat>({
   _id: { type: String, required: true },
-  accountId: { type: String, default: '' },
+  accountId: { type: String, default: '', index: true },
   createdBy: { type: String, default: '' },
   title: { type: String, required: true },
   date: { type: String, required: true },

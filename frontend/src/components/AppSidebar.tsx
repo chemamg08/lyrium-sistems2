@@ -3,6 +3,7 @@ import { useState, useEffect } from "react";
 import { useTranslation } from "react-i18next";
 import { useTheme } from "next-themes";
 import { useIsMobile } from "@/hooks/use-mobile";
+import { authFetch } from "@/lib/authFetch";
 import {
   LayoutDashboard,
   Users,
@@ -12,6 +13,7 @@ import {
   Shield,
   PenTool,
   Calculator,
+  ReceiptText,
   Scale,
   Zap,
   PanelLeftClose,
@@ -44,6 +46,7 @@ const AppSidebar = ({
   const { t } = useTranslation();
   const { theme, setTheme } = useTheme();
   const [isMainAccount, setIsMainAccount] = useState(true);
+  const [emailUnread, setEmailUnread] = useState(0);
 
   const navItems = [
     { to: "/", icon: LayoutDashboard, label: t('nav.dashboard') },
@@ -54,12 +57,32 @@ const AppSidebar = ({
     { to: "/defensa", icon: Shield, label: t('nav.defense') },
     { to: "/redaccion", icon: PenTool, label: t('nav.writing') },
     { to: "/fiscal", icon: Calculator, label: t('nav.fiscal') },
+    { to: "/tax-compliance", icon: ReceiptText, label: t('nav.taxCompliance'), beta: true },
     { to: "/automatizaciones", icon: Zap, label: t('nav.automations') },
   ];
 
   useEffect(() => {
     const userType = sessionStorage.getItem('userType');
     setIsMainAccount(userType !== 'subaccount');
+  }, []);
+
+  // Fetch unread email count for badge
+  useEffect(() => {
+    const fetchUnread = async () => {
+      const accId = sessionStorage.getItem('accountId');
+      if (!accId) return;
+      try {
+        const API = `${import.meta.env.VITE_API_URL}/automatizaciones`;
+        const res = await authFetch(`${API}/unread-count?accountId=${accId}`);
+        if (res.ok) {
+          const data = await res.json();
+          setEmailUnread(data.count || 0);
+        }
+      } catch { /* offline */ }
+    };
+    fetchUnread();
+    const interval = setInterval(fetchUnread, 30000);
+    return () => clearInterval(interval);
   }, []);
 
   const handleLogout = () => {
@@ -126,7 +149,17 @@ const AppSidebar = ({
                   }`}
                 >
                   <item.icon className="h-4 w-4 shrink-0" />
-                  {item.label}
+                  <span className="flex-1 flex items-center gap-2">
+                    <span>{item.label}</span>
+                    {item.beta ? (
+                      <span className="px-1.5 py-0.5 rounded-full text-[10px] font-semibold bg-amber-500/20 text-amber-700 dark:text-amber-300">
+                        {t('nav.beta')}
+                      </span>
+                    ) : null}
+                  </span>
+                  {item.to === '/automatizaciones' && emailUnread > 0 && (
+                    <span className="h-5 min-w-5 px-1 rounded-full bg-destructive text-destructive-foreground text-[10px] font-bold flex items-center justify-center">{emailUnread}</span>
+                  )}
                 </NavLink>
               );
             })}
@@ -213,8 +246,25 @@ const AppSidebar = ({
                   : "text-muted-foreground hover:bg-accent hover:text-accent-foreground"
               }`}
             >
-              <item.icon className="h-4 w-4 shrink-0" />
-              {!collapsed && item.label}
+              <div className="relative shrink-0">
+                <item.icon className="h-4 w-4" />
+                {collapsed && item.to === '/automatizaciones' && emailUnread > 0 && (
+                  <span className="absolute -top-1.5 -right-1.5 h-3.5 min-w-3.5 px-0.5 rounded-full bg-destructive text-destructive-foreground text-[8px] font-bold flex items-center justify-center">{emailUnread}</span>
+                )}
+              </div>
+              {!collapsed && (
+                <span className="flex-1 flex items-center gap-2">
+                  <span>{item.label}</span>
+                  {item.beta ? (
+                    <span className="px-1.5 py-0.5 rounded-full text-[10px] font-semibold bg-amber-500/20 text-amber-700 dark:text-amber-300">
+                      {t('nav.beta')}
+                    </span>
+                  ) : null}
+                </span>
+              )}
+              {!collapsed && item.to === '/automatizaciones' && emailUnread > 0 && (
+                <span className="h-5 min-w-5 px-1 rounded-full bg-destructive text-destructive-foreground text-[10px] font-bold flex items-center justify-center">{emailUnread}</span>
+              )}
             </NavLink>
           );
         })}

@@ -11,10 +11,10 @@ import {
 const router = Router();
 
 router.get('/', getAllWritingTexts);
+router.post('/review', reviewText);
 router.get('/:id', getWritingTextById);
 router.post('/', createWritingText);
 router.put('/:id', updateWritingText);
 router.delete('/:id', deleteWritingText);
-router.post('/review', reviewText);
 
 export default router;

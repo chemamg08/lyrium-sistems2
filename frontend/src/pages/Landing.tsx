@@ -24,6 +24,9 @@ import {
   ShieldCheck,
   KeyRound,
   Award,
+  PenTool,
+  Calendar,
+  Webhook,
 } from "lucide-react";
 import AppDemo from "@/components/AppDemo";
 
@@ -75,7 +78,7 @@ const Landing = () => {
     { value: "12h",    label: t('landing.stat1Label'), sub: t('landing.stat1Sub') },
     { value: "3×",     label: t('landing.stat2Label'), sub: t('landing.stat2Sub') },
     { value: "70%",    label: t('landing.stat3Label'), sub: t('landing.stat3Sub') },
-    { value: "1 case", label: t('landing.stat4Label'), sub: t('landing.stat4Sub') },
+    { value: t('landing.stat4Value'), label: t('landing.stat4Label'), sub: t('landing.stat4Sub') },
   ];
 
   const problems = [
@@ -468,6 +471,33 @@ const Landing = () => {
               </FadeUp>
             ))}
           </div>
+
+          {/* INTEGRATIONS — Signature & Calendar */}
+          <div className="mt-16">
+            <FadeUp>
+              <p className="text-xs uppercase tracking-widest text-white/30 mb-3">{t('landing.integrationsLabel')}</p>
+              <h3 className="text-2xl sm:text-3xl font-bold tracking-tight mb-10">
+                {t('landing.integrationsH2')}
+              </h3>
+            </FadeUp>
+            <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+              {[
+                { icon: PenTool, title: t('landing.integSignTitle'), description: t('landing.integSignDesc') },
+                { icon: Calendar, title: t('landing.integCalTitle'), description: t('landing.integCalDesc') },
+                { icon: Webhook, title: t('landing.integZapierTitle'), description: t('landing.integZapierDesc') },
+              ].map((item, i) => (
+                <FadeUp key={item.title} delay={i * 0.1} className="h-full">
+                  <div className="relative group rounded-xl border border-white/8 bg-white/[0.02] p-8 transition-all duration-300 hover:bg-white/[0.05] hover:border-white/15 cursor-default h-full">
+                    <div className="mb-5 inline-flex h-12 w-12 items-center justify-center rounded-lg border border-white/10 bg-white/5">
+                      <item.icon className="h-6 w-6 text-white/70" />
+                    </div>
+                    <h3 className="mb-2 text-base font-semibold text-white">{item.title}</h3>
+                    <p className="text-sm text-white/40 leading-relaxed">{item.description}</p>
+                  </div>
+                </FadeUp>
+              ))}
+            </div>
+          </div>
         </div>
       </section>
 
@@ -490,7 +520,10 @@ const Landing = () => {
           </FadeUp>
 
           <FadeUp delay={0.05}>
-            <div className="hidden md:block">
+            <div className="hidden md:block relative">
+              <span className="absolute top-3 right-3 z-20 bg-white/10 backdrop-blur-sm border border-white/20 text-white/60 text-[10px] font-bold uppercase tracking-widest px-3 py-1 rounded-full">
+                DEMO
+              </span>
               <AppDemo />
             </div>
             <div className="md:hidden flex flex-col items-center justify-center py-16 rounded-2xl border border-white/10 bg-white/[0.02]">

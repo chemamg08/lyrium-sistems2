@@ -7,8 +7,10 @@ import { Account } from './models/Account.js';
 // Cargar variables de entorno
 dotenv.config();
 
-// Configuración de Stripe (usar claves de test inicialmente)
-const stripe = new Stripe(process.env.STRIPE_SECRET_KEY || 'sk_test_YOUR_SECRET_KEY', {
+if (!process.env.STRIPE_SECRET_KEY) {
+  throw new Error('STRIPE_SECRET_KEY environment variable is required');
+}
+const stripe = new Stripe(process.env.STRIPE_SECRET_KEY, {
   apiVersion: '2026-02-25.clover',
 });
 
@@ -171,7 +173,6 @@ export const createPaymentIntent = async (req: Request, res: Response) => {
         }
       } catch (error: any) {
         if (error?.code === 'resource_missing' || error?.statusCode === 404) {
-          console.log(`Customer ${customerId} no existe en Stripe, creando uno nuevo...`);
           const newCustomer = await stripe.customers.create({
             email: userEmail,
             metadata: { accountId },
@@ -203,24 +204,26 @@ export const createPaymentIntent = async (req: Request, res: Response) => {
           subscription.stripeSubscriptionId = null;
           await subscription.save();
         } catch (cancelErr: any) {
-          console.log('Error cancelando suscripción anterior:', cancelErr?.message);
         }
       }
 
       // Calcular fecha de fin del trial (desde la suscripción actual)
       // Solo dar trial si el usuario está actualmente en trial con fecha futura
+      // y su periodo actual no ha sido expirado manualmente (ej: por admin)
       let trialEndTimestamp: number | undefined;
       const now = Math.floor(Date.now() / 1000);
       if (subscription && subscription.status === 'trial' && subscription.trialEndDate) {
         const trialEndDate = new Date(subscription.trialEndDate);
         const ts = Math.floor(trialEndDate.getTime() / 1000);
-        // Solo usar trial_end si está en el futuro
-        if (ts > now) {
+        // Verificar que el periodo actual no haya expirado (admin puede haberlo puesto en el pasado)
+        const periodStillValid = !subscription.currentPeriodEnd || new Date(subscription.currentPeriodEnd) > new Date();
+        // Solo usar trial_end si está en el futuro Y el periodo sigue vigente
+        if (ts > now && periodStillValid) {
           trialEndTimestamp = ts;
         }
       }
-      // Si el usuario ya consumió su trial, trialEndTimestamp queda undefined
-      // y Stripe cobrará de inmediato (sin periodo de prueba)
+      // Si el usuario ya consumió su trial o fue expirado por admin,
+      // trialEndTimestamp queda undefined y Stripe cobrará de inmediato
 
       // Crear suscripción con trial - Stripe cobrará automáticamente al finalizar
       const stripeSubscription = await stripe.subscriptions.create({
@@ -419,7 +422,6 @@ export const confirmPayment = async (req: Request, res: Response) => {
               customer: subscription.stripeCustomerId!,
             });
           } catch (attachError: any) {
-            console.log('PM attach skip:', attachError?.message);
           }
           await stripe.subscriptions.update(subscriptionId, {
             default_payment_method: paymentMethodId,
@@ -475,6 +477,20 @@ export const confirmPayment = async (req: Request, res: Response) => {
       }
     } else {
       return res.status(400).json({ error: 'Se requiere paymentIntentId o setupIntentId' });
+    }
+
+    // Sync Stripe subscription billing cycle with our calculated periodEnd
+    // (which may include remaining days from a previous active period)
+    if (subscriptionId) {
+      try {
+        const periodEndTimestamp = Math.floor(periodEnd.getTime() / 1000);
+        await stripe.subscriptions.update(subscriptionId, {
+          trial_end: periodEndTimestamp,
+          proration_behavior: 'none',
+        });
+      } catch (stripeErr: any) {
+        console.error('Error syncing Stripe billing cycle:', stripeErr?.message);
+      }
     }
 
     subscription.plan = plan as 'starter' | 'advanced';
@@ -618,11 +634,11 @@ export const handleWebhook = async (req: Request, res: Response) => {
         const invoice = event.data.object as Stripe.Invoice;
         const customerId = invoice.customer as string;
 
-        // Solo procesar facturas de renovación, no las prorrateadas de changePlan
-        // Las facturas prorrateadas tienen billing_reason 'subscription_update'
+        // Solo procesar facturas de renovación real (subscription_cycle)
+        // Ignorar: subscription_update (proration de changePlan) y subscription_create (factura $0 del trial)
+        // confirmPayment ya maneja las fechas correctas para pagos iniciales y cambios de plan
         const billingReason = (invoice as any).billing_reason;
-        if (billingReason === 'subscription_update') {
-          // changePlan ya calculó la fecha correcta, no sobreescribir
+        if (billingReason === 'subscription_update' || billingReason === 'subscription_create') {
           break;
         }
 
@@ -657,11 +673,39 @@ export const handleWebhook = async (req: Request, res: Response) => {
           if (periodEnd <= new Date()) {
             subscription.status = 'canceled';
           }
-          // Siempre limpiar autoRenew y stripeSubscriptionId
-          subscription.autoRenew = false;
-          subscription.stripeSubscriptionId = null;
+          // Solo limpiar stripeSubscriptionId si todavía coincide con el que se borró
+          // (evita race condition: createPaymentIntent cancela sub antigua, crea nueva,
+          //  confirmPayment guarda nuevo ID, y luego llega este webhook de la antigua)
+          if (subscription.stripeSubscriptionId === stripeSubscription.id) {
+            subscription.autoRenew = false;
+            subscription.stripeSubscriptionId = null;
+          }
           subscription.updatedAt = new Date().toISOString();
           await subscription.save();
+        }
+        break;
+      }
+
+      case 'invoice.payment_failed': {
+        const failedInvoice = event.data.object as Stripe.Invoice;
+        const failedCustomerId = failedInvoice.customer as string;
+        const failedBillingReason = (failedInvoice as any).billing_reason;
+
+        const subscription = await Subscription.findOne({ stripeCustomerId: failedCustomerId });
+        if (subscription) {
+          // If proration invoice from changePlan failed, revert plan in MongoDB
+          if (failedBillingReason === 'subscription_update') {
+            console.error(`Proration payment failed for customer ${failedCustomerId}. Invoice: ${failedInvoice.id}`);
+            // Mark status as past_due so the user knows something is wrong
+            subscription.status = 'past_due';
+            subscription.updatedAt = new Date().toISOString();
+            await subscription.save();
+          } else {
+            // Regular renewal payment failed
+            subscription.status = 'past_due';
+            subscription.updatedAt = new Date().toISOString();
+            await subscription.save();
+          }
         }
         break;
       }

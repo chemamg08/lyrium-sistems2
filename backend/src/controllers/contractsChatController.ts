@@ -13,11 +13,14 @@ import { getAccountSpecialties, buildSpecialtiesSystemPrompt } from '../services
 import { getLegalContextForAccount, buildCountryLegalSystemPrompt, getAccountCountry, getCountryName } from '../services/legalKnowledgeService.js';
 import { searchWeb } from '../services/tavilyService.js';
 import { hasLegalIntent } from '../services/legalIntentService.js';
-import { streamAIResponse } from '../services/aiService.js';
+import { streamAIResponse, AI_MODEL } from '../services/aiService.js';
 import { ContractChat } from '../models/ContractChat.js';
 import { GeneratedContract } from '../models/GeneratedContract.js';
 import { Contract } from '../models/Contract.js';
 import { Stat } from '../models/Stat.js';
+import { sanitizeFilename } from '../utils/sanitizeFilename.js';
+import { verifyOwnership } from '../middleware/auth.js';
+import { dispatchWebhook } from '../services/webhookService.js';
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
@@ -67,11 +70,23 @@ const enrichChatData = (chat: any): any => {
 const COUNTRY_TIMEZONE: Record<string, string> = {
   ES: 'Europe/Madrid', MX: 'America/Mexico_City', AR: 'America/Argentina/Buenos_Aires',
   CO: 'America/Bogota', PE: 'America/Lima', CL: 'America/Santiago',
-  VE: 'America/Caracas', EC: 'America/Guayaquil', BO: 'America/La_Paz',
+  EC: 'America/Guayaquil', BO: 'America/La_Paz',
   PY: 'America/Asuncion', UY: 'America/Montevideo', US: 'America/New_York',
   GB: 'Europe/London', FR: 'Europe/Paris', DE: 'Europe/Berlin',
   IT: 'Europe/Rome', PT: 'Europe/Lisbon', BR: 'America/Sao_Paulo',
-  AU: 'Australia/Sydney', CA: 'America/Toronto', MX2: 'America/Mexico_City',
+  AU: 'Australia/Sydney', CA: 'America/Toronto',
+  PA: 'America/Panama', DO: 'America/Santo_Domingo',
+  CR: 'America/Costa_Rica', GT: 'America/Guatemala', HN: 'America/Tegucigalpa',
+  SV: 'America/El_Salvador', NI: 'America/Managua',
+  MC: 'Europe/Monaco', LI: 'Europe/Vaduz', NZ: 'Pacific/Auckland', SG: 'Asia/Singapore',
+  AT: 'Europe/Vienna', CH: 'Europe/Zurich', BE: 'Europe/Brussels',
+  NL: 'Europe/Amsterdam', PL: 'Europe/Warsaw', SE: 'Europe/Stockholm',
+  NO: 'Europe/Oslo', DK: 'Europe/Copenhagen', FI: 'Europe/Helsinki',
+  GR: 'Europe/Athens', CZ: 'Europe/Prague', HU: 'Europe/Budapest',
+  RO: 'Europe/Bucharest', BG: 'Europe/Sofia', HR: 'Europe/Zagreb',
+  SK: 'Europe/Bratislava', SI: 'Europe/Ljubljana', LT: 'Europe/Vilnius',
+  LV: 'Europe/Riga', EE: 'Europe/Tallinn', IE: 'Europe/Dublin',
+  LU: 'Europe/Luxembourg', CY: 'Asia/Nicosia', MT: 'Europe/Malta',
 };
 
 function getDateForCountry(countryCode: string): string {
@@ -183,7 +198,9 @@ NO añadas NINGÚN comentario, pregunta ni texto después de [/FIN_CONTRATO].
   - Nombres de las partes cuando se definen (ej: **ARRENDADOR**, **ARRENDATARIO**)
   - Cualquier encabezado o título dentro del contrato
 - Usa # para el título principal del contrato (ej: # CONTRATO DE ARRENDAMIENTO)
-- Usa ## para secciones mayores si las hay (ej: ## REUNIDOS, ## MANIFIESTAN)`;
+- Usa ## para secciones mayores si las hay (ej: ## REUNIDOS, ## MANIFIESTAN)
+
+IDIOMA: Responde SIEMPRE en el mismo idioma en que el usuario te escriba. Si el contrato debe redactarse en un idioma específico, usa ese idioma para el contrato.`;
 };
 
 
@@ -202,6 +219,7 @@ export const createContractChat = async (req: Request, res: Response) => {
     if (!base) {
       return res.status(404).json({ error: 'Contrato base no encontrado' });
     }
+    if (!verifyOwnership(req, base.accountId)) return res.status(403).json({ error: 'Acceso denegado' });
 
     const now = new Date();
     const formattedDate = now.toLocaleString('es-ES', {
@@ -252,6 +270,7 @@ export const getContractChat = async (req: Request, res: Response) => {
     if (!chat) {
       return res.status(404).json({ error: 'Chat no encontrado' });
     }
+    if (!verifyOwnership(req, chat.accountId)) return res.status(403).json({ error: 'Acceso denegado' });
 
     res.json(chat.toJSON());
   } catch (error) {
@@ -268,6 +287,7 @@ export const getAllContractChats = async (req: Request, res: Response) => {
     if (!accountId) {
       return res.status(400).json({ error: 'accountId es requerido' });
     }
+    if (!verifyOwnership(req, accountId as string)) return res.status(403).json({ error: 'Acceso denegado' });
     
     const contracts = await Contract.find({ accountId: accountId as string });
     const accountContractIds = contracts.map(c => c._id);
@@ -292,6 +312,10 @@ export const getChatsByContract = async (req: Request, res: Response) => {
   try {
     const { contractBaseId } = req.params;
     
+    const contract = await Contract.findById(contractBaseId);
+    if (!contract) return res.status(404).json({ error: 'Contrato no encontrado' });
+    if (!verifyOwnership(req, contract.accountId)) return res.status(403).json({ error: 'Acceso denegado' });
+
     const contractChats = await ContractChat.find({ contractBaseId }).sort({ lastModified: -1, date: -1 });
     
     res.json(contractChats.map(c => c.toJSON()));
@@ -316,6 +340,7 @@ export const updateChatTitle = async (req: Request, res: Response) => {
     if (!chat) {
       return res.status(404).json({ error: 'Chat no encontrado' });
     }
+    if (!verifyOwnership(req, chat.accountId)) return res.status(403).json({ error: 'Acceso denegado' });
     
     chat.title = title.trim();
     enrichChatData(chat);
@@ -337,6 +362,7 @@ export const deleteContractChat = async (req: Request, res: Response) => {
     if (!chat) {
       return res.status(404).json({ error: 'Chat no encontrado' });
     }
+    if (!verifyOwnership(req, chat.accountId)) return res.status(403).json({ error: 'Acceso denegado' });
     
     await ContractChat.findByIdAndDelete(chatId);
 
@@ -373,6 +399,10 @@ export const deleteEmptyContractChats = async (req: Request, res: Response) => {
       return res.status(400).json({ error: 'contractBaseId es requerido' });
     }
 
+    const contract = await Contract.findById(contractBaseId);
+    if (!contract) return res.status(404).json({ error: 'Contrato no encontrado' });
+    if (!verifyOwnership(req, contract.accountId)) return res.status(403).json({ error: 'Acceso denegado' });
+
     const result = await ContractChat.deleteMany({ contractBaseId, messages: { $size: 0 } });
     const deletedCount = result.deletedCount || 0;
 
@@ -392,6 +422,7 @@ export const duplicateContractChat = async (req: Request, res: Response) => {
     if (!chat) {
       return res.status(404).json({ error: 'Chat no encontrado' });
     }
+    if (!verifyOwnership(req, chat.accountId)) return res.status(403).json({ error: 'Acceso denegado' });
     
     const now = new Date();
     const formattedDate = now.toLocaleString('es-ES', {
@@ -406,6 +437,8 @@ export const duplicateContractChat = async (req: Request, res: Response) => {
     const duplicatedChat = await ContractChat.create({
       _id: Date.now().toString(),
       contractBaseId: chat.contractBaseId,
+      accountId: chat.accountId,
+      createdBy: chat.createdBy,
       title: `${chat.title} (copia)`,
       date: now.toISOString().split('T')[0],
       messages: [...chat.messages],
@@ -435,6 +468,7 @@ export const sendContractMessage = async (req: Request, res: Response) => {
     if (!chat) {
       return res.status(404).json({ error: 'Chat no encontrado' });
     }
+    if (!verifyOwnership(req, chat.accountId)) return res.status(403).json({ error: 'Acceso denegado' });
 
     // Determinar si es chat temporal o con contrato base
     const isTemporary = !chat.contractBaseId && chat.temporaryContractFile;
@@ -479,16 +513,17 @@ export const sendContractMessage = async (req: Request, res: Response) => {
 
         const freeChatCountry = chat.accountId ? await getAccountCountry(chat.accountId) : 'ES';
         const freeChatFecha = getDateForCountry(freeChatCountry);
+        const countryLine = `\nJurisdicción del usuario: ${getCountryName(freeChatCountry)}. Toda referencia a normativa, legislación o jurisdicción debe corresponder a ${getCountryName(freeChatCountry)}.`;
         const freeAiMessages: any[] = [
           {
             role: 'system',
-            content: buildContractSystemPrompt(freeChatFecha) + '\n\nEstás en modo consulta libre / redacción desde cero. No hay contrato base cargado. Si el usuario pide redactar un contrato, aplica el MODO B del flujo. Si es una consulta legal general, responde de forma precisa y profesional.'
+            content: buildContractSystemPrompt(freeChatFecha) + countryLine + '\n\nEstás en modo consulta libre / redacción desde cero. No hay contrato base cargado. Si el usuario pide redactar un contrato, aplica el MODO B del flujo. Si es una consulta legal general, responde de forma precisa y profesional.'
           },
           ...chat.messages.map((m: any) => ({ role: m.role === 'system' ? 'assistant' : m.role, content: m.content }))
         ];
 
         const freeResponse = await getClient().chat.completions.create({
-          model: 'Qwen/Qwen3-235B-A22B-Instruct-2507',
+          model: AI_MODEL,
           messages: freeAiMessages,
           max_tokens: 1500,
           temperature: 0.3
@@ -573,10 +608,12 @@ El abogado quiere ${isTemporary ? 'analizar y modificar' : 'modificar'} este con
 
     // Preparar mensajes para IA
     const fecha = getDateForCountry(accountCountry);
+    const alwaysCountryLine = `\nJurisdicción del usuario: ${getCountryName(accountCountry)}. Toda referencia a normativa, legislación o jurisdicción debe corresponder a ${getCountryName(accountCountry)}.`;
     const aiMessages: any[] = [
       {
         role: 'system',
         content: buildContractSystemPrompt(fecha) +
+          alwaysCountryLine +
           (specialtiesPrompt ? `\n\n${specialtiesPrompt}` : '') +
           (legalCountryPrompt ? `\n\n${legalCountryPrompt}` : '') +
           (webContext ? `\n\n${webContext}` : '') +
@@ -591,7 +628,7 @@ El abogado quiere ${isTemporary ? 'analizar y modificar' : 'modificar'} este con
 
     // Llamar a IA
     const response = await getClient().chat.completions.create({
-      model: 'Qwen/Qwen3-235B-A22B-Instruct-2507',
+      model: AI_MODEL,
       messages: aiMessages,
       max_tokens: 4000, // Aumentado para contrato completo
       temperature: 0.3
@@ -616,7 +653,6 @@ El abogado quiere ${isTemporary ? 'analizar y modificar' : 'modificar'} este con
           throw new Error('Texto del contrato generado es insuficiente');
         }
 
-        console.log('Generando PDF con texto modificado...');
 
         // Generar contrato desde el texto
         const fileName = `contrato_${Date.now()}.pdf`;
@@ -635,6 +671,19 @@ El abogado quiere ${isTemporary ? 'analizar y modificar' : 'modificar'} este con
           variables: {},
           createdAt: new Date().toISOString()
         });
+
+        // Incrementar contador de contratos creados
+        try {
+          const statAccountId = chat.accountId || contractBase?.accountId;
+          if (statAccountId) {
+            await Stat.findByIdAndUpdate(statAccountId, { $inc: { contractsCreated: 1 } }, { upsert: true });
+          }
+        } catch (e) { console.error('Error al actualizar estadísticas:', e); }
+
+        const webhookAccountId = chat.accountId || contractBase?.accountId;
+        if (webhookAccountId) {
+          dispatchWebhook(webhookAccountId, 'contract_generated', { contractId: newContract._id, fileName, chatId: chat._id }).catch(() => {});
+        }
 
         // Mensaje con metadata de contrato generado
         const responseWithoutCommand = parts[0]?.trim() || 'Perfecto, he generado el contrato con los cambios solicitados.';
@@ -694,6 +743,7 @@ export const streamContractMessage = async (req: Request, res: Response) => {
 
     const chat = await ContractChat.findById(chatId);
     if (!chat) return res.status(404).json({ error: 'Chat no encontrado' });
+    if (!verifyOwnership(req, chat.accountId)) return res.status(403).json({ error: 'Acceso denegado' });
 
     const isTemporary = !chat.contractBaseId && chat.temporaryContractFile;
     let structure: any = null;
@@ -745,18 +795,33 @@ export const streamContractMessage = async (req: Request, res: Response) => {
       if (webResult) webContext = webResult;
     }
 
+    // RAG: Search improve AI files if ragEnabled
+    let ragContext = '';
+    let ragFound = false;
+    if (req.body.ragEnabled && effectiveAccountId) {
+      const { searchImproveAIContext } = await import('../services/ragService.js');
+      const ragResult = await searchImproveAIContext(effectiveAccountId, chat.messages.map((m: any) => ({ role: m.role, content: m.content })));
+      if (ragResult.found) {
+        ragContext = ragResult.context;
+        ragFound = true;
+      }
+    }
+
     const streamFecha = getDateForCountry(accountCountry);
+    const streamCountryLine = `\nJurisdicción del usuario: ${getCountryName(accountCountry)}. Toda referencia a normativa, legislación o jurisdicción debe corresponder a ${getCountryName(accountCountry)}.`;
     const systemMessages = [{
       role: 'system',
       content: buildContractSystemPrompt(streamFecha) +
+        streamCountryLine +
         (specialtiesPrompt ? `\n\n${specialtiesPrompt}` : '') +
         (legalCountryPrompt ? `\n\n${legalCountryPrompt}` : '') +
         (webContext ? `\n\n${webContext}` : '') +
-        (contractContext ? `\n\n${contractContext}` : '')
+        (contractContext ? `\n\n${contractContext}` : '') +
+        (ragContext ? `\n\n${ragContext}` : '')
     }];
     const chatMessages = chat.messages.map((m: any) => ({ role: m.role === 'system' ? 'assistant' : m.role, content: m.content }));
 
-    const fullText = await streamAIResponse(res, systemMessages, chatMessages, 4000, 0.3);
+    const fullText = await streamAIResponse(res, systemMessages, chatMessages, 4000, 0.3, ragFound ? { ragEnhanced: true } : undefined);
 
     // Detectar si la IA quiere generar el contrato completo
     const generateMatch = fullText.includes('[GENERAR_CONTRATO_COMPLETO]');
@@ -786,6 +851,19 @@ export const streamContractMessage = async (req: Request, res: Response) => {
           createdAt: new Date().toISOString()
         });
 
+        // Incrementar contador de contratos creados
+        try {
+          const statAccountId = chat.accountId || contractBase?.accountId;
+          if (statAccountId) {
+            await Stat.findByIdAndUpdate(statAccountId, { $inc: { contractsCreated: 1 } }, { upsert: true });
+          }
+        } catch (e) { console.error('Error al actualizar estadísticas:', e); }
+
+        const webhookAccountId2 = chat.accountId || contractBase?.accountId;
+        if (webhookAccountId2) {
+          dispatchWebhook(webhookAccountId2, 'contract_generated', { contractId: newContract._id, fileName, chatId: chat._id }).catch(() => {});
+        }
+
         const responseWithoutCommand = parts[0]?.trim() || 'Perfecto, he generado el contrato con los cambios solicitados.';
         assistantMessage = {
           id: (Date.now() + 1).toString(),
@@ -807,7 +885,8 @@ export const streamContractMessage = async (req: Request, res: Response) => {
         };
       }
     } else {
-      assistantMessage = { id: (Date.now() + 1).toString(), role: 'assistant', content: fullText, metadata: { type: 'text' } };
+      const contractAssistantContent = ragFound ? `${fullText}\n<!-- rag-enhanced -->` : fullText;
+      assistantMessage = { id: (Date.now() + 1).toString(), role: 'assistant', content: contractAssistantContent, metadata: { type: 'text' } };
     }
 
     chat.messages.push(assistantMessage);
@@ -830,18 +909,8 @@ export const downloadGeneratedContract = async (req: Request, res: Response) => 
       return res.status(404).json({ error: 'Contrato generado no encontrado' });
     }
 
-    // Obtener accountId del contrato base para actualizar estadísticas
-    try {
-      const contractBase = await Contract.findById(contract.contractBaseId);
-      
-      if (contractBase && contractBase.accountId) {
-        // Incrementar contador de contratos descargados
-        await Stat.findByIdAndUpdate(contractBase.accountId, { $inc: { contratosGenerados: 1 }, $set: { updatedAt: new Date().toISOString() } }, { upsert: true });
-      }
-    } catch (error) {
-      console.error('Error al actualizar estadísticas:', error);
-      // No falla la descarga si hay error en estadísticas
-    }
+    const genChat = await ContractChat.findById(contract.chatId);
+    if (!genChat || !verifyOwnership(req, genChat.accountId)) return res.status(403).json({ error: 'Acceso denegado' });
 
     res.download(contract.filePath, contract.fileName);
   } catch (error) {
@@ -858,6 +927,7 @@ export const createTemporaryChat = async (req: Request, res: Response) => {
     if (!accountId) {
       return res.status(400).json({ error: 'accountId es requerido' });
     }
+    if (!verifyOwnership(req, accountId as string)) return res.status(403).json({ error: 'Acceso denegado' });
 
     const now = new Date();
     const formattedDate = now.toLocaleString('es-ES', {
@@ -901,16 +971,17 @@ export const uploadTemporaryContract = async (req: Request, res: Response) => {
     if (!chat) {
       return res.status(404).json({ error: 'Chat no encontrado' });
     }
+    if (!verifyOwnership(req, chat.accountId)) return res.status(403).json({ error: 'Acceso denegado' });
 
     // Guardar información del archivo temporal
     chat.temporaryContractFile = {
-      fileName: req.file.originalname,
+      fileName: sanitizeFilename(req.file.originalname),
       filePath: req.file.path
     };
 
     // Analizar el PDF
     try {
-      await analyzeContractPdf(chatId, req.file.path, req.file.originalname);
+      await analyzeContractPdf(chatId, req.file.path, sanitizeFilename(req.file.originalname));
       const structure = await loadContractStructure(chatId);
       if (structure) {
         chat.temporaryContractFile.analyzedStructure = structure;
@@ -925,7 +996,7 @@ export const uploadTemporaryContract = async (req: Request, res: Response) => {
 
     res.json({
       success: true,
-      fileName: req.file.originalname,
+      fileName: sanitizeFilename(req.file.originalname),
       analyzed: !!chat.temporaryContractFile.analyzedStructure
     });
   } catch (error) {

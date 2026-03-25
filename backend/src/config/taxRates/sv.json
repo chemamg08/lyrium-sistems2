@@ -1,0 +1,126 @@
+{
+  "country": "El Salvador",
+  "code": "SV",
+  "year": 2026,
+  "currency": "USD",
+  "incomeTax": {
+    "brackets": [
+      {
+        "from": 0,
+        "to": 4064,
+        "rate": 0
+      },
+      {
+        "from": 4064,
+        "to": 9142.86,
+        "rate": 10
+      },
+      {
+        "from": 9142.86,
+        "to": 22857.14,
+        "rate": 20
+      },
+      {
+        "from": 22857.14,
+        "to": null,
+        "rate": 30
+      }
+    ],
+    "personalAllowance": 4064,
+    "notes": "ISR. Dollarized economy. Annual filing."
+  },
+  "corporateTax": {
+    "standard": 30,
+    "small": 30,
+    "smallThreshold": 0
+  },
+  "vat": {
+    "standard": 13,
+    "reduced": 0,
+    "superReduced": 0
+  },
+  "socialSecurity": {
+    "employee": 7.5,
+    "employer": 15.25,
+    "selfEmployed": 0
+  },
+  "fields": {
+    "asalariado": {
+      "basic": [
+        {
+          "key": "salarioBruto",
+          "label": "Salario bruto anual (USD)"
+        },
+        {
+          "key": "retencionesEmpresa",
+          "label": "ISR retenido (USD)"
+        }
+      ],
+      "advanced": []
+    },
+    "autonomo": {
+      "basic": [
+        {
+          "key": "facturacionTotal",
+          "label": "Ingresos brutos (USD)"
+        },
+        {
+          "key": "gastosDeducibles",
+          "label": "Costos y gastos (USD)"
+        },
+        {
+          "key": "ivaRepercutido",
+          "label": "IVA débito (USD)"
+        },
+        {
+          "key": "ivaSoportado",
+          "label": "IVA crédito (USD)"
+        }
+      ],
+      "advanced": []
+    },
+    "empresa": {
+      "basic": [
+        {
+          "key": "ingresosTotal",
+          "label": "Ingresos brutos (USD)"
+        },
+        {
+          "key": "gastosTotal",
+          "label": "Costos y gastos (USD)"
+        },
+        {
+          "key": "ivaRepercutidoEmp",
+          "label": "IVA débito (USD)"
+        },
+        {
+          "key": "ivaSoportadoEmp",
+          "label": "IVA crédito (USD)"
+        }
+      ],
+      "advanced": []
+    }
+  },
+  "clientForm": {
+    "taxIdLabel": "NIT / DUI",
+    "taxIdCompanyLabel": "NIT",
+    "taxIdPlaceholder": "ej. 0614-123456-101-1",
+    "regionLabel": "Departamento",
+    "regions": [
+      "Ahuachapán",
+      "Cabañas",
+      "Chalatenango",
+      "Cuscatlán",
+      "La Libertad",
+      "La Paz",
+      "La Unión",
+      "Morazán",
+      "San Miguel",
+      "San Salvador",
+      "San Vicente",
+      "Santa Ana",
+      "Sonsonate",
+      "Usulután"
+    ]
+  }
+}

@@ -26,7 +26,7 @@ const messageSchema = new Schema({
 
 const chatSchema = new Schema<IChat>({
   _id: { type: String, required: true },
-  clientId: { type: String, required: true },
+  clientId: { type: String, required: true, index: true },
   title: { type: String, required: true },
   date: { type: String, required: true },
   source: { type: String, default: 'client' },

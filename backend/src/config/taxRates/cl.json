@@ -1,0 +1,171 @@
+{
+  "country": "Chile",
+  "code": "CL",
+  "year": 2026,
+  "currency": "CLP",
+  "incomeTax": {
+    "brackets": [
+      {
+        "from": 0,
+        "to": 8038080,
+        "rate": 0
+      },
+      {
+        "from": 8038080,
+        "to": 17862400,
+        "rate": 4
+      },
+      {
+        "from": 17862400,
+        "to": 29770667,
+        "rate": 8
+      },
+      {
+        "from": 29770667,
+        "to": 41678933,
+        "rate": 13.5
+      },
+      {
+        "from": 41678933,
+        "to": 53587200,
+        "rate": 23
+      },
+      {
+        "from": 53587200,
+        "to": 71449600,
+        "rate": 30.4
+      },
+      {
+        "from": 71449600,
+        "to": 89312000,
+        "rate": 35
+      },
+      {
+        "from": 89312000,
+        "to": null,
+        "rate": 40
+      }
+    ],
+    "personalAllowance": 8038080,
+    "notes": "Global Complementario tax for individuals. Impuesto Único for employees. Monthly thresholds."
+  },
+  "corporateTax": {
+    "standard": 27,
+    "small": 25,
+    "smallThreshold": 75000
+  },
+  "vat": {
+    "standard": 19,
+    "reduced": 0,
+    "superReduced": 0
+  },
+  "socialSecurity": {
+    "employee": 17.6,
+    "employer": 4.11,
+    "selfEmployed": 21.7
+  },
+  "fields": {
+    "asalariado": {
+      "basic": [
+        {
+          "key": "salarioBruto",
+          "label": "Remuneración bruta anual (CLP)"
+        },
+        {
+          "key": "retencionesEmpresa",
+          "label": "Impuesto Único retenido (CLP)"
+        }
+      ],
+      "advanced": [
+        {
+          "key": "cotizacionesSS",
+          "label": "Cotizaciones previsionales (AFP + salud) (CLP)"
+        },
+        {
+          "key": "deduccionesAuto",
+          "label": "APV / créditos tributarios (CLP)"
+        }
+      ]
+    },
+    "autonomo": {
+      "basic": [
+        {
+          "key": "facturacionTotal",
+          "label": "Ingresos brutos anuales (CLP)"
+        },
+        {
+          "key": "gastosDeducibles",
+          "label": "Gastos necesarios (CLP)"
+        },
+        {
+          "key": "ivaRepercutido",
+          "label": "IVA débito (CLP)"
+        },
+        {
+          "key": "ivaSoportado",
+          "label": "IVA crédito (CLP)"
+        }
+      ],
+      "advanced": [
+        {
+          "key": "pagosFracc130",
+          "label": "PPM pagados (CLP)"
+        }
+      ]
+    },
+    "empresa": {
+      "basic": [
+        {
+          "key": "ingresosTotal",
+          "label": "Ingresos brutos (CLP)"
+        },
+        {
+          "key": "gastosTotal",
+          "label": "Costos y gastos (CLP)"
+        },
+        {
+          "key": "ivaRepercutidoEmp",
+          "label": "IVA débito (CLP)"
+        },
+        {
+          "key": "ivaSoportadoEmp",
+          "label": "IVA crédito (CLP)"
+        }
+      ],
+      "advanced": [
+        {
+          "key": "basesNegAnter",
+          "label": "Pérdidas tributarias acumuladas (CLP)"
+        },
+        {
+          "key": "pagosFracc202",
+          "label": "PPM empresa (CLP)"
+        }
+      ]
+    }
+  },
+  "clientForm": {
+    "taxIdLabel": "RUT",
+    "taxIdCompanyLabel": "RUT Empresa",
+    "taxIdPlaceholder": "ej. 12.345.678-9",
+    "regionLabel": "Región",
+    "regions": [
+      "Arica y Parinacota",
+      "Tarapacá",
+      "Antofagasta",
+      "Atacama",
+      "Coquimbo",
+      "Valparaíso",
+      "Metropolitana",
+      "O'Higgins",
+      "Maule",
+      "Ñuble",
+      "Biobío",
+      "Araucanía",
+      "Los Ríos",
+      "Los Lagos",
+      "Aysén",
+      "Magallanes"
+    ]
+  }
+}

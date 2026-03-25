@@ -579,8 +579,11 @@ export function calcularEmpresaGenerico(data: Record<string, string>, rates: Tax
 
 // ── Main dispatcher ─────────────────────────────────────────────────────────────
 
-export function calcular(clientType: string, data: Record<string, string>, country = 'ES'): CalcResult {
-  const countryCode = (country || 'ES').toUpperCase();
+export function calcular(clientType: string, data: Record<string, string>, country?: string): CalcResult {
+  const countryCode = String(country || '').trim().toUpperCase().slice(0, 2);
+  if (!countryCode) {
+    throw new Error('Country is required');
+  }
 
   // Spain: use the full Spain-specific engine
   if (countryCode === 'ES') {
@@ -595,13 +598,7 @@ export function calcular(clientType: string, data: Record<string, string>, count
   // Other countries: use the generic engine
   const rates = loadTaxRatesGeneric(countryCode);
   if (!rates) {
-    // Fallback to Spain if JSON not found
-    switch (clientType) {
-      case 'asalariado': return calcularAsalariado(data);
-      case 'autonomo':   return calcularAutonomo(data);
-      case 'empresa':    return calcularEmpresa(data);
-      default:           return calcularAsalariado(data);
-    }
+    throw new Error(`No tax config for country: ${countryCode}`);
   }
 
   switch (clientType) {

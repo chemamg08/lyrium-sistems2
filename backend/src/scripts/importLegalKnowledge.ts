@@ -1136,23 +1136,11 @@ async function run() {
   const outputPath = path.join(OUTPUT_DIR, `${country}.json`);
   await fs.writeFile(outputPath, JSON.stringify(output, null, 2), 'utf-8');
 
-  console.log(`✅ Importación completada para ${country.toUpperCase()}`);
-  console.log(`   PDFs: ${pdfFiles.length} | Textos: ${plaintextFiles.length} | Total: ${totalFiles}`);
-  console.log(`   Archivos procesados correctamente: ${processedFiles}`);
-  console.log(`   Archivos sin texto útil: ${emptyFiles.length}`);
-  console.log(`   Archivos con error: ${failedFiles.length}`);
-  console.log(`   Artículos extraídos: ${articles.length}`);
-  console.log(`   Chunks generados: ${chunks.length}`);
-  console.log(`   Salida: ${outputPath}`);
 
   if (emptyFiles.length > 0) {
-    console.log('   Archivos sin texto útil:');
-    emptyFiles.forEach((file) => console.log(`   - ${file}`));
   }
 
   if (failedFiles.length > 0) {
-    console.log('   Archivos con error:');
-    failedFiles.forEach((item) => console.log(`   - ${item.file}: ${item.error}`));
   }
 }
 

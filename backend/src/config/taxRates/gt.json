@@ -1,0 +1,129 @@
+{
+  "country": "Guatemala",
+  "code": "GT",
+  "year": 2026,
+  "currency": "GTQ",
+  "incomeTax": {
+    "brackets": [
+      {
+        "from": 0,
+        "to": 300000,
+        "rate": 5
+      },
+      {
+        "from": 300000,
+        "to": null,
+        "rate": 7
+      }
+    ],
+    "personalAllowance": 48000,
+    "notes": "ISR. Optional regimes: simplified (5-7%) or profit-based (25%). Q48,000 exempt."
+  },
+  "corporateTax": {
+    "standard": 25,
+    "small": 5,
+    "smallThreshold": 0
+  },
+  "vat": {
+    "standard": 12,
+    "reduced": 0,
+    "superReduced": 0
+  },
+  "socialSecurity": {
+    "employee": 4.83,
+    "employer": 12.67,
+    "selfEmployed": 0
+  },
+  "fields": {
+    "asalariado": {
+      "basic": [
+        {
+          "key": "salarioBruto",
+          "label": "Sueldo bruto anual (GTQ)"
+        },
+        {
+          "key": "retencionesEmpresa",
+          "label": "ISR retenido (GTQ)"
+        }
+      ],
+      "advanced": [
+        {
+          "key": "cotizacionesSS",
+          "label": "Cuota IGSS trabajador (GTQ)"
+        }
+      ]
+    },
+    "autonomo": {
+      "basic": [
+        {
+          "key": "facturacionTotal",
+          "label": "Ingresos brutos (GTQ)"
+        },
+        {
+          "key": "gastosDeducibles",
+          "label": "Costos y gastos (GTQ)"
+        },
+        {
+          "key": "ivaRepercutido",
+          "label": "IVA débito (GTQ)"
+        },
+        {
+          "key": "ivaSoportado",
+          "label": "IVA crédito (GTQ)"
+        }
+      ],
+      "advanced": []
+    },
+    "empresa": {
+      "basic": [
+        {
+          "key": "ingresosTotal",
+          "label": "Ingresos brutos (GTQ)"
+        },
+        {
+          "key": "gastosTotal",
+          "label": "Costos y gastos (GTQ)"
+        },
+        {
+          "key": "ivaRepercutidoEmp",
+          "label": "IVA débito (GTQ)"
+        },
+        {
+          "key": "ivaSoportadoEmp",
+          "label": "IVA crédito (GTQ)"
+        }
+      ],
+      "advanced": []
+    }
+  },
+  "clientForm": {
+    "taxIdLabel": "NIT",
+    "taxIdCompanyLabel": "NIT",
+    "taxIdPlaceholder": "ej. 1234567-8",
+    "regionLabel": "Departamento",
+    "regions": [
+      "Alta Verapaz",
+      "Baja Verapaz",
+      "Chimaltenango",
+      "Chiquimula",
+      "El Progreso",
+      "Escuintla",
+      "Guatemala",
+      "Huehuetenango",
+      "Izabal",
+      "Jalapa",
+      "Jutiapa",
+      "Petén",
+      "Quetzaltenango",
+      "Quiché",
+      "Retalhuleu",
+      "Sacatepéquez",
+      "San Marcos",
+      "Santa Rosa",
+      "Sololá",
+      "Suchitepéquez",
+      "Totonicapán",
+      "Zacapa"
+    ]
+  }
+}

@@ -7,8 +7,10 @@ import { getAccountSpecialties, filterContextBySpecialties, buildSpecialtiesSyst
 import { getLegalContextForAccount, buildCountryLegalSystemPrompt, getAccountCountry, getCountryName } from '../services/legalKnowledgeService.js';
 import { searchWeb } from '../services/tavilyService.js';
 import { hasLegalIntent } from '../services/legalIntentService.js';
-import { streamAIResponse } from '../services/aiService.js';
+import { streamAIResponse, AI_MODEL } from '../services/aiService.js';
 import { DocumentSummariesChat } from '../models/DocumentSummariesChat.js';
+import { sanitizeFilename } from '../utils/sanitizeFilename.js';
+import { verifyOwnership } from '../middleware/auth.js';
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
@@ -105,7 +107,9 @@ Cuando es tu primer mensaje en un chat nuevo (sin documentos aún subidos), pres
 - Analizar e identificar posibles objeciones o puntos débiles en los documentos
 - Responder preguntas sobre el contenido de los archivos subidos
 Invita al usuario a subir un documento para comenzar.
-- Si hay múltiples documentos, especifica de cuál hablas`;
+- Si hay múltiples documentos, especifica de cuál hablas
+
+IDIOMA: Responde SIEMPRE en el mismo idioma en que el usuario te escriba.`;
 
 // Asegurar que exista el directorio de uploads
 async function ensureSummariesDir() {
@@ -143,6 +147,7 @@ export const createSummaryChat = async (req: Request, res: Response) => {
     if (!accountId) {
       return res.status(400).json({ error: 'accountId es requerido' });
     }
+    if (!verifyOwnership(req, accountId as string)) return res.status(403).json({ error: 'Acceso denegado' });
     
     const now = new Date();
     const formattedDate = now.toLocaleString('es-ES', {
@@ -181,6 +186,7 @@ export const getSummaryChat = async (req: Request, res: Response) => {
     if (!chat) {
       return res.status(404).json({ error: 'Chat no encontrado' });
     }
+    if (!verifyOwnership(req, chat.accountId)) return res.status(403).json({ error: 'Acceso denegado' });
     
     res.json(chat.toJSON());
   } catch (error) {
@@ -197,6 +203,7 @@ export const getAllSummaryChats = async (req: Request, res: Response) => {
     if (!accountId) {
       return res.status(400).json({ error: 'accountId es requerido' });
     }
+    if (!verifyOwnership(req, accountId as string)) return res.status(403).json({ error: 'Acceso denegado' });
     
     const chats = await DocumentSummariesChat.find((() => {
       const f: any = { accountId };
@@ -227,6 +234,7 @@ export const updateChatTitle = async (req: Request, res: Response) => {
     if (!chat) {
       return res.status(404).json({ error: 'Chat no encontrado' });
     }
+    if (!verifyOwnership(req, chat.accountId)) return res.status(403).json({ error: 'Acceso denegado' });
     
     chat.title = title.trim();
     chat.lastModified = new Date().toISOString();
@@ -248,6 +256,7 @@ export const deleteSummaryChat = async (req: Request, res: Response) => {
     if (!chat) {
       return res.status(404).json({ error: 'Chat no encontrado' });
     }
+    if (!verifyOwnership(req, chat.accountId)) return res.status(403).json({ error: 'Acceso denegado' });
     
     // Eliminar archivos físicos del chat
     for (const file of chat.uploadedFiles) {
@@ -277,6 +286,7 @@ export const duplicateSummaryChat = async (req: Request, res: Response) => {
     if (!chat) {
       return res.status(404).json({ error: 'Chat no encontrado' });
     }
+    if (!verifyOwnership(req, chat.accountId)) return res.status(403).json({ error: 'Acceso denegado' });
     
     const now = new Date();
     
@@ -316,6 +326,7 @@ export const stageUploadFiles = async (req: Request, res: Response) => {
     if (!chat) {
       return res.status(404).json({ error: 'Chat no encontrado' });
     }
+    if (!verifyOwnership(req, chat.accountId)) return res.status(403).json({ error: 'Acceso denegado' });
 
     if (chat.uploadedFiles.length + files.length > 4) {
       return res.status(400).json({
@@ -325,7 +336,7 @@ export const stageUploadFiles = async (req: Request, res: Response) => {
 
     const stagedFiles: StagedUploadFile[] = files.map((file) => ({
       path: file.path,
-      originalName: file.originalname,
+      originalName: sanitizeFilename(file.originalname),
       fileName: file.filename,
       size: file.size
     }));
@@ -350,7 +361,7 @@ async function processStagedFilesForChat(chat: any, stagedFiles: StagedUploadFil
       const extractedText = await extractPdfText(stagedFile.path);
 
       const summaryResponse = await getClient().chat.completions.create({
-        model: 'Qwen/Qwen3-235B-A22B-Instruct-2507',
+        model: AI_MODEL,
         messages: [
           { role: 'system', content: SUMMARY_SYSTEM_PROMPT },
           {
@@ -414,6 +425,7 @@ export const processStagedUploadFiles = async (req: Request, res: Response) => {
     if (!chat) {
       return res.status(404).json({ error: 'Chat no encontrado' });
     }
+    if (!verifyOwnership(req, chat.accountId)) return res.status(403).json({ error: 'Acceso denegado' });
 
     if (chat.uploadedFiles.length + stagedFiles.length > 4) {
       return res.status(400).json({
@@ -456,6 +468,7 @@ export const uploadFiles = async (req: Request, res: Response) => {
     if (!chat) {
       return res.status(404).json({ error: 'Chat no encontrado' });
     }
+    if (!verifyOwnership(req, chat.accountId)) return res.status(403).json({ error: 'Acceso denegado' });
     
     // Verificar límite total de archivos en el chat
     if (chat.uploadedFiles.length + files.length > 4) {
@@ -466,7 +479,7 @@ export const uploadFiles = async (req: Request, res: Response) => {
     
     const stagedFiles: StagedUploadFile[] = files.map((file) => ({
       path: file.path,
-      originalName: file.originalname,
+      originalName: sanitizeFilename(file.originalname),
       fileName: file.filename,
       size: file.size
     }));
@@ -500,6 +513,7 @@ export const deleteFile = async (req: Request, res: Response) => {
     if (!chat) {
       return res.status(404).json({ error: 'Chat no encontrado' });
     }
+    if (!verifyOwnership(req, chat.accountId)) return res.status(403).json({ error: 'Acceso denegado' });
     
     const fileIndex = chat.uploadedFiles.findIndex((f: any) => f.id === fileId);
     
@@ -553,6 +567,7 @@ export const sendMessage = async (req: Request, res: Response) => {
     if (!chat) {
       return res.status(404).json({ error: 'Chat no encontrado' });
     }
+    if (!verifyOwnership(req, chat.accountId)) return res.status(403).json({ error: 'Acceso denegado' });
     
     // Crear mensaje del usuario
     const userMessage: Message = {
@@ -600,7 +615,9 @@ export const sendMessage = async (req: Request, res: Response) => {
       if (webResult) webContext = webResult;
     }
 
+    const summaryCountryLine = `\nJurisdicción del usuario: ${getCountryName(accountCountry)}. Toda referencia a normativa, legislación o jurisdicción debe corresponder a ${getCountryName(accountCountry)}.`;
     const systemContent = SUMMARY_SYSTEM_PROMPT +
+      summaryCountryLine +
       (specialtiesPrompt ? `\n\n${specialtiesPrompt}` : '') +
       (legalCountryPrompt ? `\n\n${legalCountryPrompt}` : '') +
       (webContext ? `\n\n${webContext}` : '') +
@@ -617,7 +634,7 @@ export const sendMessage = async (req: Request, res: Response) => {
     
     // Llamar a IA
     const response = await getClient().chat.completions.create({
-      model: 'Qwen/Qwen3-235B-A22B-Instruct-2507',
+      model: AI_MODEL,
       messages: aiMessages,
       max_tokens: 2000,
       temperature: 0.3
@@ -657,6 +674,7 @@ export const streamMessage = async (req: Request, res: Response) => {
 
     const chat = await DocumentSummariesChat.findById(chatId);
     if (!chat) return res.status(404).json({ error: 'Chat no encontrado' });
+    if (!verifyOwnership(req, chat.accountId)) return res.status(403).json({ error: 'Acceso denegado' });
 
     const userMessage: Message = { id: Date.now().toString(), role: 'user', content: content.trim() };
     chat.messages.push(userMessage as any);
@@ -685,17 +703,33 @@ export const streamMessage = async (req: Request, res: Response) => {
       if (webResult) webContext = webResult;
     }
 
+    // RAG: Search improve AI files if ragEnabled
+    let ragContext = '';
+    let ragFound = false;
+    if (req.body.ragEnabled && chat.accountId) {
+      const { searchImproveAIContext } = await import('../services/ragService.js');
+      const ragResult = await searchImproveAIContext(chat.accountId, chat.messages.map((m: any) => ({ role: m.role, content: m.content })));
+      if (ragResult.found) {
+        ragContext = ragResult.context;
+        ragFound = true;
+      }
+    }
+
+    const streamCountryLine = `\nJurisdicción del usuario: ${getCountryName(accountCountry)}. Toda referencia a normativa, legislación o jurisdicción debe corresponder a ${getCountryName(accountCountry)}.`;
     const systemContent = SUMMARY_SYSTEM_PROMPT +
+      streamCountryLine +
       (specialtiesPrompt ? `\n\n${specialtiesPrompt}` : '') +
       (legalCountryPrompt ? `\n\n${legalCountryPrompt}` : '') +
       (webContext ? `\n\n${webContext}` : '') +
-      documentsContext;
+      documentsContext +
+      (ragContext ? `\n\n${ragContext}` : '');
     const systemMessages = [{ role: 'system', content: systemContent }];
     const chatMessages = chat.messages.map((m: any) => ({ role: m.role, content: m.content }));
 
-    const fullText = await streamAIResponse(res, systemMessages, chatMessages, 2000, 0.3);
+    const fullText = await streamAIResponse(res, systemMessages, chatMessages, 2000, 0.3, ragFound ? { ragEnhanced: true } : undefined);
 
-    const assistantMessage: Message = { id: (Date.now() + 1).toString(), role: 'assistant', content: fullText };
+    const docAssistantContent = ragFound ? `${fullText}\n<!-- rag-enhanced -->` : fullText;
+    const assistantMessage: Message = { id: (Date.now() + 1).toString(), role: 'assistant', content: docAssistantContent };
     chat.messages.push(assistantMessage as any);
     chat.lastModified = new Date().toISOString();
     const firstUserMsg = chat.messages.find((m: any) => m.role === 'user');

@@ -14,7 +14,7 @@ interface SummaryChat {
   firstMessagePreview?: string;
 }
 
-const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:3000/api';
+const API_URL = import.meta.env.VITE_API_URL;
 
 const DocumentSummaries = () => {
   const { t } = useTranslation();
@@ -78,7 +78,7 @@ const DocumentSummaries = () => {
         method: 'DELETE',
       });
     } catch (error) {
-      console.error('Error al eliminar chat vacÃ­o:', error);
+      // Ignore - chat may already be deleted
     }
   };
 

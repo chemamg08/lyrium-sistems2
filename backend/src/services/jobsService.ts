@@ -109,9 +109,13 @@ async function processNextJob(): Promise<void> {
 
     try {
       const targetUrl = `${API_BASE_URL}${next.request.endpoint}`;
+      const jobSecret = process.env.INTERNAL_JOB_SECRET;
+      if (!jobSecret) {
+        throw new Error('INTERNAL_JOB_SECRET not configured');
+      }
       const headers: Record<string, string> = {
         'content-type': 'application/json',
-        'x-internal-job': '1',
+        'x-internal-job': jobSecret,
         ...next.request.headers
       };
 

@@ -1,6 +1,7 @@
 import { Request, Response } from 'express';
 import { Stat } from '../models/Stat.js';
 import { Client } from '../models/Client.js';
+import { verifyOwnership } from '../middleware/auth.js';
 
 // GET /api/stats - Obtener estadísticas de una cuenta
 export const getStats = async (req: Request, res: Response) => {
@@ -11,21 +12,21 @@ export const getStats = async (req: Request, res: Response) => {
       return res.status(400).json({ error: 'accountId es requerido' });
     }
 
-    // Leer estadísticas
-    const accountStats = await Stat.findById(accountId as string);
+    const aid = accountId as string;
 
-    // Contar clientes registrados
-    let clientsCount = 0;
-    try {
-      clientsCount = await Client.countDocuments({ accountId: accountId as string });
-    } catch (error) {
-      console.error('Error al leer clientes:', error);
+    if (!verifyOwnership(req, aid)) {
+      return res.status(403).json({ error: 'Acceso denegado' });
     }
+
+    const [accountStats, clientsCount] = await Promise.all([
+      Stat.findById(aid),
+      Client.countDocuments({ accountId: aid }),
+    ]);
 
     res.json({
       clientsRegistered: clientsCount,
-      contractsCreated: accountStats?.contractsDownloaded || 0,
-      defensesCreated: accountStats?.defensesExported || 0
+      contractsCreated: accountStats?.contractsCreated || 0,
+      defensesCreated: accountStats?.defensesCreated || 0,
     });
   } catch (error) {
     console.error('Error al obtener estadísticas:', error);
@@ -42,17 +43,22 @@ export const incrementStat = async (req: Request, res: Response) => {
       return res.status(400).json({ error: 'accountId y stat son requeridos' });
     }
 
-    if (stat !== 'contractsDownloaded' && stat !== 'defensesExported') {
-      return res.status(400).json({ error: 'stat debe ser contractsDownloaded o defensesExported' });
+    const validStats = ['contractsDownloaded', 'defensesExported', 'contractsCreated', 'defensesCreated'];
+    if (!validStats.includes(stat)) {
+      return res.status(400).json({ error: 'stat no válido' });
+    }
+
+    if (!verifyOwnership(req, accountId)) {
+      return res.status(403).json({ error: 'Acceso denegado' });
     }
 
     const updated = await Stat.findByIdAndUpdate(
       accountId,
-      { $inc: { [stat]: 1 }, $setOnInsert: { accountId } },
+      { $inc: { [stat]: 1 } },
       { upsert: true, returnDocument: 'after' }
     );
 
-    const newValue = stat === 'contractsDownloaded' ? updated!.contractsDownloaded : updated!.defensesExported;
+    const newValue = (updated as any)[stat];
     res.json({ success: true, newValue });
   } catch (error) {
     console.error('Error al incrementar estadística:', error);

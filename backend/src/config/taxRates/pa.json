@@ -1,0 +1,122 @@
+{
+  "country": "Panamá / Panama",
+  "code": "PA",
+  "year": 2026,
+  "currency": "USD",
+  "incomeTax": {
+    "brackets": [
+      {
+        "from": 0,
+        "to": 11000,
+        "rate": 0
+      },
+      {
+        "from": 11000,
+        "to": 50000,
+        "rate": 15
+      },
+      {
+        "from": 50000,
+        "to": null,
+        "rate": 25
+      }
+    ],
+    "personalAllowance": 800,
+    "notes": "Territorial tax system. Only Panama-sourced income taxed."
+  },
+  "corporateTax": {
+    "standard": 25,
+    "small": 25,
+    "smallThreshold": 0
+  },
+  "vat": {
+    "standard": 7,
+    "reduced": 0,
+    "superReduced": 0
+  },
+  "socialSecurity": {
+    "employee": 9.75,
+    "employer": 12.25,
+    "selfEmployed": 0
+  },
+  "fields": {
+    "asalariado": {
+      "basic": [
+        {
+          "key": "salarioBruto",
+          "label": "Salario bruto anual (USD)"
+        },
+        {
+          "key": "retencionesEmpresa",
+          "label": "ISR retenido (USD)"
+        }
+      ],
+      "advanced": [
+        {
+          "key": "cotizacionesSS",
+          "label": "CSS trabajador (USD)"
+        }
+      ]
+    },
+    "autonomo": {
+      "basic": [
+        {
+          "key": "facturacionTotal",
+          "label": "Ingresos gravables (USD)"
+        },
+        {
+          "key": "gastosDeducibles",
+          "label": "Gastos deducibles (USD)"
+        },
+        {
+          "key": "ivaRepercutido",
+          "label": "ITBMS cobrado (USD)"
+        },
+        {
+          "key": "ivaSoportado",
+          "label": "ITBMS crédito fiscal (USD)"
+        }
+      ],
+      "advanced": []
+    },
+    "empresa": {
+      "basic": [
+        {
+          "key": "ingresosTotal",
+          "label": "Ingresos gravables (USD)"
+        },
+        {
+          "key": "gastosTotal",
+          "label": "Gastos deducibles (USD)"
+        },
+        {
+          "key": "ivaRepercutidoEmp",
+          "label": "ITBMS cobrado (USD)"
+        },
+        {
+          "key": "ivaSoportadoEmp",
+          "label": "ITBMS pagado (USD)"
+        }
+      ],
+      "advanced": []
+    }
+  },
+  "clientForm": {
+    "taxIdLabel": "RUC / Cédula",
+    "taxIdCompanyLabel": "RUC",
+    "taxIdPlaceholder": "ej. 8-123-456",
+    "regionLabel": "Provincia",
+    "regions": [
+      "Bocas del Toro",
+      "Chiriquí",
+      "Coclé",
+      "Colón",
+      "Darién",
+      "Herrera",
+      "Los Santos",
+      "Panamá",
+      "Panamá Oeste",
+      "Veraguas"
+    ]
+  }
+}

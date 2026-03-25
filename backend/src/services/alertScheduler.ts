@@ -1,7 +1,7 @@
 import { sendEmail } from './emailService.js';
 import { FiscalAlert } from '../models/FiscalAlert.js';
 
-const INTERVAL_MS = 20 * 60 * 60 * 1000; // 20 horas
+const INTERVAL_MS = 1 * 60 * 1000; // 1 minuto
 
 async function runAlertScheduler(): Promise<void> {
   try {
@@ -18,7 +18,6 @@ async function runAlertScheduler(): Promise<void> {
     });
 
     if (dueAlerts.length === 0) {
-      console.log('[alertScheduler] No hay alertas pendientes.');
       return;
     }
 
@@ -59,7 +58,6 @@ async function runAlertScheduler(): Promise<void> {
       await FiscalAlert.findByIdAndUpdate(alert._id, update);
     }
 
-    console.log(`[alertScheduler] Enviadas: ${sent}, Fallidas: ${failed}, Total: ${dueAlerts.length}`);
   } catch (err) {
     console.error('[alertScheduler] Error:', err);
   }
@@ -76,5 +74,4 @@ export function startAlertScheduler(): void {
     );
   }, INTERVAL_MS);
 
-  console.log('[alertScheduler] Scheduler de alertas iniciado (cada 20h).');
 }

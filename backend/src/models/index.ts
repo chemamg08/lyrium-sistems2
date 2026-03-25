@@ -10,6 +10,8 @@ export { DocumentSummariesChat } from './DocumentSummariesChat.js';
 export { FiscalChat } from './FiscalChat.js';
 export { FiscalProfile } from './FiscalProfile.js';
 export { FiscalAlert } from './FiscalAlert.js';
+export { TaxObligation } from './TaxObligation.js';
+export { TaxRateSnapshot } from './TaxRateSnapshot.js';
 export { GeneratedContract } from './GeneratedContract.js';
 export { Contract } from './Contract.js';
 export { Job } from './Job.js';

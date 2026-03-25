@@ -16,9 +16,9 @@ export interface IJob {
 const jobSchema = new Schema<IJob>({
   _id: { type: String, required: true },
   type: { type: String, required: true },
-  status: { type: String, default: 'pending' },
+  status: { type: String, default: 'pending', index: true },
   createdAt: { type: String, default: () => new Date().toISOString() },
-  accountId: { type: String, default: '' },
+  accountId: { type: String, default: '', index: true },
   request: { type: Schema.Types.Mixed, default: {} },
   startedAt: { type: String, default: null },
   result: { type: Schema.Types.Mixed, default: null },

@@ -99,7 +99,6 @@ async function run() {
   let recallTotal = 0;
   let hallucinationRiskCount = 0;
 
-  console.log(`🔍 Ejecutando evaluación legal con accountId=${accountId}`);
 
   for (const testCase of EVAL_SET_ES) {
     const result = await getLegalContextForAccount(accountId, testCase.question, [], 5000);
@@ -109,12 +108,6 @@ async function run() {
     recallTotal += metrics.recall;
     hallucinationRiskCount += metrics.hallucinationRisk;
 
-    console.log(`\nPregunta: ${testCase.question}`);
-    console.log(`- sufficient: ${result.sufficient}`);
-    console.log(`- citations: ${result.citations.length}`);
-    console.log(`- precision@k: ${metrics.precisionAtK.toFixed(3)}`);
-    console.log(`- recall: ${metrics.recall.toFixed(3)}`);
-    console.log(`- hallucinationRisk: ${metrics.hallucinationRisk}`);
   }
 
   const n = EVAL_SET_ES.length;
@@ -125,8 +118,6 @@ async function run() {
     hallucinationRiskRate: hallucinationRiskCount / n
   };
 
-  console.log('\n📊 Resumen evaluación:');
-  console.log(JSON.stringify(report, null, 2));
 }
 
 run().catch((error) => {

@@ -5,6 +5,7 @@ import { getLegalContextForAccount, buildCountryLegalSystemPrompt, getAccountCou
 import { hasLegalIntent } from '../services/legalIntentService.js';
 import { Chat } from '../models/Chat.js';
 import { Client } from '../models/Client.js';
+import { verifyOwnership } from '../middleware/auth.js';
 
 interface Message {
   id: string;
@@ -20,6 +21,10 @@ export const getClientChats = async (req: Request, res: Response) => {
     if (!clientId) {
       return res.status(400).json({ error: 'clientId es requerido' });
     }
+
+    const ownerClient = await Client.findById(clientId as string);
+    if (!ownerClient) return res.status(404).json({ error: 'Cliente no encontrado' });
+    if (!verifyOwnership(req, ownerClient.accountId)) return res.status(403).json({ error: 'Acceso denegado' });
 
     const filter: any = { clientId: clientId as string };
     const user = (req as any).user;
@@ -43,6 +48,10 @@ export const createClientChat = async (req: Request, res: Response) => {
     if (!clientId || !title) {
       return res.status(400).json({ error: 'clientId y title son requeridos' });
     }
+
+    const ownerClient = await Client.findById(clientId);
+    if (!ownerClient) return res.status(404).json({ error: 'Cliente no encontrado' });
+    if (!verifyOwnership(req, ownerClient.accountId)) return res.status(403).json({ error: 'Acceso denegado' });
 
     const user = (req as any).user;
     const newChat = await Chat.create({
@@ -70,6 +79,10 @@ export const sendClientMessage = async (req: Request, res: Response) => {
     if (!clientId || !chatId || !content || !content.trim()) {
       return res.status(400).json({ error: 'clientId, chatId y content son requeridos' });
     }
+
+    const ownerClient = await Client.findById(clientId);
+    if (!ownerClient) return res.status(404).json({ error: 'Cliente no encontrado' });
+    if (!verifyOwnership(req, ownerClient.accountId)) return res.status(403).json({ error: 'Acceso denegado' });
 
     const chat = await Chat.findOne({ _id: chatId, clientId });
 
@@ -176,6 +189,10 @@ export const streamClientMessage = async (req: Request, res: Response) => {
       return res.status(400).json({ error: 'clientId, chatId y content son requeridos' });
     }
 
+    const ownerClient = await Client.findById(clientId);
+    if (!ownerClient) return res.status(404).json({ error: 'Cliente no encontrado' });
+    if (!verifyOwnership(req, ownerClient.accountId)) return res.status(403).json({ error: 'Acceso denegado' });
+
     const chat = await Chat.findOne({ _id: chatId, clientId });
     if (!chat) return res.status(404).json({ error: 'Chat no encontrado' });
 
@@ -222,6 +239,11 @@ export const streamClientMessage = async (req: Request, res: Response) => {
 export const deleteClientChat = async (req: Request, res: Response) => {
   try {
     const { id } = req.params;
+    const chatToDelete = await Chat.findById(id);
+    if (!chatToDelete) return res.status(404).json({ error: 'Chat no encontrado' });
+    const chatClient = await Client.findById(chatToDelete.clientId);
+    if (!chatClient || !verifyOwnership(req, chatClient.accountId)) return res.status(403).json({ error: 'Acceso denegado' });
+
     const user = (req as any).user;
     const filter: any = { _id: id };
     if (user?.type === 'subaccount') {
@@ -249,6 +271,10 @@ export const deleteEmptyChats = async (req: Request, res: Response) => {
     if (!clientId) {
       return res.status(400).json({ error: 'clientId es requerido' });
     }
+
+    const ownerClient = await Client.findById(clientId);
+    if (!ownerClient) return res.status(404).json({ error: 'Cliente no encontrado' });
+    if (!verifyOwnership(req, ownerClient.accountId)) return res.status(403).json({ error: 'Acceso denegado' });
 
     const deleteFilter: any = { clientId, messages: { $size: 0 } };
     const user = (req as any).user;

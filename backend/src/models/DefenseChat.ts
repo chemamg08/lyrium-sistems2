@@ -53,7 +53,7 @@ const savedStrategySchema = new Schema({
 
 const defenseChatSchema = new Schema<IDefenseChat>({
   _id: { type: String, required: true },
-  accountId: { type: String, required: true },
+  accountId: { type: String, required: true, index: true },
   createdBy: { type: String, default: '' },
   title: { type: String, required: true },
   createdAt: { type: String, default: () => new Date().toISOString() },

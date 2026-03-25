@@ -33,7 +33,7 @@ const fiscalAlertSchema = new Schema<IFiscalAlert>({
   fechaEnvio: { type: String, required: true },
   repeticion: { type: String, default: 'una vez' },
   estado: { type: String, default: 'pendiente' },
-  accountId: { type: String, required: true },
+  accountId: { type: String, required: true, index: true },
   createdAt: { type: String, default: () => new Date().toISOString() },
   updatedAt: { type: String, default: () => new Date().toISOString() },
 }, { _id: false, versionKey: false });

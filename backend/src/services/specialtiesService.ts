@@ -1,4 +1,5 @@
 import OpenAI from 'openai';
+import { AI_MODEL } from '../config/aiModel.js';
 import { SpecialtiesSettings } from '../models/SpecialtiesSettings.js';
 
 // Tipos de chat disponibles
@@ -283,7 +284,7 @@ export async function classifyQuerySpecialties(query: string): Promise<string[]>
 
   try {
     const response = await getAiClient().chat.completions.create({
-      model: 'Qwen/Qwen3-235B-A22B-Instruct-2507',
+      model: AI_MODEL,
       messages: [
         { role: 'system', content: CLASSIFY_SYSTEM_PROMPT },
         { role: 'user', content: query.trim() }

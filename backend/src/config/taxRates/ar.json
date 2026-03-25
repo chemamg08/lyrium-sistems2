@@ -1,0 +1,188 @@
+{
+  "country": "Argentina",
+  "code": "AR",
+  "year": 2026,
+  "currency": "ARS",
+  "incomeTax": {
+    "brackets": [
+      {
+        "from": 0,
+        "to": 1578032,
+        "rate": 5
+      },
+      {
+        "from": 1578032,
+        "to": 3156065,
+        "rate": 9
+      },
+      {
+        "from": 3156065,
+        "to": 4734097,
+        "rate": 12
+      },
+      {
+        "from": 4734097,
+        "to": 6312130,
+        "rate": 15
+      },
+      {
+        "from": 6312130,
+        "to": 9468194,
+        "rate": 19
+      },
+      {
+        "from": 9468194,
+        "to": 12624259,
+        "rate": 23
+      },
+      {
+        "from": 12624259,
+        "to": 18936389,
+        "rate": 27
+      },
+      {
+        "from": 18936389,
+        "to": 25248518,
+        "rate": 31
+      },
+      {
+        "from": 25248518,
+        "to": null,
+        "rate": 35
+      }
+    ],
+    "personalAllowance": 3091035,
+    "notes": "Ganancias tax. Minimum non-taxable amount updated annually. 4th category for employees."
+  },
+  "corporateTax": {
+    "standard": 35,
+    "small": 25,
+    "smallThreshold": 50000000
+  },
+  "vat": {
+    "standard": 21,
+    "reduced": 10.5,
+    "superReduced": 0
+  },
+  "socialSecurity": {
+    "employee": 17,
+    "employer": 26.4,
+    "selfEmployed": 32
+  },
+  "fields": {
+    "asalariado": {
+      "basic": [
+        {
+          "key": "salarioBruto",
+          "label": "Sueldo bruto anual (ARS)"
+        },
+        {
+          "key": "retencionesEmpresa",
+          "label": "Retenciones Ganancias 4ta categoría (ARS)"
+        }
+      ],
+      "advanced": [
+        {
+          "key": "cotizacionesSS",
+          "label": "Aportes jubilatorios + obra social (ARS)"
+        },
+        {
+          "key": "deduccionesAuto",
+          "label": "Deducciones generales (ARS)"
+        },
+        {
+          "key": "capitalMobiliario",
+          "label": "Rentas financieras (ARS)"
+        }
+      ]
+    },
+    "autonomo": {
+      "basic": [
+        {
+          "key": "facturacionTotal",
+          "label": "Facturación anual neta de IVA (ARS)"
+        },
+        {
+          "key": "gastosDeducibles",
+          "label": "Gastos deducibles (ARS)"
+        },
+        {
+          "key": "ivaRepercutido",
+          "label": "IVA débito fiscal (ARS)"
+        },
+        {
+          "key": "ivaSoportado",
+          "label": "IVA crédito fiscal (ARS)"
+        }
+      ],
+      "advanced": [
+        {
+          "key": "pagosFracc130",
+          "label": "Anticipos Ganancias pagados (ARS)"
+        }
+      ]
+    },
+    "empresa": {
+      "basic": [
+        {
+          "key": "ingresosTotal",
+          "label": "Ingresos totales (ARS)"
+        },
+        {
+          "key": "gastosTotal",
+          "label": "Gastos deducibles (ARS)"
+        },
+        {
+          "key": "ivaRepercutidoEmp",
+          "label": "IVA débito fiscal (ARS)"
+        },
+        {
+          "key": "ivaSoportadoEmp",
+          "label": "IVA crédito fiscal (ARS)"
+        }
+      ],
+      "advanced": [
+        {
+          "key": "basesNegAnter",
+          "label": "Quebrantos acumulados (ARS)"
+        },
+        {
+          "key": "pagosFracc202",
+          "label": "Anticipos Ganancias (ARS)"
+        }
+      ]
+    }
+  },
+  "clientForm": {
+    "taxIdLabel": "CUIT / CUIL",
+    "taxIdCompanyLabel": "CUIT",
+    "taxIdPlaceholder": "ej. 20-12345678-9",
+    "regionLabel": "Provincia",
+    "regions": [
+      "Buenos Aires",
+      "CABA",
+      "Catamarca",
+      "Chaco",
+      "Chubut",
+      "Córdoba",
+      "Corrientes",
+      "Entre Ríos",
+      "Formosa",
+      "Jujuy",
+      "La Pampa",
+      "La Rioja",
+      "Mendoza",
+      "Misiones",
+      "Neuquén",
+      "Río Negro",
+      "Salta",
+      "San Juan",
+      "San Luis",
+      "Santa Cruz",
+      "Santa Fe",
+      "Santiago del Estero",
+      "Tierra del Fuego",
+      "Tucumán"
+    ]
+  }
+}

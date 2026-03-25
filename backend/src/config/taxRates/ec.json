@@ -1,0 +1,175 @@
+{
+  "country": "Ecuador",
+  "code": "EC",
+  "year": 2026,
+  "currency": "USD",
+  "incomeTax": {
+    "brackets": [
+      {
+        "from": 0,
+        "to": 11722,
+        "rate": 0
+      },
+      {
+        "from": 11722,
+        "to": 14930,
+        "rate": 5
+      },
+      {
+        "from": 14930,
+        "to": 19385,
+        "rate": 10
+      },
+      {
+        "from": 19385,
+        "to": 25638,
+        "rate": 12
+      },
+      {
+        "from": 25638,
+        "to": 33738,
+        "rate": 15
+      },
+      {
+        "from": 33738,
+        "to": 44721,
+        "rate": 20
+      },
+      {
+        "from": 44721,
+        "to": 59537,
+        "rate": 25
+      },
+      {
+        "from": 59537,
+        "to": 79388,
+        "rate": 30
+      },
+      {
+        "from": 79388,
+        "to": 105580,
+        "rate": 35
+      },
+      {
+        "from": 105580,
+        "to": null,
+        "rate": 37
+      }
+    ],
+    "personalAllowance": 11722,
+    "notes": "Dollarized economy. Progressive rates on global income."
+  },
+  "corporateTax": {
+    "standard": 25,
+    "small": 25,
+    "smallThreshold": 0
+  },
+  "vat": {
+    "standard": 15,
+    "reduced": 0,
+    "superReduced": 0
+  },
+  "socialSecurity": {
+    "employee": 9.45,
+    "employer": 12.15,
+    "selfEmployed": 20.6
+  },
+  "fields": {
+    "asalariado": {
+      "basic": [
+        {
+          "key": "salarioBruto",
+          "label": "Ingreso bruto anual (USD)"
+        },
+        {
+          "key": "retencionesEmpresa",
+          "label": "Retenciones IR empleador (USD)"
+        }
+      ],
+      "advanced": [
+        {
+          "key": "cotizacionesSS",
+          "label": "Aportes IESS trabajador (USD)"
+        },
+        {
+          "key": "deduccionesAuto",
+          "label": "Gastos personales deducibles (USD)"
+        }
+      ]
+    },
+    "autonomo": {
+      "basic": [
+        {
+          "key": "facturacionTotal",
+          "label": "Ingresos brutos (USD)"
+        },
+        {
+          "key": "gastosDeducibles",
+          "label": "Gastos deducibles (USD)"
+        },
+        {
+          "key": "ivaRepercutido",
+          "label": "IVA cobrado (USD)"
+        },
+        {
+          "key": "ivaSoportado",
+          "label": "IVA pagado (USD)"
+        }
+      ],
+      "advanced": []
+    },
+    "empresa": {
+      "basic": [
+        {
+          "key": "ingresosTotal",
+          "label": "Ingresos gravables (USD)"
+        },
+        {
+          "key": "gastosTotal",
+          "label": "Costos y gastos deducibles (USD)"
+        },
+        {
+          "key": "ivaRepercutidoEmp",
+          "label": "IVA cobrado (USD)"
+        },
+        {
+          "key": "ivaSoportadoEmp",
+          "label": "IVA pagado (USD)"
+        }
+      ],
+      "advanced": []
+    }
+  },
+  "clientForm": {
+    "taxIdLabel": "RUC / Cédula",
+    "taxIdCompanyLabel": "RUC",
+    "taxIdPlaceholder": "ej. 1712345678001",
+    "regionLabel": "Provincia",
+    "regions": [
+      "Azuay",
+      "Bolívar",
+      "Cañar",
+      "Carchi",
+      "Chimborazo",
+      "Cotopaxi",
+      "El Oro",
+      "Esmeraldas",
+      "Galápagos",
+      "Guayas",
+      "Imbabura",
+      "Loja",
+      "Los Ríos",
+      "Manabí",
+      "Morona Santiago",
+      "Napo",
+      "Orellana",
+      "Pastaza",
+      "Pichincha",
+      "Santa Elena",
+      "Santo Domingo",
+      "Sucumbíos",
+      "Tungurahua",
+      "Zamora Chinchipe"
+    ]
+  }
+}

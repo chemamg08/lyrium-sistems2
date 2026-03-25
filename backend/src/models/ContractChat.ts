@@ -36,7 +36,7 @@ const contractChatMessageSchema = new Schema({
 const contractChatSchema = new Schema<IContractChat>({
   _id: { type: String, required: true },
   contractBaseId: { type: String, default: '' },
-  accountId: { type: String, default: '' },
+  accountId: { type: String, default: '', index: true },
   createdBy: { type: String, default: '' },
   title: { type: String, required: true },
   date: { type: String, required: true },

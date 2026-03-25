@@ -157,12 +157,9 @@ export async function analyzeContractPdf(
   await ensureDirectories();
 
   try {
-    console.log('Extrayendo texto del PDF...');
     const text = await extractPdfText(pdfPath);
     
-    console.log('Detectando campos vacíos en el contrato...');
     const emptyFields = detectEmptyFields(text);
-    console.log(`📝 Detectados ${emptyFields.length} campos vacíos`);
 
     const structure: ContractStructure = {
       text,
@@ -181,7 +178,6 @@ export async function analyzeContractPdf(
     const structurePath = path.join(templateDir, 'structure.json');
     await fs.writeFile(structurePath, JSON.stringify(structure, null, 2));
 
-    console.log('✅ Texto extraído exitosamente');
     return structure;
   } catch (error) {
     console.error('Error analizando contrato:', error);
@@ -219,6 +215,41 @@ async function hasLogo(): Promise<boolean> {
 }
 
 /**
+ * Sanitize text for WinAnsi encoding (used by pdf-lib standard fonts).
+ * Replaces unicode characters that cannot be encoded with ASCII equivalents.
+ */
+function sanitizeForWinAnsi(text: string): string {
+  const replacements: Record<string, string> = {
+    // Subscript / superscript numbers
+    '\u2080': '0', '\u2081': '1', '\u2082': '2', '\u2083': '3', '\u2084': '4',
+    '\u2085': '5', '\u2086': '6', '\u2087': '7', '\u2088': '8', '\u2089': '9',
+    '\u00B2': '2', '\u00B3': '3', '\u00B9': '1',
+    // Typographic quotes / dashes
+    '\u2018': "'", '\u2019': "'", '\u201C': '"', '\u201D': '"',
+    '\u2013': '-', '\u2014': '-', '\u2026': '...',
+    // Misc symbols
+    '\u2022': '-', '\u2023': '-', '\u25CF': '-', '\u25CB': 'o',
+    '\u2192': '->', '\u2190': '<-',
+    '\u20AC': 'EUR', '\u00A0': ' ',
+  };
+  let result = '';
+  for (const ch of text) {
+    if (replacements[ch]) {
+      result += replacements[ch];
+    } else {
+      const code = ch.charCodeAt(0);
+      // WinAnsi supports: 0x20-0x7E (basic ASCII) + 0xA0-0xFF (Latin-1 Supplement)
+      if (code <= 0x7E || (code >= 0xA0 && code <= 0xFF)) {
+        result += ch;
+      } else {
+        result += '?';
+      }
+    }
+  }
+  return result;
+}
+
+/**
  * Genera un nuevo PDF con el texto modificado, logo, estilos profesionales y números de página.
  * Soporta: # H1, ## H2, ### H3, **bold** inline, separadores, paginación.
  */
@@ -227,6 +258,8 @@ export async function generateContractFromText(
   outputFileName: string
 ): Promise<string> {
   await ensureDirectories();
+  // Sanitize the entire text for WinAnsi encoding before processing
+  modifiedText = sanitizeForWinAnsi(modifiedText);
 
   try {
     const pdfDoc = await PDFDocument.create();
@@ -239,7 +272,9 @@ export async function generateContractFromText(
       try {
         const logoBytes = await fs.readFile(LOGO_PATH);
         logo = await pdfDoc.embedPng(logoBytes);
-      } catch { console.log('Logo no disponible'); }
+      } catch {
+        // Logo optional — continue without it
+      }
     }
 
     // Dimensiones A4
@@ -442,7 +477,6 @@ export async function generateContractFromText(
 
     const outputPath = path.join(GENERATED_DIR, outputFileName);
     await fs.writeFile(outputPath, await pdfDoc.save());
-    console.log(`✅ Contrato generado: ${outputPath}`);
     return outputPath;
   } catch (error) {
     console.error('Error generando contrato:', error);

@@ -23,7 +23,7 @@ const assistantMessageSchema = new Schema({
 
 const assistantChatSchema = new Schema<IAssistantChat>({
   _id: { type: String, required: true },
-  accountId: { type: String, required: true },
+  accountId: { type: String, required: true, index: true },
   createdBy: { type: String, default: '' },
   name: { type: String, required: true },
   createdAt: { type: String, default: () => new Date().toISOString() },

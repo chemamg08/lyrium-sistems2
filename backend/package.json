@@ -10,13 +10,17 @@
     "dev": "tsx watch src/server.ts"
   },
   "dependencies": {
+    "@types/cookie-parser": "^1.4.10",
     "bcrypt": "^6.0.0",
+    "cookie-parser": "^1.4.7",
     "cors": "^2.8.6",
     "crypto-js": "^4.2.0",
     "dotenv": "^16.6.1",
     "express": "^4.22.1",
+    "express-rate-limit": "^8.3.1",
     "gm": "^1.25.1",
     "googleapis": "^171.4.0",
+    "helmet": "^8.1.0",
     "html-to-text": "^9.0.5",
     "imap": "^0.8.19",
     "jsonwebtoken": "^9.0.3",
@@ -31,6 +35,7 @@
     "pdfjs-dist": "^5.4.624",
     "pdfkit": "^0.17.2",
     "sharp": "^0.34.5",
+    "speakeasy": "^2.0.0",
     "stripe": "^20.3.1"
   },
   "devDependencies": {
@@ -44,6 +49,7 @@
     "@types/node": "^20.19.33",
     "@types/nodemailer": "^7.0.10",
     "@types/pdfkit": "^0.17.5",
+    "@types/speakeasy": "^2.0.10",
     "tsx": "^4.21.0",
     "typescript": "^5.9.3"
   }

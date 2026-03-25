@@ -2,16 +2,18 @@ import mongoose, { Schema } from 'mongoose';
 
 export interface IStat {
   _id: string;
-  accountId: string;
   contractsDownloaded: number;
   defensesExported: number;
+  contractsCreated: number;
+  defensesCreated: number;
 }
 
 const statSchema = new Schema<IStat>({
   _id: { type: String, required: true },
-  accountId: { type: String, required: true, unique: true },
   contractsDownloaded: { type: Number, default: 0 },
   defensesExported: { type: Number, default: 0 },
+  contractsCreated: { type: Number, default: 0 },
+  defensesCreated: { type: Number, default: 0 },
 }, { _id: false, versionKey: false });
 
 statSchema.set('toJSON', {

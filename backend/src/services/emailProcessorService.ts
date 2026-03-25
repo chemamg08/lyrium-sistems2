@@ -1,23 +1,55 @@
 import fs from 'fs';
 import fsPromises from 'fs/promises';
 import path from 'path';
+import crypto from 'crypto';
 import { fileURLToPath } from 'url';
 import OpenAI from 'openai';
+import { AI_MODEL } from '../config/aiModel.js';
 import {
   fetchUnreadEmails,
   sendEmailViaCuenta,
   replyToEmail,
   type CuentaCorreoConfig,
   type IncomingEmail,
+  type IncomingEmailAttachment,
 } from './emailService.js';
 import { Automation } from '../models/Automation.js';
 import { Client } from '../models/Client.js';
 import { Subaccount } from '../models/Subaccount.js';
+import { sanitizeFilename } from '../utils/sanitizeFilename.js';
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
 
 const UPLOADS_DIR = path.join(__dirname, '../../uploads/automatizaciones');
+const EMAIL_ATTACHMENTS_DIR = path.join(__dirname, '../../uploads/email-attachments');
+
+// Ensure directories exist
+if (!fs.existsSync(EMAIL_ATTACHMENTS_DIR)) fs.mkdirSync(EMAIL_ATTACHMENTS_DIR, { recursive: true });
+
+// ── Encryption for email passwords (AES-256-GCM) ────────────────────
+const ENCRYPTION_KEY = crypto.createHash('sha256').update(process.env.JWT_SECRET || 'lyrium-fallback-key').digest();
+
+export function encryptPassword(plaintext: string): string {
+  const iv = crypto.randomBytes(12);
+  const cipher = crypto.createCipheriv('aes-256-gcm', ENCRYPTION_KEY, iv);
+  const encrypted = Buffer.concat([cipher.update(plaintext, 'utf8'), cipher.final()]);
+  const tag = cipher.getAuthTag();
+  return iv.toString('hex') + ':' + tag.toString('hex') + ':' + encrypted.toString('hex');
+}
+
+export function decryptPassword(ciphertext: string): string {
+  // Support plain-text passwords (not yet encrypted)
+  if (!ciphertext.includes(':')) return ciphertext;
+  const parts = ciphertext.split(':');
+  if (parts.length !== 3) return ciphertext;
+  const iv = Buffer.from(parts[0], 'hex');
+  const tag = Buffer.from(parts[1], 'hex');
+  const encrypted = Buffer.from(parts[2], 'hex');
+  const decipher = crypto.createDecipheriv('aes-256-gcm', ENCRYPTION_KEY, iv);
+  decipher.setAuthTag(tag);
+  return decipher.update(encrypted) + decipher.final('utf8');
+}
 
 // ── AI clients ───────────────────────────────────────────────────────
 let _qwen: OpenAI | null = null;
@@ -99,12 +131,15 @@ async function getAccount(accountId: string): Promise<any> {
   }
   if (!doc.emailConversations) (doc as any).emailConversations = [];
   if (!doc.pendingConsultas) (doc as any).pendingConsultas = [];
+  if (!doc.emailFolders) (doc as any).emailFolders = [];
+  if (!doc.pendingReplies) (doc as any).pendingReplies = [];
   return doc;
 }
 
 async function saveAccount(account: any): Promise<void> {
   // Convert to plain objects to avoid Mongoose serialization issues with mixed subdocuments
   const plain = typeof account.toObject === 'function' ? account.toObject() : account;
+  // NOTE: pendingReplies is intentionally excluded — managed via atomic $push/$pull/$inc
   await Automation.findByIdAndUpdate(account._id, {
     $set: {
       accountId: plain.accountId,
@@ -118,8 +153,18 @@ async function saveAccount(account: any): Promise<void> {
       autoAssignEnabled: plain.autoAssignEnabled ?? false,
       emailConversations: plain.emailConversations,
       pendingConsultas: plain.pendingConsultas,
+      emailFolders: plain.emailFolders ?? [],
     }
   }, { upsert: true });
+}
+
+// ── Per-account processing lock to avoid race conditions ─────────────
+const accountLocks = new Map<string, Promise<void>>();
+function withAccountLock<T>(accountId: string, fn: () => Promise<T>): Promise<T> {
+  const prev = accountLocks.get(accountId) || Promise.resolve();
+  const next = prev.then(fn, fn);
+  accountLocks.set(accountId, next.then(() => {}, () => {}));
+  return next;
 }
 
 // ── Get KB context from uploaded docs ────────────────────────────────
@@ -181,14 +226,13 @@ ${emailBody.substring(0, 3000)}`;
 
   try {
     const response = await getQwen().chat.completions.create({
-      model: 'Qwen/Qwen3-235B-A22B-Instruct-2507',
+      model: AI_MODEL,
       messages: [{ role: 'user', content: prompt + '\n/no_think' }],
       max_tokens: 200,
       temperature: 0.1,
     });
 
     const text = (response.choices[0].message.content || '').replace(/<think>[\s\S]*?<\/think>/gi, '').trim();
-    console.log('[classifyEmail] Qwen raw:', text);
     const jsonMatch = text.match(/\{[^}]+\}/);
     if (jsonMatch) {
       const parsed = JSON.parse(jsonMatch[0]);
@@ -199,7 +243,6 @@ ${emailBody.substring(0, 3000)}`;
         // Ensure it's always a string
         parsed.especialidadId = String(parsed.especialidadId);
       }
-      console.log('[classifyEmail] Parsed:', JSON.stringify(parsed));
       return parsed;
     }
   } catch (err) {
@@ -219,7 +262,7 @@ async function findAnswerInKB(
 
   try {
     const response = await getQwen().chat.completions.create({
-      model: 'Qwen/Qwen3-235B-A22B-Instruct-2507',
+      model: AI_MODEL,
       messages: [
         {
           role: 'system',
@@ -254,21 +297,22 @@ async function composeClientReply(
 ): Promise<string> {
   try {
     const response = await getQwen().chat.completions.create({
-      model: 'Qwen/Qwen3-235B-A22B-Instruct-2507',
+      model: AI_MODEL,
       messages: [
         {
           role: 'system',
-          content: `Eres el asistente de email de un despacho de abogados. Tu tarea es redactar una respuesta breve y profesional para enviar a un cliente.
+          content: `Eres el asistente de email de un despacho profesional. Tu tarea es redactar una respuesta breve y profesional para enviar a un cliente.
 
 Se te proporcionará:
-1. La pregunta original del cliente
-2. La instrucción/información que te da el responsable del despacho
+1. La pregunta original del cliente (CONTEXTO — úsala para entender a qué se refiere la instrucción)
+2. La instrucción/información que te da el responsable del despacho (CONTENIDO — la información que debes transmitir)
 
 Reglas ESTRICTAS:
-- Usa ÚNICAMENTE la información que te da el responsable. NO añadas, inventes ni amplíes información bajo ningún concepto
+- Lee primero la pregunta del cliente para entender el contexto exacto. Luego aplica la instrucción del responsable sobre ese contexto
+- Por ejemplo: si el cliente preguntó "¿Cuánto cuesta el servicio de divorcio?" y el responsable dice "dile que 500€", tu respuesta debe mencionar "el servicio de divorcio" (tomado de la pregunta) y "500 €" (tomado de la instrucción)
+- Usa ÚNICAMENTE la información que te da el responsable. NO añadas, inventes ni amplíes datos que no estén en la instrucción
 - NO incluyas firmas, nombres, teléfonos, correos ni datos de contacto. NUNCA pongas placeholders como "[Nombre]", "[Teléfono]", "[Despacho]" ni similares
-- Sé breve y directo: un saludo corto, la información solicitada, y una despedida corta ("Un saludo" es suficiente)
-- No inventes descripciones de productos, servicios ni características que no estén en la instrucción del responsable
+- Estructura: saludo breve → respuesta clara referenciando lo que el cliente preguntó → despedida corta ("Un saludo" o "Quedamos a su disposición")
 - Responde en el mismo idioma que el cliente
 - No menciones que alguien te dio instrucciones`,
         },
@@ -303,6 +347,41 @@ async function forwardToConsultas(
 ): Promise<void> {
   if (correosConsultas.length === 0) return;
 
+  const cleanBody = stripQuotedText(email.body);
+
+  // Build AI-generated conversation context summary
+  let contextSummary = '';
+  const conv = account.emailConversations.find((c: any) => c.id === conversationId);
+  if (conv && conv.messages && conv.messages.length > 1) {
+    try {
+      const transcript = conv.messages.map((m: any) => {
+        const who = m.sent ? 'Asistente' : (conv.contactName || conv.contactEmail);
+        return `${who}: ${(m.text || '').substring(0, 800)}`;
+      }).join('\n');
+
+      const res = await getQwen().chat.completions.create({
+        model: 'Qwen/Qwen3-235B-A22B-Instruct-2507',
+        messages: [
+          { role: 'system', content: 'Eres un asistente que resume conversaciones de email de un despacho de abogados. Genera un resumen breve y claro en español de la conversación, destacando: el tema principal, lo que pide el cliente, y las respuestas que se le han dado. Máximo 5 frases. No uses saludos ni introducciones, ve directo al resumen.' },
+          { role: 'user', content: transcript },
+        ],
+        max_tokens: 300,
+      });
+      const summary = res.choices?.[0]?.message?.content?.trim();
+      if (summary) {
+        contextSummary = `\n\nRESUMEN DE LA CONVERSACIÓN PREVIA:\n${summary}`;
+      }
+    } catch (err) {
+      console.error('[EmailProcessor] Error generating conversation summary:', err);
+      // Fallback: list last 3 messages
+      const last3 = conv.messages.slice(-3).map((m: any) => {
+        const who = m.sent ? 'Asistente' : (conv.contactName || conv.contactEmail);
+        return `${who}: ${(m.text || '').substring(0, 300)}`;
+      });
+      contextSummary = `\n\nÚLTIMOS MENSAJES DE LA CONVERSACIÓN:\n${last3.join('\n')}`;
+    }
+  }
+
   let forwardBody: string;
   if (type === 'solicitud_sin_especialista') {
     forwardBody = `Se ha recibido una solicitud de servicio de "${especialidadNombre || 'especialidad desconocida'}" pero no hay ningún abogado asignado a esa especialidad.
@@ -310,7 +389,7 @@ async function forwardToConsultas(
 DE: ${email.fromName} <${email.from}>
 ASUNTO: ${email.subject}
 MENSAJE:
-${email.body}
+${cleanBody}${contextSummary}
 
 ---
 Responde a este email indicando qué hacer. Ejemplos:
@@ -324,7 +403,7 @@ Responde a este email indicando qué hacer. Ejemplos:
 DE: ${email.fromName} <${email.from}>
 ASUNTO: ${email.subject}
 MENSAJE:
-${email.body}
+${cleanBody}${contextSummary}
 
 ---
 Responde a este email con las instrucciones para la respuesta.
@@ -341,7 +420,7 @@ También puedes escribir "pausa la respuesta automática" para desactivar las re
     originalFrom: email.from,
     originalFromName: email.fromName,
     originalSubject: email.subject,
-    originalBody: email.body,
+    originalBody: cleanBody,
     cuentaCorreoId,
     conversationId,
     forwardedAt: new Date().toISOString(),
@@ -365,14 +444,33 @@ function stripQuotedText(body: string): string {
     // Gmail English: "On Mon, Feb 28, 2026 at 9:42 PM <email> wrote:"
     if (/^On\s+.+wrote:\s*$/i.test(trimmed)) break;
 
+    // Gmail German: "Am Mo., 28. Feb. 2026 um 21:42 Uhr schrieb <email>:"
+    if (/^Am\s+.+schrieb\s+/i.test(trimmed)) break;
+
+    // Gmail French: "Le lun. 28 févr. 2026 à 21:42, <email> a écrit :"
+    if (/^Le\s+.+a\s+[eé]crit\s*:/i.test(trimmed)) break;
+
+    // Gmail Portuguese: "Em seg., 28 de fev. de 2026 às 21:42, <email> escreveu:"
+    if (/^Em\s+.+escreveu:\s*$/i.test(trimmed)) break;
+
+    // Gmail Italian: "Il giorno lun 28 feb 2026 alle ore 21:42 <email> ha scritto:"
+    if (/^Il\s+giorno\s+.+ha\s+scritto:\s*$/i.test(trimmed)) break;
+
+    // Apple Mail: various patterns with date lines
+    if (/^(>?\s*)?El\s+\d{1,2}\s+\w+\s+\d{4},?\s+a\s+las?\s+\d{1,2}:\d{2}/i.test(trimmed)) break;
+
+    // Thunderbird: "-------- Original Message --------" or "-------- Forwarded Message --------"
+    if (/^-{4,}\s*(Original|Forwarded|Reenviar|Mensaje original)\s*(Message|mensaje)?\s*-{4,}$/i.test(trimmed)) break;
+
     // Outlook separator line
     if (trimmed.startsWith('________________________________')) break;
 
-    // Outlook From/Sent block
+    // Outlook From/Sent block (multiple languages)
     if (/^From:\s+/i.test(trimmed) && i + 1 < lines.length && /^Sent:\s+/i.test(lines[i + 1].trim())) break;
     if (/^De:\s+/i.test(trimmed) && i + 1 < lines.length && /^Enviado:\s+/i.test(lines[i + 1].trim())) break;
+    if (/^Von:\s+/i.test(trimmed) && i + 1 < lines.length && /^Gesendet:\s+/i.test(lines[i + 1].trim())) break;
 
-    // Block of quoted lines (all remaining lines start with >)
+    // Generic: block of quoted lines (all remaining lines start with >)
     if (trimmed.startsWith('>')) {
       const allQuoted = lines.slice(i).every(l => l.trim().startsWith('>') || l.trim() === '');
       if (allQuoted) break;
@@ -400,7 +498,7 @@ async function interpretConsultaAction(
 
   try {
     const response = await getQwen().chat.completions.create({
-      model: 'Qwen/Qwen3-235B-A22B-Instruct-2507',
+      model: AI_MODEL,
       messages: [
         {
           role: 'system',
@@ -430,14 +528,12 @@ Responde SOLO con JSON válido:
     });
 
     const content = response.choices[0]?.message?.content || '';
-    console.log('[interpretConsultaAction] AI raw response:', content);
 
     // Remove <think>...</think> blocks if present
     const cleaned = content.replace(/<think>[\s\S]*?<\/think>/gi, '').trim();
     const jsonMatch = cleaned.match(/\{[\s\S]*\}/);
     if (jsonMatch) {
       const parsed = JSON.parse(jsonMatch[0]);
-      console.log('[interpretConsultaAction] Parsed:', JSON.stringify(parsed));
       return parsed;
     }
     console.warn('[interpretConsultaAction] No valid JSON found in AI response');
@@ -453,7 +549,7 @@ Responde SOLO con JSON válido:
 async function interpretClientConfirmation(replyText: string): Promise<boolean> {
   try {
     const response = await getQwen().chat.completions.create({
-      model: 'Qwen/Qwen3-235B-A22B-Instruct-2507',
+      model: AI_MODEL,
       messages: [
         {
           role: 'system',
@@ -485,7 +581,7 @@ Reply ONLY with JSON: {"affirmative": true} or {"affirmative": false}
 async function detectExplicitAssignmentRequest(emailBody: string, emailSubject: string): Promise<boolean> {
   try {
     const response = await getQwen().chat.completions.create({
-      model: 'Qwen/Qwen3-235B-A22B-Instruct-2507',
+      model: AI_MODEL,
       messages: [
         {
           role: 'system',
@@ -505,7 +601,6 @@ Responde SOLO con JSON: {"explicit": true} o {"explicit": false}
     const jsonMatch = content.match(/\{[\s\S]*?\}/);
     if (jsonMatch) {
       const parsed = JSON.parse(jsonMatch[0]);
-      console.log('[detectExplicitAssignment]', parsed);
       return parsed.explicit === true;
     }
   } catch (err) {
@@ -541,13 +636,13 @@ async function processConsultaReply(
   const cuentaConfig: CuentaCorreoConfig = {
     plataforma: cuentaCorreo.plataforma,
     correo: cuentaCorreo.correo,
-    password: cuentaCorreo.password,
+    password: decryptPassword(cuentaCorreo.password),
   };
 
   if (pending.type === 'confirmacion_asignacion') {
     // ── Client replied to assignment confirmation ──
     const conv = account.emailConversations.find((c: any) => c.id === pending.conversationId);
-    const timeStr = new Date().toLocaleTimeString('es-ES', { hour: '2-digit', minute: '2-digit' });
+    const timeStr = new Date().toISOString();
 
     // Add client's reply to conversation
     if (conv) {
@@ -558,7 +653,6 @@ async function processConsultaReply(
 
     // Use AI to determine if the reply is affirmative or negative
     const isAffirmative = await interpretClientConfirmation(cleanReply);
-    console.log(`[processConsultaReply] Client confirmation: "${cleanReply}" -> affirmative=${isAffirmative}`);
 
     if (isAffirmative) {
       const origEmail: IncomingEmail = {
@@ -603,7 +697,7 @@ async function processConsultaReply(
     );
 
     const conv = account.emailConversations.find((c: any) => c.id === pending.conversationId);
-    const timeStr = new Date().toLocaleTimeString('es-ES', { hour: '2-digit', minute: '2-digit' });
+    const timeStr = new Date().toISOString();
 
     if (interpretation.action === 'assign' && interpretation.assignToName) {
       const targetName = interpretation.assignToName.toLowerCase();
@@ -646,7 +740,6 @@ async function processConsultaReply(
         conv.autoReplyPaused = true;
         conv.lastMessageTime = new Date().toISOString();
       }
-      console.log(`[processConsultaReply] Auto-reply paused for conversation ${pending.conversationId}`);
     } else {
       // reject or reply — send the AI-generated message to the client
       const defaultMsg = interpretation.action === 'reject'
@@ -669,7 +762,6 @@ async function processConsultaReply(
         convPause.autoReplyPaused = true;
         convPause.lastMessageTime = new Date().toISOString();
       }
-      console.log(`[processConsultaReply] Auto-reply paused for conversation ${pending.conversationId} (consulta_general)`);
 
       account.pendingConsultas.splice(pendingIdx, 1);
       await saveAccount(account);
@@ -683,7 +775,7 @@ async function processConsultaReply(
 
     if (!fs.existsSync(UPLOADS_DIR)) fs.mkdirSync(UPLOADS_DIR, { recursive: true });
 
-    const docContent = `Respuesta a consulta sobre: ${pending.originalSubject}\n\nPregunta original: ${pending.originalBody}\n\nRespuesta: ${cleanReply}`;
+    const docContent = `Tema: ${pending.originalSubject}\nPregunta del cliente: ${pending.originalBody}\nRespuesta del despacho: ${cleanReply}`;
     fs.writeFileSync(docPath, docContent, 'utf-8');
 
     account.documentos.push({
@@ -703,7 +795,7 @@ async function processConsultaReply(
         id: Date.now().toString(),
         from: 'Asistente',
         text: composedReply,
-        time: new Date().toLocaleTimeString('es-ES', { hour: '2-digit', minute: '2-digit' }),
+        time: new Date().toISOString(),
         sent: true,
       });
       conv.lastMessageTime = new Date().toISOString();
@@ -718,12 +810,8 @@ async function processConsultaReply(
 // ── 4b. Check if a matching specialist exists ───────────────────────
 async function hasMatchingSpecialist(accountId: string, account: any, especialidadId?: string): Promise<boolean> {
   const subaccounts = await Subaccount.find({ parentAccountId: accountId });
-  if (subaccounts.length === 0) { console.log('[hasMatchingSpecialist] No subaccounts'); return false; }
-  if (account.sortByCarga) { console.log('[hasMatchingSpecialist] sortByCarga=true, assigning by load'); return true; }
-  if (!especialidadId) { console.log('[hasMatchingSpecialist] No especialidadId — no specialist match'); return false; }
   const subs = account.subcuentaEspecialidades || {};
   const match = subaccounts.some((s: any) => subs[s._id] === especialidadId);
-  console.log(`[hasMatchingSpecialist] especialidadId=${especialidadId}, match=${match}`);
   return match;
 }
 
@@ -746,7 +834,7 @@ async function generateCaseSummary(
 
   try {
     const response = await getQwen().chat.completions.create({
-      model: 'Qwen/Qwen3-235B-A22B-Instruct-2507',
+      model: AI_MODEL,
       messages: [
         {
           role: 'system',
@@ -790,6 +878,11 @@ async function assignCaseToSubaccount(
   // Generate AI summary
   const aiSummary = await generateCaseSummary(email, account, conversationId, espName, lawyerName);
 
+  // Save account first (set autoClientId), then create client
+  const conv = account.emailConversations.find((c: any) => c.id === conversationId);
+  if (conv) conv.autoClientId = clientId;
+  await saveAccount(account);
+
   await Client.create({
     _id: clientId,
     name: email.fromName || email.from,
@@ -806,14 +899,10 @@ async function assignCaseToSubaccount(
     fiscalInfo: {},
   });
 
-  // Set autoClientId directly on passed account (avoid race condition)
-  const conv = account.emailConversations.find((c: any) => c.id === conversationId);
-  if (conv) conv.autoClientId = clientId;
-
   const cuentaConfig: CuentaCorreoConfig = {
     plataforma: cuentaCorreo.plataforma,
     correo: cuentaCorreo.correo,
-    password: cuentaCorreo.password,
+    password: decryptPassword(cuentaCorreo.password),
   };
 
   const lawyerNotification = `Nuevo cliente asignado.\n\nDATOS DEL CLIENTE:\n- Nombre: ${email.fromName || email.from}\n- Email: ${email.from}\n- Especialidad: ${espName}\n\nRESUMEN DEL CASO:\n${aiSummary}\n\n---\nEste cliente ha sido asignado a tu cuenta.`;
@@ -840,13 +929,16 @@ async function assignCase(
   conversationId: string,
 ): Promise<void> {
   const subaccounts = await Subaccount.find({ parentAccountId: accountId });
-  if (subaccounts.length === 0) return;
+  if (subaccounts.length === 0) {
+    console.warn(`[assignCase] No subaccounts available for account ${accountId} — case for ${email.from} not assigned`);
+    return;
+  }
 
   let bestSubaccount: any = null;
 
   if (account.sortByCarga) {
-    // Only by workload — ignore specialty
-    const clients = await Client.find({ accountId });
+    // Only by workload — ignore specialty (count only open clients)
+    const clients = await Client.find({ accountId, status: 'abierto' });
     let minLoad = Infinity;
     for (const sub of subaccounts) {
       const load = clients.filter((c: any) => c.assignedSubaccountId === sub._id).length;
@@ -860,7 +952,7 @@ async function assignCase(
       : subaccounts;
 
     const pool = candidates.length > 0 ? candidates : subaccounts;
-    const clients = await Client.find({ accountId });
+    const clients = await Client.find({ accountId, status: 'abierto' });
     let minLoad = Infinity;
     for (const sub of pool) {
       const load = clients.filter((c: any) => c.assignedSubaccountId === sub._id).length;
@@ -870,8 +962,13 @@ async function assignCase(
 
   if (!bestSubaccount) return;
 
-  // Create auto client
+  // Update conversation with clientId FIRST, save, THEN create client
   const clientId = Date.now().toString();
+  const conv = account.emailConversations.find((c: any) => c.id === conversationId);
+  if (conv) conv.autoClientId = clientId;
+  await saveAccount(account);
+
+  // Now create the client (after account save succeeded)
   const espName = account.especialidades.find((e: any) => e.id === especialidadId)?.nombre || 'General';
   const lawyerName = bestSubaccount.name || bestSubaccount.email;
 
@@ -894,16 +991,11 @@ async function assignCase(
     fiscalInfo: {},
   });
 
-  // Update conversation with clientId
-  // Set autoClientId directly on passed account (avoid race condition)
-  const conv = account.emailConversations.find((c: any) => c.id === conversationId);
-  if (conv) conv.autoClientId = clientId;
-
   // Send email to the assigned lawyer
   const cuentaConfig: CuentaCorreoConfig = {
     plataforma: cuentaCorreo.plataforma,
     correo: cuentaCorreo.correo,
-    password: cuentaCorreo.password,
+    password: decryptPassword(cuentaCorreo.password),
   };
 
   const lawyerNotification = `Nuevo cliente asignado automáticamente.
@@ -931,7 +1023,7 @@ Este cliente ha sido asignado a tu cuenta automáticamente.`;
   }
 }
 
-// ── Delayed reply queue (5-15 min random delay) ──────────────────────
+// ── Delayed reply queue (persisted in MongoDB) ──────────────────────
 interface PendingReply {
   cuentaConfig: CuentaCorreoConfig;
   to: string;
@@ -944,10 +1036,7 @@ interface PendingReply {
   conversationId?: string;
 }
 
-const pendingReplies: PendingReply[] = [];
-
-function scheduleReply(
-  cuentaConfig: CuentaCorreoConfig,
+async function scheduleReply(
   to: string,
   subject: string,
   text: string,
@@ -955,49 +1044,88 @@ function scheduleReply(
   references?: string,
   accountId?: string,
   conversationId?: string,
-): void {
-  const delayMs = (5 + Math.random() * 10) * 60 * 1000; // 5-15 min
+): Promise<void> {
+  const delayMs = 1 * 60 * 1000; // 1 minuto
   const scheduledAt = Date.now() + delayMs;
-  pendingReplies.push({
-    cuentaConfig, to, subject, text, messageId, references,
+  const replyDoc = {
+    id: Date.now().toString() + '_' + Math.random().toString(36).substring(2, 8),
+    to, subject, text, messageId, references,
     scheduledAt, accountId: accountId || '', conversationId,
-  });
-  console.log(`[scheduleReply] Queued reply to ${to}, will send in ${Math.round(delayMs / 60000)} min`);
+    retryCount: 0,
+  };
+  await Automation.findByIdAndUpdate(accountId, { $push: { pendingReplies: replyDoc } });
 }
 
 async function processPendingReplies(): Promise<void> {
   const now = Date.now();
-  const due = pendingReplies.filter(r => r.scheduledAt <= now);
-  if (due.length === 0) return;
+  // Find all accounts with due pending replies
+  const accounts = await Automation.find({ 'pendingReplies.scheduledAt': { $lte: now } });
+  if (accounts.length === 0) return;
 
-  for (const reply of due) {
-    try {
-      await replyToEmail(reply.cuentaConfig, reply.to, reply.subject, reply.text, reply.messageId, reply.references);
-      console.log(`[scheduleReply] Sent delayed reply to ${reply.to}`);
+  for (const account of accounts) {
+    const due = (account.pendingReplies || []).filter((r: any) => r.scheduledAt <= now);
+    if (due.length === 0) continue;
 
-      // Update conversation with the reply message
-      if (reply.accountId && reply.conversationId) {
-        const account = await getAccount(reply.accountId);
-        const conv = account.emailConversations.find((c: any) => c.id === reply.conversationId);
-        if (conv) {
-          const timeStr = new Date().toLocaleTimeString('es-ES', { hour: '2-digit', minute: '2-digit' });
-          conv.messages.push({
-            id: Date.now().toString(),
-            from: 'Asistente',
-            text: reply.text,
-            time: timeStr,
-            sent: true,
-          });
-          conv.lastMessageTime = new Date().toISOString();
-          await saveAccount(account);
+    const sentIds: string[] = [];
+
+    const MAX_RETRIES = 5;
+
+    for (const reply of due) {
+      try {
+        // Drop replies that exceeded max retries
+        if ((reply.retryCount || 0) >= MAX_RETRIES) {
+          console.error(`[scheduleReply] Reply to ${reply.to} exceeded ${MAX_RETRIES} retries, discarding`);
+          sentIds.push(reply.id);
+          continue;
         }
+
+        // Resolve email credentials from account's cuentasCorreo (no plaintext passwords stored)
+        const cuentaCorreo = account.cuentasCorreo?.[0];
+        if (!cuentaCorreo) {
+          console.error(`[scheduleReply] No email account found for ${account._id}, skipping reply to ${reply.to}`);
+          sentIds.push(reply.id); // Remove orphaned reply
+          continue;
+        }
+        const cuentaConfig: CuentaCorreoConfig = {
+          plataforma: cuentaCorreo.plataforma,
+          correo: cuentaCorreo.correo,
+          password: decryptPassword(cuentaCorreo.password),
+        };
+        await replyToEmail(cuentaConfig, reply.to, reply.subject, reply.text, reply.messageId, reply.references);
+        sentIds.push(reply.id);
+
+        // Update conversation with the reply message
+        if (reply.accountId && reply.conversationId) {
+          const freshAccount = await getAccount(reply.accountId);
+          const conv = freshAccount.emailConversations.find((c: any) => c.id === reply.conversationId);
+          if (conv) {
+            const timeStr = new Date().toISOString();
+            conv.messages.push({
+              id: Date.now().toString(),
+              from: 'Asistente',
+              text: reply.text,
+              time: timeStr,
+              sent: true,
+            });
+            conv.lastMessageTime = new Date().toISOString();
+            await saveAccount(freshAccount);
+          }
+        }
+      } catch (err) {
+        console.error(`[scheduleReply] Error sending to ${reply.to} (attempt ${(reply.retryCount || 0) + 1}/${MAX_RETRIES}):`, err);
+        // Increment retry counter; reply stays in queue for next cycle
+        await Automation.findByIdAndUpdate(account._id, {
+          $inc: { 'pendingReplies.$[elem].retryCount': 1 }
+        }, { arrayFilters: [{ 'elem.id': reply.id }] });
       }
-    } catch (err) {
-      console.error(`[scheduleReply] Error sending to ${reply.to}:`, err);
     }
 
-    const idx = pendingReplies.indexOf(reply);
-    if (idx >= 0) pendingReplies.splice(idx, 1);
+    // Only remove successfully sent replies
+    if (sentIds.length > 0) {
+      await Automation.findByIdAndUpdate(account._id, {
+        $pull: { pendingReplies: { id: { $in: sentIds } } }
+      });
+    }
   }
 }
 
@@ -1007,6 +1135,20 @@ setInterval(() => {
     console.error('[scheduleReply] Error processing queue:', err)
   );
 }, 30 * 1000);
+
+// ── Save incoming email attachments to disk ──────────────────────────
+function saveIncomingAttachments(attachments?: IncomingEmailAttachment[]): Array<{ id: string; filename: string; originalName: string; mimeType: string; size: number }> {
+  if (!attachments || attachments.length === 0) return [];
+  const saved: Array<{ id: string; filename: string; originalName: string; mimeType: string; size: number }> = [];
+  for (const att of attachments) {
+    const id = Date.now().toString() + '_' + Math.random().toString(36).substring(2, 8);
+    const diskFilename = `${Date.now()}_${sanitizeFilename(att.filename)}`;
+    const filePath = path.join(EMAIL_ATTACHMENTS_DIR, diskFilename);
+    fs.writeFileSync(filePath, att.content);
+    saved.push({ id, filename: diskFilename, originalName: sanitizeFilename(att.filename), mimeType: att.mimeType, size: att.size });
+  }
+  return saved;
+}
 
 // ── 6. Add/update email conversation ─────────────────────────────────
 function addToConversation(
@@ -1019,15 +1161,21 @@ function addToConversation(
   let conv = account.emailConversations.find((c: any) => c.contactEmail === email.from);
 
   const now = new Date();
-  const timeStr = now.toLocaleTimeString('es-ES', { hour: '2-digit', minute: '2-digit' });
+  const timeStr = now.toISOString();
+
+  // Save incoming attachments to disk
+  const savedAttachments = saveIncomingAttachments(email.attachments);
+
+  const cleanBody = stripQuotedText(email.body);
 
   if (!conv) {
     const incomingMsg: any = {
       id: Date.now().toString(),
       from: email.fromName || email.from,
-      text: email.body.substring(0, 5000),
+      text: cleanBody.substring(0, 5000),
       time: timeStr,
       sent: false,
+      attachments: savedAttachments,
     };
     const msgs: any[] = [incomingMsg];
 
@@ -1038,6 +1186,7 @@ function addToConversation(
         text: replyText,
         time: timeStr,
         sent: true,
+        attachments: [],
       });
     }
 
@@ -1058,9 +1207,10 @@ function addToConversation(
   conv.messages.push({
     id: Date.now().toString(),
     from: email.fromName || email.from,
-    text: email.body.substring(0, 5000),
+    text: cleanBody.substring(0, 5000),
     time: timeStr,
     sent: false,
+    attachments: savedAttachments,
   });
   conv.unread++;
   conv.lastMessageTime = now.toISOString();
@@ -1073,6 +1223,7 @@ function addToConversation(
       text: replyText,
       time: timeStr,
       sent: true,
+      attachments: [],
     });
   }
 
@@ -1089,7 +1240,7 @@ async function processOneEmail(
   const cuentaConfig: CuentaCorreoConfig = {
     plataforma: cuentaCorreo.plataforma,
     correo: cuentaCorreo.correo,
-    password: cuentaCorreo.password,
+    password: decryptPassword(cuentaCorreo.password),
   };
 
   // Check if this is a reply to a pending consulta (from consultas emails)
@@ -1117,7 +1268,6 @@ async function processOneEmail(
     // Auto-reply paused — just store the message, no AI processing
     addToConversation(account, email, false);
     await saveAccount(account);
-    console.log(`[Email] Auto-reply paused for ${email.from}, storing only`);
     return;
   }
 
@@ -1127,6 +1277,32 @@ async function processOneEmail(
     email.subject,
     account.especialidades,
   );
+
+  // ── Email selection filters ──
+  const respondConsultas = account.respondConsultasGenerales !== false;
+  const respondSolicitudes = account.respondSolicitudesServicio !== false;
+  const soloConocidos = account.soloContactosConocidos === true;
+
+  if (soloConocidos && !existingConv && classification.type !== 'otro') {
+    // Only respond to known contacts — this is a new contact, just store
+    addToConversation(account, email, false);
+    await saveAccount(account);
+    return;
+  }
+
+  if (classification.type === 'consulta_general' && !respondConsultas) {
+    // General queries disabled — store but don't auto-respond
+    addToConversation(account, email, false);
+    await saveAccount(account);
+    return;
+  }
+
+  if (classification.type === 'solicitud_servicio' && !respondSolicitudes) {
+    // Service requests disabled — store but don't auto-manage
+    addToConversation(account, email, false);
+    await saveAccount(account);
+    return;
+  }
 
   if (classification.type === 'otro') {
     // Just store the conversation, no action
@@ -1144,7 +1320,7 @@ async function processOneEmail(
       // Schedule delayed reply
       const convId = addToConversation(account, email, false);
       await saveAccount(account);
-      scheduleReply(cuentaConfig, email.from, email.subject, kbResult.answer, email.messageId, email.references, accountId, convId);
+      scheduleReply(email.from, email.subject, kbResult.answer, email.messageId, email.references, accountId, convId);
     } else {
       // Forward to consultas
       const convId = addToConversation(account, email, false);
@@ -1160,7 +1336,6 @@ async function processOneEmail(
       // Auto-assign disabled — just store conversation, no forwarding
       addToConversation(account, email, false);
       await saveAccount(account);
-      console.log(`[Email] Auto-assign disabled, storing only for ${email.from}`);
       return;
     }
 
@@ -1177,13 +1352,13 @@ async function processOneEmail(
         await assignCase(email, accountId, account, classification.especialidadId, cuentaCorreo, convId);
 
         const confirmMsg = 'Perfecto, le hemos asignado un abogado especializado. Se pondrá en contacto con usted en breve.';
-        scheduleReply(cuentaConfig, email.from, email.subject, confirmMsg, email.messageId, email.references, accountId, convId);
+        scheduleReply(email.from, email.subject, confirmMsg, email.messageId, email.references, accountId, convId);
         await saveAccount(account);
       } else {
         // Ask client before assigning
         const espName = account.especialidades.find((e: any) => e.id === classification.especialidadId)?.nombre || 'su caso';
         const askMsg = `Hemos recibido su solicitud. Contamos con abogados especializados en ${espName}. ¿Le gustaría que le asignemos un abogado para su caso? Responda a este email para confirmar.`;
-        scheduleReply(cuentaConfig, email.from, email.subject, askMsg, email.messageId, email.references, accountId);
+        scheduleReply(email.from, email.subject, askMsg, email.messageId, email.references, accountId);
         const convId = addToConversation(account, email, true, askMsg);
         // Save pending confirmation on same account object (avoid race condition)
         account.pendingConsultas.push({
@@ -1191,7 +1366,7 @@ async function processOneEmail(
           originalFrom: email.from,
           originalFromName: email.fromName,
           originalSubject: email.subject,
-          originalBody: email.body,
+          originalBody: stripQuotedText(email.body),
           cuentaCorreoId: cuentaCorreo.id,
           conversationId: convId,
           forwardedAt: new Date().toISOString(),
@@ -1205,7 +1380,7 @@ async function processOneEmail(
       const neutralMsg = 'Hemos recibido su solicitud. La estamos revisando y le responderemos en breve.';
       const convId = addToConversation(account, email, false);
       await saveAccount(account);
-      scheduleReply(cuentaConfig, email.from, email.subject, neutralMsg, email.messageId, email.references, accountId, convId);
+      scheduleReply(email.from, email.subject, neutralMsg, email.messageId, email.references, accountId, convId);
       const espName = account.especialidades.find((e: any) => e.id === classification.especialidadId)?.nombre || 'desconocida';
       await forwardToConsultas(cuentaConfig, account.correosConsultas, email, account, cuentaCorreo.id, convId, 'solicitud_sin_especialista', espName, classification.especialidadId);
     }
@@ -1216,40 +1391,84 @@ async function processOneEmail(
 const pollingIntervals = new Map<string, ReturnType<typeof setInterval>>();
 
 export async function processIncomingEmails(accountId: string): Promise<number> {
-  const account = await getAccount(accountId);
-  if (!account.switchActivo) return 0;
+  return withAccountLock(accountId, async () => {
+    const account = await getAccount(accountId);
 
-  let totalProcessed = 0;
+    let totalProcessed = 0;
 
-  for (const cuentaCorreo of account.cuentasCorreo) {
-    const cuentaConfig: CuentaCorreoConfig = {
-      plataforma: cuentaCorreo.plataforma,
-      correo: cuentaCorreo.correo,
-      password: cuentaCorreo.password,
-    };
+    for (const cuentaCorreo of account.cuentasCorreo) {
+      const cuentaConfig: CuentaCorreoConfig = {
+        plataforma: cuentaCorreo.plataforma,
+        correo: cuentaCorreo.correo,
+        password: decryptPassword(cuentaCorreo.password),
+      };
 
-    try {
-      const emails = await fetchUnreadEmails(cuentaConfig);
-      for (const email of emails) {
-        try {
-          await processOneEmail(email, accountId, cuentaCorreo);
-          totalProcessed++;
-        } catch (err) {
-          console.error(`Error procesando email de ${email.from}:`, err);
+      try {
+        const emails = await fetchUnreadEmails(cuentaConfig);
+
+        // Group emails by sender to avoid multiple replies to the same contact
+        const emailsBySender = new Map<string, typeof emails>();
+        for (const email of emails) {
+          const key = email.from.toLowerCase();
+          const group = emailsBySender.get(key) || [];
+          group.push(email);
+          emailsBySender.set(key, group);
         }
-      }
-    } catch (err) {
-      console.error(`Error fetching emails de ${cuentaCorreo.correo}:`, err);
-    }
-  }
 
-  return totalProcessed;
+        for (const [, senderEmails] of emailsBySender) {
+          try {
+            // Sort by date ascending so we process in order
+            senderEmails.sort((a, b) => (a.date?.getTime() || 0) - (b.date?.getTime() || 0));
+
+            if (!account.switchActivo) {
+              // Just store all messages
+              for (const email of senderEmails) {
+                addToConversation(account, email, false);
+                await saveAccount(account);
+              }
+              totalProcessed += senderEmails.length;
+              continue;
+            }
+
+            if (senderEmails.length === 1) {
+              // Single email — process normally
+              await processOneEmail(senderEmails[0], accountId, cuentaCorreo);
+            } else {
+              // Multiple emails from same sender — store all, but only AI-process the merged version
+              // Store all individual messages in the conversation first
+              for (let i = 0; i < senderEmails.length - 1; i++) {
+                addToConversation(account, senderEmails[i], false);
+              }
+              await saveAccount(account);
+
+              // Merge bodies into the last email for AI processing
+              const lastEmail = senderEmails[senderEmails.length - 1];
+              const mergedBody = senderEmails.map(e => e.body).join('\n\n---\n\n');
+              const mergedEmail: IncomingEmail = {
+                ...lastEmail,
+                body: mergedBody.substring(0, 10000),
+                // Merge attachments from all emails
+                attachments: senderEmails.flatMap(e => e.attachments || []),
+              };
+              await processOneEmail(mergedEmail, accountId, cuentaCorreo);
+            }
+            totalProcessed += senderEmails.length;
+          } catch (err) {
+            console.error(`Error procesando emails de ${senderEmails[0]?.from}:`, err);
+          }
+        }
+      } catch (err) {
+        console.error(`Error fetching emails de ${cuentaCorreo.correo}:`, err);
+      }
+    }
+
+    return totalProcessed;
+  });
 }
 
 export function startPolling(accountId: string): void {
   if (pollingIntervals.has(accountId)) return;
 
-  console.log(`[Email] Polling started for account ${accountId}`);
 
   // Run immediately once
   processIncomingEmails(accountId).catch(console.error);
@@ -1267,7 +1486,6 @@ export function stopPolling(accountId: string): void {
   if (interval) {
     clearInterval(interval);
     pollingIntervals.delete(accountId);
-    console.log(`[Email] Polling stopped for account ${accountId}`);
   }
 }
 
@@ -1312,7 +1530,6 @@ export async function deleteConversation(accountId: string, conversationId: stri
   account.pendingConsultas = account.pendingConsultas.filter((p: any) => p.conversationId !== conversationId);
   const removedPending = beforePending - account.pendingConsultas.length;
   if (removedPending > 0) {
-    console.log(`[Email] Deleted ${removedPending} pendingConsulta(s) for conversation ${conversationId}`);
   }
 
   await saveAccount(account);
@@ -1322,7 +1539,6 @@ export async function deleteConversation(accountId: string, conversationId: stri
     try {
       const result = await Client.deleteOne({ _id: conv.autoClientId });
       if (result.deletedCount > 0) {
-        console.log(`[Email] Deleted auto-created client ${conv.autoClientId} for conversation ${conversationId}`);
       }
     } catch (err) {
       console.error('[Email] Error deleting auto-created client:', err);
@@ -1337,12 +1553,16 @@ export async function toggleConversationAutoReply(accountId: string, conversatio
   if (!conv) return false;
   conv.autoReplyPaused = paused;
   await saveAccount(account);
-  console.log(`[Email] Auto-reply ${paused ? 'paused' : 'resumed'} for conversation ${conversationId}`);
   return true;
 }
 
 // ── Send manual email from a conversation ────────────────────
-export async function sendManualEmail(accountId: string, conversationId: string, text: string): Promise<boolean> {
+export async function sendManualEmail(
+  accountId: string,
+  conversationId: string,
+  text: string,
+  attachmentFiles?: Array<{ id: string; filename: string; originalName: string; mimeType: string; size: number; path: string }>,
+): Promise<boolean> {
   const account = await getAccount(accountId);
   const conv = account.emailConversations.find((c: any) => c.id === conversationId);
   if (!conv) return false;
@@ -1354,27 +1574,47 @@ export async function sendManualEmail(accountId: string, conversationId: string,
   const cuentaConfig: CuentaCorreoConfig = {
     plataforma: cuentaCorreo.plataforma,
     correo: cuentaCorreo.correo,
-    password: cuentaCorreo.password,
+    password: decryptPassword(cuentaCorreo.password),
   };
 
+  // Save message BEFORE sending so it's not lost if SMTP succeeds but save fails
+  const timeStr = new Date().toISOString();
+  const msgAttachments = attachmentFiles?.map(a => ({
+    id: a.id,
+    filename: a.filename,
+    originalName: a.originalName,
+    mimeType: a.mimeType,
+    size: a.size,
+  }));
+  const newMsg = {
+    id: Date.now().toString(),
+    from: 'Asistente',
+    text,
+    time: timeStr,
+    sent: true,
+    attachments: msgAttachments || [],
+  };
+  conv.messages.push(newMsg);
+  conv.lastMessageTime = new Date().toISOString();
+  await saveAccount(account);
+
   try {
-    await replyToEmail(cuentaConfig, conv.contactEmail, conv.subject, text);
+    const smtpAttachments = attachmentFiles?.map(a => ({ filename: a.originalName, path: a.path }));
+    await replyToEmail(cuentaConfig, conv.contactEmail, conv.subject, text, undefined, undefined, smtpAttachments);
 
-    const timeStr = new Date().toLocaleTimeString('es-ES', { hour: '2-digit', minute: '2-digit' });
-    conv.messages.push({
-      id: Date.now().toString(),
-      from: 'Asistente',
-      text,
-      time: timeStr,
-      sent: true,
-    });
-    conv.lastMessageTime = new Date().toISOString();
-    await saveAccount(account);
-
-    console.log(`[Email] Manual email sent to ${conv.contactEmail} in conversation ${conversationId}`);
     return true;
   } catch (err) {
-    console.error('[Email] Error sending manual email:', err);
+    console.error('[Email] Error sending manual email, rolling back message:', err);
+    // Rollback: remove message from conversation
+    const idx = conv.messages.findIndex((m: any) => m.id === newMsg.id);
+    if (idx >= 0) conv.messages.splice(idx, 1);
+    await saveAccount(account);
+    // Cleanup orphaned attachment files on disk
+    if (attachmentFiles) {
+      for (const af of attachmentFiles) {
+        try { const fs = await import('fs'); fs.unlinkSync(af.path); } catch { /* already gone */ }
+      }
+    }
     return false;
   }
 }
@@ -1382,12 +1622,10 @@ export async function sendManualEmail(accountId: string, conversationId: string,
 // ── Resume polling for all active accounts on server startup ─────────
 export async function resumeAllPolling(): Promise<void> {
   try {
-    const allDocs = await Automation.find({ switchActivo: true });
+    // Resume polling for all accounts that have email accounts configured (fetch always, AI only when switchActivo)
+    const allDocs = await Automation.find({ 'cuentasCorreo.0': { $exists: true } });
     for (const doc of allDocs) {
-      if (doc.cuentasCorreo.length > 0) {
-        console.log(`[Email] Resuming polling for account ${doc._id}`);
-        startPolling(doc._id);
-      }
+      startPolling(doc._id);
     }
   } catch (err) {
     console.error('[Email] Error resuming polling on startup:', err);

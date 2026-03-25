@@ -18,7 +18,7 @@ export interface IFiscalProfile {
 
 const fiscalProfileSchema = new Schema<IFiscalProfile>({
   _id: { type: String, required: true },
-  clientId: { type: String, required: true },
+  clientId: { type: String, required: true, index: true },
   accountId: { type: String, required: true },
   tipoActividad: { type: String, default: '' },
   ingresosAnuales: { type: Number, default: 0 },

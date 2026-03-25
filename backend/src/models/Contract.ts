@@ -15,7 +15,7 @@ const contractSchema = new Schema<IContract>({
   summary: { type: String, default: '' },
   fileName: { type: String, required: true },
   filePath: { type: String, required: true },
-  accountId: { type: String, default: '' },
+  accountId: { type: String, default: '', index: true },
 }, { _id: false, versionKey: false });
 
 contractSchema.set('toJSON', {

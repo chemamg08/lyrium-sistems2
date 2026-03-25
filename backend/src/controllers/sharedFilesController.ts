@@ -6,6 +6,8 @@ import { fileURLToPath } from 'url';
 import { SharedFile } from '../models/SharedFile.js';
 import { Account } from '../models/Account.js';
 import { Subaccount } from '../models/Subaccount.js';
+import { sanitizeFilename } from '../utils/sanitizeFilename.js';
+import { verifyOwnership } from '../middleware/auth.js';
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
@@ -17,6 +19,10 @@ export const uploadAndShare = async (req: Request, res: Response) => {
   try {
     const { senderId, senderName, recipientIds } = req.body;
     const files = req.files as Express.Multer.File[];
+
+    if (!senderId || !verifyOwnership(req, senderId)) {
+      return res.status(403).json({ error: 'Acceso denegado' });
+    }
 
     if (!files || files.length === 0)
       return res.status(400).json({ error: 'No files uploaded' });
@@ -31,7 +37,7 @@ export const uploadAndShare = async (req: Request, res: Response) => {
         const doc = await SharedFile.create({
           _id: Date.now().toString() + '_' + Math.random().toString(36).slice(2),
           filename: file.filename,
-          originalName: file.originalname,
+          originalName: sanitizeFilename(file.originalname),
           senderId,
           senderName,
           recipientIds: parsed,
@@ -52,6 +58,9 @@ export const uploadAndShare = async (req: Request, res: Response) => {
 // GET /shared?userId=X  — files sent by this user
 export const getShared = async (req: Request, res: Response) => {
   const { userId } = req.query as { userId: string };
+  if (!userId || !verifyOwnership(req, userId)) {
+    return res.status(403).json({ error: 'Acceso denegado' });
+  }
   const docs = await SharedFile.find({ senderId: userId });
   res.json(docs.map((d) => d.toJSON()));
 };
@@ -59,6 +68,9 @@ export const getShared = async (req: Request, res: Response) => {
 // GET /received?userId=X  — files received by this user
 export const getReceived = async (req: Request, res: Response) => {
   const { userId } = req.query as { userId: string };
+  if (!userId || !verifyOwnership(req, userId)) {
+    return res.status(403).json({ error: 'Acceso denegado' });
+  }
   const docs = await SharedFile.find({ recipientIds: userId });
   res.json(docs.map((d) => d.toJSON()));
 };
@@ -68,6 +80,10 @@ export const deleteSharedFile = async (req: Request, res: Response) => {
   try {
     const { fileId } = req.params;
     const { userId } = req.body;
+
+    if (!userId || !verifyOwnership(req, userId)) {
+      return res.status(403).json({ error: 'Acceso denegado' });
+    }
 
     const file = await SharedFile.findById(fileId);
     if (!file) return res.status(404).json({ error: 'File not found' });
@@ -92,6 +108,10 @@ export const downloadSharedFile = async (req: Request, res: Response) => {
   const { fileId } = req.params;
   const { userId } = req.query as { userId: string };
 
+  if (!userId || !verifyOwnership(req, userId)) {
+    return res.status(403).json({ error: 'Acceso denegado' });
+  }
+
   const file = await SharedFile.findById(fileId);
   if (!file) return res.status(404).json({ error: 'File not found' });
 
@@ -110,6 +130,10 @@ export const downloadSharedFile = async (req: Request, res: Response) => {
 export const getGroupMembers = async (req: Request, res: Response) => {
   const { accountId, userId } = req.query as { accountId: string; userId: string };
   try {
+    if (!accountId || !verifyOwnership(req, accountId)) {
+      return res.status(403).json({ error: 'Acceso denegado' });
+    }
+
     const main = await Account.findById(accountId);
     const subs = await Subaccount.find({ parentAccountId: accountId });
 

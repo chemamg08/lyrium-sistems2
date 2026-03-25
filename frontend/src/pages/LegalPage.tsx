@@ -137,7 +137,7 @@ const privacyContentES = `
 
 Lyrium Systems S.L. (en adelante, "Lyrium") es el responsable del tratamiento de los datos personales recogidos a través de la plataforma.
 
-Correo de contacto para cuestiones de privacidad: privacidad@lyrium.es
+Correo de contacto para cuestiones de privacidad: customerservice@lyrium.io
 
 2. DATOS QUE RECOPILAMOS
 
@@ -155,7 +155,7 @@ b) Gestionar la cuenta del usuario y la facturación.
 c) Mejorar y personalizar la experiencia del usuario.
 d) Comunicar actualizaciones del servicio y cambios relevantes.
 e) Cumplir con obligaciones legales y fiscales.
-f) Entrenar y mejorar los modelos de IA (solo con datos anonimizados y agregados, nunca con datos personales identificables).
+f) Lyrium NO utiliza ningún dato de usuarios, clientes ni experiencias para entrenar o mejorar modelos de inteligencia artificial.
 
 4. BASE LEGAL DEL TRATAMIENTO
 
@@ -182,7 +182,7 @@ En caso de transferencias de datos fuera del Espacio Económico Europeo, se gara
 
 - Datos de cuenta activa: durante la vigencia de la relación contractual.
 - Datos tras cancelación: 30 días naturales para permitir la recuperación, tras los cuales se eliminan definitivamente.
-- Datos de facturación: 5 años conforme a la normativa fiscal española.
+- Datos de facturación: conservados conforme a la normativa fiscal aplicable en cada jurisdicción (generalmente entre 5 y 10 años).
 - Logs de seguridad: 12 meses.
 
 8. DERECHOS DEL USUARIO
@@ -195,9 +195,9 @@ d) Limitación: solicitar que se restrinja el tratamiento en determinadas circun
 e) Portabilidad: recibir sus datos en un formato estructurado y de uso común.
 f) Oposición: oponerse al tratamiento basado en interés legítimo.
 
-Para ejercer estos derechos, el usuario puede contactar a: privacidad@lyrium.es
+Para ejercer estos derechos, el usuario puede contactar a: customerservice@lyrium.io
 
-El usuario tiene también derecho a presentar una reclamación ante la Agencia Española de Protección de Datos (www.aepd.es).
+El usuario tiene también derecho a presentar una reclamación ante la autoridad de protección de datos competente en su país de residencia.
 
 9. SEGURIDAD
 
@@ -218,7 +218,7 @@ const privacyContentEN = `
 
 Lyrium Systems S.L. (hereinafter, "Lyrium") is the data controller for personal data collected through the platform.
 
-Contact email for privacy matters: privacy@lyrium.es
+Contact email for privacy matters: customerservice@lyrium.io
 
 2. DATA WE COLLECT
 
@@ -236,7 +236,7 @@ b) Manage user accounts and billing.
 c) Improve and personalise the user experience.
 d) Communicate service updates and relevant changes.
 e) Comply with legal and tax obligations.
-f) Train and improve AI models (using only anonymised and aggregated data, never personally identifiable information).
+f) Lyrium does NOT use any user, client or experience data to train or improve artificial intelligence models.
 
 4. LEGAL BASIS FOR PROCESSING
 
@@ -263,7 +263,7 @@ In the event of data transfers outside the European Economic Area, appropriate s
 
 - Active account data: for the duration of the contractual relationship.
 - Data after cancellation: 30 calendar days to allow recovery, after which they are permanently deleted.
-- Billing data: 5 years in accordance with Spanish tax regulations.
+- Billing data: retained in accordance with applicable tax regulations in each jurisdiction (generally between 5 and 10 years).
 - Security logs: 12 months.
 
 8. USER RIGHTS
@@ -276,9 +276,9 @@ d) Restriction: request that processing be restricted in certain circumstances.
 e) Portability: receive their data in a structured, commonly used format.
 f) Objection: object to processing based on legitimate interest.
 
-To exercise these rights, the user may contact: privacy@lyrium.es
+To exercise these rights, the user may contact: customerservice@lyrium.io
 
-The user also has the right to lodge a complaint with the Spanish Data Protection Agency (www.aepd.es).
+The user also has the right to lodge a complaint with the competent data protection authority in their country of residence.
 
 9. SECURITY
 
@@ -295,113 +295,127 @@ We reserve the right to update this privacy policy. Significant changes will be 
 `;
 
 const cookiesContentES = `
-1. ¿QUÉ SON LAS COOKIES?
+1. ¿QUÉ SON LAS COOKIES Y EL ALMACENAMIENTO LOCAL?
 
-Las cookies son pequeños archivos de texto que se almacenan en el dispositivo del usuario al visitar un sitio web. Permiten que el sitio recuerde información sobre la visita, como preferencias de idioma y otros ajustes.
+Las cookies son pequeños archivos de texto que se almacenan en el dispositivo del usuario al visitar un sitio web. El almacenamiento local (localStorage y sessionStorage) es un mecanismo del navegador que permite guardar datos en el dispositivo del usuario sin enviarlos automáticamente al servidor.
 
-2. ¿QUÉ COOKIES UTILIZAMOS?
+2. ¿QUÉ ALMACENAMIENTO UTILIZAMOS?
 
-2.1. Cookies estrictamente necesarias
-Estas cookies son esenciales para el funcionamiento de la Plataforma. Sin ellas, servicios como la autenticación y la seguridad no podrían funcionar.
-- Cookie de sesión: mantiene la sesión del usuario activa.
-- Cookie de seguridad CSRF: protege contra ataques de falsificación de solicitudes.
-- Cookie de preferencias de cookies: almacena su elección sobre el uso de cookies.
+2.1. Cookies propias
+- Token de autenticación (authToken): cookie httpOnly que mantiene la sesión del usuario activa. Duración: 7 días. Estrictamente necesaria.
+- Estado del panel lateral (sidebar:state): recuerda si el panel lateral está expandido o colapsado. Duración: 7 días.
 
-2.2. Cookies funcionales
-Permiten recordar las preferencias del usuario para ofrecer una experiencia personalizada.
-- Preferencia de idioma: recuerda el idioma seleccionado.
-- Preferencia de tema: recuerda si el usuario prefiere modo claro u oscuro.
+2.2. Almacenamiento local del navegador (localStorage)
+Estos datos no se envían automáticamente al servidor y permanecen únicamente en el dispositivo del usuario.
+- Preferencia de idioma (appLanguage): recuerda el idioma seleccionado.
+- Preferencia de tema (theme): recuerda si el usuario prefiere modo claro u oscuro.
+- Consentimiento de cookies (lyrium_cookie_consent): almacena su elección sobre el uso de cookies.
+- Borradores de escritura (writing_draft_*): guarda temporalmente borradores en edición.
 
-2.3. Cookies analíticas
-Nos ayudan a entender cómo los usuarios interactúan con la Plataforma, permitiéndonos mejorar su funcionamiento.
-- Datos de uso anonimizados: páginas visitadas, tiempo de permanencia, flujos de navegación.
+2.3. Almacenamiento de sesión del navegador (sessionStorage)
+Se eliminan automáticamente al cerrar la pestaña del navegador.
+- Datos de sesión: identificador de usuario, nombre, email, tipo de cuenta, país y rol. Necesarios para el funcionamiento de la aplicación.
+- Estado de la aplicación: chat activo, contrato seleccionado, temporizador de cliente.
+
+2.4. Cookies de terceros
+- Stripe: utiliza cookies necesarias para procesar pagos de forma segura (__stripe_mid, __stripe_sid). Consulte la política de cookies de Stripe en https://stripe.com/cookies-policy.
+
+2.5. Cookies analíticas (opcionales)
+- Google Analytics (_ga, _ga_*): utilizadas para comprender cómo los usuarios interactúan con la plataforma y mejorar el servicio. Duración: hasta 2 años. Estas cookies SOLO se activan si el usuario da su consentimiento explícito a través del banner de cookies. Puede revocar su consentimiento en cualquier momento eliminando la clave lyrium_cookie_consent del almacenamiento local de su navegador.
 
 3. BASE LEGAL
 
-El uso de cookies estrictamente necesarias se basa en nuestro interés legítimo en proporcionar un servicio funcional y seguro (art. 6.1.f RGPD).
+- Cookies estrictamente necesarias (autenticación, panel lateral, datos de sesión): interés legítimo (art. 6.1.f RGPD) y ejecución del contrato (art. 6.1.b RGPD).
+- Cookies de Stripe: ejecución del contrato (art. 6.1.b RGPD).
+- Cookies analíticas de Google Analytics: consentimiento del usuario (art. 6.1.a RGPD). Solo se activan tras aceptación explícita.
 
-Para las cookies funcionales y analíticas, solicitamos el consentimiento del usuario (art. 6.1.a RGPD), conforme a la Ley 34/2002 de Servicios de la Sociedad de la Información y Comercio Electrónico (LSSI-CE).
+4. GESTIÓN DEL ALMACENAMIENTO
 
-4. GESTIÓN DE COOKIES
+El usuario puede gestionar los datos almacenados:
+a) A través de la configuración del navegador, accediendo a las herramientas de desarrollo para borrar el almacenamiento local y de sesión.
+b) Eliminando las cookies del navegador para las cookies propias y de terceros.
+c) Revocando el consentimiento de cookies analíticas eliminando lyrium_cookie_consent del almacenamiento local.
 
-El usuario puede gestionar sus preferencias de cookies:
-a) A través del banner de cookies que aparece al visitar la Plataforma por primera vez.
-b) A través de la configuración del navegador, desactivando o eliminando cookies.
+Nota: eliminar el almacenamiento local cerrará la sesión activa y restablecerá las preferencias guardadas.
 
-Nota: desactivar cookies estrictamente necesarias puede afectar al funcionamiento de la Plataforma.
+5. PERÍODO DE CONSERVACIÓN
 
-5. COOKIES DE TERCEROS
+- Token de autenticación: 7 días.
+- Preferencias (idioma, tema): se conservan indefinidamente hasta que el usuario las elimine.
+- Consentimiento de cookies: se conserva indefinidamente hasta que el usuario lo elimine.
+- Datos de sesión (sessionStorage): se eliminan al cerrar la pestaña del navegador.
+- Borradores de escritura: se conservan hasta que el usuario los elimine.
+- Cookies de Google Analytics: hasta 2 años (solo si se ha dado consentimiento).
 
-- Stripe: utiliza cookies necesarias para procesar pagos de forma segura. Consulte la política de cookies de Stripe en https://stripe.com/cookies-policy.
+6. ACTUALIZACIONES
 
-6. PERÍODO DE CONSERVACIÓN
+Esta política puede actualizarse periódicamente. Los cambios serán reflejados en esta página con la fecha de la última actualización.
 
-- Cookies de sesión: se eliminan al cerrar el navegador.
-- Cookies persistentes: se conservan entre 30 días y 12 meses según su finalidad.
-- Cookies analíticas: máximo 12 meses.
+7. CONTACTO
 
-7. ACTUALIZACIONES
-
-Esta política de cookies puede actualizarse periódicamente. Los cambios serán reflejados en esta página con la fecha de la última actualización.
-
-8. CONTACTO
-
-Para cualquier consulta relacionada con el uso de cookies, puede contactar con nosotros en: privacidad@lyrium.es
+Para cualquier consulta relacionada con el uso de cookies y almacenamiento de datos, puede contactar con nosotros en: customerservice@lyrium.io
 `;
 
 const cookiesContentEN = `
-1. WHAT ARE COOKIES?
+1. WHAT ARE COOKIES AND LOCAL STORAGE?
 
-Cookies are small text files stored on the user's device when visiting a website. They allow the site to remember information about the visit, such as language preferences and other settings.
+Cookies are small text files stored on the user's device when visiting a website. Local storage (localStorage and sessionStorage) is a browser mechanism that allows data to be saved on the user's device without automatically sending it to the server.
 
-2. WHAT COOKIES DO WE USE?
+2. WHAT STORAGE DO WE USE?
 
-2.1. Strictly necessary cookies
-These cookies are essential for the Platform to function. Without them, services such as authentication and security would not work.
-- Session cookie: keeps the user session active.
-- CSRF security cookie: protects against cross-site request forgery attacks.
-- Cookie preferences cookie: stores your choice regarding cookie usage.
+2.1. First-party cookies
+- Authentication token (authToken): httpOnly cookie that keeps the user session active. Duration: 7 days. Strictly necessary.
+- Sidebar state (sidebar:state): remembers whether the sidebar is expanded or collapsed. Duration: 7 days.
 
-2.2. Functional cookies
-Allow remembering user preferences to offer a personalised experience.
-- Language preference: remembers the selected language.
-- Theme preference: remembers whether the user prefers light or dark mode.
+2.2. Browser local storage (localStorage)
+This data is not automatically sent to the server and remains solely on the user's device.
+- Language preference (appLanguage): remembers the selected language.
+- Theme preference (theme): remembers whether the user prefers light or dark mode.
+- Cookie consent (lyrium_cookie_consent): stores your choice regarding cookie usage.
+- Writing drafts (writing_draft_*): temporarily saves drafts being edited.
 
-2.3. Analytical cookies
-Help us understand how users interact with the Platform, allowing us to improve its performance.
-- Anonymised usage data: pages visited, time spent, navigation flows.
+2.3. Browser session storage (sessionStorage)
+Automatically deleted when the browser tab is closed.
+- Session data: user identifier, name, email, account type, country and role. Required for application functionality.
+- Application state: active chat, selected contract, client timer.
+
+2.4. Third-party cookies
+- Stripe: uses necessary cookies to process payments securely (__stripe_mid, __stripe_sid). See Stripe's cookie policy at https://stripe.com/cookies-policy.
+
+2.5. Analytics cookies (optional)
+- Google Analytics (_ga, _ga_*): used to understand how users interact with the platform and improve the service. Duration: up to 2 years. These cookies are ONLY activated if the user gives explicit consent through the cookie banner. You can revoke your consent at any time by deleting the lyrium_cookie_consent key from your browser's local storage.
 
 3. LEGAL BASIS
 
-The use of strictly necessary cookies is based on our legitimate interest in providing a functional and secure service (Art. 6.1.f GDPR).
+- Strictly necessary cookies (authentication, sidebar, session data): legitimate interest (Art. 6.1.f GDPR) and contract performance (Art. 6.1.b GDPR).
+- Stripe cookies: contract performance (Art. 6.1.b GDPR).
+- Google Analytics cookies: user consent (Art. 6.1.a GDPR). Only activated after explicit acceptance.
 
-For functional and analytical cookies, we request user consent (Art. 6.1.a GDPR), in accordance with the Spanish Law 34/2002 on Information Society Services and Electronic Commerce (LSSI-CE).
+4. STORAGE MANAGEMENT
 
-4. COOKIE MANAGEMENT
+The user can manage stored data:
+a) Through browser settings, accessing developer tools to clear local storage and session storage.
+b) By deleting browser cookies for first-party and third-party cookies.
+c) By revoking analytics cookie consent by deleting lyrium_cookie_consent from local storage.
 
-The user can manage their cookie preferences:
-a) Through the cookie banner that appears when visiting the Platform for the first time.
-b) Through browser settings, by disabling or deleting cookies.
+Note: clearing local storage will end the active session and reset saved preferences.
 
-Note: disabling strictly necessary cookies may affect the functioning of the Platform.
+5. RETENTION PERIOD
 
-5. THIRD-PARTY COOKIES
+- Authentication token: 7 days.
+- Preferences (language, theme): retained indefinitely until the user deletes them.
+- Cookie consent: retained indefinitely until the user deletes them.
+- Session data (sessionStorage): deleted when the browser tab is closed.
+- Writing drafts: retained until the user deletes them.
+- Google Analytics cookies: up to 2 years (only if consent was given).
 
-- Stripe: uses necessary cookies to process payments securely. See Stripe's cookie policy at https://stripe.com/cookies-policy.
+6. UPDATES
 
-6. RETENTION PERIOD
+This policy may be updated periodically. Changes will be reflected on this page with the date of the last update.
 
-- Session cookies: deleted when the browser is closed.
-- Persistent cookies: retained between 30 days and 12 months depending on their purpose.
-- Analytical cookies: maximum 12 months.
+7. CONTACT
 
-7. UPDATES
-
-This cookie policy may be updated periodically. Changes will be reflected on this page with the date of the last update.
-
-8. CONTACT
-
-For any queries related to the use of cookies, you may contact us at: privacy@lyrium.es
+For any queries related to the use of cookies and data storage, you may contact us at: customerservice@lyrium.io
 `;
 
 const contentMap: Record<string, { es: string; en: string }> = {

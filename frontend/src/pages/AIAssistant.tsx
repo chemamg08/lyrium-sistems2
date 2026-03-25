@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState } from "react";
-import { MessageSquarePlus, Send, StopCircle, Trash2, PanelLeft, Paperclip, FileText } from "lucide-react";
+import { MessageSquarePlus, Send, StopCircle, Trash2, PanelLeft, Paperclip, FileText, Brain, FolderOpen } from "lucide-react";
 import ReactMarkdown from "react-markdown";
 import { useTranslation } from "react-i18next";
 import { useToast } from "@/components/ui/use-toast";
@@ -20,7 +20,7 @@ interface Chat {
   messageCount: number;
 }
 
-const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:3000/api';
+const API_URL = import.meta.env.VITE_API_URL;
 const ACTIVE_CHAT_KEY = "assistantActiveChatId";
 
 const AIAssistant = () => {
@@ -37,19 +37,68 @@ const AIAssistant = () => {
   const [fileContext, setFileContext] = useState<string | null>(null);
   const [isUploadingFile, setIsUploadingFile] = useState(false);
   const [isDragOver, setIsDragOver] = useState(false);
+  const [ragEnabled, setRagEnabled] = useState(false);
+  const [hasImproveAI, setHasImproveAI] = useState(false);
+  const [isPollingForResponse, setIsPollingForResponse] = useState(false);
   const endRef = useRef<HTMLDivElement>(null);
   const fileRef = useRef<HTMLInputElement>(null);
+  const activeChatIdRef = useRef<string | null>(null);
+  const pollingRef = useRef<ReturnType<typeof setInterval> | null>(null);
   const { streamingText, isStreaming, startStream, cancelStream } = useStreamingChat();
 
   useEffect(() => {
     loadChats();
+    const accId = sessionStorage.getItem('accountId');
+    if (accId) {
+      const cached = sessionStorage.getItem('hasImproveAI');
+      if (cached !== null) {
+        setHasImproveAI(cached === 'true');
+      } else {
+        authFetch(`${API_URL}/improve-ai/has-files?accountId=${accId}`)
+          .then(r => r.json()).then(d => { setHasImproveAI(d.hasFiles); sessionStorage.setItem('hasImproveAI', String(d.hasFiles)); }).catch(() => {});
+      }
+    }
   }, []);
+
+  // Mantener ref sincronizado
+  useEffect(() => { activeChatIdRef.current = activeChatId; }, [activeChatId]);
 
   useEffect(() => {
     if (activeChatId) {
       loadChat(activeChatId);
       sessionStorage.setItem(ACTIVE_CHAT_KEY, activeChatId);
+
+      // Detectar si hay un stream en curso (componente fue remontado)
+      const streamingFlag = sessionStorage.getItem(`streaming_assistant_${activeChatId}`);
+      if (streamingFlag) {
+        const expectedMsgCount = parseInt(streamingFlag, 10);
+        setIsPollingForResponse(true);
+        setIsLoading(true);
+        if (pollingRef.current) clearInterval(pollingRef.current);
+        pollingRef.current = setInterval(async () => {
+          try {
+            const accountId = sessionStorage.getItem('accountId');
+            if (!accountId) return;
+            const res = await authFetch(`${API_URL}/assistant/chat?accountId=${accountId}&chatId=${activeChatId}`);
+            if (res.ok) {
+              const data = await res.json();
+              const msgs: Message[] = data.messages || [];
+              if (msgs.length > expectedMsgCount) {
+                setMessages(msgs);
+                setIsPollingForResponse(false);
+                setIsLoading(false);
+                sessionStorage.removeItem(`streaming_assistant_${activeChatId}`);
+                if (pollingRef.current) { clearInterval(pollingRef.current); pollingRef.current = null; }
+                loadChats();
+              }
+            }
+          } catch { /* ignore */ }
+        }, 2000);
+      }
     }
+    return () => {
+      if (pollingRef.current) { clearInterval(pollingRef.current); pollingRef.current = null; }
+    };
   }, [activeChatId]);
 
   useEffect(() => {
@@ -217,12 +266,21 @@ const AIAssistant = () => {
     setMessages(prev => [...prev, { id: Date.now().toString(), role: 'user', content }]);
     setIsLoading(true);
 
+    // Marcar stream en curso
+    const currentMsgCount = messages.length + 1;
+    sessionStorage.setItem(`streaming_assistant_${activeChatId}`, String(currentMsgCount));
+
     try {
       await startStream({
         endpoint: "/assistant/chat/message/stream",
-        body: { accountId, chatId: activeChatId, content, ...(fileContext ? { fileContext } : {}) },
+        body: { accountId, chatId: activeChatId, content, ...(fileContext ? { fileContext } : {}), ...(ragEnabled ? { ragEnabled: true } : {}) },
         onDone: (fullText) => {
-          setMessages(prev => [...prev, { id: `ai-${Date.now()}`, role: 'assistant', content: fullText }]);
+          // Limpiar flag de streaming
+          const doneChatId = activeChatIdRef.current;
+          if (doneChatId) sessionStorage.removeItem(`streaming_assistant_${doneChatId}`);
+
+          const content = ragEnabled ? `${fullText}\n<!-- rag-enhanced -->` : fullText;
+          setMessages(prev => [...prev, { id: `ai-${Date.now()}`, role: 'assistant', content }]);
           setIsLoading(false);
           loadChats();
         },
@@ -318,7 +376,10 @@ const AIAssistant = () => {
             </div>
           )}
 
-          {messages.map((msg) => (
+          {messages.map((msg) => {
+            const isRagEnhanced = msg.role === 'assistant' && msg.content.includes('<!-- rag-enhanced -->');
+            const displayContent = isRagEnhanced ? msg.content.replace(/\n?<!-- rag-enhanced -->/g, '') : msg.content;
+            return (
             <div key={msg.id} className={`flex ${msg.role === "user" ? "justify-end" : "justify-start"}`}>
               <div
                 className={`max-w-[85%] md:max-w-[70%] rounded-lg px-4 py-3 text-sm leading-relaxed prose prose-sm dark:prose-invert prose-p:my-1 prose-ul:my-1 prose-ol:my-1 ${
@@ -327,12 +388,19 @@ const AIAssistant = () => {
                     : "bg-chat-ai text-chat-ai-foreground"
                 }`}
               >
-                <ReactMarkdown>{msg.content}</ReactMarkdown>
+                <ReactMarkdown>{displayContent}</ReactMarkdown>
+                {isRagEnhanced && (
+                  <div className="flex items-center justify-end gap-1 mt-2 pt-1.5 border-t border-border/30 not-prose">
+                    <FolderOpen className="h-3 w-3 text-primary/60" />
+                    <span className="text-[10px] text-muted-foreground">{t('improveAI.ragUsed')}</span>
+                  </div>
+                )}
               </div>
             </div>
-          ))}
+            );
+          })}
 
-          {isLoading && !isStreaming && (
+          {(isLoading || isPollingForResponse) && !isStreaming && (
             <div className="flex justify-start">
               <div className="max-w-[70%] rounded-lg px-4 py-3 text-sm leading-relaxed bg-chat-ai text-chat-ai-foreground opacity-80">
                 {t('assistant.loading')}
@@ -380,6 +448,15 @@ const AIAssistant = () => {
             >
               <Paperclip className="h-5 w-5" />
             </button>
+            {hasImproveAI && (
+              <button
+                onClick={() => setRagEnabled(!ragEnabled)}
+                className={`p-2 rounded-md transition-colors ${ragEnabled ? 'bg-primary/20 text-primary' : 'hover:bg-accent text-muted-foreground hover:text-foreground'}`}
+                title={t('improveAI.ragToggle')}
+              >
+                <Brain className="h-5 w-5" />
+              </button>
+            )}
             <textarea
               value={input}
               rows={1}

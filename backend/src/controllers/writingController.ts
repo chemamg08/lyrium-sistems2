@@ -2,6 +2,7 @@ import { Request, Response } from 'express';
 import { reviewLegalText } from '../services/aiService.js';
 import { WritingText } from '../models/WritingText.js';
 import { getAccountCountry } from '../services/legalKnowledgeService.js';
+import { verifyOwnership } from '../middleware/auth.js';
 
 // GET /api/writing-texts?accountId=xxx - Obtener todos los textos de una cuenta
 export async function getAllWritingTexts(req: Request, res: Response) {
@@ -10,6 +11,10 @@ export async function getAllWritingTexts(req: Request, res: Response) {
     
     if (!accountId) {
       return res.status(400).json({ message: 'accountId es requerido' });
+    }
+
+    if (!verifyOwnership(req, accountId as string)) {
+      return res.status(403).json({ message: 'Acceso denegado' });
     }
 
     const texts = await WritingText.find({ accountId });
@@ -29,6 +34,10 @@ export async function getWritingTextById(req: Request, res: Response) {
     
     if (!accountId) {
       return res.status(400).json({ message: 'accountId es requerido' });
+    }
+
+    if (!verifyOwnership(req, accountId as string)) {
+      return res.status(403).json({ message: 'Acceso denegado' });
     }
 
     const text = await WritingText.findOne({ _id: id, accountId });
@@ -51,6 +60,10 @@ export async function createWritingText(req: Request, res: Response) {
     
     if (!accountId || !title) {
       return res.status(400).json({ message: 'accountId y title son requeridos' });
+    }
+
+    if (!verifyOwnership(req, accountId as string)) {
+      return res.status(403).json({ message: 'Acceso denegado' });
     }
 
     const newText = await WritingText.create({
@@ -77,6 +90,10 @@ export async function updateWritingText(req: Request, res: Response) {
     
     if (!accountId) {
       return res.status(400).json({ message: 'accountId es requerido' });
+    }
+
+    if (!verifyOwnership(req, accountId as string)) {
+      return res.status(403).json({ message: 'Acceso denegado' });
     }
 
     const existing = await WritingText.findOne({ _id: id, accountId });
@@ -107,6 +124,10 @@ export async function deleteWritingText(req: Request, res: Response) {
       return res.status(400).json({ message: 'accountId es requerido' });
     }
 
+    if (!verifyOwnership(req, accountId as string)) {
+      return res.status(403).json({ message: 'Acceso denegado' });
+    }
+
     const result = await WritingText.deleteOne({ _id: id, accountId });
     
     if (result.deletedCount === 0) {
@@ -127,6 +148,10 @@ export async function reviewText(req: Request, res: Response) {
     
     if (!text) {
       return res.status(400).json({ message: 'text es requerido' });
+    }
+
+    if (accountId && !verifyOwnership(req, accountId as string)) {
+      return res.status(403).json({ message: 'Acceso denegado' });
     }
 
     const country = accountId ? await getAccountCountry(accountId) : undefined;

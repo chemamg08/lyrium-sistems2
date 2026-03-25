@@ -26,7 +26,7 @@ const fiscalMessageSchema = new Schema({
 const fiscalChatSchema = new Schema<IFiscalChat>({
   _id: { type: String, required: true },
   clientId: { type: String, default: 'general' },
-  accountId: { type: String, required: true },
+  accountId: { type: String, required: true, index: true },
   createdBy: { type: String, default: '' },
   title: { type: String, default: '' },
   messages: { type: [fiscalMessageSchema], default: [] },

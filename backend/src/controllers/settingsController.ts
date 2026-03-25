@@ -3,6 +3,7 @@ import fs from 'fs/promises';
 import path from 'path';
 import { fileURLToPath } from 'url';
 import { SpecialtiesSettings } from '../models/SpecialtiesSettings.js';
+import { verifyOwnership } from '../middleware/auth.js';
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
@@ -29,7 +30,6 @@ export const uploadLogo = async (req: Request, res: Response) => {
     // Eliminar archivo temporal de multer
     await fs.unlink(file.path);
 
-    console.log('✅ Logo actualizado');
     res.json({ message: 'Logo actualizado exitosamente' });
   } catch (error) {
     console.error('Error al subir logo:', error);
@@ -65,6 +65,7 @@ export const getSpecialties = async (req: Request, res: Response) => {
     if (!accountId) {
       return res.status(400).json({ error: 'accountId es requerido' });
     }
+    if (!verifyOwnership(req, accountId as string)) return res.status(403).json({ error: 'Acceso denegado' });
 
     const accountSetting = await SpecialtiesSettings.findById(accountId as string);
 
@@ -86,6 +87,7 @@ export const updateSpecialties = async (req: Request, res: Response) => {
     if (!accountId) {
       return res.status(400).json({ error: 'accountId es requerido' });
     }
+    if (!verifyOwnership(req, accountId as string)) return res.status(403).json({ error: 'Acceso denegado' });
 
     if (!Array.isArray(specialties)) {
       return res.status(400).json({ error: 'specialties debe ser un array' });

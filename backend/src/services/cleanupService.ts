@@ -1,3 +1,5 @@
+import Stripe from 'stripe';
+import dotenv from 'dotenv';
 import { Subscription } from '../models/Subscription.js';
 import { Account } from '../models/Account.js';
 import { Client } from '../models/Client.js';
@@ -20,6 +22,15 @@ import { EmailConfig } from '../models/EmailConfig.js';
 import { WritingText } from '../models/WritingText.js';
 import { SpecialtiesSettings } from '../models/SpecialtiesSettings.js';
 import { SharedFile } from '../models/SharedFile.js';
+
+dotenv.config();
+
+if (!process.env.STRIPE_SECRET_KEY) {
+  throw new Error('STRIPE_SECRET_KEY environment variable is required');
+}
+const stripe = new Stripe(process.env.STRIPE_SECRET_KEY, {
+  apiVersion: '2026-02-25.clover',
+});
 
 const GRACE_PERIOD_MS = 30 * 24 * 60 * 60 * 1000; // 30 días
 const INTERVAL_MS     = 20 * 60 * 60 * 1000;       // 20 horas
@@ -47,7 +58,6 @@ function isExpiredForDeletion(record: Record<string, any>): boolean {
 }
 
 async function runCleanup(): Promise<void> {
-  console.log('[cleanupService] Iniciando revisión de cuentas expiradas…');
 
   const subscriptions = await Subscription.find().lean();
   const expiredAccountIds = new Set<string>(
@@ -57,12 +67,24 @@ async function runCleanup(): Promise<void> {
   );
 
   if (expiredAccountIds.size === 0) {
-    console.log('[cleanupService] No hay cuentas expiradas para eliminar.');
     return;
   }
 
   const ids = [...expiredAccountIds];
-  console.log(`[cleanupService] Eliminando ${expiredAccountIds.size} cuenta(s): ${ids.join(', ')}`);
+
+  // Cancel active Stripe subscriptions before deleting
+  const expiredSubscriptions = subscriptions.filter(
+    (s) => expiredAccountIds.has(s.accountId as string)
+  );
+  for (const sub of expiredSubscriptions) {
+    if (sub.stripeSubscriptionId) {
+      try {
+        await stripe.subscriptions.cancel(sub.stripeSubscriptionId);
+      } catch (err: any) {
+        // Ignore if already cancelled or not found
+      }
+    }
+  }
 
   // Eliminar subscriptions expiradas
   await Subscription.deleteMany({ accountId: { $in: ids } });
@@ -99,7 +121,7 @@ async function runCleanup(): Promise<void> {
     Calculation.deleteMany({ accountId: { $in: ids } }),
     FiscalProfile.deleteMany({ accountId: { $in: ids } }),
     FiscalAlert.deleteMany({ accountId: { $in: ids } }),
-    Stat.deleteMany({ accountId: { $in: ids } }),
+    Stat.deleteMany({ _id: { $in: ids } }),
     Job.deleteMany({ accountId: { $in: ids } }),
     Contract.deleteMany({ accountId: { $in: ids } }),
     GeneratedContract.deleteMany({ chatId: { $in: contractChatIds } }),
@@ -109,7 +131,6 @@ async function runCleanup(): Promise<void> {
     SharedFile.deleteMany({ senderId: { $in: ids } }),
   ]);
 
-  console.log('[cleanupService] Limpieza completada.');
 }
 
 export function startCleanupWorker(): void {

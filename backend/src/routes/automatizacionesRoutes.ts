@@ -15,8 +15,10 @@ import {
   updateSwitch,
   updateSortByCarga,
   updateAutoAssignEnabled,
+  updateEmailSelection,
   updateSubcuentaEspecialidad,
   uploadMiddleware,
+  emailAttachmentMiddleware,
   getConversations,
   getPendingConsultasHandler,
   getPollingStatus,
@@ -25,6 +27,12 @@ import {
   deleteConversationHandler,
   toggleAutoReplyHandler,
   sendManualEmailHandler,
+  getUnreadCount,
+  createEmailFolder,
+  deleteEmailFolder,
+  assignConversationToFolder,
+  removeConversationFromFolder,
+  downloadEmailAttachment,
 } from '../controllers/automatizacionesController.js';
 
 const router = Router();
@@ -49,6 +57,7 @@ router.get('/documentos/:id/view', viewDocumento);
 router.put('/switch', updateSwitch);
 router.put('/sort-by-carga', updateSortByCarga);
 router.put('/auto-assign-enabled', updateAutoAssignEnabled);
+router.put('/email-selection', updateEmailSelection);
 router.put('/subcuenta-especialidad', updateSubcuentaEspecialidad);
 
 // Email automation endpoints
@@ -59,6 +68,16 @@ router.post('/check-emails', forceCheckEmails);
 router.put('/mark-read', markRead);
 router.delete('/conversations/:id', deleteConversationHandler);
 router.put('/conversations/:id/auto-reply', toggleAutoReplyHandler);
-router.post('/conversations/:id/send', sendManualEmailHandler);
+router.post('/conversations/:id/send', emailAttachmentMiddleware.array('files', 10), sendManualEmailHandler);
+
+// Email attachments download
+router.get('/email-attachments/:filename', downloadEmailAttachment);
+
+// Email folders
+router.get('/unread-count', getUnreadCount);
+router.post('/email-folders', createEmailFolder);
+router.delete('/email-folders/:id', deleteEmailFolder);
+router.put('/email-folders/assign', assignConversationToFolder);
+router.put('/email-folders/remove', removeConversationFromFolder);
 
 export default router;

@@ -1,0 +1,130 @@
+{
+  "country": "Honduras",
+  "code": "HN",
+  "year": 2026,
+  "currency": "HNL",
+  "incomeTax": {
+    "brackets": [
+      {
+        "from": 0,
+        "to": 185528,
+        "rate": 0
+      },
+      {
+        "from": 185528,
+        "to": 282791,
+        "rate": 15
+      },
+      {
+        "from": 282791,
+        "to": 657135,
+        "rate": 20
+      },
+      {
+        "from": 657135,
+        "to": null,
+        "rate": 25
+      }
+    ],
+    "personalAllowance": 185528,
+    "notes": "ISR. Exempt up to L185,528. Solidarity contribution 5% above L1M."
+  },
+  "corporateTax": {
+    "standard": 25,
+    "small": 25,
+    "smallThreshold": 0
+  },
+  "vat": {
+    "standard": 15,
+    "reduced": 0,
+    "superReduced": 0
+  },
+  "socialSecurity": {
+    "employee": 8.5,
+    "employer": 14,
+    "selfEmployed": 0
+  },
+  "fields": {
+    "asalariado": {
+      "basic": [
+        {
+          "key": "salarioBruto",
+          "label": "Sueldo bruto anual (HNL)"
+        },
+        {
+          "key": "retencionesEmpresa",
+          "label": "ISR retenido (HNL)"
+        }
+      ],
+      "advanced": []
+    },
+    "autonomo": {
+      "basic": [
+        {
+          "key": "facturacionTotal",
+          "label": "Ingresos brutos (HNL)"
+        },
+        {
+          "key": "gastosDeducibles",
+          "label": "Gastos deducibles (HNL)"
+        },
+        {
+          "key": "ivaRepercutido",
+          "label": "ISV cobrado (HNL)"
+        },
+        {
+          "key": "ivaSoportado",
+          "label": "ISV crédito (HNL)"
+        }
+      ],
+      "advanced": []
+    },
+    "empresa": {
+      "basic": [
+        {
+          "key": "ingresosTotal",
+          "label": "Ingresos brutos (HNL)"
+        },
+        {
+          "key": "gastosTotal",
+          "label": "Gastos deducibles (HNL)"
+        },
+        {
+          "key": "ivaRepercutidoEmp",
+          "label": "ISV cobrado (HNL)"
+        },
+        {
+          "key": "ivaSoportadoEmp",
+          "label": "ISV crédito (HNL)"
+        }
+      ],
+      "advanced": []
+    }
+  },
+  "clientForm": {
+    "taxIdLabel": "RTN",
+    "taxIdCompanyLabel": "RTN",
+    "taxIdPlaceholder": "ej. 0801-1990-12345",
+    "regionLabel": "Departamento",
+    "regions": [
+      "Atlántida",
+      "Choluteca",
+      "Colón",
+      "Comayagua",
+      "Copán",
+      "Cortés",
+      "El Paraíso",
+      "Francisco Morazán",
+      "Gracias a Dios",
+      "Intibucá",
+      "Islas de la Bahía",
+      "La Paz",
+      "Lempira",
+      "Ocotepeque",
+      "Olancho",
+      "Santa Bárbara",
+      "Valle",
+      "Yoro"
+    ]
+  }
+}

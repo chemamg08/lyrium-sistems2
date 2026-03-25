@@ -1,0 +1,143 @@
+{
+  "country": "Liechtenstein",
+  "code": "LI",
+  "year": 2026,
+  "currency": "CHF",
+  "incomeTax": {
+    "brackets": [
+      {
+        "from": 0,
+        "to": 15000,
+        "rate": 1
+      },
+      {
+        "from": 15000,
+        "to": 20000,
+        "rate": 3
+      },
+      {
+        "from": 20000,
+        "to": 40000,
+        "rate": 4
+      },
+      {
+        "from": 40000,
+        "to": 70000,
+        "rate": 5.5
+      },
+      {
+        "from": 70000,
+        "to": 100000,
+        "rate": 6.5
+      },
+      {
+        "from": 100000,
+        "to": 200000,
+        "rate": 7
+      },
+      {
+        "from": 200000,
+        "to": null,
+        "rate": 8
+      }
+    ],
+    "personalAllowance": 15000,
+    "notes": "Erwerbssteuer (wealth-based element removed 2011). Max rate 8%. Municipal surcharge ~150-200%."
+  },
+  "corporateTax": {
+    "standard": 12.5,
+    "small": 12.5,
+    "smallThreshold": 0
+  },
+  "vat": {
+    "standard": 8.1,
+    "reduced": 3.8,
+    "superReduced": 2.6
+  },
+  "socialSecurity": {
+    "employee": 8.35,
+    "employer": 8.35,
+    "selfEmployed": 16.7
+  },
+  "fields": {
+    "asalariado": {
+      "basic": [
+        {
+          "key": "salarioBruto",
+          "label": "Bruttolohn jährlich (CHF)"
+        },
+        {
+          "key": "retencionesEmpresa",
+          "label": "Quellensteuer (CHF)"
+        }
+      ],
+      "advanced": [
+        {
+          "key": "cotizacionesSS",
+          "label": "AHV/IV/ALV Beiträge (CHF)"
+        }
+      ]
+    },
+    "autonomo": {
+      "basic": [
+        {
+          "key": "facturacionTotal",
+          "label": "Umsatz netto (CHF)"
+        },
+        {
+          "key": "gastosDeducibles",
+          "label": "Abzugsfähige Kosten (CHF)"
+        },
+        {
+          "key": "ivaRepercutido",
+          "label": "MWST geschuldet (CHF)"
+        },
+        {
+          "key": "ivaSoportado",
+          "label": "Vorsteuer (CHF)"
+        }
+      ],
+      "advanced": []
+    },
+    "empresa": {
+      "basic": [
+        {
+          "key": "ingresosTotal",
+          "label": "Gesamtumsatz (CHF)"
+        },
+        {
+          "key": "gastosTotal",
+          "label": "Gesamtkosten (CHF)"
+        },
+        {
+          "key": "ivaRepercutidoEmp",
+          "label": "MWST geschuldet (CHF)"
+        },
+        {
+          "key": "ivaSoportadoEmp",
+          "label": "Vorsteuer (CHF)"
+        }
+      ],
+      "advanced": []
+    }
+  },
+  "clientForm": {
+    "taxIdLabel": "PEID",
+    "taxIdCompanyLabel": "FL-Nummer",
+    "taxIdPlaceholder": "ej. FL-0001.234.567-8",
+    "regionLabel": "Gemeinde",
+    "regions": [
+      "Balzers",
+      "Eschen",
+      "Gamprin",
+      "Mauren",
+      "Planken",
+      "Ruggell",
+      "Schaan",
+      "Schellenberg",
+      "Triesen",
+      "Triesenberg",
+      "Vaduz"
+    ]
+  }
+}
