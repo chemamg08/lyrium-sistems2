@@ -1205,7 +1205,11 @@
     "integCalTitle": "Google Calendar",
     "integCalDesc": "Savienojiet Google Calendar, lai skatītu un pārvaldītu gaidāmās tikšanās un termiņus tieši no vadības paneļa, nepārslēdzoties starp lietotnēm.",
     "integZapierTitle": "Zapier & Make",
-    "integZapierDesc": "Savienojiet savu biroju ar vairāk nekā 5 000 lietotnēm, izmantojot webhookus un API atslēgas. Automatizējiet paziņojumus par jauniem klientiem, līgumiem, parakstiem, rēķiniem un vēl ar Zapier, Make vai saviem rīkiem."
+    "integZapierDesc": "Savienojiet savu biroju ar vairāk nekā 5 000 lietotnēm, izmantojot webhookus un API atslēgas. Automatizējiet paziņojumus par jauniem klientiem, līgumiem, parakstiem, rēķiniem un vēl ar Zapier, Make vai saviem rīkiem.",
+    "integAITitle": "Pielāgojiet savu AI",
+    "integAIDesc": "Augšupielādējiet tiesu praksi, stratēģijas vai iepriekšējās lietas PDF formātā, un AI tās izmantos, lai sniegtu precīzākas un jūsu birojam pielāgotas atbildes.",
+    "integShareTitle": "Kopīgojiet failus ar savu komandu",
+    "integShareDesc": "Sūtiet dokumentus starp galveno kontu un jūsu biroja apakškontiem. Visi komandas dalībnieki var nekavējoties piekļūt kopīgotajiem failiem."
   },
   "legal": {
     "backToHome": "Atpakaļ uz sākumlapu",

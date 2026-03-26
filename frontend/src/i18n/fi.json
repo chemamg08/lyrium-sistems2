@@ -1205,7 +1205,11 @@
     "integCalTitle": "Google Calendar",
     "integCalDesc": "Yhdistä Google Calendar tarkastellaksesi ja hallitaksesi tulevia tapaamisia ja määräaikoja suoraan hallintapaneelista ilman sovellusten välistä vaihtamista.",
     "integZapierTitle": "Zapier & Make",
-    "integZapierDesc": "Yhdistä toimistosi yli 5 000 sovellukseen webhookien ja API-avainten avulla. Automatisoi ilmoituksia uusista asiakkaista, sopimuksista, allekirjoituksista, laskuista ja muusta Zapierin, Maken tai omien työkalujesi avulla."
+    "integZapierDesc": "Yhdistä toimistosi yli 5 000 sovellukseen webhookien ja API-avainten avulla. Automatisoi ilmoituksia uusista asiakkaista, sopimuksista, allekirjoituksista, laskuista ja muusta Zapierin, Maken tai omien työkalujesi avulla.",
+    "integAITitle": "Mukauta tekoälyäsi",
+    "integAIDesc": "Lataa oikeuskäytäntöä, strategioita tai aiempia tapauksia PDF-muodossa, ja tekoäly hyödyntää niitä antaakseen tarkempia ja toimistoosi räätälöityjä vastauksia.",
+    "integShareTitle": "Jaa tiedostoja tiimisi kanssa",
+    "integShareDesc": "Lähetä asiakirjoja päätilin ja toimistosi alatilien välillä. Kaikki tiimin jäsenet pääsevät jaettuihin tiedostoihin välittömästi."
   },
   "legal": {
     "backToHome": "Takaisin etusivulle",

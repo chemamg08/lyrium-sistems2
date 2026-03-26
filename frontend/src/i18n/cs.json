@@ -1205,7 +1205,11 @@
     "integCalTitle": "Google Calendar",
     "integCalDesc": "Propojte Google Calendar a zobrazujte a spravujte nadcházející schůzky a termíny přímo z řídicího panelu bez přepínání mezi aplikacemi.",
     "integZapierTitle": "Zapier & Make",
-    "integZapierDesc": "Propojte svou kancelář s více než 5 000 aplikacemi pomocí webhooků a API klíčů. Automatizujte oznámení o nových klientech, smlouvách, podpisech, fakturách a dalších s Zapier, Make nebo vlastními nástroji."
+    "integZapierDesc": "Propojte svou kancelář s více než 5 000 aplikacemi pomocí webhooků a API klíčů. Automatizujte oznámení o nových klientech, smlouvách, podpisech, fakturách a dalších s Zapier, Make nebo vlastními nástroji.",
+    "integAITitle": "Přizpůsobte si svou AI",
+    "integAIDesc": "Nahrajte judikaturu, strategie nebo předchozí případy ve formátu PDF a AI je využije k poskytování přesnějších a na míru přizpůsobených odpovědí pro vaši kancelář.",
+    "integShareTitle": "Sdílejte soubory se svým týmem",
+    "integShareDesc": "Posílejte dokumenty mezi hlavním účtem a podúčty vaší kanceláře. Všichni členové týmu mají okamžitý přístup ke sdíleným souborům."
   },
   "legal": {
     "backToHome": "Zpět na hlavní stránku",

@@ -27,6 +27,8 @@ import {
   PenTool,
   Calendar,
   Webhook,
+  Brain,
+  Share2,
 } from "lucide-react";
 import AppDemo from "@/components/AppDemo";
 
@@ -487,6 +489,22 @@ const Landing = () => {
                 { icon: Webhook, title: t('landing.integZapierTitle'), description: t('landing.integZapierDesc') },
               ].map((item, i) => (
                 <FadeUp key={item.title} delay={i * 0.1} className="h-full">
+                  <div className="relative group rounded-xl border border-white/8 bg-white/[0.02] p-8 transition-all duration-300 hover:bg-white/[0.05] hover:border-white/15 cursor-default h-full">
+                    <div className="mb-5 inline-flex h-12 w-12 items-center justify-center rounded-lg border border-white/10 bg-white/5">
+                      <item.icon className="h-6 w-6 text-white/70" />
+                    </div>
+                    <h3 className="mb-2 text-base font-semibold text-white">{item.title}</h3>
+                    <p className="text-sm text-white/40 leading-relaxed">{item.description}</p>
+                  </div>
+                </FadeUp>
+              ))}
+            </div>
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mt-4 max-w-2xl mx-auto">
+              {[
+                { icon: Brain, title: t('landing.integAITitle'), description: t('landing.integAIDesc') },
+                { icon: Share2, title: t('landing.integShareTitle'), description: t('landing.integShareDesc') },
+              ].map((item, i) => (
+                <FadeUp key={item.title} delay={i * 0.1 + 0.3} className="h-full">
                   <div className="relative group rounded-xl border border-white/8 bg-white/[0.02] p-8 transition-all duration-300 hover:bg-white/[0.05] hover:border-white/15 cursor-default h-full">
                     <div className="mb-5 inline-flex h-12 w-12 items-center justify-center rounded-lg border border-white/10 bg-white/5">
                       <item.icon className="h-6 w-6 text-white/70" />

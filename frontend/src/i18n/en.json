@@ -1210,7 +1210,11 @@
     "integCalTitle": "Google Calendar",
     "integCalDesc": "Connect Google Calendar to view and manage upcoming meetings and deadlines directly from the dashboard without switching between apps.",
     "integZapierTitle": "Zapier & Make",
-    "integZapierDesc": "Connect your firm to 5,000+ apps via webhooks and API keys. Automate notifications for new clients, contracts, signatures, invoices, and more with Zapier, Make, or your own tools."
+    "integZapierDesc": "Connect your firm to 5,000+ apps via webhooks and API keys. Automate notifications for new clients, contracts, signatures, invoices, and more with Zapier, Make, or your own tools.",
+    "integAITitle": "Customize your AI",
+    "integAIDesc": "Upload case law, strategies, or past cases as PDFs and the AI will use them to give you more accurate, tailored responses for your firm.",
+    "integShareTitle": "Share files with your team",
+    "integShareDesc": "Send documents between the main account and your firm’s subaccounts. All team members can access shared files instantly."
   },
   "legal": {
     "backToHome": "Back to home",

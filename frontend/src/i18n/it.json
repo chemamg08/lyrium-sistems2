@@ -1206,7 +1206,11 @@
     "integCalTitle": "Google Calendar",
     "integCalDesc": "Collega Google Calendar per visualizzare e gestire appuntamenti e scadenze imminenti direttamente dalla dashboard senza passare da un'app all'altra.",
     "integZapierTitle": "Zapier & Make",
-    "integZapierDesc": "Collega il tuo studio a oltre 5.000 app tramite webhook e chiavi API. Automatizza le notifiche per nuovi clienti, contratti, firme, fatture e altro con Zapier, Make o i tuoi strumenti."
+    "integZapierDesc": "Collega il tuo studio a oltre 5.000 app tramite webhook e chiavi API. Automatizza le notifiche per nuovi clienti, contratti, firme, fatture e altro con Zapier, Make o i tuoi strumenti.",
+    "integAITitle": "Personalizza la tua IA",
+    "integAIDesc": "Carica giurisprudenza, strategie o casi passati in PDF e l’IA li utilizzerà per fornirti risposte più precise e adattate al tuo studio.",
+    "integShareTitle": "Condividi file con il tuo team",
+    "integShareDesc": "Invia documenti tra l’account principale e i sottoaccount del tuo studio. Tutti i membri del team accedono ai file condivisi istantaneamente."
   },
   "legal": {
     "backToHome": "Torna alla home",

@@ -1205,7 +1205,11 @@
     "integCalTitle": "Google Calendar",
     "integCalDesc": "Conectați Google Calendar pentru a vizualiza și gestiona întâlnirile și termenele limită viitoare direct din panoul de control fără a comuta între aplicații.",
     "integZapierTitle": "Zapier & Make",
-    "integZapierDesc": "Conectați-vă cabinetul la peste 5.000 de aplicații prin webhookuri și chei API. Automatizați notificările pentru clienți noi, contracte, semnături, facturi și altele cu Zapier, Make sau propriile instrumente."
+    "integZapierDesc": "Conectați-vă cabinetul la peste 5.000 de aplicații prin webhookuri și chei API. Automatizați notificările pentru clienți noi, contracte, semnături, facturi și altele cu Zapier, Make sau propriile instrumente.",
+    "integAITitle": "Personalizează-ți AI-ul",
+    "integAIDesc": "Încarcă jurisprudență, strategii sau cazuri anterioare în format PDF, iar AI-ul le va folosi pentru a-ți oferi răspunsuri mai precise și adaptate cabinetului tău.",
+    "integShareTitle": "Partajează fișiere cu echipa ta",
+    "integShareDesc": "Trimite documente între contul principal și subconturile cabinetului tău. Toți membrii echipei accesează fișierele partajate instantaneu."
   },
   "legal": {
     "backToHome": "Înapoi la pagina principală",

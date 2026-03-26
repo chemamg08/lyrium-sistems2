@@ -1212,7 +1212,11 @@
     "integCalTitle": "Google Calendar",
     "integCalDesc": "Conecta Google Calendar para ver y gestionar tus próximas citas y plazos directamente desde el panel de control sin cambiar entre aplicaciones.",
     "integZapierTitle": "Zapier & Make",
-    "integZapierDesc": "Conecta tu despacho con más de 5.000 aplicaciones mediante webhooks y claves API. Automatiza notificaciones de nuevos clientes, contratos, firmas, facturas y más con Zapier, Make o tus propias herramientas."
+    "integZapierDesc": "Conecta tu despacho con más de 5.000 aplicaciones mediante webhooks y claves API. Automatiza notificaciones de nuevos clientes, contratos, firmas, facturas y más con Zapier, Make o tus propias herramientas.",
+    "integAITitle": "Personaliza tu IA",
+    "integAIDesc": "Sube jurisprudencia, estrategias o casos pasados en PDF y la IA los utilizará para darte respuestas más precisas y adaptadas a tu despacho.",
+    "integShareTitle": "Comparte archivos con tu equipo",
+    "integShareDesc": "Envía documentos entre la cuenta principal y las subcuentas de tu despacho. Todos los miembros del equipo acceden a los archivos compartidos al instante."
   },
   "legal": {
     "backToHome": "Volver al inicio",

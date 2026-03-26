@@ -1206,7 +1206,11 @@
     "integCalTitle": "Google Calendar",
     "integCalDesc": "Verbind Google Calendar om aankomende afspraken en deadlines direct vanuit het dashboard te bekijken en beheren zonder tussen apps te schakelen.",
     "integZapierTitle": "Zapier & Make",
-    "integZapierDesc": "Verbind uw kantoor met meer dan 5.000 apps via webhooks en API-sleutels. Automatiseer meldingen voor nieuwe klanten, contracten, handtekeningen, facturen en meer met Zapier, Make of uw eigen tools."
+    "integZapierDesc": "Verbind uw kantoor met meer dan 5.000 apps via webhooks en API-sleutels. Automatiseer meldingen voor nieuwe klanten, contracten, handtekeningen, facturen en meer met Zapier, Make of uw eigen tools.",
+    "integAITitle": "Pas uw AI aan",
+    "integAIDesc": "Upload jurisprudentie, strategieën of eerdere zaken als PDF en de AI zal deze gebruiken om u nauwkeurigere en op uw kantoor afgestemde antwoorden te geven.",
+    "integShareTitle": "Deel bestanden met uw team",
+    "integShareDesc": "Verstuur documenten tussen het hoofdaccount en de subaccounts van uw kantoor. Alle teamleden hebben direct toegang tot gedeelde bestanden."
   },
   "legal": {
     "backToHome": "Terug naar startpagina",

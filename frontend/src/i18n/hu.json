@@ -1205,7 +1205,11 @@
     "integCalTitle": "Google Calendar",
     "integCalDesc": "Csatlakoztassa a Google Calendart, hogy közvetlenül az irányítópultról tekinthesse meg és kezelhesse a közelgő megbeszéléseket és határidőket alkalmazásváltás nélkül.",
     "integZapierTitle": "Zapier & Make",
-    "integZapierDesc": "Csatlakoztassa irodáját több mint 5000 alkalmazáshoz webhookok és API-kulcsok segítségével. Automatizálja az értesítéseket új ügyfelekről, szerződésekről, aláírásokról, számlákról és még többről a Zapier, Make vagy saját eszközei segítségével."
+    "integZapierDesc": "Csatlakoztassa irodáját több mint 5000 alkalmazáshoz webhookok és API-kulcsok segítségével. Automatizálja az értesítéseket új ügyfelekről, szerződésekről, aláírásokról, számlákról és még többről a Zapier, Make vagy saját eszközei segítségével.",
+    "integAITitle": "Szabja testre az AI-t",
+    "integAIDesc": "Töltsön fel joggyakorlatot, stratégiákat vagy korábbi ügyeket PDF formátumban, és az AI felhasználja ezeket, hogy pontosabb és az irodájára szabott válaszokat adjon.",
+    "integShareTitle": "Osszon meg fájlokat a csapatával",
+    "integShareDesc": "Küldjeön dokumentumokat a fő fiók és az irodája alfiókjai között. Minden csapattag azonnal hozzáfér a megosztott fájlokhoz."
   },
   "legal": {
     "backToHome": "Vissza a főoldalra",

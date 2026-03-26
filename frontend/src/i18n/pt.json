@@ -1206,7 +1206,11 @@
     "integCalTitle": "Google Calendar",
     "integCalDesc": "Ligue o Google Calendar para ver e gerir reuniões e prazos futuros diretamente do painel de controlo sem alternar entre aplicações.",
     "integZapierTitle": "Zapier & Make",
-    "integZapierDesc": "Ligue o seu escritório a mais de 5.000 aplicações através de webhooks e chaves API. Automatize notificações de novos clientes, contratos, assinaturas, faturas e mais com Zapier, Make ou as suas próprias ferramentas."
+    "integZapierDesc": "Ligue o seu escritório a mais de 5.000 aplicações através de webhooks e chaves API. Automatize notificações de novos clientes, contratos, assinaturas, faturas e mais com Zapier, Make ou as suas próprias ferramentas.",
+    "integAITitle": "Personalize a sua IA",
+    "integAIDesc": "Carregue jurisprudência, estratégias ou casos anteriores em PDF e a IA utilizará essas informações para fornecer respostas mais precisas e adaptadas ao seu escritório.",
+    "integShareTitle": "Partilhe ficheiros com a sua equipa",
+    "integShareDesc": "Envie documentos entre a conta principal e as subcontas do seu escritório. Todos os membros da equipa acedem aos ficheiros partilhados instantaneamente."
   },
   "legal": {
     "backToHome": "Voltar ao início",

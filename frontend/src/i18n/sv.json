@@ -1205,7 +1205,11 @@
     "integCalTitle": "Google Calendar",
     "integCalDesc": "Anslut Google Calendar för att visa och hantera kommande möten och deadlines direkt från instrumentpanelen utan att växla mellan appar.",
     "integZapierTitle": "Zapier & Make",
-    "integZapierDesc": "Anslut ditt kontor till över 5 000 appar via webhooks och API-nycklar. Automatisera aviseringar om nya klienter, kontrakt, signaturer, fakturor och mer med Zapier, Make eller dina egna verktyg."
+    "integZapierDesc": "Anslut ditt kontor till över 5 000 appar via webhooks och API-nycklar. Automatisera aviseringar om nya klienter, kontrakt, signaturer, fakturor och mer med Zapier, Make eller dina egna verktyg.",
+    "integAITitle": "Anpassa din AI",
+    "integAIDesc": "Ladda upp rättspraxis, strategier eller tidigare ärenden som PDF och AI:n kommer att använda dem för att ge dig mer precisa och anpassade svar för din byrå.",
+    "integShareTitle": "Dela filer med ditt team",
+    "integShareDesc": "Skicka dokument mellan huvudkontot och underkontona på din byrå. Alla teammedlemmar får omedelbar tillgång till delade filer."
   },
   "legal": {
     "backToHome": "Tillbaka till startsidan",

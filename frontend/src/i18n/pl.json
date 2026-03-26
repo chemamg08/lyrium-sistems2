@@ -1205,7 +1205,11 @@
     "integCalTitle": "Google Calendar",
     "integCalDesc": "Połącz Google Calendar, aby przeglądać i zarządzać nadchodzącymi spotkaniami i terminami bezpośrednio z panelu sterowania bez przełączania między aplikacjami.",
     "integZapierTitle": "Zapier & Make",
-    "integZapierDesc": "Połącz swoją kancelarię z ponad 5000 aplikacjami za pomocą webhooków i kluczy API. Automatyzuj powiadomienia o nowych klientach, umowach, podpisach, fakturach i więcej z Zapier, Make lub własnymi narzędziami."
+    "integZapierDesc": "Połącz swoją kancelarię z ponad 5000 aplikacjami za pomocą webhooków i kluczy API. Automatyzuj powiadomienia o nowych klientach, umowach, podpisach, fakturach i więcej z Zapier, Make lub własnymi narzędziami.",
+    "integAITitle": "Dostosuj swoją AI",
+    "integAIDesc": "Prześlij orzecznictwo, strategie lub wcześniejsze sprawy w formacie PDF, a AI wykorzysta je, aby udzielać bardziej precyzyjnych i dostosowanych do Twojej kancelarii odpowiedzi.",
+    "integShareTitle": "Udostępniaj pliki swojemu zespołowi",
+    "integShareDesc": "Wysyłaj dokumenty między kontem głównym a subkontami Twojej kancelarii. Wszyscy członkowie zespołu mają natychmiastowy dostęp do udostępnionych plików."
   },
   "legal": {
     "backToHome": "Powrót do strony głównej",

@@ -1205,7 +1205,11 @@
     "integCalTitle": "Google Calendar",
     "integCalDesc": "Koble til Google Calendar for å se og administrere kommende møter og frister direkte fra dashbordet uten å bytte mellom apper.",
     "integZapierTitle": "Zapier & Make",
-    "integZapierDesc": "Koble kontoret ditt til over 5 000 apper via webhooks og API-nøkler. Automatiser varsler om nye klienter, kontrakter, signaturer, fakturaer og mer med Zapier, Make eller dine egne verktøy."
+    "integZapierDesc": "Koble kontoret ditt til over 5 000 apper via webhooks og API-nøkler. Automatiser varsler om nye klienter, kontrakter, signaturer, fakturaer og mer med Zapier, Make eller dine egne verktøy.",
+    "integAITitle": "Tilpass din AI",
+    "integAIDesc": "Last opp rettspraksis, strategier eller tidligere saker som PDF, og AI-en vil bruke dem til å gi deg mer presise og tilpassede svar for ditt advokatfirma.",
+    "integShareTitle": "Del filer med teamet ditt",
+    "integShareDesc": "Send dokumenter mellom hovedkontoen og underkontocne til firmaet ditt. Alle teammedlemmer får umiddelbar tilgang til delte filer."
   },
   "legal": {
     "backToHome": "Tilbake til forsiden",

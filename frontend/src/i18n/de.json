@@ -1233,7 +1233,11 @@
     "integCalTitle": "Google Calendar",
     "integCalDesc": "Verbinden Sie Google Calendar, um anstehende Termine und Fristen direkt vom Dashboard aus einzusehen und zu verwalten, ohne zwischen Apps wechseln zu müssen.",
     "integZapierTitle": "Zapier & Make",
-    "integZapierDesc": "Verbinden Sie Ihre Kanzlei mit über 5.000 Apps über Webhooks und API-Schlüssel. Automatisieren Sie Benachrichtigungen für neue Mandanten, Verträge, Unterschriften, Rechnungen und mehr mit Zapier, Make oder Ihren eigenen Tools."
+    "integZapierDesc": "Verbinden Sie Ihre Kanzlei mit über 5.000 Apps über Webhooks und API-Schlüssel. Automatisieren Sie Benachrichtigungen für neue Mandanten, Verträge, Unterschriften, Rechnungen und mehr mit Zapier, Make oder Ihren eigenen Tools.",
+    "integAITitle": "Passen Sie Ihre KI an",
+    "integAIDesc": "Laden Sie Rechtsprechung, Strategien oder frühere Fälle als PDF hoch und die KI nutzt diese, um Ihnen präzisere und auf Ihre Kanzlei zugeschnittene Antworten zu geben.",
+    "integShareTitle": "Dateien mit Ihrem Team teilen",
+    "integShareDesc": "Senden Sie Dokumente zwischen dem Hauptkonto und den Unterkonten Ihrer Kanzlei. Alle Teammitglieder können sofort auf geteilte Dateien zugreifen."
   },
   "legal": {
     "backToHome": "Zurück zur Startseite",

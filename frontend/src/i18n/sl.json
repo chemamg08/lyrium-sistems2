@@ -1205,7 +1205,11 @@
     "integCalTitle": "Google Calendar",
     "integCalDesc": "Povežite Google Calendar za pregled in upravljanje prihajajočih sestankov in rokov neposredno z nadzorne plošče brez preklapljanja med aplikacijami.",
     "integZapierTitle": "Zapier & Make",
-    "integZapierDesc": "Povežite svojo pisarno z več kot 5.000 aplikacijami prek webhookov in API ključev. Avtomatizirajte obvestila o novih strankah, pogodbah, podpisih, računih in več z Zapier, Make ali lastnimi orodji."
+    "integZapierDesc": "Povežite svojo pisarno z več kot 5.000 aplikacijami prek webhookov in API ključev. Avtomatizirajte obvestila o novih strankah, pogodbah, podpisih, računih in več z Zapier, Make ali lastnimi orodji.",
+    "integAITitle": "Prilagodite svojo AI",
+    "integAIDesc": "Naložite sodno prakso, strategije ali pretekle primere v PDF formatu in AI jih bo uporabila za natančnejše in prilagojene odgovore za vašo pisarno.",
+    "integShareTitle": "Delite datoteke s svojo ekipo",
+    "integShareDesc": "Pošiljajte dokumente med glavnim računom in podračuni vaše pisarne. Vsi člani ekipe imajo takojšen dostop do deljenih datotek."
   },
   "legal": {
     "backToHome": "Nazaj na začetno stran",

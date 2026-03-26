@@ -1209,7 +1209,11 @@
     "integCalTitle": "Google Calendar",
     "integCalDesc": "Connectez Google Calendar pour consulter et gérer vos prochains rendez-vous et échéances directement depuis le tableau de bord sans changer d'application.",
     "integZapierTitle": "Zapier & Make",
-    "integZapierDesc": "Connectez votre cabinet à plus de 5 000 applications via webhooks et clés API. Automatisez les notifications de nouveaux clients, contrats, signatures, factures et plus avec Zapier, Make ou vos propres outils."
+    "integZapierDesc": "Connectez votre cabinet à plus de 5 000 applications via webhooks et clés API. Automatisez les notifications de nouveaux clients, contrats, signatures, factures et plus avec Zapier, Make ou vos propres outils.",
+    "integAITitle": "Personnalisez votre IA",
+    "integAIDesc": "Téléchargez de la jurisprudence, des stratégies ou des dossiers passés en PDF et l’IA les utilisera pour vous fournir des réponses plus précises et adaptées à votre cabinet.",
+    "integShareTitle": "Partagez des fichiers avec votre équipe",
+    "integShareDesc": "Envoyez des documents entre le compte principal et les sous-comptes de votre cabinet. Tous les membres de l’équipe accèdent aux fichiers partagés instantanément."
   },
   "legal": {
     "backToHome": "Retour à l'accueil",

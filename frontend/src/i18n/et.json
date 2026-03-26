@@ -1205,7 +1205,11 @@
     "integCalTitle": "Google Calendar",
     "integCalDesc": "Ühendage Google Calendar, et vaadata ja hallata eelseisvaid kohtumisi ja tähtaegu otse juhtpaneelilt ilma rakenduste vahel vahetamata.",
     "integZapierTitle": "Zapier & Make",
-    "integZapierDesc": "Ühendage oma büroo üle 5000 rakendusega webhookide ja API-võtmete kaudu. Automatiseerige teavitusi uute klientide, lepingute, allkirjade, arvete ja muu kohta Zapieri, Make'i või oma tööriistadega."
+    "integZapierDesc": "Ühendage oma büroo üle 5000 rakendusega webhookide ja API-võtmete kaudu. Automatiseerige teavitusi uute klientide, lepingute, allkirjade, arvete ja muu kohta Zapieri, Make'i või oma tööriistadega.",
+    "integAITitle": "Kohanda oma AI-d",
+    "integAIDesc": "Laadige üles kohtupraktikat, strateegiaid või varasemaid juhtumeid PDF-vormingus ja AI kasutab neid, et anda teile täpsemaid ja teie büroole kohandatud vastuseid.",
+    "integShareTitle": "Jagage faile oma meeskonnaga",
+    "integShareDesc": "Saatke dokumente peakonto ja oma büroo alamkontode vahel. Kõik meeskonnaliikmed pääsevad jagatud failidele koheselt ligi."
   },
   "legal": {
     "backToHome": "Tagasi avalehele",

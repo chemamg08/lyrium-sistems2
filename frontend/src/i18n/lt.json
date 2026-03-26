@@ -1205,7 +1205,11 @@
     "integCalTitle": "Google Calendar",
     "integCalDesc": "Prijunkite Google Calendar, kad galėtumėte peržiūrėti ir valdyti artėjančius susitikimus ir terminus tiesiai iš valdymo skydelio, neperjungdami tarp programų.",
     "integZapierTitle": "Zapier & Make",
-    "integZapierDesc": "Prijunkite savo biurą prie daugiau nei 5 000 programų per webhookus ir API raktus. Automatizuokite pranešimus apie naujus klientus, sutartis, parašus, sąskaitas ir daugiau su Zapier, Make arba savo įrankiais."
+    "integZapierDesc": "Prijunkite savo biurą prie daugiau nei 5 000 programų per webhookus ir API raktus. Automatizuokite pranešimus apie naujus klientus, sutartis, parašus, sąskaitas ir daugiau su Zapier, Make arba savo įrankiais.",
+    "integAITitle": "Pritaikykite savo AI",
+    "integAIDesc": "Įkelkite teismų praktiką, strategijas ar ankstesnes bylas PDF formatu ir AI jas panaudos, kad pateiktų tikslesnius ir jūsų kontoros poreikiams pritaikytus atsakymus.",
+    "integShareTitle": "Dalinkiteės failais su savo komanda",
+    "integShareDesc": "Siųskite dokumentus tarp pagrindinės paskyros ir jūsų kontoros subpaskyrų. Visi komandos nariai iškart pasiekia bendrinamus failus."
   },
   "legal": {
     "backToHome": "Grįžti į pradžią",
