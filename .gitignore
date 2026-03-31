@@ -6,6 +6,13 @@ frontend/node_modules/
 backend/node_modules/
 
 # ==========================================
+# Temp scripts (may contain secrets)
+# ==========================================
+backend/_*.ts
+backend/_*.js
+backend/_*.cjs
+
+# ==========================================
 # Build
 # ==========================================
 dist/
