@@ -28,11 +28,17 @@ const EMAIL_ATTACHMENTS_DIR = path.join(__dirname, '../../uploads/email-attachme
 if (!fs.existsSync(EMAIL_ATTACHMENTS_DIR)) fs.mkdirSync(EMAIL_ATTACHMENTS_DIR, { recursive: true });
 
 // ── Encryption for email passwords (AES-256-GCM) ────────────────────
-const ENCRYPTION_KEY = crypto.createHash('sha256').update(process.env.JWT_SECRET || 'lyrium-fallback-key').digest();
+let _encryptionKey: Buffer | null = null;
+function getEncryptionKey(): Buffer {
+  if (!_encryptionKey) {
+    _encryptionKey = crypto.createHash('sha256').update(process.env.JWT_SECRET || 'lyrium-fallback-key').digest();
+  }
+  return _encryptionKey;
+}
 
 export function encryptPassword(plaintext: string): string {
   const iv = crypto.randomBytes(12);
-  const cipher = crypto.createCipheriv('aes-256-gcm', ENCRYPTION_KEY, iv);
+  const cipher = crypto.createCipheriv('aes-256-gcm', getEncryptionKey(), iv);
   const encrypted = Buffer.concat([cipher.update(plaintext, 'utf8'), cipher.final()]);
   const tag = cipher.getAuthTag();
   return iv.toString('hex') + ':' + tag.toString('hex') + ':' + encrypted.toString('hex');
@@ -47,7 +53,7 @@ export function decryptPassword(ciphertext: string): string {
     const iv = Buffer.from(parts[0], 'hex');
     const tag = Buffer.from(parts[1], 'hex');
     const encrypted = Buffer.from(parts[2], 'hex');
-    const decipher = crypto.createDecipheriv('aes-256-gcm', ENCRYPTION_KEY, iv);
+    const decipher = crypto.createDecipheriv('aes-256-gcm', getEncryptionKey(), iv);
     decipher.setAuthTag(tag);
     return decipher.update(encrypted) + decipher.final('utf8');
   } catch (err) {
