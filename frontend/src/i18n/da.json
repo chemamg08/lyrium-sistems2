@@ -16,7 +16,7 @@
     "writing": "Skrivning",
     "settings": "Indstillinger",
     "logout": "Log ud",
-    "taxCompliance": "Tax Compliance",
+    "taxCompliance": "Skatteoverholdelse",
     "beta": "Beta"
   },
   "auth": {
@@ -755,7 +755,7 @@
     "currentPlan": "Nuværende plan:",
     "monthly": "Månedlig",
     "annual": "Årlig",
-    "savePerYear": "Spar {{amount}}€ om året",
+    "savePerYear": "Spar {{amount}} om året",
     "autoRenewLabel": "Automatisk fornyelse",
     "autoRenewDesc": "Fornyes automatisk ved periodens slutning",
     "changePlan": "Skift plan",
@@ -816,7 +816,24 @@
     "intWebhookCreated": "Webhook oprettet",
     "intWebhookDeleted": "Webhook slettet",
     "intTestSent": "Testhændelse sendt",
-    "intTestFailed": "Fejl ved afsendelse af testhændelse"
+    "intTestFailed": "Fejl ved afsendelse af testhændelse",
+    "billingProfileTitle": "Faktureringsoplysninger",
+    "billingProfileDesc": "Disse oplysninger vises på dine fakturaer som kundedata.",
+    "companyNameLabel": "Firmanavn",
+    "companyNamePlaceholder": "F.eks.: Advokatfirmaet Jensen",
+    "companyCIFLabel": "CVR-nummer",
+    "companyCIFPlaceholder": "F.eks.: DK12345678",
+    "companyAddressLabel": "Adresse",
+    "companyAddressPlaceholder": "F.eks.: Strøget 10, 1000 København",
+    "companyPhoneLabel": "Telefon",
+    "companyPhonePlaceholder": "F.eks.: +45 12 34 56 78",
+    "companyEmailLabel": "Faktura-e-mail",
+    "companyEmailPlaceholder": "F.eks.: faktura@firma.dk",
+    "invoiceNotesLabel": "Yderligere oplysninger",
+    "invoiceNotesPlaceholder": "Ekstra oplysninger til fakturaen",
+    "saveBillingProfile": "Gem faktureringsoplysninger",
+    "billingProfileSaved": "Faktureringsoplysninger gemt",
+    "errorSaveBillingProfile": "Fejl ved gemning af faktureringsoplysninger"
   },
   "renewal": {
     "title": "Forny abonnement",
@@ -1124,7 +1141,7 @@
     "solution3": "Alle kundeoplysninger centraliseret ét sted",
     "solution4": "E-mail og WhatsApp integreret i et enkelt automatiseret panel",
     "roiLabel": "Produktiv investering",
-    "roiH2a": "250 € / måned.",
+    "roiH2a": "{{price}} / måned.",
     "roiH2b": "Genvundet på det første tilfælde.",
     "roiDesc": "En advokat, der fakturerer 150 €/time, får den månedlige investering tilbage med kun 2 ekstra timers produktivt arbejde. Lyrium giver dig mere end 12 timer tilbage om ugen. Lav matematikken.",
     "modulesLabel": "Moduler",
@@ -1149,7 +1166,7 @@
     "pricingLabel": "Priser",
     "pricingH2": "Enkelt og uden overraskelser",
     "freeTrial": "14 dages gratis prøveperiode",
-    "pricingDesc": "Fuld adgang til alle moduler. Ingen kunstige grænser.",
+    "pricingDesc": "Fuld adgang til alle moduler.",
     "planMonthly": "Månedlig",
     "planMonthlyNote": "Faktureres månedligt",
     "planUnitMonthly": "€ / md.",
@@ -1209,7 +1226,17 @@
     "integAITitle": "Tilpas din AI",
     "integAIDesc": "Upload retspraksis, strategier eller tidligere sager som PDF, og AI’en vil bruge dem til at give dig mere præcise og tilpassede svar til dit advokatfirma.",
     "integShareTitle": "Del filer med dit team",
-    "integShareDesc": "Send dokumenter mellem hovedkontoen og underkontiene i dit firma. Alle teammedlemmer får øjeblikkelig adgang til delte filer."
+    "integShareDesc": "Send dokumenter mellem hovedkontoen og underkontiene i dit firma. Alle teammedlemmer får øjeblikkelig adgang til delte filer.",
+    "planStarterName": "Starter",
+    "planStarterSub": "Til små advokatfirmaer",
+    "planStarterSubaccounts": "Op til 4 underkonti",
+    "planAdvancedName": "Avanceret",
+    "planAdvancedSub": "Til større teams",
+    "planAdvancedSubaccounts": "Op til 10 underkonti",
+    "perMonth": "/ md",
+    "perYear": "/ år",
+    "planAnnualEquiv": "Svarer til {{perMonth}} / md — spar {{saving}}",
+    "billedInEur": "Priserne vises som reference. Faktureringen sker i euro (EUR)."
   },
   "legal": {
     "backToHome": "Tilbage til forsiden",
@@ -1285,97 +1312,97 @@
     "documentName": "Dokumentnavn"
   },
   "taxCompliance": {
-    "title": "Tax Compliance",
-    "subtitle": "Complete tax tracking: calculated, filed and paid.",
-    "newObligation": "New obligation",
+    "title": "Skatteoverholdelse",
+    "subtitle": "Komplet skatteopfølgning: beregnet, indberettet og betalt.",
+    "newObligation": "Ny forpligtelse",
     "tabs": {
-      "obligations": "Obligations",
-      "calendar": "Calendar",
-      "summary": "Summary"
+      "obligations": "Forpligtelser",
+      "calendar": "Kalender",
+      "summary": "Oversigt"
     },
     "filters": {
-      "searchPlaceholder": "Search by client, model or period",
+      "searchPlaceholder": "Søg efter klient, model eller periode",
       "status": "Status",
-      "client": "Client",
-      "all": "All",
-      "allClients": "All clients"
+      "client": "Klient",
+      "all": "Alle",
+      "allClients": "Alle klienter"
     },
     "table": {
-      "client": "Client",
+      "client": "Klient",
       "model": "Model",
-      "period": "Period",
-      "amount": "Amount",
+      "period": "Periode",
+      "amount": "Beløb",
       "status": "Status",
-      "actions": "Actions",
-      "noResults": "No obligations for the current filters."
+      "actions": "Handlinger",
+      "noResults": "Ingen forpligtelser for de aktuelle filtre."
     },
     "actions": {
       "pdf": "PDF",
-      "markFiled": "Filed",
-      "markPaid": "Paid",
-      "officialPortal": "Official portal",
-      "delete": "Delete"
+      "markFiled": "Indberettet",
+      "markPaid": "Betalt",
+      "officialPortal": "Officiel portal",
+      "delete": "Slet"
     },
     "calendar": {
-      "title": "Upcoming deadlines",
-      "description": "Obligations due in the next 30 days.",
-      "empty": "No upcoming deadlines.",
-      "dueLabel": "Due"
+      "title": "Kommende frister",
+      "description": "Forpligtelser der forfalder inden for 30 dage.",
+      "empty": "Ingen kommende frister.",
+      "dueLabel": "Forfalder"
     },
     "summary": {
-      "totalObligations": "Total obligations",
-      "totalEstimated": "Total estimated",
-      "pendingPayment": "Pending payment",
-      "currentStatus": "Current status",
-      "currentStatusLine": "Calculated: {{calculated}} · Filed: {{filed}} · Paid: {{paid}}"
+      "totalObligations": "Samlede forpligtelser",
+      "totalEstimated": "Samlet estimat",
+      "pendingPayment": "Afventende betaling",
+      "currentStatus": "Aktuel status",
+      "currentStatusLine": "Beregnet: {{calculated}} · Indberettet: {{filed}} · Betalt: {{paid}}"
     },
     "dialog": {
-      "title": "New tax obligation",
-      "description": "Select client, saved calculation and model to create a traceable obligation.",
-      "client": "Client",
-      "selectClient": "Select a client",
-      "savedCalculation": "Saved calculation",
-      "selectCalculation": "Select a calculation",
-      "taxModel": "Tax model",
+      "title": "Ny skatteforpligtelse",
+      "description": "Vælg klient, gemt beregning og model for at oprette en sporbar forpligtelse.",
+      "client": "Klient",
+      "selectClient": "Vælg en klient",
+      "savedCalculation": "Gemt beregning",
+      "selectCalculation": "Vælg en beregning",
+      "taxModel": "Skattemodel",
       "modelPlaceholder": "Model",
-      "period": "Period",
-      "notes": "Notes",
-      "optional": "Optional",
-      "creating": "Creating...",
-      "create": "Create obligation"
+      "period": "Periode",
+      "notes": "Noter",
+      "optional": "Valgfrit",
+      "creating": "Opretter...",
+      "create": "Opret forpligtelse"
     },
     "status": {
-      "draft": "Draft",
-      "calculated": "Calculated",
-      "filed": "Filed",
-      "paid": "Paid",
-      "overdue": "Overdue",
-      "error": "Error"
+      "draft": "Kladde",
+      "calculated": "Beregnet",
+      "filed": "Indberettet",
+      "paid": "Betalt",
+      "overdue": "Forfalden",
+      "error": "Fejl"
     },
     "toasts": {
-      "accountCountryRequiredTitle": "Account country required",
-      "accountCountryRequiredDesc": "The account has no configured country. Set the account country before creating obligations.",
-      "selectCalculation": "Select a saved calculation",
-      "selectTaxModel": "Select a tax model",
-      "createObligationFailed": "Could not create the obligation.",
-      "obligationCreatedTitle": "Obligation created",
-      "obligationCreatedDesc": "You can manage it from the table now.",
-      "updateStatusFailed": "Could not update the status.",
-      "downloadPdfFailed": "Could not download the PDF.",
-      "deleteFailed": "Could not delete the obligation.",
-      "deletedTitle": "Obligation deleted",
-      "deletedDesc": "The obligation was deleted successfully."
+      "accountCountryRequiredTitle": "Kontoland påkrævet",
+      "accountCountryRequiredDesc": "Kontoen har ikke et konfigureret land. Angiv kontoland før du opretter forpligtelser.",
+      "selectCalculation": "Vælg en gemt beregning",
+      "selectTaxModel": "Vælg en skattemodel",
+      "createObligationFailed": "Kunne ikke oprette forpligtelsen.",
+      "obligationCreatedTitle": "Forpligtelse oprettet",
+      "obligationCreatedDesc": "Du kan administrere den fra tabellen nu.",
+      "updateStatusFailed": "Kunne ikke opdatere status.",
+      "downloadPdfFailed": "Kunne ikke downloade PDF.",
+      "deleteFailed": "Kunne ikke slette forpligtelsen.",
+      "deletedTitle": "Forpligtelse slettet",
+      "deletedDesc": "Forpligtelsen blev slettet."
     },
     "beta": {
       "button": "Beta",
-      "title": "Tax Compliance (Beta)",
+      "title": "Skatteoverholdelse (Beta)",
       "description": "Du bruger en funktion i tidlig adgang, som er aktiv og i drift, med lobende forbedringer. Selvom vi tilstraber maksimal stabilitet, kan der forekomme fejl, afbrydelser eller unojagtige resultater under videreudviklingen. Brug funktionen som stotte, og verificer altid resultatet, for du tager skattemassige eller juridiske beslutninger. I naeste opdatering bliver funktionaliteten fuldt implementeret for at sikre optimal drift i alle lande. Lyrium garanterer ikke fuldstaendig fejlfrihed i denne version og paatager sig intet ansvar for beslutninger truffet udelukkende pa baggrund af denne beta-funktion."
     },
     "deleteDialog": {
-      "title": "Delete obligation?",
-      "description": "This action cannot be undone. The obligation will be permanently deleted.",
-      "confirm": "Delete obligation",
-      "deleting": "Deleting..."
+      "title": "Slet forpligtelse?",
+      "description": "Denne handling kan ikke fortrydes. Forpligtelsen slettes permanent.",
+      "confirm": "Slet forpligtelse",
+      "deleting": "Sletter..."
     }
   }
 }

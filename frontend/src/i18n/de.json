@@ -17,7 +17,7 @@
     "settings": "Einstellungen",
     "logout": "Abmelden",
     "writing": "Schreiben",
-    "taxCompliance": "Tax Compliance",
+    "taxCompliance": "Steuer-Compliance",
     "beta": "Beta"
   },
   "auth": {
@@ -1001,7 +1001,7 @@
     "planStarter": "Starter-Plan",
     "processing": "Wird verarbeitet...",
     "removeCardBtn": "Karte entfernen und Verlängerung abbrechen",
-    "savePerYear": "Sparen Sie {{amount}}€ pro Jahr",
+    "savePerYear": "Sparen Sie {{amount}} pro Jahr",
     "subaccountLimitReached": "Sie haben das Limit an {{max}}-Unterkonten für Ihren {{plan}}-Plan erreicht. Aktualisieren Sie Ihren Plan, um weitere Unterkonten zu erstellen.",
     "subaccounts": "Unterkonten",
     "subscribe": "Abonnieren",
@@ -1042,7 +1042,24 @@
     "intWebhookCreated": "Webhook erstellt",
     "intWebhookDeleted": "Webhook gelöscht",
     "intTestSent": "Testereignis gesendet",
-    "intTestFailed": "Fehler beim Senden des Testereignisses"
+    "intTestFailed": "Fehler beim Senden des Testereignisses",
+    "billingProfileTitle": "Rechnungsinformationen",
+    "billingProfileDesc": "Diese Informationen erscheinen auf Ihren Rechnungen als Kundendaten.",
+    "companyNameLabel": "Kanzleiname",
+    "companyNamePlaceholder": "z.B.: Kanzlei Müller & Partner",
+    "companyCIFLabel": "USt-IdNr.",
+    "companyCIFPlaceholder": "z.B.: DE123456789",
+    "companyAddressLabel": "Adresse",
+    "companyAddressPlaceholder": "z.B.: Hauptstraße 10, 10115 Berlin",
+    "companyPhoneLabel": "Telefon",
+    "companyPhonePlaceholder": "z.B.: +49 30 1234567",
+    "companyEmailLabel": "Rechnungs-E-Mail",
+    "companyEmailPlaceholder": "z.B.: buchhaltung@kanzlei.de",
+    "invoiceNotesLabel": "Zusätzliche Informationen",
+    "invoiceNotesPlaceholder": "Zusätzliche Angaben für die Rechnung",
+    "saveBillingProfile": "Rechnungsdaten speichern",
+    "billingProfileSaved": "Rechnungsdaten gespeichert",
+    "errorSaveBillingProfile": "Fehler beim Speichern der Rechnungsdaten"
   },
   "renewal": {
     "account": "Konto:",
@@ -1152,7 +1169,7 @@
     "solution3": "Alle Mandanteninformationen an einem zentralen Ort",
     "solution4": "E-Mail und WhatsApp in einem automatisierten Panel integriert",
     "roiLabel": "Produktive Investition",
-    "roiH2a": "250 € / Monat.",
+    "roiH2a": "{{price}} / Monat.",
     "roiH2b": "Bereits beim ersten Fall amortisiert.",
     "roiDesc": "Ein Anwalt, der mit 150 €/Stunde abrechnet, amortisiert die monatliche Investition mit nur 2 zusätzlichen Stunden produktiver Arbeit. Lyrium gibt Ihnen mehr als 12 Stunden pro Woche zurück. Rechnen Sie nach.",
     "modulesLabel": "Module",
@@ -1177,7 +1194,7 @@
     "pricingLabel": "Preise",
     "pricingH2": "Einfach und ohne Überraschungen",
     "freeTrial": "14 Tage kostenlos testen",
-    "pricingDesc": "Voller Zugriff auf alle Module. Keine künstlichen Grenzen.",
+    "pricingDesc": "Vollständiger Zugang zu allen Modulen.",
     "planMonthly": "Monatlich",
     "planMonthlyNote": "Monatliche Abrechnung",
     "planUnitMonthly": "€ / Monat",
@@ -1237,7 +1254,17 @@
     "integAITitle": "Passen Sie Ihre KI an",
     "integAIDesc": "Laden Sie Rechtsprechung, Strategien oder frühere Fälle als PDF hoch und die KI nutzt diese, um Ihnen präzisere und auf Ihre Kanzlei zugeschnittene Antworten zu geben.",
     "integShareTitle": "Dateien mit Ihrem Team teilen",
-    "integShareDesc": "Senden Sie Dokumente zwischen dem Hauptkonto und den Unterkonten Ihrer Kanzlei. Alle Teammitglieder können sofort auf geteilte Dateien zugreifen."
+    "integShareDesc": "Senden Sie Dokumente zwischen dem Hauptkonto und den Unterkonten Ihrer Kanzlei. Alle Teammitglieder können sofort auf geteilte Dateien zugreifen.",
+    "planStarterName": "Starter",
+    "planStarterSub": "Für kleine Kanzleien",
+    "planStarterSubaccounts": "Bis zu 4 Unterkonten",
+    "planAdvancedName": "Erweitert",
+    "planAdvancedSub": "Für größere Teams",
+    "planAdvancedSubaccounts": "Bis zu 10 Unterkonten",
+    "perMonth": "/ Monat",
+    "perYear": "/ Jahr",
+    "planAnnualEquiv": "Entspricht {{perMonth}} / Monat — sparen Sie {{saving}}",
+    "billedInEur": "Preise als Referenz. Die Abrechnung erfolgt in Euro (EUR)."
   },
   "legal": {
     "backToHome": "Zurück zur Startseite",
@@ -1313,97 +1340,97 @@
     "documentName": "Dokumentname"
   },
   "taxCompliance": {
-    "title": "Tax Compliance",
-    "subtitle": "Complete tax tracking: calculated, filed and paid.",
-    "newObligation": "New obligation",
+    "title": "Steuer-Compliance",
+    "subtitle": "Vollständige Steuerverfolgung: berechnet, eingereicht und bezahlt.",
+    "newObligation": "Neue Verpflichtung",
     "tabs": {
-      "obligations": "Obligations",
-      "calendar": "Calendar",
-      "summary": "Summary"
+      "obligations": "Verpflichtungen",
+      "calendar": "Kalender",
+      "summary": "Zusammenfassung"
     },
     "filters": {
-      "searchPlaceholder": "Search by client, model or period",
+      "searchPlaceholder": "Nach Mandant, Modell oder Zeitraum suchen",
       "status": "Status",
-      "client": "Client",
-      "all": "All",
-      "allClients": "All clients"
+      "client": "Mandant",
+      "all": "Alle",
+      "allClients": "Alle Mandanten"
     },
     "table": {
-      "client": "Client",
-      "model": "Model",
-      "period": "Period",
-      "amount": "Amount",
+      "client": "Mandant",
+      "model": "Modell",
+      "period": "Zeitraum",
+      "amount": "Betrag",
       "status": "Status",
-      "actions": "Actions",
-      "noResults": "No obligations for the current filters."
+      "actions": "Aktionen",
+      "noResults": "Keine Verpflichtungen für die aktuellen Filter."
     },
     "actions": {
       "pdf": "PDF",
-      "markFiled": "Filed",
-      "markPaid": "Paid",
-      "officialPortal": "Official portal",
-      "delete": "Delete"
+      "markFiled": "Eingereicht",
+      "markPaid": "Bezahlt",
+      "officialPortal": "Offizielles Portal",
+      "delete": "Löschen"
     },
     "calendar": {
-      "title": "Upcoming deadlines",
-      "description": "Obligations due in the next 30 days.",
-      "empty": "No upcoming deadlines.",
-      "dueLabel": "Due"
+      "title": "Anstehende Fristen",
+      "description": "Verpflichtungen, die in den nächsten 30 Tagen fällig sind.",
+      "empty": "Keine anstehenden Fristen.",
+      "dueLabel": "Fällig"
     },
     "summary": {
-      "totalObligations": "Total obligations",
-      "totalEstimated": "Total estimated",
-      "pendingPayment": "Pending payment",
-      "currentStatus": "Current status",
-      "currentStatusLine": "Calculated: {{calculated}} · Filed: {{filed}} · Paid: {{paid}}"
+      "totalObligations": "Gesamtverpflichtungen",
+      "totalEstimated": "Geschätzter Gesamtbetrag",
+      "pendingPayment": "Ausstehende Zahlung",
+      "currentStatus": "Aktueller Status",
+      "currentStatusLine": "Berechnet: {{calculated}} · Eingereicht: {{filed}} · Bezahlt: {{paid}}"
     },
     "dialog": {
-      "title": "New tax obligation",
-      "description": "Select client, saved calculation and model to create a traceable obligation.",
-      "client": "Client",
-      "selectClient": "Select a client",
-      "savedCalculation": "Saved calculation",
-      "selectCalculation": "Select a calculation",
-      "taxModel": "Tax model",
-      "modelPlaceholder": "Model",
-      "period": "Period",
-      "notes": "Notes",
+      "title": "Neue Steuerverpflichtung",
+      "description": "Wählen Sie Mandant, gespeicherte Berechnung und Modell, um eine nachverfolgbare Verpflichtung zu erstellen.",
+      "client": "Mandant",
+      "selectClient": "Mandant auswählen",
+      "savedCalculation": "Gespeicherte Berechnung",
+      "selectCalculation": "Berechnung auswählen",
+      "taxModel": "Steuermodell",
+      "modelPlaceholder": "Modell",
+      "period": "Zeitraum",
+      "notes": "Notizen",
       "optional": "Optional",
-      "creating": "Creating...",
-      "create": "Create obligation"
+      "creating": "Wird erstellt...",
+      "create": "Verpflichtung erstellen"
     },
     "status": {
-      "draft": "Draft",
-      "calculated": "Calculated",
-      "filed": "Filed",
-      "paid": "Paid",
-      "overdue": "Overdue",
-      "error": "Error"
+      "draft": "Entwurf",
+      "calculated": "Berechnet",
+      "filed": "Eingereicht",
+      "paid": "Bezahlt",
+      "overdue": "Überfällig",
+      "error": "Fehler"
     },
     "toasts": {
-      "accountCountryRequiredTitle": "Account country required",
-      "accountCountryRequiredDesc": "The account has no configured country. Set the account country before creating obligations.",
-      "selectCalculation": "Select a saved calculation",
-      "selectTaxModel": "Select a tax model",
-      "createObligationFailed": "Could not create the obligation.",
-      "obligationCreatedTitle": "Obligation created",
-      "obligationCreatedDesc": "You can manage it from the table now.",
-      "updateStatusFailed": "Could not update the status.",
-      "downloadPdfFailed": "Could not download the PDF.",
-      "deleteFailed": "Could not delete the obligation.",
-      "deletedTitle": "Obligation deleted",
-      "deletedDesc": "The obligation was deleted successfully."
+      "accountCountryRequiredTitle": "Kontoland erforderlich",
+      "accountCountryRequiredDesc": "Das Konto hat kein konfiguriertes Land. Legen Sie das Kontoland fest, bevor Sie Verpflichtungen erstellen.",
+      "selectCalculation": "Gespeicherte Berechnung auswählen",
+      "selectTaxModel": "Steuermodell auswählen",
+      "createObligationFailed": "Verpflichtung konnte nicht erstellt werden.",
+      "obligationCreatedTitle": "Verpflichtung erstellt",
+      "obligationCreatedDesc": "Sie können sie jetzt in der Tabelle verwalten.",
+      "updateStatusFailed": "Status konnte nicht aktualisiert werden.",
+      "downloadPdfFailed": "PDF konnte nicht heruntergeladen werden.",
+      "deleteFailed": "Verpflichtung konnte nicht gelöscht werden.",
+      "deletedTitle": "Verpflichtung gelöscht",
+      "deletedDesc": "Die Verpflichtung wurde erfolgreich gelöscht."
     },
     "beta": {
       "button": "Beta",
-      "title": "Tax Compliance (Beta)",
+      "title": "Steuer-Compliance (Beta)",
       "description": "Sie nutzen eine Early-Access-Funktion, die aktiv und betriebsbereit ist und kontinuierlich verbessert wird. Obwohl wir maximale Stabilitat anstreben, konnen wahrend der Weiterentwicklung Fehler, Unterbrechungen oder ungenaue Ergebnisse auftreten. Verwenden Sie diese Funktion als Unterstutzung und uberprufen Sie Ergebnisse stets, bevor Sie steuerliche oder rechtliche Entscheidungen treffen. Mit dem nachsten Update wird diese Funktion vollstandig umgesetzt, um eine optimale Funktionsweise in allen Landern sicherzustellen. Lyrium garantiert in dieser Version nicht die vollstandige Fehlerfreiheit und ubernimmt keine Verantwortung fur Entscheidungen, die ausschliesslich auf dieser Beta-Funktion basieren."
     },
     "deleteDialog": {
-      "title": "Delete obligation?",
-      "description": "This action cannot be undone. The obligation will be permanently deleted.",
-      "confirm": "Delete obligation",
-      "deleting": "Deleting..."
+      "title": "Verpflichtung löschen?",
+      "description": "Diese Aktion kann nicht rückgängig gemacht werden. Die Verpflichtung wird dauerhaft gelöscht.",
+      "confirm": "Verpflichtung löschen",
+      "deleting": "Wird gelöscht..."
     }
   }
 }

@@ -16,7 +16,7 @@
     "writing": "Írás",
     "settings": "Beállítások elemre",
     "logout": "Jelentkezzen ki",
-    "taxCompliance": "Tax Compliance",
+    "taxCompliance": "Adómegfelelés",
     "beta": "Beta"
   },
   "auth": {
@@ -755,7 +755,7 @@
     "currentPlan": "Jelenlegi csomag:",
     "monthly": "Havi",
     "annual": "Évi",
-    "savePerYear": "Takarítson meg évente {{amount}}€-t",
+    "savePerYear": "Takarítson meg évente {{amount}}",
     "autoRenewLabel": "Automatikus megújítás",
     "autoRenewDesc": "Az időszak végén automatikusan megújul",
     "changePlan": "Terv módosítása",
@@ -816,7 +816,24 @@
     "intWebhookCreated": "Webhook létrehozva",
     "intWebhookDeleted": "Webhook törölve",
     "intTestSent": "Tesztesemény elküldve",
-    "intTestFailed": "Hiba a tesztesemény küldésekor"
+    "intTestFailed": "Hiba a tesztesemény küldésekor",
+    "billingProfileTitle": "Számlázási adatok",
+    "billingProfileDesc": "Ez az információ jelenik meg a számlákon ügyfélként.",
+    "companyNameLabel": "Cég neve",
+    "companyNamePlaceholder": "Pl.: Ügyvédi Iroda Kovács",
+    "companyCIFLabel": "Adószám",
+    "companyCIFPlaceholder": "Pl.: HU12345678",
+    "companyAddressLabel": "Cím",
+    "companyAddressPlaceholder": "Pl.: Andrássy út 10, 1061 Budapest",
+    "companyPhoneLabel": "Telefon",
+    "companyPhonePlaceholder": "Pl.: +36 1 234 5678",
+    "companyEmailLabel": "Számlázási email",
+    "companyEmailPlaceholder": "Pl.: szamla@iroda.hu",
+    "invoiceNotesLabel": "További információ",
+    "invoiceNotesPlaceholder": "Kiegészítő információ a számlához",
+    "saveBillingProfile": "Számlázási adatok mentése",
+    "billingProfileSaved": "Számlázási adatok mentve",
+    "errorSaveBillingProfile": "Hiba a számlázási adatok mentésekor"
   },
   "renewal": {
     "title": "Előfizetés megújítása",
@@ -1124,7 +1141,7 @@
     "solution3": "Minden ügyfélinformáció egy helyen központosítva",
     "solution4": "Az e-mail és a WhatsApp egyetlen automatizált panelbe integrálva",
     "roiLabel": "Termelő befektetés",
-    "roiH2a": "250 € / hó.",
+    "roiH2a": "{{price}} / hónap.",
     "roiH2b": "Az első esetben helyreállt.",
     "roiDesc": "Egy 150 €/óra áron számlázó ügyvéd mindössze 2 extra munkaórával megtéríti a havi befektetést. A Lyrium heti több mint 12 órát ad vissza. Számolj.",
     "modulesLabel": "Modulok",
@@ -1149,7 +1166,7 @@
     "pricingLabel": "Árképzés",
     "pricingH2": "Egyszerű és nem okoz meglepetéseket",
     "freeTrial": "14 napos ingyenes próbaverzió",
-    "pricingDesc": "Teljes hozzáférés az összes modulhoz. Nincsenek mesterséges korlátok.",
+    "pricingDesc": "Teljes hozzáférés minden modulhoz.",
     "planMonthly": "Havi",
     "planMonthlyNote": "Havi számlázás",
     "planUnitMonthly": "€ / hó",
@@ -1209,7 +1226,17 @@
     "integAITitle": "Szabja testre az AI-t",
     "integAIDesc": "Töltsön fel joggyakorlatot, stratégiákat vagy korábbi ügyeket PDF formátumban, és az AI felhasználja ezeket, hogy pontosabb és az irodájára szabott válaszokat adjon.",
     "integShareTitle": "Osszon meg fájlokat a csapatával",
-    "integShareDesc": "Küldjeön dokumentumokat a fő fiók és az irodája alfiókjai között. Minden csapattag azonnal hozzáfér a megosztott fájlokhoz."
+    "integShareDesc": "Küldjeön dokumentumokat a fő fiók és az irodája alfiókjai között. Minden csapattag azonnal hozzáfér a megosztott fájlokhoz.",
+    "planStarterName": "Starter",
+    "planStarterSub": "Kis irodáknak",
+    "planStarterSubaccounts": "Legfeljebb 4 alfiók",
+    "planAdvancedName": "Haladó",
+    "planAdvancedSub": "Nagyobb csapatoknak",
+    "planAdvancedSubaccounts": "Legfeljebb 10 alfiók",
+    "perMonth": "/ hó",
+    "perYear": "/ év",
+    "planAnnualEquiv": "{{perMonth}} / hó — megtakarít {{saving}}",
+    "billedInEur": "Az árak tájékoztató jellegűek. A számlázás euróban (EUR) történik."
   },
   "legal": {
     "backToHome": "Vissza a főoldalra",
@@ -1285,97 +1312,97 @@
     "documentName": "Dokumentum neve"
   },
   "taxCompliance": {
-    "title": "Tax Compliance",
-    "subtitle": "Complete tax tracking: calculated, filed and paid.",
-    "newObligation": "New obligation",
+    "title": "Adómegfelelés",
+    "subtitle": "Teljes adókövetés: kiszámítva, benyújtva és kifizetve.",
+    "newObligation": "Új kötelezettség",
     "tabs": {
-      "obligations": "Obligations",
-      "calendar": "Calendar",
-      "summary": "Summary"
+      "obligations": "Kötelezettségek",
+      "calendar": "Naptár",
+      "summary": "Összefoglaló"
     },
     "filters": {
-      "searchPlaceholder": "Search by client, model or period",
-      "status": "Status",
-      "client": "Client",
-      "all": "All",
-      "allClients": "All clients"
+      "searchPlaceholder": "Keresés ügyfél, modell vagy időszak alapján",
+      "status": "Állapot",
+      "client": "Ügyfél",
+      "all": "Mind",
+      "allClients": "Összes ügyfél"
     },
     "table": {
-      "client": "Client",
-      "model": "Model",
-      "period": "Period",
-      "amount": "Amount",
-      "status": "Status",
-      "actions": "Actions",
-      "noResults": "No obligations for the current filters."
+      "client": "Ügyfél",
+      "model": "Modell",
+      "period": "Időszak",
+      "amount": "Összeg",
+      "status": "Állapot",
+      "actions": "Műveletek",
+      "noResults": "Nincs kötelezettség az aktuális szűrőkhöz."
     },
     "actions": {
       "pdf": "PDF",
-      "markFiled": "Filed",
-      "markPaid": "Paid",
-      "officialPortal": "Official portal",
-      "delete": "Delete"
+      "markFiled": "Benyújtva",
+      "markPaid": "Kifizetve",
+      "officialPortal": "Hivatalos portál",
+      "delete": "Törlés"
     },
     "calendar": {
-      "title": "Upcoming deadlines",
-      "description": "Obligations due in the next 30 days.",
-      "empty": "No upcoming deadlines.",
-      "dueLabel": "Due"
+      "title": "Közelgő határidők",
+      "description": "A következő 30 napban esedékes kötelezettségek.",
+      "empty": "Nincsenek közelgő határidők.",
+      "dueLabel": "Esedékes"
     },
     "summary": {
-      "totalObligations": "Total obligations",
-      "totalEstimated": "Total estimated",
-      "pendingPayment": "Pending payment",
-      "currentStatus": "Current status",
-      "currentStatusLine": "Calculated: {{calculated}} · Filed: {{filed}} · Paid: {{paid}}"
+      "totalObligations": "Összes kötelezettség",
+      "totalEstimated": "Becsült összeg",
+      "pendingPayment": "Függő fizetés",
+      "currentStatus": "Jelenlegi állapot",
+      "currentStatusLine": "Kiszámítva: {{calculated}} · Benyújtva: {{filed}} · Kifizetve: {{paid}}"
     },
     "dialog": {
-      "title": "New tax obligation",
-      "description": "Select client, saved calculation and model to create a traceable obligation.",
-      "client": "Client",
-      "selectClient": "Select a client",
-      "savedCalculation": "Saved calculation",
-      "selectCalculation": "Select a calculation",
-      "taxModel": "Tax model",
-      "modelPlaceholder": "Model",
-      "period": "Period",
-      "notes": "Notes",
-      "optional": "Optional",
-      "creating": "Creating...",
-      "create": "Create obligation"
+      "title": "Új adókötelezettség",
+      "description": "Válasszon ügyfelet, mentett számítást és modellt egy nyomon követhető kötelezettség létrehozásához.",
+      "client": "Ügyfél",
+      "selectClient": "Válasszon ügyfelet",
+      "savedCalculation": "Mentett számítás",
+      "selectCalculation": "Válasszon számítást",
+      "taxModel": "Adómodell",
+      "modelPlaceholder": "Modell",
+      "period": "Időszak",
+      "notes": "Jegyzetek",
+      "optional": "Opcionális",
+      "creating": "Létrehozás...",
+      "create": "Kötelezettség létrehozása"
     },
     "status": {
-      "draft": "Draft",
-      "calculated": "Calculated",
-      "filed": "Filed",
-      "paid": "Paid",
-      "overdue": "Overdue",
-      "error": "Error"
+      "draft": "Vázlat",
+      "calculated": "Kiszámítva",
+      "filed": "Benyújtva",
+      "paid": "Kifizetve",
+      "overdue": "Lejárt",
+      "error": "Hiba"
     },
     "toasts": {
-      "accountCountryRequiredTitle": "Account country required",
-      "accountCountryRequiredDesc": "The account has no configured country. Set the account country before creating obligations.",
-      "selectCalculation": "Select a saved calculation",
-      "selectTaxModel": "Select a tax model",
-      "createObligationFailed": "Could not create the obligation.",
-      "obligationCreatedTitle": "Obligation created",
-      "obligationCreatedDesc": "You can manage it from the table now.",
-      "updateStatusFailed": "Could not update the status.",
-      "downloadPdfFailed": "Could not download the PDF.",
-      "deleteFailed": "Could not delete the obligation.",
-      "deletedTitle": "Obligation deleted",
-      "deletedDesc": "The obligation was deleted successfully."
+      "accountCountryRequiredTitle": "Fiók országának megadása szükséges",
+      "accountCountryRequiredDesc": "A fióknak nincs beállított országa. Állítsa be a fiók országát kötelezettségek létrehozása előtt.",
+      "selectCalculation": "Válasszon mentett számítást",
+      "selectTaxModel": "Válasszon adómodellt",
+      "createObligationFailed": "A kötelezettség nem hozható létre.",
+      "obligationCreatedTitle": "Kötelezettség létrehozva",
+      "obligationCreatedDesc": "Most már kezelheti a táblázatból.",
+      "updateStatusFailed": "Az állapot nem frissíthető.",
+      "downloadPdfFailed": "A PDF nem tölthető le.",
+      "deleteFailed": "A kötelezettség nem törölhető.",
+      "deletedTitle": "Kötelezettség törölve",
+      "deletedDesc": "A kötelezettség sikeresen törölve."
     },
     "beta": {
-      "button": "Beta",
-      "title": "Tax Compliance (Beta)",
+      "button": "Béta",
+      "title": "Adómegfelelés (Béta)",
       "description": "On egy korai hozzaferesu funkciot hasznal, amely aktivan mukodik, folyamatos fejlesztes mellett. Bar a leheto legnagyobb stabilitasra torekszunk, a tovabbfejlesztes soran elofordulhatnak hibak, megszakitasok vagy pontatlan eredmenyek. Hasznalja ezt a funkciot tamogataskent, es adozasi vagy jogi dontes elott mindig ellenorizze az eredmenyt. A kovetkezo frissitesben ez a funkcionalitas teljes koruen bevezetesre kerul, hogy minden orszagban optimalis mukodest biztositson. A Lyrium ebben a verzioban nem garantalja a teljes hibamentesseget, es nem vallal felelosseget az ezen beta funkciora kizarolagosan alapozott dontesekert."
     },
     "deleteDialog": {
-      "title": "Delete obligation?",
-      "description": "This action cannot be undone. The obligation will be permanently deleted.",
-      "confirm": "Delete obligation",
-      "deleting": "Deleting..."
+      "title": "Kötelezettség törlése?",
+      "description": "Ez a művelet nem vonható vissza. A kötelezettség véglegesen törlődik.",
+      "confirm": "Kötelezettség törlése",
+      "deleting": "Törlés..."
     }
   }
 }

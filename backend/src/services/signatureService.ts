@@ -17,12 +17,13 @@ const FRONTEND_URL = process.env.FRONTEND_URL || 'http://localhost:8080';
 const SIGNATURE_EXPIRY_DAYS = 30;
 
 function getSystemTransporter() {
+  const port = Number(process.env.SYSTEM_EMAIL_PORT) || 587;
   return nodemailer.createTransport({
-    host: process.env.SYSTEM_EMAIL_HOST || 'smtp.hostinger.com',
-    port: Number(process.env.SYSTEM_EMAIL_PORT) || 465,
-    secure: true,
+    host: process.env.SYSTEM_EMAIL_HOST || 'smtp-relay.brevo.com',
+    port,
+    secure: port === 465,
     auth: {
-      user: process.env.SYSTEM_EMAIL_USER,
+      user: process.env.SYSTEM_EMAIL_LOGIN || process.env.SYSTEM_EMAIL_USER,
       pass: process.env.SYSTEM_EMAIL_PASS,
     },
   });

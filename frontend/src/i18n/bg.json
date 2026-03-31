@@ -16,7 +16,7 @@
     "writing": "Писане",
     "settings": "Настройки",
     "logout": "Изход",
-    "taxCompliance": "Tax Compliance",
+    "taxCompliance": "Данъчно съответствие",
     "beta": "Beta"
   },
   "auth": {
@@ -764,7 +764,7 @@
     "currentPlan": "Текущ план:",
     "monthly": "Месечен",
     "annual": "Годишен",
-    "savePerYear": "Спестете {{amount}}€ годишно",
+    "savePerYear": "Спестете {{amount}} годишно",
     "autoRenewLabel": "Автоматично подновяване",
     "autoRenewDesc": "Ще се поднови автоматично в края на периода",
     "changePlan": "Смяна на план",
@@ -825,7 +825,24 @@
     "intWebhookCreated": "Webhook създаден",
     "intWebhookDeleted": "Webhook изтрит",
     "intTestSent": "Тестово събитие изпратено",
-    "intTestFailed": "Грешка при изпращане на тестово събитие"
+    "intTestFailed": "Грешка при изпращане на тестово събитие",
+    "billingProfileTitle": "Данни за фактуриране",
+    "billingProfileDesc": "Тази информация ще се показва във фактурите ви като данни на клиента.",
+    "companyNameLabel": "Име на фирмата",
+    "companyNamePlaceholder": "Напр.: Адвокатска кантора Иванов",
+    "companyCIFLabel": "ЕИК / ДДС номер",
+    "companyCIFPlaceholder": "Напр.: BG123456789",
+    "companyAddressLabel": "Адрес",
+    "companyAddressPlaceholder": "Напр.: бул. Витоша 10, 1000 София",
+    "companyPhoneLabel": "Телефон",
+    "companyPhonePlaceholder": "Напр.: +359 2 123 4567",
+    "companyEmailLabel": "Имейл за фактури",
+    "companyEmailPlaceholder": "Напр.: fakturi@kantora.bg",
+    "invoiceNotesLabel": "Допълнителна информация",
+    "invoiceNotesPlaceholder": "Допълнителна информация за фактурата",
+    "saveBillingProfile": "Запазване на данните за фактуриране",
+    "billingProfileSaved": "Данните за фактуриране са запазени",
+    "errorSaveBillingProfile": "Грешка при запазване"
   },
   "renewal": {
     "title": "Подновяване на абонамент",
@@ -1132,7 +1149,7 @@
     "solution3": "Цялата информация за клиентите централизирана на едно място",
     "solution4": "Имейл и WhatsApp интегрирани в един автоматизиран панел",
     "roiLabel": "Продуктивна инвестиция",
-    "roiH2a": "250 € / месец.",
+    "roiH2a": "{{price}} / месец.",
     "roiH2b": "Изплаща се от първия случай.",
     "roiDesc": "Адвокат, таксуващ 150 €/час, възстановява месечната инвестиция само с 2 допълнителни часа продуктивна работа. Lyrium ви връща над 12 часа седмично. Пресметнете сами.",
     "modulesLabel": "Модули",
@@ -1157,7 +1174,7 @@
     "pricingLabel": "Цени",
     "pricingH2": "Просто и без изненади",
     "freeTrial": "14 дни безплатен пробен период",
-    "pricingDesc": "Пълен достъп до всички модули. Без изкуствени ограничения.",
+    "pricingDesc": "Пълен достъп до всички модули.",
     "planMonthly": "Месечно",
     "planMonthlyNote": "Таксува се месечно",
     "planUnitMonthly": "€ / мес.",
@@ -1218,7 +1235,17 @@
     "integAITitle": "Персонализирайте вашия ИИ",
     "integAIDesc": "Качете съдебна практика, стратегии или предишни дела в PDF формат и ИИ ще ги използва, за да ви дава по-точни и адаптирани към вашата кантора отговори.",
     "integShareTitle": "Споделяйте файлове с екипа си",
-    "integShareDesc": "Изпращайте документи между основния акаунт и подакаунтите на вашата кантора. Всички членове на екипа имат незабавен достъп до споделените файлове."
+    "integShareDesc": "Изпращайте документи между основния акаунт и подакаунтите на вашата кантора. Всички членове на екипа имат незабавен достъп до споделените файлове.",
+    "planStarterName": "Starter",
+    "planStarterSub": "За малки кантори",
+    "planStarterSubaccounts": "До 4 подакаунта",
+    "planAdvancedName": "Разширен",
+    "planAdvancedSub": "За по-големи екипи",
+    "planAdvancedSubaccounts": "До 10 подакаунта",
+    "perMonth": "/ мес.",
+    "perYear": "/ год.",
+    "planAnnualEquiv": "Еквивалент на {{perMonth}} / мес. — спестете {{saving}}",
+    "billedInEur": "Цените са ориентировъчни. Фактурирането е в евро (EUR)."
   },
   "legal": {
     "backToHome": "Обратно към началната страница",
@@ -1296,97 +1323,97 @@
     "documentName": "Име на документа"
   },
   "taxCompliance": {
-    "title": "Tax Compliance",
-    "subtitle": "Complete tax tracking: calculated, filed and paid.",
-    "newObligation": "New obligation",
+    "title": "Данъчно съответствие",
+    "subtitle": "Пълно данъчно проследяване: изчислено, подадено и платено.",
+    "newObligation": "Ново задължение",
     "tabs": {
-      "obligations": "Obligations",
-      "calendar": "Calendar",
-      "summary": "Summary"
+      "obligations": "Задължения",
+      "calendar": "Календар",
+      "summary": "Обобщение"
     },
     "filters": {
-      "searchPlaceholder": "Search by client, model or period",
-      "status": "Status",
-      "client": "Client",
-      "all": "All",
-      "allClients": "All clients"
+      "searchPlaceholder": "Търсене по клиент, модел или период",
+      "status": "Статус",
+      "client": "Клиент",
+      "all": "Всички",
+      "allClients": "Всички клиенти"
     },
     "table": {
-      "client": "Client",
-      "model": "Model",
-      "period": "Period",
-      "amount": "Amount",
-      "status": "Status",
-      "actions": "Actions",
-      "noResults": "No obligations for the current filters."
+      "client": "Клиент",
+      "model": "Модел",
+      "period": "Период",
+      "amount": "Сума",
+      "status": "Статус",
+      "actions": "Действия",
+      "noResults": "Няма задължения за текущите филтри."
     },
     "actions": {
       "pdf": "PDF",
-      "markFiled": "Filed",
-      "markPaid": "Paid",
-      "officialPortal": "Official portal",
-      "delete": "Delete"
+      "markFiled": "Подадено",
+      "markPaid": "Платено",
+      "officialPortal": "Официален портал",
+      "delete": "Изтрий"
     },
     "calendar": {
-      "title": "Upcoming deadlines",
-      "description": "Obligations due in the next 30 days.",
-      "empty": "No upcoming deadlines.",
-      "dueLabel": "Due"
+      "title": "Предстоящи срокове",
+      "description": "Задължения с падеж в следващите 30 дни.",
+      "empty": "Няма предстоящи срокове.",
+      "dueLabel": "Падеж"
     },
     "summary": {
-      "totalObligations": "Total obligations",
-      "totalEstimated": "Total estimated",
-      "pendingPayment": "Pending payment",
-      "currentStatus": "Current status",
-      "currentStatusLine": "Calculated: {{calculated}} · Filed: {{filed}} · Paid: {{paid}}"
+      "totalObligations": "Общо задължения",
+      "totalEstimated": "Общо прогнозно",
+      "pendingPayment": "Чакащо плащане",
+      "currentStatus": "Текущ статус",
+      "currentStatusLine": "Изчислено: {{calculated}} · Подадено: {{filed}} · Платено: {{paid}}"
     },
     "dialog": {
-      "title": "New tax obligation",
-      "description": "Select client, saved calculation and model to create a traceable obligation.",
-      "client": "Client",
-      "selectClient": "Select a client",
-      "savedCalculation": "Saved calculation",
-      "selectCalculation": "Select a calculation",
-      "taxModel": "Tax model",
-      "modelPlaceholder": "Model",
-      "period": "Period",
-      "notes": "Notes",
-      "optional": "Optional",
-      "creating": "Creating...",
-      "create": "Create obligation"
+      "title": "Ново данъчно задължение",
+      "description": "Изберете клиент, запазено изчисление и модел, за да създадете проследимо задължение.",
+      "client": "Клиент",
+      "selectClient": "Изберете клиент",
+      "savedCalculation": "Запазено изчисление",
+      "selectCalculation": "Изберете изчисление",
+      "taxModel": "Данъчен модел",
+      "modelPlaceholder": "Модел",
+      "period": "Период",
+      "notes": "Бележки",
+      "optional": "По избор",
+      "creating": "Създаване...",
+      "create": "Създай задължение"
     },
     "status": {
-      "draft": "Draft",
-      "calculated": "Calculated",
-      "filed": "Filed",
-      "paid": "Paid",
-      "overdue": "Overdue",
-      "error": "Error"
+      "draft": "Чернова",
+      "calculated": "Изчислено",
+      "filed": "Подадено",
+      "paid": "Платено",
+      "overdue": "Просрочено",
+      "error": "Грешка"
     },
     "toasts": {
-      "accountCountryRequiredTitle": "Account country required",
-      "accountCountryRequiredDesc": "The account has no configured country. Set the account country before creating obligations.",
-      "selectCalculation": "Select a saved calculation",
-      "selectTaxModel": "Select a tax model",
-      "createObligationFailed": "Could not create the obligation.",
-      "obligationCreatedTitle": "Obligation created",
-      "obligationCreatedDesc": "You can manage it from the table now.",
-      "updateStatusFailed": "Could not update the status.",
-      "downloadPdfFailed": "Could not download the PDF.",
-      "deleteFailed": "Could not delete the obligation.",
-      "deletedTitle": "Obligation deleted",
-      "deletedDesc": "The obligation was deleted successfully."
+      "accountCountryRequiredTitle": "Необходима е държава на акаунта",
+      "accountCountryRequiredDesc": "Акаунтът няма конфигурирана държава. Задайте държавата на акаунта преди създаване на задължения.",
+      "selectCalculation": "Изберете запазено изчисление",
+      "selectTaxModel": "Изберете данъчен модел",
+      "createObligationFailed": "Задължението не може да бъде създадено.",
+      "obligationCreatedTitle": "Задължение създадено",
+      "obligationCreatedDesc": "Можете да го управлявате от таблицата.",
+      "updateStatusFailed": "Статусът не може да бъде актуализиран.",
+      "downloadPdfFailed": "PDF не може да бъде изтеглен.",
+      "deleteFailed": "Задължението не може да бъде изтрито.",
+      "deletedTitle": "Задължение изтрито",
+      "deletedDesc": "Задължението беше изтрито успешно."
     },
     "beta": {
-      "button": "Beta",
-      "title": "Tax Compliance (Beta)",
+      "button": "Бета",
+      "title": "Данъчно съответствие (Бета)",
       "description": "Използвате функция с ранен достъп, която е активна и работеща, с непрекъснати подобрения. Въпреки че се стремим към максимална стабилност, по време на развитието са възможни грешки, прекъсвания или неточни резултати. Използвайте тази функция като помощ и винаги проверявайте резултата, преди да вземете данъчни или правни решения. В следващата актуализация тази функционалност ще бъде внедрена изцяло, за да гарантира оптимална работа във всички държави. Lyrium не гарантира пълна липса на грешки в тази версия и не носи отговорност за решения, взети изцяло въз основа на тази бета функционалност."
     },
     "deleteDialog": {
-      "title": "Delete obligation?",
-      "description": "This action cannot be undone. The obligation will be permanently deleted.",
-      "confirm": "Delete obligation",
-      "deleting": "Deleting..."
+      "title": "Изтриване на задължение?",
+      "description": "Това действие не може да бъде отменено. Задължението ще бъде изтрито завинаги.",
+      "confirm": "Изтрий задължение",
+      "deleting": "Изтриване..."
     }
   }
 }

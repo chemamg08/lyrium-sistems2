@@ -16,7 +16,7 @@
     "writing": "Kirjutamine",
     "settings": "Seaded",
     "logout": "Logi välja",
-    "taxCompliance": "Tax Compliance",
+    "taxCompliance": "Maksuvastavus",
     "beta": "Beta"
   },
   "auth": {
@@ -755,7 +755,7 @@
     "currentPlan": "Praegune plaan:",
     "monthly": "Igakuine",
     "annual": "Iga-aastane",
-    "savePerYear": "Säästa {{amount}} € aastas",
+    "savePerYear": "Säästa {{amount}} aastas",
     "autoRenewLabel": "Automaatne uuendamine",
     "autoRenewDesc": "Uueneb perioodi lõpus automaatselt",
     "changePlan": "Muuda plaani",
@@ -816,7 +816,24 @@
     "intWebhookCreated": "Webhook loodud",
     "intWebhookDeleted": "Webhook kustutatud",
     "intTestSent": "Testisündmus saadetud",
-    "intTestFailed": "Viga testisündmuse saatmisel"
+    "intTestFailed": "Viga testisündmuse saatmisel",
+    "billingProfileTitle": "Arveldusandmed",
+    "billingProfileDesc": "See teave kuvatakse teie arvetel kliendi andmetena.",
+    "companyNameLabel": "Ettevõtte nimi",
+    "companyNamePlaceholder": "Nt.: Advokaadibüroo Tamm",
+    "companyCIFLabel": "Registrikood / KMKR nr",
+    "companyCIFPlaceholder": "Nt.: EE123456789",
+    "companyAddressLabel": "Aadress",
+    "companyAddressPlaceholder": "Nt.: Viru 10, 10140 Tallinn",
+    "companyPhoneLabel": "Telefon",
+    "companyPhonePlaceholder": "Nt.: +372 612 3456",
+    "companyEmailLabel": "Arvelduse e-post",
+    "companyEmailPlaceholder": "Nt.: arved@buroo.ee",
+    "invoiceNotesLabel": "Lisainfo",
+    "invoiceNotesPlaceholder": "Täiendav info arvele",
+    "saveBillingProfile": "Salvesta arveldusandmed",
+    "billingProfileSaved": "Arveldusandmed salvestatud",
+    "errorSaveBillingProfile": "Viga arveldusandmete salvestamisel"
   },
   "renewal": {
     "title": "Uuenda tellimust",
@@ -1124,7 +1141,7 @@
     "solution3": "Kogu klienditeave on koondatud ühte kohta",
     "solution4": "E-post ja WhatsApp on integreeritud ühte automatiseeritud paneeli",
     "roiLabel": "Tootlik investeering",
-    "roiH2a": "250 € / kuu.",
+    "roiH2a": "{{price}} / kuu.",
     "roiH2b": "Taastatud esimesel juhul.",
     "roiDesc": "Advokaat, kes arveldab 150 €/tund, tasub igakuise investeeringu vaid 2 lisatunni tootliku tööga. Lyrium annab sulle tagasi rohkem kui 12 tundi nädalas. Tee matemaatikat.",
     "modulesLabel": "Moodulid",
@@ -1149,7 +1166,7 @@
     "pricingLabel": "Hinnad",
     "pricingH2": "Lihtne ja üllatusteta",
     "freeTrial": "14-päevane tasuta prooviperiood",
-    "pricingDesc": "Täielik juurdepääs kõigile moodulitele. Ei mingeid kunstlikke piiranguid.",
+    "pricingDesc": "Täielik juurdepääs kõigile moodulitele.",
     "planMonthly": "Kuine",
     "planMonthlyNote": "Arveldatakse kuus",
     "planUnitMonthly": "€ / kuus",
@@ -1209,7 +1226,17 @@
     "integAITitle": "Kohanda oma AI-d",
     "integAIDesc": "Laadige üles kohtupraktikat, strateegiaid või varasemaid juhtumeid PDF-vormingus ja AI kasutab neid, et anda teile täpsemaid ja teie büroole kohandatud vastuseid.",
     "integShareTitle": "Jagage faile oma meeskonnaga",
-    "integShareDesc": "Saatke dokumente peakonto ja oma büroo alamkontode vahel. Kõik meeskonnaliikmed pääsevad jagatud failidele koheselt ligi."
+    "integShareDesc": "Saatke dokumente peakonto ja oma büroo alamkontode vahel. Kõik meeskonnaliikmed pääsevad jagatud failidele koheselt ligi.",
+    "planStarterName": "Starter",
+    "planStarterSub": "Väikestele büroodele",
+    "planStarterSubaccounts": "Kuni 4 alamkontot",
+    "planAdvancedName": "Edasijõudnud",
+    "planAdvancedSub": "Suurematele meeskondadele",
+    "planAdvancedSubaccounts": "Kuni 10 alamkontot",
+    "perMonth": "/ kuu",
+    "perYear": "/ aasta",
+    "planAnnualEquiv": "Vastab {{perMonth}} / kuu — säästate {{saving}}",
+    "billedInEur": "Hinnad on viitlikud. Arveldamine toimub eurodes (EUR)."
   },
   "legal": {
     "backToHome": "Tagasi avalehele",
@@ -1285,97 +1312,97 @@
     "documentName": "Dokumendi nimi"
   },
   "taxCompliance": {
-    "title": "Tax Compliance",
-    "subtitle": "Complete tax tracking: calculated, filed and paid.",
-    "newObligation": "New obligation",
+    "title": "Maksuvastavus",
+    "subtitle": "Täielik maksujälgimine: arvutatud, esitatud ja makstud.",
+    "newObligation": "Uus kohustus",
     "tabs": {
-      "obligations": "Obligations",
-      "calendar": "Calendar",
-      "summary": "Summary"
+      "obligations": "Kohustused",
+      "calendar": "Kalender",
+      "summary": "Kokkuvõte"
     },
     "filters": {
-      "searchPlaceholder": "Search by client, model or period",
-      "status": "Status",
-      "client": "Client",
-      "all": "All",
-      "allClients": "All clients"
+      "searchPlaceholder": "Otsi kliendi, mudeli või perioodi järgi",
+      "status": "Olek",
+      "client": "Klient",
+      "all": "Kõik",
+      "allClients": "Kõik kliendid"
     },
     "table": {
-      "client": "Client",
-      "model": "Model",
-      "period": "Period",
-      "amount": "Amount",
-      "status": "Status",
-      "actions": "Actions",
-      "noResults": "No obligations for the current filters."
+      "client": "Klient",
+      "model": "Mudel",
+      "period": "Periood",
+      "amount": "Summa",
+      "status": "Olek",
+      "actions": "Tegevused",
+      "noResults": "Praeguste filtrite jaoks kohustusi pole."
     },
     "actions": {
       "pdf": "PDF",
-      "markFiled": "Filed",
-      "markPaid": "Paid",
-      "officialPortal": "Official portal",
-      "delete": "Delete"
+      "markFiled": "Esitatud",
+      "markPaid": "Makstud",
+      "officialPortal": "Ametlik portaal",
+      "delete": "Kustuta"
     },
     "calendar": {
-      "title": "Upcoming deadlines",
-      "description": "Obligations due in the next 30 days.",
-      "empty": "No upcoming deadlines.",
-      "dueLabel": "Due"
+      "title": "Tulevad tähtajad",
+      "description": "Kohustused, mis aeguvad järgmise 30 päeva jooksul.",
+      "empty": "Tulevaid tähtaegu pole.",
+      "dueLabel": "Tähtaeg"
     },
     "summary": {
-      "totalObligations": "Total obligations",
-      "totalEstimated": "Total estimated",
-      "pendingPayment": "Pending payment",
-      "currentStatus": "Current status",
-      "currentStatusLine": "Calculated: {{calculated}} · Filed: {{filed}} · Paid: {{paid}}"
+      "totalObligations": "Kohustused kokku",
+      "totalEstimated": "Hinnanguline kokku",
+      "pendingPayment": "Ootel makse",
+      "currentStatus": "Praegune olek",
+      "currentStatusLine": "Arvutatud: {{calculated}} · Esitatud: {{filed}} · Makstud: {{paid}}"
     },
     "dialog": {
-      "title": "New tax obligation",
-      "description": "Select client, saved calculation and model to create a traceable obligation.",
-      "client": "Client",
-      "selectClient": "Select a client",
-      "savedCalculation": "Saved calculation",
-      "selectCalculation": "Select a calculation",
-      "taxModel": "Tax model",
-      "modelPlaceholder": "Model",
-      "period": "Period",
-      "notes": "Notes",
-      "optional": "Optional",
-      "creating": "Creating...",
-      "create": "Create obligation"
+      "title": "Uus maksukohustus",
+      "description": "Valige klient, salvestatud arvutus ja mudel jälgitava kohustuse loomiseks.",
+      "client": "Klient",
+      "selectClient": "Valige klient",
+      "savedCalculation": "Salvestatud arvutus",
+      "selectCalculation": "Valige arvutus",
+      "taxModel": "Maksumudel",
+      "modelPlaceholder": "Mudel",
+      "period": "Periood",
+      "notes": "Märkmed",
+      "optional": "Valikuline",
+      "creating": "Loomine...",
+      "create": "Loo kohustus"
     },
     "status": {
-      "draft": "Draft",
-      "calculated": "Calculated",
-      "filed": "Filed",
-      "paid": "Paid",
-      "overdue": "Overdue",
-      "error": "Error"
+      "draft": "Mustand",
+      "calculated": "Arvutatud",
+      "filed": "Esitatud",
+      "paid": "Makstud",
+      "overdue": "Tähtaja ületanud",
+      "error": "Viga"
     },
     "toasts": {
-      "accountCountryRequiredTitle": "Account country required",
-      "accountCountryRequiredDesc": "The account has no configured country. Set the account country before creating obligations.",
-      "selectCalculation": "Select a saved calculation",
-      "selectTaxModel": "Select a tax model",
-      "createObligationFailed": "Could not create the obligation.",
-      "obligationCreatedTitle": "Obligation created",
-      "obligationCreatedDesc": "You can manage it from the table now.",
-      "updateStatusFailed": "Could not update the status.",
-      "downloadPdfFailed": "Could not download the PDF.",
-      "deleteFailed": "Could not delete the obligation.",
-      "deletedTitle": "Obligation deleted",
-      "deletedDesc": "The obligation was deleted successfully."
+      "accountCountryRequiredTitle": "Konto riik on nõutav",
+      "accountCountryRequiredDesc": "Kontol pole seadistatud riiki. Määrake konto riik enne kohustuste loomist.",
+      "selectCalculation": "Valige salvestatud arvutus",
+      "selectTaxModel": "Valige maksumudel",
+      "createObligationFailed": "Kohustust ei saanud luua.",
+      "obligationCreatedTitle": "Kohustus loodud",
+      "obligationCreatedDesc": "Saate seda nüüd tabelist hallata.",
+      "updateStatusFailed": "Olekut ei saanud värskendada.",
+      "downloadPdfFailed": "PDF-i ei saanud alla laadida.",
+      "deleteFailed": "Kohustust ei saanud kustutada.",
+      "deletedTitle": "Kohustus kustutatud",
+      "deletedDesc": "Kohustus kustutati edukalt."
     },
     "beta": {
-      "button": "Beta",
-      "title": "Tax Compliance (Beta)",
+      "button": "Beeta",
+      "title": "Maksuvastavus (Beeta)",
       "description": "Kasutate varajase juurdepääsuga funktsiooni, mis on aktiivne ja toimiv ning mida täiustatakse pidevalt. Kuigi püüdleme maksimaalse stabiilsuse poole, võivad arenduse käigus esineda vead, katkestused või ebatäpsed tulemused. Kasutage seda funktsiooni abivahendina ja kontrollige tulemust alati enne maksu- või õiguslike otsuste tegemist. Järgmises uuenduses rakendatakse see funktsionaalsus täielikult, et tagada optimaalne toimimine kõigis riikides. Lyrium ei taga selles versioonis täielikku veavabadust ega vastuta otsuste eest, mis on tehtud üksnes selle beetafunktsiooni alusel."
     },
     "deleteDialog": {
-      "title": "Delete obligation?",
-      "description": "This action cannot be undone. The obligation will be permanently deleted.",
-      "confirm": "Delete obligation",
-      "deleting": "Deleting..."
+      "title": "Kustutada kohustus?",
+      "description": "Seda toimingut ei saa tagasi võtta. Kohustus kustutatakse jäädavalt.",
+      "confirm": "Kustuta kohustus",
+      "deleting": "Kustutamine..."
     }
   }
 }

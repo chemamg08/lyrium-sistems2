@@ -16,7 +16,7 @@
     "writing": "Kirjoittaminen",
     "settings": "Asetukset",
     "logout": "Kirjaudu ulos",
-    "taxCompliance": "Tax Compliance",
+    "taxCompliance": "Veronmukaisuus",
     "beta": "Beta"
   },
   "auth": {
@@ -755,7 +755,7 @@
     "currentPlan": "Nykyinen paketti:",
     "monthly": "Kuukausittain",
     "annual": "Vuosittain",
-    "savePerYear": "Säästä {{amount}} € vuodessa",
+    "savePerYear": "Säästä {{amount}} vuodessa",
     "autoRenewLabel": "Automaattinen uusiminen",
     "autoRenewDesc": "Uusitaan automaattisesti kauden lopussa",
     "changePlan": "Vaihda paketti",
@@ -816,7 +816,24 @@
     "intWebhookCreated": "Webhook luotu",
     "intWebhookDeleted": "Webhook poistettu",
     "intTestSent": "Testitapahtuma lähetetty",
-    "intTestFailed": "Virhe testitapahtuman lähetyksessä"
+    "intTestFailed": "Virhe testitapahtuman lähetyksessä",
+    "billingProfileTitle": "Laskutustiedot",
+    "billingProfileDesc": "Nämä tiedot näkyvät laskuissasi asiakastietoina.",
+    "companyNameLabel": "Yrityksen nimi",
+    "companyNamePlaceholder": "Esim.: Asianajotoimisto Virtanen",
+    "companyCIFLabel": "Y-tunnus / ALV-tunnus",
+    "companyCIFPlaceholder": "Esim.: FI12345678",
+    "companyAddressLabel": "Osoite",
+    "companyAddressPlaceholder": "Esim.: Mannerheimintie 10, 00100 Helsinki",
+    "companyPhoneLabel": "Puhelin",
+    "companyPhonePlaceholder": "Esim.: +358 9 123 4567",
+    "companyEmailLabel": "Laskutussähköposti",
+    "companyEmailPlaceholder": "Esim.: laskut@toimisto.fi",
+    "invoiceNotesLabel": "Lisätiedot",
+    "invoiceNotesPlaceholder": "Lisätietoja laskulle",
+    "saveBillingProfile": "Tallenna laskutustiedot",
+    "billingProfileSaved": "Laskutustiedot tallennettu",
+    "errorSaveBillingProfile": "Virhe laskutustietojen tallennuksessa"
   },
   "renewal": {
     "title": "Uudista tilaus",
@@ -1124,7 +1141,7 @@
     "solution3": "Kaikki asiakastiedot keskitetty yhteen paikkaan",
     "solution4": "Sähköposti ja WhatsApp integroituna yhteen automaattiseen paneeliin",
     "roiLabel": "Tuottava investointi",
-    "roiH2a": "250 €/kk.",
+    "roiH2a": "{{price}} / kk.",
     "roiH2b": "Toipui ensimmäisestä tapauksesta.",
     "roiDesc": "150 €/tunti laskuttava asianajaja saa kuukausisijoituksen takaisin vain kahdella ylimääräisellä tuottavalla työtunnilla. Lyrium antaa sinulle takaisin yli 12 tuntia viikossa. Tee matematiikka.",
     "modulesLabel": "Moduulit",
@@ -1149,7 +1166,7 @@
     "pricingLabel": "Hinnat",
     "pricingH2": "Yksinkertaista ja ilman yllätyksiä",
     "freeTrial": "14 päivän ilmainen kokeilu",
-    "pricingDesc": "Täysi pääsy kaikkiin moduuleihin. Ei keinotekoisia rajoja.",
+    "pricingDesc": "Täysi pääsy kaikkiin moduuleihin.",
     "planMonthly": "Kuukausittain",
     "planMonthlyNote": "Laskutetaan kuukausittain",
     "planUnitMonthly": "€ / kk",
@@ -1209,7 +1226,17 @@
     "integAITitle": "Mukauta tekoälyäsi",
     "integAIDesc": "Lataa oikeuskäytäntöä, strategioita tai aiempia tapauksia PDF-muodossa, ja tekoäly hyödyntää niitä antaakseen tarkempia ja toimistoosi räätälöityjä vastauksia.",
     "integShareTitle": "Jaa tiedostoja tiimisi kanssa",
-    "integShareDesc": "Lähetä asiakirjoja päätilin ja toimistosi alatilien välillä. Kaikki tiimin jäsenet pääsevät jaettuihin tiedostoihin välittömästi."
+    "integShareDesc": "Lähetä asiakirjoja päätilin ja toimistosi alatilien välillä. Kaikki tiimin jäsenet pääsevät jaettuihin tiedostoihin välittömästi.",
+    "planStarterName": "Starter",
+    "planStarterSub": "Pienille toimistoille",
+    "planStarterSubaccounts": "Enintään 4 alatiliä",
+    "planAdvancedName": "Edistynyt",
+    "planAdvancedSub": "Suuremmille tiimeille",
+    "planAdvancedSubaccounts": "Enintään 10 alatiliä",
+    "perMonth": "/ kk",
+    "perYear": "/ vuosi",
+    "planAnnualEquiv": "Vastaa {{perMonth}} / kk — säästä {{saving}}",
+    "billedInEur": "Hinnat viitteelliset. Laskutus euroissa (EUR)."
   },
   "legal": {
     "backToHome": "Takaisin etusivulle",
@@ -1285,97 +1312,97 @@
     "documentName": "Asiakirjan nimi"
   },
   "taxCompliance": {
-    "title": "Tax Compliance",
-    "subtitle": "Complete tax tracking: calculated, filed and paid.",
-    "newObligation": "New obligation",
+    "title": "Veronmukaisuus",
+    "subtitle": "Täydellinen veroseuranta: laskettu, ilmoitettu ja maksettu.",
+    "newObligation": "Uusi velvoite",
     "tabs": {
-      "obligations": "Obligations",
-      "calendar": "Calendar",
-      "summary": "Summary"
+      "obligations": "Velvoitteet",
+      "calendar": "Kalenteri",
+      "summary": "Yhteenveto"
     },
     "filters": {
-      "searchPlaceholder": "Search by client, model or period",
-      "status": "Status",
-      "client": "Client",
-      "all": "All",
-      "allClients": "All clients"
+      "searchPlaceholder": "Hae asiakkaan, mallin tai kauden mukaan",
+      "status": "Tila",
+      "client": "Asiakas",
+      "all": "Kaikki",
+      "allClients": "Kaikki asiakkaat"
     },
     "table": {
-      "client": "Client",
-      "model": "Model",
-      "period": "Period",
-      "amount": "Amount",
-      "status": "Status",
-      "actions": "Actions",
-      "noResults": "No obligations for the current filters."
+      "client": "Asiakas",
+      "model": "Malli",
+      "period": "Kausi",
+      "amount": "Summa",
+      "status": "Tila",
+      "actions": "Toiminnot",
+      "noResults": "Ei velvoitteita nykyisille suodattimille."
     },
     "actions": {
       "pdf": "PDF",
-      "markFiled": "Filed",
-      "markPaid": "Paid",
-      "officialPortal": "Official portal",
-      "delete": "Delete"
+      "markFiled": "Ilmoitettu",
+      "markPaid": "Maksettu",
+      "officialPortal": "Virallinen portaali",
+      "delete": "Poista"
     },
     "calendar": {
-      "title": "Upcoming deadlines",
-      "description": "Obligations due in the next 30 days.",
-      "empty": "No upcoming deadlines.",
-      "dueLabel": "Due"
+      "title": "Tulevat eräpäivät",
+      "description": "Velvoitteet, jotka erääntyvät seuraavan 30 päivän aikana.",
+      "empty": "Ei tulevia eräpäiviä.",
+      "dueLabel": "Erääntyy"
     },
     "summary": {
-      "totalObligations": "Total obligations",
-      "totalEstimated": "Total estimated",
-      "pendingPayment": "Pending payment",
-      "currentStatus": "Current status",
-      "currentStatusLine": "Calculated: {{calculated}} · Filed: {{filed}} · Paid: {{paid}}"
+      "totalObligations": "Velvoitteet yhteensä",
+      "totalEstimated": "Arvioitu yhteensä",
+      "pendingPayment": "Odottava maksu",
+      "currentStatus": "Nykyinen tila",
+      "currentStatusLine": "Laskettu: {{calculated}} · Ilmoitettu: {{filed}} · Maksettu: {{paid}}"
     },
     "dialog": {
-      "title": "New tax obligation",
-      "description": "Select client, saved calculation and model to create a traceable obligation.",
-      "client": "Client",
-      "selectClient": "Select a client",
-      "savedCalculation": "Saved calculation",
-      "selectCalculation": "Select a calculation",
-      "taxModel": "Tax model",
-      "modelPlaceholder": "Model",
-      "period": "Period",
-      "notes": "Notes",
-      "optional": "Optional",
-      "creating": "Creating...",
-      "create": "Create obligation"
+      "title": "Uusi verovelvoite",
+      "description": "Valitse asiakas, tallennettu laskelma ja malli luodaksesi jäljitettävän velvoitteen.",
+      "client": "Asiakas",
+      "selectClient": "Valitse asiakas",
+      "savedCalculation": "Tallennettu laskelma",
+      "selectCalculation": "Valitse laskelma",
+      "taxModel": "Veromalli",
+      "modelPlaceholder": "Malli",
+      "period": "Kausi",
+      "notes": "Muistiinpanot",
+      "optional": "Valinnainen",
+      "creating": "Luodaan...",
+      "create": "Luo velvoite"
     },
     "status": {
-      "draft": "Draft",
-      "calculated": "Calculated",
-      "filed": "Filed",
-      "paid": "Paid",
-      "overdue": "Overdue",
-      "error": "Error"
+      "draft": "Luonnos",
+      "calculated": "Laskettu",
+      "filed": "Ilmoitettu",
+      "paid": "Maksettu",
+      "overdue": "Myöhässä",
+      "error": "Virhe"
     },
     "toasts": {
-      "accountCountryRequiredTitle": "Account country required",
-      "accountCountryRequiredDesc": "The account has no configured country. Set the account country before creating obligations.",
-      "selectCalculation": "Select a saved calculation",
-      "selectTaxModel": "Select a tax model",
-      "createObligationFailed": "Could not create the obligation.",
-      "obligationCreatedTitle": "Obligation created",
-      "obligationCreatedDesc": "You can manage it from the table now.",
-      "updateStatusFailed": "Could not update the status.",
-      "downloadPdfFailed": "Could not download the PDF.",
-      "deleteFailed": "Could not delete the obligation.",
-      "deletedTitle": "Obligation deleted",
-      "deletedDesc": "The obligation was deleted successfully."
+      "accountCountryRequiredTitle": "Tilin maa vaaditaan",
+      "accountCountryRequiredDesc": "Tilillä ei ole konfiguroitua maata. Aseta tilin maa ennen velvoitteiden luomista.",
+      "selectCalculation": "Valitse tallennettu laskelma",
+      "selectTaxModel": "Valitse veromalli",
+      "createObligationFailed": "Velvoitetta ei voitu luoda.",
+      "obligationCreatedTitle": "Velvoite luotu",
+      "obligationCreatedDesc": "Voit hallita sitä taulukosta.",
+      "updateStatusFailed": "Tilaa ei voitu päivittää.",
+      "downloadPdfFailed": "PDF:ää ei voitu ladata.",
+      "deleteFailed": "Velvoitetta ei voitu poistaa.",
+      "deletedTitle": "Velvoite poistettu",
+      "deletedDesc": "Velvoite poistettiin onnistuneesti."
     },
     "beta": {
       "button": "Beta",
-      "title": "Tax Compliance (Beta)",
+      "title": "Veronmukaisuus (Beta)",
       "description": "Kaytat varhaisen vaiheen ominaisuutta, joka on aktiivinen ja toiminnassa ja jota parannetaan jatkuvasti. Vaikka tavoitteenamme on mahdollisimman vakaa toiminta, kehityksen aikana voi ilmeta virheita, katkoksia tai epatarkkoja tuloksia. Kayta ominaisuutta tukena ja tarkista tulos aina ennen vero- tai oikeudellisia paatoksia. Seuraavassa paivityksessa ominaisuus otetaan kokonaisuudessaan kayttoon, jotta optimaalinen toiminta varmistetaan kaikissa maissa. Lyrium ei takaa tassa versiossa taydellista virheettomyytta eika vastaa paatoksista, jotka on tehty yksinomaan taman beta-ominaisuuden perusteella."
     },
     "deleteDialog": {
-      "title": "Delete obligation?",
-      "description": "This action cannot be undone. The obligation will be permanently deleted.",
-      "confirm": "Delete obligation",
-      "deleting": "Deleting..."
+      "title": "Poista velvoite?",
+      "description": "Tätä toimintoa ei voi kumota. Velvoite poistetaan pysyvästi.",
+      "confirm": "Poista velvoite",
+      "deleting": "Poistetaan..."
     }
   }
 }

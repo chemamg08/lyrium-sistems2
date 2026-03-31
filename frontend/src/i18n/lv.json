@@ -16,7 +16,7 @@
     "writing": "Rakstīšana",
     "settings": "Iestatijumi",
     "logout": "Izrakstities",
-    "taxCompliance": "Tax Compliance",
+    "taxCompliance": "Nodokļu atbilstība",
     "beta": "Beta"
   },
   "auth": {
@@ -755,7 +755,7 @@
     "currentPlan": "Pašreizējais plāns:",
     "monthly": "Ikmēneša",
     "annual": "Gada",
-    "savePerYear": "Ietaupiet {{amount}} € gadā",
+    "savePerYear": "Ietaupiet {{amount}} gadā",
     "autoRenewLabel": "Automātiskā atjaunošana",
     "autoRenewDesc": "Automatiski atjaunojas perioda beigas",
     "changePlan": "Mainit planu",
@@ -816,7 +816,24 @@
     "intWebhookCreated": "Webhook izveidots",
     "intWebhookDeleted": "Webhook dzēsts",
     "intTestSent": "Testa notikums nosūtīts",
-    "intTestFailed": "Kļūda nosūtot testa notikumu"
+    "intTestFailed": "Kļūda nosūtot testa notikumu",
+    "billingProfileTitle": "Rēķinu dati",
+    "billingProfileDesc": "Šī informācija tiks parādīta jūsu rēķinos kā klienta dati.",
+    "companyNameLabel": "Uzņēmuma nosaukums",
+    "companyNamePlaceholder": "Piem.: Zvērinātu advokātu birojs Bērziņš",
+    "companyCIFLabel": "Reģ. Nr. / PVN Nr.",
+    "companyCIFPlaceholder": "Piem.: LV12345678901",
+    "companyAddressLabel": "Adrese",
+    "companyAddressPlaceholder": "Piem.: Brīvības iela 10, Rīga, LV-1001",
+    "companyPhoneLabel": "Tālrunis",
+    "companyPhonePlaceholder": "Piem.: +371 67 123 456",
+    "companyEmailLabel": "Rēķinu e-pasts",
+    "companyEmailPlaceholder": "Piem.: rekini@birojs.lv",
+    "invoiceNotesLabel": "Papildu informācija",
+    "invoiceNotesPlaceholder": "Papildu informācija rēķinam",
+    "saveBillingProfile": "Saglabāt rēķinu datus",
+    "billingProfileSaved": "Rēķinu dati saglabāti",
+    "errorSaveBillingProfile": "Kļūda saglabājot rēķinu datus"
   },
   "renewal": {
     "title": "Atjaunot abonementu",
@@ -1124,7 +1141,7 @@
     "solution3": "Visa klientu informacija centralizeta viena vieta",
     "solution4": "E-pasts un WhatsApp integreti viena automatizeta paneli",
     "roiLabel": "Produktivs ieguldijums",
-    "roiH2a": "250 €/mēn.",
+    "roiH2a": "{{price}} / mēn.",
     "roiH2b": "Atmaksajas pirmaja lieta.",
     "roiDesc": "Advokāts, kurš maksā 150 €/stundā, atmaksā ikmēneša ieguldījumus tikai ar 2 papildu stundām produktīva darba. Lyrium atdod jums vairāk nekā 12 stundas nedēļā. Veiciet matemātiku.",
     "modulesLabel": "Moduli",
@@ -1149,7 +1166,7 @@
     "pricingLabel": "Cenas",
     "pricingH2": "Vienkārši un bez pārsteigumiem",
     "freeTrial": "14 dienu bezmaksas izmeginajums",
-    "pricingDesc": "Pilnīga piekļuve visiem moduļiem. Nav mākslīgu ierobežojumu.",
+    "pricingDesc": "Pilna piekļuve visiem moduļiem.",
     "planMonthly": "Ikmēneša",
     "planMonthlyNote": "Rekins izrakstams katru menesi",
     "planUnitMonthly": "€ / mēn.",
@@ -1209,7 +1226,17 @@
     "integAITitle": "Pielāgojiet savu AI",
     "integAIDesc": "Augšupielādējiet tiesu praksi, stratēģijas vai iepriekšējās lietas PDF formātā, un AI tās izmantos, lai sniegtu precīzākas un jūsu birojam pielāgotas atbildes.",
     "integShareTitle": "Kopīgojiet failus ar savu komandu",
-    "integShareDesc": "Sūtiet dokumentus starp galveno kontu un jūsu biroja apakškontiem. Visi komandas dalībnieki var nekavējoties piekļūt kopīgotajiem failiem."
+    "integShareDesc": "Sūtiet dokumentus starp galveno kontu un jūsu biroja apakškontiem. Visi komandas dalībnieki var nekavējoties piekļūt kopīgotajiem failiem.",
+    "planStarterName": "Starter",
+    "planStarterSub": "Maziem birojiem",
+    "planStarterSubaccounts": "Līdz 4 apakškontiem",
+    "planAdvancedName": "Uzlabots",
+    "planAdvancedSub": "Lielākām komandām",
+    "planAdvancedSubaccounts": "Līdz 10 apakškontiem",
+    "perMonth": "/ mēn.",
+    "perYear": "/ gadā",
+    "planAnnualEquiv": "Atbilst {{perMonth}} / mēn. — ietaupiet {{saving}}",
+    "billedInEur": "Cenas ir orientējošas. Norēķini notiek eiro (EUR)."
   },
   "legal": {
     "backToHome": "Atpakaļ uz sākumlapu",
@@ -1285,97 +1312,97 @@
     "documentName": "Dokumenta nosaukums"
   },
   "taxCompliance": {
-    "title": "Tax Compliance",
-    "subtitle": "Complete tax tracking: calculated, filed and paid.",
-    "newObligation": "New obligation",
+    "title": "Nodokļu atbilstība",
+    "subtitle": "Pilnīga nodokļu izsekošana: aprēķināts, iesniegts un samaksāts.",
+    "newObligation": "Jauns pienākums",
     "tabs": {
-      "obligations": "Obligations",
-      "calendar": "Calendar",
-      "summary": "Summary"
+      "obligations": "Pienākumi",
+      "calendar": "Kalendārs",
+      "summary": "Kopsavilkums"
     },
     "filters": {
-      "searchPlaceholder": "Search by client, model or period",
-      "status": "Status",
-      "client": "Client",
-      "all": "All",
-      "allClients": "All clients"
+      "searchPlaceholder": "Meklēt pēc klienta, modeļa vai perioda",
+      "status": "Statuss",
+      "client": "Klients",
+      "all": "Visi",
+      "allClients": "Visi klienti"
     },
     "table": {
-      "client": "Client",
-      "model": "Model",
-      "period": "Period",
-      "amount": "Amount",
-      "status": "Status",
-      "actions": "Actions",
-      "noResults": "No obligations for the current filters."
+      "client": "Klients",
+      "model": "Modelis",
+      "period": "Periods",
+      "amount": "Summa",
+      "status": "Statuss",
+      "actions": "Darbības",
+      "noResults": "Nav pienākumu pašreizējiem filtriem."
     },
     "actions": {
       "pdf": "PDF",
-      "markFiled": "Filed",
-      "markPaid": "Paid",
-      "officialPortal": "Official portal",
-      "delete": "Delete"
+      "markFiled": "Iesniegts",
+      "markPaid": "Samaksāts",
+      "officialPortal": "Oficiālais portāls",
+      "delete": "Dzēst"
     },
     "calendar": {
-      "title": "Upcoming deadlines",
-      "description": "Obligations due in the next 30 days.",
-      "empty": "No upcoming deadlines.",
-      "dueLabel": "Due"
+      "title": "Tuvākie termiņi",
+      "description": "Pienākumi, kas jāizpilda nākamo 30 dienu laikā.",
+      "empty": "Nav tuvāko termiņu.",
+      "dueLabel": "Termiņš"
     },
     "summary": {
-      "totalObligations": "Total obligations",
-      "totalEstimated": "Total estimated",
-      "pendingPayment": "Pending payment",
-      "currentStatus": "Current status",
-      "currentStatusLine": "Calculated: {{calculated}} · Filed: {{filed}} · Paid: {{paid}}"
+      "totalObligations": "Kopējie pienākumi",
+      "totalEstimated": "Kopējais aplēstais",
+      "pendingPayment": "Gaidošs maksājums",
+      "currentStatus": "Pašreizējais statuss",
+      "currentStatusLine": "Aprēķināts: {{calculated}} · Iesniegts: {{filed}} · Samaksāts: {{paid}}"
     },
     "dialog": {
-      "title": "New tax obligation",
-      "description": "Select client, saved calculation and model to create a traceable obligation.",
-      "client": "Client",
-      "selectClient": "Select a client",
-      "savedCalculation": "Saved calculation",
-      "selectCalculation": "Select a calculation",
-      "taxModel": "Tax model",
-      "modelPlaceholder": "Model",
-      "period": "Period",
-      "notes": "Notes",
-      "optional": "Optional",
-      "creating": "Creating...",
-      "create": "Create obligation"
+      "title": "Jauns nodokļu pienākums",
+      "description": "Izvēlieties klientu, saglabāto aprēķinu un modeli, lai izveidotu izsekojamu pienākumu.",
+      "client": "Klients",
+      "selectClient": "Izvēlieties klientu",
+      "savedCalculation": "Saglabātais aprēķins",
+      "selectCalculation": "Izvēlieties aprēķinu",
+      "taxModel": "Nodokļu modelis",
+      "modelPlaceholder": "Modelis",
+      "period": "Periods",
+      "notes": "Piezīmes",
+      "optional": "Neobligāts",
+      "creating": "Izveido...",
+      "create": "Izveidot pienākumu"
     },
     "status": {
-      "draft": "Draft",
-      "calculated": "Calculated",
-      "filed": "Filed",
-      "paid": "Paid",
-      "overdue": "Overdue",
-      "error": "Error"
+      "draft": "Melnraksts",
+      "calculated": "Aprēķināts",
+      "filed": "Iesniegts",
+      "paid": "Samaksāts",
+      "overdue": "Nokavēts",
+      "error": "Kļūda"
     },
     "toasts": {
-      "accountCountryRequiredTitle": "Account country required",
-      "accountCountryRequiredDesc": "The account has no configured country. Set the account country before creating obligations.",
-      "selectCalculation": "Select a saved calculation",
-      "selectTaxModel": "Select a tax model",
-      "createObligationFailed": "Could not create the obligation.",
-      "obligationCreatedTitle": "Obligation created",
-      "obligationCreatedDesc": "You can manage it from the table now.",
-      "updateStatusFailed": "Could not update the status.",
-      "downloadPdfFailed": "Could not download the PDF.",
-      "deleteFailed": "Could not delete the obligation.",
-      "deletedTitle": "Obligation deleted",
-      "deletedDesc": "The obligation was deleted successfully."
+      "accountCountryRequiredTitle": "Nepieciešama konta valsts",
+      "accountCountryRequiredDesc": "Kontam nav konfigurētas valsts. Iestatiet konta valsti pirms pienākumu izveides.",
+      "selectCalculation": "Izvēlieties saglabāto aprēķinu",
+      "selectTaxModel": "Izvēlieties nodokļu modeli",
+      "createObligationFailed": "Nevarēja izveidot pienākumu.",
+      "obligationCreatedTitle": "Pienākums izveidots",
+      "obligationCreatedDesc": "Tagad to varat pārvaldīt no tabulas.",
+      "updateStatusFailed": "Nevarēja atjaunināt statusu.",
+      "downloadPdfFailed": "Nevarēja lejupielādēt PDF.",
+      "deleteFailed": "Nevarēja dzēst pienākumu.",
+      "deletedTitle": "Pienākums dzēsts",
+      "deletedDesc": "Pienākums tika veiksmīgi dzēsts."
     },
     "beta": {
       "button": "Beta",
-      "title": "Tax Compliance (Beta)",
+      "title": "Nodokļu atbilstība (Beta)",
       "description": "Jus izmantojat agrinas pieejas funkcionalitati, kas ir aktiva un darbspējiga, ar nepārtrauktiem uzlabojumiem. Lai gan mes tiecamies uz maksimalu stabilitati, attistibas laika var rasties kludas, partraukumi vai neprecizi rezultati. Izmantojiet so funkcionalitati ka atbalstu un vienmer parbaudiet rezultatu pirms nodoklu vai juridisku lemumu pienemsanas. Nakamaja atjauninajuma si funkcionalitate tiks pilniba ieviesta, lai nodrosinatu optimalu darbibu visās valstis. Lyrium negarante pilnigu kludu neesamibu saja versija un neuznemas atbildibu par lemumiem, kas pienemti tikai, balstoties uz so beta funkcionalitati."
     },
     "deleteDialog": {
-      "title": "Delete obligation?",
-      "description": "This action cannot be undone. The obligation will be permanently deleted.",
-      "confirm": "Delete obligation",
-      "deleting": "Deleting..."
+      "title": "Dzēst pienākumu?",
+      "description": "Šo darbību nevar atsaukt. Pienākums tiks neatgriezeniski dzēsts.",
+      "confirm": "Dzēst pienākumu",
+      "deleting": "Dzēš..."
     }
   }
 }

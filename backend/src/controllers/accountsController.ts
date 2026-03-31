@@ -25,12 +25,13 @@ function validatePassword(password: string): { valid: boolean; error?: string } 
 
 // System email transporter for password reset and email verification
 function getSystemTransporter() {
+  const port = Number(process.env.SYSTEM_EMAIL_PORT) || 587;
   return nodemailer.createTransport({
-    host: process.env.SYSTEM_EMAIL_HOST || 'smtp.hostinger.com',
-    port: Number(process.env.SYSTEM_EMAIL_PORT) || 465,
-    secure: true,
+    host: process.env.SYSTEM_EMAIL_HOST || 'smtp-relay.brevo.com',
+    port,
+    secure: port === 465,
     auth: {
-      user: process.env.SYSTEM_EMAIL_USER,
+      user: process.env.SYSTEM_EMAIL_LOGIN || process.env.SYSTEM_EMAIL_USER,
       pass: process.env.SYSTEM_EMAIL_PASS,
     },
   });
@@ -369,6 +370,7 @@ export const login = async (req: Request, res: Response) => {
         needsPayment: userType === 'main',
         accountId: userType === 'main' ? user._id : undefined,
         email: user.email,
+        country: user.country || 'ES',
       });
     }
 
@@ -383,6 +385,7 @@ export const login = async (req: Request, res: Response) => {
         needsPayment: userType === 'main',
         accountId: userType === 'main' ? user._id : undefined,
         email: user.email,
+        country: user.country || 'ES',
       });
     }
 
@@ -954,5 +957,64 @@ export const changePassword = async (req: Request, res: Response) => {
   } catch (error) {
     console.error('Error changing password:', error);
     res.status(500).json({ error: 'Error changing password' });
+  }
+};
+
+// ============= BILLING PROFILE =============
+
+// Get billing profile fields
+export const getBillingProfile = async (req: Request, res: Response) => {
+  try {
+    const accountId = (req as any).user?.userId;
+    if (!accountId) return res.status(401).json({ error: 'No autorizado' });
+
+    const account = await Account.findById(accountId);
+    if (!account) return res.status(404).json({ error: 'Cuenta no encontrada' });
+
+    res.json({
+      companyName: account.companyName || '',
+      companyAddress: account.companyAddress || '',
+      companyPhone: account.companyPhone || '',
+      companyEmail: account.companyEmail || '',
+      companyCIF: account.companyCIF || '',
+      invoiceNotes: account.invoiceNotes || '',
+    });
+  } catch (error) {
+    console.error('Error getting billing profile:', error);
+    res.status(500).json({ error: 'Error al obtener perfil de facturación' });
+  }
+};
+
+// Update billing profile fields
+export const updateBillingProfile = async (req: Request, res: Response) => {
+  try {
+    const accountId = (req as any).user?.userId;
+    if (!accountId) return res.status(401).json({ error: 'No autorizado' });
+
+    const { companyName, companyAddress, companyPhone, companyEmail, companyCIF, invoiceNotes } = req.body;
+
+    const account = await Account.findById(accountId);
+    if (!account) return res.status(404).json({ error: 'Cuenta no encontrada' });
+
+    if (companyName !== undefined) account.companyName = companyName;
+    if (companyAddress !== undefined) account.companyAddress = companyAddress;
+    if (companyPhone !== undefined) account.companyPhone = companyPhone;
+    if (companyEmail !== undefined) account.companyEmail = companyEmail;
+    if (companyCIF !== undefined) account.companyCIF = companyCIF;
+    if (invoiceNotes !== undefined) account.invoiceNotes = invoiceNotes;
+
+    await account.save();
+
+    res.json({
+      companyName: account.companyName || '',
+      companyAddress: account.companyAddress || '',
+      companyPhone: account.companyPhone || '',
+      companyEmail: account.companyEmail || '',
+      companyCIF: account.companyCIF || '',
+      invoiceNotes: account.invoiceNotes || '',
+    });
+  } catch (error) {
+    console.error('Error updating billing profile:', error);
+    res.status(500).json({ error: 'Error al actualizar perfil de facturación' });
   }
 };

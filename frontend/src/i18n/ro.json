@@ -16,7 +16,7 @@
     "writing": "Redactare",
     "settings": "Setari",
     "logout": "Deconectare",
-    "taxCompliance": "Tax Compliance",
+    "taxCompliance": "Conformitate Fiscală",
     "beta": "Beta"
   },
   "auth": {
@@ -755,7 +755,7 @@
     "currentPlan": "Planul curent:",
     "monthly": "Lunar",
     "annual": "Anual",
-    "savePerYear": "Economisiți {{amount}}€ pe an",
+    "savePerYear": "Economisiți {{amount}} pe an",
     "autoRenewLabel": "Reînnoire automată",
     "autoRenewDesc": "Se va reînnoi automat la sfârșitul perioadei",
     "changePlan": "Schimbare plan",
@@ -816,7 +816,24 @@
     "intWebhookCreated": "Webhook creat",
     "intWebhookDeleted": "Webhook șters",
     "intTestSent": "Eveniment de test trimis",
-    "intTestFailed": "Eroare la trimiterea evenimentului de test"
+    "intTestFailed": "Eroare la trimiterea evenimentului de test",
+    "billingProfileTitle": "Date de facturare",
+    "billingProfileDesc": "Aceste informații vor apărea pe facturi ca date ale clientului.",
+    "companyNameLabel": "Numele firmei",
+    "companyNamePlaceholder": "Ex.: Cabinet Avocat Popescu",
+    "companyCIFLabel": "CUI / CIF",
+    "companyCIFPlaceholder": "Ex.: RO12345678",
+    "companyAddressLabel": "Adresă",
+    "companyAddressPlaceholder": "Ex.: Bd. Magheru 10, București",
+    "companyPhoneLabel": "Telefon",
+    "companyPhonePlaceholder": "Ex.: +40 21 123 4567",
+    "companyEmailLabel": "Email de facturare",
+    "companyEmailPlaceholder": "Ex.: facturare@cabinet.ro",
+    "invoiceNotesLabel": "Informații suplimentare",
+    "invoiceNotesPlaceholder": "Informații extra pentru factură",
+    "saveBillingProfile": "Salvează datele de facturare",
+    "billingProfileSaved": "Date de facturare salvate",
+    "errorSaveBillingProfile": "Eroare la salvarea datelor de facturare"
   },
   "renewal": {
     "title": "Reînnoiți abonamentul",
@@ -1124,7 +1141,7 @@
     "solution3": "Toate informațiile despre clienți centralizate într-un singur loc",
     "solution4": "Email și WhatsApp integrate într-un singur panou automat",
     "roiLabel": "Investiție productivă",
-    "roiH2a": "250 €/luna.",
+    "roiH2a": "{{price}} / lună.",
     "roiH2b": "Recuperat la primul caz.",
     "roiDesc": "Un avocat care facturează la 150 €/oră recuperează investiția lunară cu doar 2 ore suplimentare de muncă productivă. Lyrium vă oferă înapoi mai mult de 12 ore pe săptămână. Faceți matematica.",
     "modulesLabel": "Module",
@@ -1149,7 +1166,7 @@
     "pricingLabel": "Prețuri",
     "pricingH2": "Simplu și fără surprize",
     "freeTrial": "14 zile de proba gratuita",
-    "pricingDesc": "Acces complet la toate modulele. Fara limite artificiale.",
+    "pricingDesc": "Acces complet la toate modulele.",
     "planMonthly": "Lunar",
     "planMonthlyNote": "Facturat lunar",
     "planUnitMonthly": "€ / lună",
@@ -1209,7 +1226,17 @@
     "integAITitle": "Personalizează-ți AI-ul",
     "integAIDesc": "Încarcă jurisprudență, strategii sau cazuri anterioare în format PDF, iar AI-ul le va folosi pentru a-ți oferi răspunsuri mai precise și adaptate cabinetului tău.",
     "integShareTitle": "Partajează fișiere cu echipa ta",
-    "integShareDesc": "Trimite documente între contul principal și subconturile cabinetului tău. Toți membrii echipei accesează fișierele partajate instantaneu."
+    "integShareDesc": "Trimite documente între contul principal și subconturile cabinetului tău. Toți membrii echipei accesează fișierele partajate instantaneu.",
+    "planStarterName": "Starter",
+    "planStarterSub": "Pentru cabinete mici",
+    "planStarterSubaccounts": "Până la 4 subconturi",
+    "planAdvancedName": "Avansat",
+    "planAdvancedSub": "Pentru echipe mai mari",
+    "planAdvancedSubaccounts": "Până la 10 subconturi",
+    "perMonth": "/ lună",
+    "perYear": "/ an",
+    "planAnnualEquiv": "Echivalent cu {{perMonth}} / lună — economisește {{saving}}",
+    "billedInEur": "Prețurile sunt orientative. Facturarea se face în euro (EUR)."
   },
   "legal": {
     "backToHome": "Înapoi la pagina principală",
@@ -1285,97 +1312,97 @@
     "documentName": "Numele documentului"
   },
   "taxCompliance": {
-    "title": "Tax Compliance",
-    "subtitle": "Complete tax tracking: calculated, filed and paid.",
-    "newObligation": "New obligation",
+    "title": "Conformitate Fiscală",
+    "subtitle": "Urmărire fiscală completă: calculat, depus și plătit.",
+    "newObligation": "Obligație nouă",
     "tabs": {
-      "obligations": "Obligations",
+      "obligations": "Obligații",
       "calendar": "Calendar",
-      "summary": "Summary"
+      "summary": "Rezumat"
     },
     "filters": {
-      "searchPlaceholder": "Search by client, model or period",
-      "status": "Status",
+      "searchPlaceholder": "Căutare după client, model sau perioadă",
+      "status": "Stare",
       "client": "Client",
-      "all": "All",
-      "allClients": "All clients"
+      "all": "Toate",
+      "allClients": "Toți clienții"
     },
     "table": {
       "client": "Client",
       "model": "Model",
-      "period": "Period",
-      "amount": "Amount",
-      "status": "Status",
-      "actions": "Actions",
-      "noResults": "No obligations for the current filters."
+      "period": "Perioadă",
+      "amount": "Sumă",
+      "status": "Stare",
+      "actions": "Acțiuni",
+      "noResults": "Nu există obligații pentru filtrele actuale."
     },
     "actions": {
       "pdf": "PDF",
-      "markFiled": "Filed",
-      "markPaid": "Paid",
-      "officialPortal": "Official portal",
-      "delete": "Delete"
+      "markFiled": "Depus",
+      "markPaid": "Plătit",
+      "officialPortal": "Portal oficial",
+      "delete": "Șterge"
     },
     "calendar": {
-      "title": "Upcoming deadlines",
-      "description": "Obligations due in the next 30 days.",
-      "empty": "No upcoming deadlines.",
-      "dueLabel": "Due"
+      "title": "Termene viitoare",
+      "description": "Obligații scadente în următoarele 30 de zile.",
+      "empty": "Nu există termene viitoare.",
+      "dueLabel": "Scadent"
     },
     "summary": {
-      "totalObligations": "Total obligations",
-      "totalEstimated": "Total estimated",
-      "pendingPayment": "Pending payment",
-      "currentStatus": "Current status",
-      "currentStatusLine": "Calculated: {{calculated}} · Filed: {{filed}} · Paid: {{paid}}"
+      "totalObligations": "Total obligații",
+      "totalEstimated": "Total estimat",
+      "pendingPayment": "Plată în așteptare",
+      "currentStatus": "Stare actuală",
+      "currentStatusLine": "Calculat: {{calculated}} · Depus: {{filed}} · Plătit: {{paid}}"
     },
     "dialog": {
-      "title": "New tax obligation",
-      "description": "Select client, saved calculation and model to create a traceable obligation.",
+      "title": "Obligație fiscală nouă",
+      "description": "Selectați clientul, calculul salvat și modelul pentru a crea o obligație trasabilă.",
       "client": "Client",
-      "selectClient": "Select a client",
-      "savedCalculation": "Saved calculation",
-      "selectCalculation": "Select a calculation",
-      "taxModel": "Tax model",
+      "selectClient": "Selectați un client",
+      "savedCalculation": "Calcul salvat",
+      "selectCalculation": "Selectați un calcul",
+      "taxModel": "Model fiscal",
       "modelPlaceholder": "Model",
-      "period": "Period",
-      "notes": "Notes",
-      "optional": "Optional",
-      "creating": "Creating...",
-      "create": "Create obligation"
+      "period": "Perioadă",
+      "notes": "Note",
+      "optional": "Opțional",
+      "creating": "Se creează...",
+      "create": "Creează obligație"
     },
     "status": {
-      "draft": "Draft",
-      "calculated": "Calculated",
-      "filed": "Filed",
-      "paid": "Paid",
-      "overdue": "Overdue",
-      "error": "Error"
+      "draft": "Ciornă",
+      "calculated": "Calculat",
+      "filed": "Depus",
+      "paid": "Plătit",
+      "overdue": "Depășit",
+      "error": "Eroare"
     },
     "toasts": {
-      "accountCountryRequiredTitle": "Account country required",
-      "accountCountryRequiredDesc": "The account has no configured country. Set the account country before creating obligations.",
-      "selectCalculation": "Select a saved calculation",
-      "selectTaxModel": "Select a tax model",
-      "createObligationFailed": "Could not create the obligation.",
-      "obligationCreatedTitle": "Obligation created",
-      "obligationCreatedDesc": "You can manage it from the table now.",
-      "updateStatusFailed": "Could not update the status.",
-      "downloadPdfFailed": "Could not download the PDF.",
-      "deleteFailed": "Could not delete the obligation.",
-      "deletedTitle": "Obligation deleted",
-      "deletedDesc": "The obligation was deleted successfully."
+      "accountCountryRequiredTitle": "Țara contului este necesară",
+      "accountCountryRequiredDesc": "Contul nu are o țară configurată. Setați țara contului înainte de a crea obligații.",
+      "selectCalculation": "Selectați un calcul salvat",
+      "selectTaxModel": "Selectați un model fiscal",
+      "createObligationFailed": "Nu s-a putut crea obligația.",
+      "obligationCreatedTitle": "Obligație creată",
+      "obligationCreatedDesc": "O puteți gestiona din tabel acum.",
+      "updateStatusFailed": "Nu s-a putut actualiza starea.",
+      "downloadPdfFailed": "Nu s-a putut descărca PDF-ul.",
+      "deleteFailed": "Nu s-a putut șterge obligația.",
+      "deletedTitle": "Obligație ștearsă",
+      "deletedDesc": "Obligația a fost ștearsă cu succes."
     },
     "beta": {
       "button": "Beta",
-      "title": "Tax Compliance (Beta)",
+      "title": "Conformitate Fiscală (Beta)",
       "description": "Utilizati o functionalitate in acces timpuriu, activa si operationala, cu imbunatatiri continue. Desi urmarim stabilitatea maxima, pe parcursul evolutiei pot aparea erori, intreruperi sau rezultate inexacte. Folositi aceasta functionalitate ca suport si verificati intotdeauna rezultatul inainte de a lua decizii fiscale sau juridice. In urmatoarea actualizare, aceasta functionalitate va fi implementata complet pentru a garanta functionarea optima in toate tarile. Lyrium nu garanteaza absenta totala a erorilor in aceasta versiune si nu isi asuma raspunderea pentru decizii luate exclusiv pe baza acestei functionalitati beta."
     },
     "deleteDialog": {
-      "title": "Delete obligation?",
-      "description": "This action cannot be undone. The obligation will be permanently deleted.",
-      "confirm": "Delete obligation",
-      "deleting": "Deleting..."
+      "title": "Ștergeți obligația?",
+      "description": "Această acțiune nu poate fi anulată. Obligația va fi ștearsă permanent.",
+      "confirm": "Șterge obligația",
+      "deleting": "Se șterge..."
     }
   }
 }

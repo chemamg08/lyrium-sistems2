@@ -23,7 +23,7 @@
     "writing": "Redacción",
     "settings": "Configuración",
     "logout": "Cerrar sesión",
-    "taxCompliance": "Tax Compliance",
+    "taxCompliance": "Cumplimiento Fiscal",
     "beta": "Beta"
   },
   "auth": {
@@ -762,7 +762,7 @@
     "currentPlan": "Plan Actual:",
     "monthly": "Mensual",
     "annual": "Anual",
-    "savePerYear": "Ahorra {{amount}}€ al año",
+    "savePerYear": "Ahorra {{amount}} al año",
     "autoRenewLabel": "Renovación automática",
     "autoRenewDesc": "Se renovará automáticamente al final del período",
     "changePlan": "Cambiar Plan",
@@ -823,7 +823,24 @@
     "intWebhookCreated": "Webhook creado",
     "intWebhookDeleted": "Webhook eliminado",
     "intTestSent": "Evento de prueba enviado",
-    "intTestFailed": "Error al enviar evento de prueba"
+    "intTestFailed": "Error al enviar evento de prueba",
+    "billingProfileTitle": "Datos de facturación",
+    "billingProfileDesc": "Esta información aparecerá en tus facturas como datos del cliente.",
+    "companyNameLabel": "Nombre del despacho",
+    "companyNamePlaceholder": "Ej: Despacho García & Asociados",
+    "companyCIFLabel": "CIF / NIF",
+    "companyCIFPlaceholder": "Ej: B12345678",
+    "companyAddressLabel": "Dirección",
+    "companyAddressPlaceholder": "Ej: Calle Mayor 10, 28001 Madrid",
+    "companyPhoneLabel": "Teléfono",
+    "companyPhonePlaceholder": "Ej: 612 345 678",
+    "companyEmailLabel": "Email de facturación",
+    "companyEmailPlaceholder": "Ej: admin@despacho.com",
+    "invoiceNotesLabel": "Información adicional",
+    "invoiceNotesPlaceholder": "Información extra que aparecerá en la factura",
+    "saveBillingProfile": "Guardar datos de facturación",
+    "billingProfileSaved": "Datos de facturación guardados",
+    "errorSaveBillingProfile": "Error al guardar datos de facturación"
   },
   "renewal": {
     "title": "Renovar Suscripción",
@@ -1131,7 +1148,7 @@
     "solution3": "Toda la información de clientes centralizada en un solo lugar",
     "solution4": "Email y WhatsApp integrados en un único panel automatizado",
     "roiLabel": "Inversión productiva",
-    "roiH2a": "250 € / mes.",
+    "roiH2a": "{{price}} / mes.",
     "roiH2b": "Recuperado en el primer caso.",
     "roiDesc": "Un abogado que factura a 150 €/hora recupera la inversión mensual con solo 2 horas extra de trabajo productivo. Lyrium te devuelve más de 12 horas a la semana. Haz los cálculos.",
     "modulesLabel": "Módulos",
@@ -1156,7 +1173,7 @@
     "pricingLabel": "Precios",
     "pricingH2": "Simple y sin sorpresas",
     "freeTrial": "14 días de prueba gratuita",
-    "pricingDesc": "Acceso completo a todos los módulos. Sin límites artificiales.",
+    "pricingDesc": "Acceso completo a todos los módulos.",
     "planMonthly": "Mensual",
     "planMonthlyNote": "Facturación mensual",
     "planUnitMonthly": "€ / mes",
@@ -1216,7 +1233,17 @@
     "integAITitle": "Personaliza tu IA",
     "integAIDesc": "Sube jurisprudencia, estrategias o casos pasados en PDF y la IA los utilizará para darte respuestas más precisas y adaptadas a tu despacho.",
     "integShareTitle": "Comparte archivos con tu equipo",
-    "integShareDesc": "Envía documentos entre la cuenta principal y las subcuentas de tu despacho. Todos los miembros del equipo acceden a los archivos compartidos al instante."
+    "integShareDesc": "Envía documentos entre la cuenta principal y las subcuentas de tu despacho. Todos los miembros del equipo acceden a los archivos compartidos al instante.",
+    "planStarterName": "Starter",
+    "planStarterSub": "Para despachos pequeños",
+    "planStarterSubaccounts": "Hasta 4 subcuentas",
+    "planAdvancedName": "Avanzado",
+    "planAdvancedSub": "Para equipos más grandes",
+    "planAdvancedSubaccounts": "Hasta 10 subcuentas",
+    "perMonth": "/ mes",
+    "perYear": "/ año",
+    "planAnnualEquiv": "Equivale a {{perMonth}} / mes — ahorra {{saving}}",
+    "billedInEur": "Los precios se muestran como referencia. La facturación se realiza en euros (EUR)."
   },
   "legal": {
     "backToHome": "Volver al inicio",
@@ -1292,9 +1319,9 @@
     "documentName": "Nombre del documento"
   },
   "taxCompliance": {
-    "title": "Tax Compliance",
+    "title": "Cumplimiento Fiscal",
     "subtitle": "Seguimiento fiscal completo: calculado, presentado y pagado.",
-    "newObligation": "Nueva obligacion",
+    "newObligation": "Nueva obligación",
     "tabs": {
       "obligations": "Obligaciones",
       "calendar": "Calendario",
@@ -1324,9 +1351,9 @@
       "delete": "Eliminar"
     },
     "calendar": {
-      "title": "Proximos vencimientos",
-      "description": "Obligaciones que vencen en los proximos 30 dias.",
-      "empty": "No hay vencimientos proximos.",
+      "title": "Próximos vencimientos",
+      "description": "Obligaciones que vencen en los próximos 30 días.",
+      "empty": "No hay vencimientos próximos.",
       "dueLabel": "Vence"
     },
     "summary": {
@@ -1337,19 +1364,19 @@
       "currentStatusLine": "Calculado: {{calculated}} · Presentado: {{filed}} · Pagado: {{paid}}"
     },
     "dialog": {
-      "title": "Nueva obligacion fiscal",
-      "description": "Selecciona cliente, calculo y modelo para crear una obligacion trazable.",
+      "title": "Nueva obligación fiscal",
+      "description": "Selecciona cliente, cálculo guardado y modelo para crear una obligación trazable.",
       "client": "Cliente",
       "selectClient": "Selecciona un cliente",
-      "savedCalculation": "Calculo guardado",
-      "selectCalculation": "Selecciona un calculo",
+      "savedCalculation": "Cálculo guardado",
+      "selectCalculation": "Selecciona un cálculo",
       "taxModel": "Modelo fiscal",
       "modelPlaceholder": "Modelo",
       "period": "Periodo",
       "notes": "Notas",
       "optional": "Opcional",
       "creating": "Creando...",
-      "create": "Crear obligacion"
+      "create": "Crear obligación"
     },
     "status": {
       "draft": "Borrador",
@@ -1360,12 +1387,12 @@
       "error": "Error"
     },
     "toasts": {
-      "accountCountryRequiredTitle": "Pais de cuenta requerido",
-      "accountCountryRequiredDesc": "La cuenta no tiene pais configurado. Completa el pais en la cuenta para crear obligaciones.",
-      "selectCalculation": "Selecciona un calculo",
+      "accountCountryRequiredTitle": "País de cuenta requerido",
+      "accountCountryRequiredDesc": "La cuenta no tiene país configurado. Establece el país de la cuenta antes de crear obligaciones.",
+      "selectCalculation": "Selecciona un cálculo guardado",
       "selectTaxModel": "Selecciona un modelo fiscal",
-      "createObligationFailed": "No se pudo crear la obligacion.",
-      "obligationCreatedTitle": "Obligacion creada",
+      "createObligationFailed": "No se pudo crear la obligación.",
+      "obligationCreatedTitle": "Obligación creada",
       "obligationCreatedDesc": "Ya puedes gestionarla desde la tabla.",
       "updateStatusFailed": "No se pudo actualizar el estado.",
       "downloadPdfFailed": "No se pudo descargar el PDF.",
@@ -1375,7 +1402,7 @@
     },
     "beta": {
       "button": "Beta",
-      "title": "Tax Compliance (Beta)",
+      "title": "Cumplimiento Fiscal (Beta)",
       "description": "Estas usando una funcion en acceso anticipado, activa y operativa, con mejoras continuas. Aunque buscamos la maxima estabilidad, pueden producirse errores, interrupciones o resultados inexactos durante su evolucion. Usa esta funcionalidad como apoyo y verifica siempre el resultado antes de tomar decisiones fiscales o legales. En la proxima actualizacion, esta funcionalidad se implementara de forma completa para garantizar un funcionamiento optimo en todos los paises. Lyrium no garantiza la ausencia total de errores en esta version y no asume responsabilidad por decisiones tomadas exclusivamente en base a esta funcionalidad beta."
     },
     "deleteDialog": {

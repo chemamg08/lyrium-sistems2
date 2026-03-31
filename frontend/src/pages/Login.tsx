@@ -62,6 +62,7 @@ const Login = () => {
     type: 'main' | 'subaccount' | null;
     accountId?: string;
     email?: string;
+    country?: string;
   } | null>(null);
   const [showRenewalModal, setShowRenewalModal] = useState(false);
   const navigate = useNavigate();
@@ -133,7 +134,8 @@ const Login = () => {
           message: data.error,
           type: data.type,
           accountId: data.accountId,
-          email: data.email || email
+          email: data.email || email,
+          country: data.country || 'ES'
         });
       } else {
         toast({ title: t('auth.wrongCredentials'), variant: 'destructive' });
@@ -415,6 +417,7 @@ const Login = () => {
           }}
           accountId={subscriptionError.accountId}
           userEmail={subscriptionError.email}
+          userCountry={subscriptionError.country || 'ES'}
         />
       )}
     </div>

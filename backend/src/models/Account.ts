@@ -25,6 +25,14 @@ export interface IAccount {
   failedLoginAttempts?: number;
   lockUntil?: string | null;
   disabled?: boolean;
+  // Billing / invoice fields
+  companyName?: string;
+  companyAddress?: string;
+  companyPhone?: string;
+  companyEmail?: string;
+  companyCIF?: string;
+  invoiceNotes?: string;
+  nextInvoiceNumber?: number;
 }
 
 const accountSchema = new Schema<IAccount>({
@@ -52,6 +60,13 @@ const accountSchema = new Schema<IAccount>({
   failedLoginAttempts: { type: Number, default: 0 },
   lockUntil: { type: String, default: null },
   disabled: { type: Boolean, default: false },
+  companyName: { type: String, default: '' },
+  companyAddress: { type: String, default: '' },
+  companyPhone: { type: String, default: '' },
+  companyEmail: { type: String, default: '' },
+  companyCIF: { type: String, default: '' },
+  invoiceNotes: { type: String, default: '' },
+  nextInvoiceNumber: { type: Number, default: 1 },
 }, { _id: false, versionKey: false });
 
 accountSchema.set('toJSON', {

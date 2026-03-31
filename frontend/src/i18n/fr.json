@@ -20,7 +20,7 @@
     "writing": "En écrivant",
     "settings": "Paramètres",
     "logout": "Se déconnecter",
-    "taxCompliance": "Tax Compliance",
+    "taxCompliance": "Conformité Fiscale",
     "beta": "Beta"
   },
   "auth": {
@@ -759,7 +759,7 @@
     "currentPlan": "Formule actuelle :",
     "monthly": "Mensuel",
     "annual": "Annuel",
-    "savePerYear": "Économisez {{amount}}€ par an",
+    "savePerYear": "Économisez {{amount}} par an",
     "autoRenewLabel": "Renouvellement automatique",
     "autoRenewDesc": "Se renouvellera automatiquement à la fin de la période",
     "changePlan": "Changer de formule",
@@ -820,7 +820,24 @@
     "intWebhookCreated": "Webhook créé",
     "intWebhookDeleted": "Webhook supprimé",
     "intTestSent": "Événement de test envoyé",
-    "intTestFailed": "Erreur lors de l'envoi de l'événement de test"
+    "intTestFailed": "Erreur lors de l'envoi de l'événement de test",
+    "billingProfileTitle": "Informations de facturation",
+    "billingProfileDesc": "Ces informations apparaîtront sur vos factures en tant que données client.",
+    "companyNameLabel": "Nom du cabinet",
+    "companyNamePlaceholder": "Ex : Cabinet Dupont & Associés",
+    "companyCIFLabel": "N° TVA / SIRET",
+    "companyCIFPlaceholder": "Ex : FR12345678901",
+    "companyAddressLabel": "Adresse",
+    "companyAddressPlaceholder": "Ex : 10 Rue de Rivoli, 75001 Paris",
+    "companyPhoneLabel": "Téléphone",
+    "companyPhonePlaceholder": "Ex : +33 1 23 45 67 89",
+    "companyEmailLabel": "Email de facturation",
+    "companyEmailPlaceholder": "Ex : admin@cabinet.fr",
+    "invoiceNotesLabel": "Informations supplémentaires",
+    "invoiceNotesPlaceholder": "Informations supplémentaires à inclure sur la facture",
+    "saveBillingProfile": "Enregistrer les informations de facturation",
+    "billingProfileSaved": "Informations de facturation enregistrées",
+    "errorSaveBillingProfile": "Erreur lors de l'enregistrement"
   },
   "renewal": {
     "title": "Renouveler l'abonnement",
@@ -1128,7 +1145,7 @@
     "solution3": "Toutes les informations clients centralisées en un seul endroit",
     "solution4": "Email et WhatsApp intégrés dans un seul panneau automatisé",
     "roiLabel": "Investissement productif",
-    "roiH2a": "250 €/mois.",
+    "roiH2a": "{{price}} / mois.",
     "roiH2b": "Récupéré sur le premier cas.",
     "roiDesc": "Un avocat facturant 150 €/heure récupère son investissement mensuel avec seulement 2 heures supplémentaires de travail productif. Lyrium vous redonne plus de 12 heures par semaine. Faites le calcul.",
     "modulesLabel": "Modules",
@@ -1153,7 +1170,7 @@
     "pricingLabel": "Tarifs",
     "pricingH2": "Simple et sans surprises",
     "freeTrial": "14 jours d'essai gratuit",
-    "pricingDesc": "Accès complet à tous les modules. Aucune limite artificielle.",
+    "pricingDesc": "Accès complet à tous les modules.",
     "planMonthly": "Mensuel",
     "planMonthlyNote": "Facturé mensuellement",
     "planUnitMonthly": "€ / mois",
@@ -1213,7 +1230,17 @@
     "integAITitle": "Personnalisez votre IA",
     "integAIDesc": "Téléchargez de la jurisprudence, des stratégies ou des dossiers passés en PDF et l’IA les utilisera pour vous fournir des réponses plus précises et adaptées à votre cabinet.",
     "integShareTitle": "Partagez des fichiers avec votre équipe",
-    "integShareDesc": "Envoyez des documents entre le compte principal et les sous-comptes de votre cabinet. Tous les membres de l’équipe accèdent aux fichiers partagés instantanément."
+    "integShareDesc": "Envoyez des documents entre le compte principal et les sous-comptes de votre cabinet. Tous les membres de l’équipe accèdent aux fichiers partagés instantanément.",
+    "planStarterName": "Starter",
+    "planStarterSub": "Pour les petits cabinets",
+    "planStarterSubaccounts": "Jusqu'à 4 sous-comptes",
+    "planAdvancedName": "Avancé",
+    "planAdvancedSub": "Pour les équipes plus grandes",
+    "planAdvancedSubaccounts": "Jusqu'à 10 sous-comptes",
+    "perMonth": "/ mois",
+    "perYear": "/ an",
+    "planAnnualEquiv": "Équivaut à {{perMonth}} / mois — économisez {{saving}}",
+    "billedInEur": "Prix affichés à titre indicatif. La facturation est en euros (EUR)."
   },
   "legal": {
     "backToHome": "Retour à l'accueil",
@@ -1289,97 +1316,97 @@
     "documentName": "Nom du document"
   },
   "taxCompliance": {
-    "title": "Tax Compliance",
-    "subtitle": "Complete tax tracking: calculated, filed and paid.",
-    "newObligation": "New obligation",
+    "title": "Conformité Fiscale",
+    "subtitle": "Suivi fiscal complet : calculé, déclaré et payé.",
+    "newObligation": "Nouvelle obligation",
     "tabs": {
       "obligations": "Obligations",
-      "calendar": "Calendar",
-      "summary": "Summary"
+      "calendar": "Calendrier",
+      "summary": "Résumé"
     },
     "filters": {
-      "searchPlaceholder": "Search by client, model or period",
-      "status": "Status",
+      "searchPlaceholder": "Rechercher par client, modèle ou période",
+      "status": "Statut",
       "client": "Client",
-      "all": "All",
-      "allClients": "All clients"
+      "all": "Tous",
+      "allClients": "Tous les clients"
     },
     "table": {
       "client": "Client",
-      "model": "Model",
-      "period": "Period",
-      "amount": "Amount",
-      "status": "Status",
+      "model": "Modèle",
+      "period": "Période",
+      "amount": "Montant",
+      "status": "Statut",
       "actions": "Actions",
-      "noResults": "No obligations for the current filters."
+      "noResults": "Aucune obligation pour les filtres actuels."
     },
     "actions": {
       "pdf": "PDF",
-      "markFiled": "Filed",
-      "markPaid": "Paid",
-      "officialPortal": "Official portal",
-      "delete": "Delete"
+      "markFiled": "Déclaré",
+      "markPaid": "Payé",
+      "officialPortal": "Portail officiel",
+      "delete": "Supprimer"
     },
     "calendar": {
-      "title": "Upcoming deadlines",
-      "description": "Obligations due in the next 30 days.",
-      "empty": "No upcoming deadlines.",
-      "dueLabel": "Due"
+      "title": "Échéances à venir",
+      "description": "Obligations dues dans les 30 prochains jours.",
+      "empty": "Aucune échéance à venir.",
+      "dueLabel": "Échéance"
     },
     "summary": {
-      "totalObligations": "Total obligations",
-      "totalEstimated": "Total estimated",
-      "pendingPayment": "Pending payment",
-      "currentStatus": "Current status",
-      "currentStatusLine": "Calculated: {{calculated}} · Filed: {{filed}} · Paid: {{paid}}"
+      "totalObligations": "Total des obligations",
+      "totalEstimated": "Total estimé",
+      "pendingPayment": "En attente de paiement",
+      "currentStatus": "Statut actuel",
+      "currentStatusLine": "Calculé : {{calculated}} · Déclaré : {{filed}} · Payé : {{paid}}"
     },
     "dialog": {
-      "title": "New tax obligation",
-      "description": "Select client, saved calculation and model to create a traceable obligation.",
+      "title": "Nouvelle obligation fiscale",
+      "description": "Sélectionnez un client, un calcul enregistré et un modèle pour créer une obligation traçable.",
       "client": "Client",
-      "selectClient": "Select a client",
-      "savedCalculation": "Saved calculation",
-      "selectCalculation": "Select a calculation",
-      "taxModel": "Tax model",
-      "modelPlaceholder": "Model",
-      "period": "Period",
+      "selectClient": "Sélectionner un client",
+      "savedCalculation": "Calcul enregistré",
+      "selectCalculation": "Sélectionner un calcul",
+      "taxModel": "Modèle fiscal",
+      "modelPlaceholder": "Modèle",
+      "period": "Période",
       "notes": "Notes",
-      "optional": "Optional",
-      "creating": "Creating...",
-      "create": "Create obligation"
+      "optional": "Facultatif",
+      "creating": "Création...",
+      "create": "Créer l'obligation"
     },
     "status": {
-      "draft": "Draft",
-      "calculated": "Calculated",
-      "filed": "Filed",
-      "paid": "Paid",
-      "overdue": "Overdue",
-      "error": "Error"
+      "draft": "Brouillon",
+      "calculated": "Calculé",
+      "filed": "Déclaré",
+      "paid": "Payé",
+      "overdue": "En retard",
+      "error": "Erreur"
     },
     "toasts": {
-      "accountCountryRequiredTitle": "Account country required",
-      "accountCountryRequiredDesc": "The account has no configured country. Set the account country before creating obligations.",
-      "selectCalculation": "Select a saved calculation",
-      "selectTaxModel": "Select a tax model",
-      "createObligationFailed": "Could not create the obligation.",
-      "obligationCreatedTitle": "Obligation created",
-      "obligationCreatedDesc": "You can manage it from the table now.",
-      "updateStatusFailed": "Could not update the status.",
-      "downloadPdfFailed": "Could not download the PDF.",
-      "deleteFailed": "Could not delete the obligation.",
-      "deletedTitle": "Obligation deleted",
-      "deletedDesc": "The obligation was deleted successfully."
+      "accountCountryRequiredTitle": "Pays du compte requis",
+      "accountCountryRequiredDesc": "Le compte n'a pas de pays configuré. Définissez le pays du compte avant de créer des obligations.",
+      "selectCalculation": "Sélectionnez un calcul enregistré",
+      "selectTaxModel": "Sélectionnez un modèle fiscal",
+      "createObligationFailed": "Impossible de créer l'obligation.",
+      "obligationCreatedTitle": "Obligation créée",
+      "obligationCreatedDesc": "Vous pouvez la gérer depuis le tableau.",
+      "updateStatusFailed": "Impossible de mettre à jour le statut.",
+      "downloadPdfFailed": "Impossible de télécharger le PDF.",
+      "deleteFailed": "Impossible de supprimer l'obligation.",
+      "deletedTitle": "Obligation supprimée",
+      "deletedDesc": "L'obligation a été supprimée avec succès."
     },
     "beta": {
-      "button": "Beta",
-      "title": "Tax Compliance (Beta)",
+      "button": "Bêta",
+      "title": "Conformité Fiscale (Bêta)",
       "description": "Vous utilisez une fonctionnalite en acces anticipe, active et operationnelle, avec des ameliorations continues. Bien que nous recherchions une stabilite maximale, des erreurs, interruptions ou resultats inexacts peuvent survenir pendant son evolution. Utilisez cette fonctionnalite comme un support et verifiez toujours le resultat avant de prendre des decisions fiscales ou juridiques. Lors de la prochaine mise a jour, cette fonctionnalite sera deployee de maniere complete afin de garantir un fonctionnement optimal dans tous les pays. Lyrium ne garantit pas l absence totale d erreurs dans cette version et decline toute responsabilite pour les decisions prises exclusivement sur la base de cette fonctionnalite beta."
     },
     "deleteDialog": {
-      "title": "Delete obligation?",
-      "description": "This action cannot be undone. The obligation will be permanently deleted.",
-      "confirm": "Delete obligation",
-      "deleting": "Deleting..."
+      "title": "Supprimer l'obligation ?",
+      "description": "Cette action est irréversible. L'obligation sera définitivement supprimée.",
+      "confirm": "Supprimer l'obligation",
+      "deleting": "Suppression..."
     }
   }
 }

@@ -29,8 +29,10 @@ import {
   Webhook,
   Brain,
   Share2,
+  ChevronDown,
 } from "lucide-react";
 import AppDemo from "@/components/AppDemo";
+import { getLanguageForCountry, getCurrencyForCountry, formatPrice, COUNTRIES_LIST } from "@/i18n";
 
 // Scroll-triggered fade-up wrapper
 const FadeUp = ({
@@ -66,6 +68,59 @@ const scrollTo = (id: string) => {
 const Landing = () => {
   const { t, i18n } = useTranslation();
 
+  // Country & currency state
+  const [selectedCountry, setSelectedCountry] = useState(() => {
+    return sessionStorage.getItem('landingCountry') || 'ES';
+  });
+  const [countryOpen, setCountryOpen] = useState(false);
+  const countryRef = useRef<HTMLDivElement>(null);
+  const currency = getCurrencyForCountry(selectedCountry);
+
+  // Billing toggle for pricing section
+  const [billingAnnual, setBillingAnnual] = useState(true);
+
+  // IP-based country detection on first visit
+  useEffect(() => {
+    if (sessionStorage.getItem('landingCountry')) return; // already detected
+    const controller = new AbortController();
+    fetch('https://ipapi.co/json/', { signal: controller.signal })
+      .then(r => r.ok ? r.json() : Promise.reject())
+      .then(data => {
+        const cc = data?.country_code?.toUpperCase();
+        if (cc && COUNTRIES_LIST.some(c => c.code === cc)) {
+          setSelectedCountry(cc);
+          sessionStorage.setItem('landingCountry', cc);
+          const lang = getLanguageForCountry(cc);
+          i18n.changeLanguage(lang);
+          localStorage.setItem('appLanguage', lang);
+        }
+      })
+      .catch(() => {}); // fallback: keep ES
+    return () => controller.abort();
+  }, []);
+
+  // Close country dropdown on click outside
+  useEffect(() => {
+    const handler = (e: MouseEvent) => {
+      if (countryRef.current && !countryRef.current.contains(e.target as Node)) {
+        setCountryOpen(false);
+      }
+    };
+    document.addEventListener('mousedown', handler);
+    return () => document.removeEventListener('mousedown', handler);
+  }, []);
+
+  const handleCountryChange = (code: string) => {
+    setSelectedCountry(code);
+    sessionStorage.setItem('landingCountry', code);
+    setCountryOpen(false);
+    const lang = getLanguageForCountry(code);
+    i18n.changeLanguage(lang);
+    localStorage.setItem('appLanguage', lang);
+  };
+
+  const currentCountry = COUNTRIES_LIST.find(c => c.code === selectedCountry) || COUNTRIES_LIST[0];
+
   // Data (reactive to language)
   const modules = [
     { icon: FileSignature, title: t('landing.mod1Title'), description: t('landing.mod1Desc') },
@@ -97,10 +152,16 @@ const Landing = () => {
     { icon: Zap,           text: t('landing.solution4') },
   ];
 
-  const plans = [
-    { period: t('landing.planMonthly'), price: "250",   unit: t('landing.planUnitMonthly'), note: t('landing.planMonthlyNote'), highlight: false },
-    { period: t('landing.planAnnual'),  price: "2.700", unit: t('landing.planUnitAnnual'),  note: t('landing.planAnnualNote'),  highlight: true  },
-  ];
+  // Pricing data (reactive to currency)
+  const starterMonthly = formatPrice(197, currency);
+  const starterAnnual = formatPrice(2100, currency);
+  const starterAnnualPerMonth = formatPrice(175, currency);
+  const starterSaving = formatPrice(264, currency);
+  const advancedMonthly = formatPrice(350, currency);
+  const advancedAnnual = formatPrice(3700, currency);
+  const advancedAnnualPerMonth = formatPrice(308, currency);
+  const advancedSaving = formatPrice(500, currency);
+  const roiPrice = formatPrice(197, currency);
 
   const features = [
     t('landing.feat1'),
@@ -187,37 +248,31 @@ const Landing = () => {
 
         {/* Right CTA */}
         <div className="flex items-center gap-3">
-          <div className="flex items-center gap-1 text-white">
-            <Globe className="h-3.5 w-3.5" />
-            <select
-              value={i18n.language.slice(0,2)}
-              onChange={(e) => { i18n.changeLanguage(e.target.value); localStorage.setItem('appLanguage', e.target.value); }}
-              className="bg-black text-white text-sm cursor-pointer focus:outline-none appearance-none pr-1 [&>option]:bg-black [&>option]:text-white rounded px-1"
+          <div ref={countryRef} className="relative">
+            <button
+              onClick={() => setCountryOpen(!countryOpen)}
+              className="flex items-center gap-1.5 text-white text-sm cursor-pointer hover:text-white/80 transition-colors"
             >
-              <option value="en">English</option>
-              <option value="es">Español</option>
-              <option value="fr">Français</option>
-              <option value="de">Deutsch</option>
-              <option value="it">Italiano</option>
-              <option value="pt">Português</option>
-              <option value="nl">Nederlands</option>
-              <option value="pl">Polski</option>
-              <option value="sv">Svenska</option>
-              <option value="no">Norsk</option>
-              <option value="da">Dansk</option>
-              <option value="fi">Suomi</option>
-              <option value="cs">Čeština</option>
-              <option value="sk">Slovenčina</option>
-              <option value="hu">Magyar</option>
-              <option value="ro">Română</option>
-              <option value="hr">Hrvatski</option>
-              <option value="bg">Български</option>
-              <option value="el">Ελληνικά</option>
-              <option value="lt">Lietuvių</option>
-              <option value="lv">Latviešu</option>
-              <option value="et">Eesti</option>
-              <option value="sl">Slovenščina</option>
-            </select>
+              <span className="text-base leading-none">{currentCountry.flag}</span>
+              <span className="hidden sm:inline">{currentCountry.name}</span>
+              <ChevronDown className={`h-3 w-3 transition-transform ${countryOpen ? 'rotate-180' : ''}`} />
+            </button>
+            {countryOpen && (
+              <div className="absolute right-0 top-full mt-2 w-56 max-h-72 overflow-y-auto rounded-lg border border-white/10 bg-[#111] shadow-xl z-[100]">
+                {COUNTRIES_LIST.map(c => (
+                  <button
+                    key={c.code}
+                    onClick={() => handleCountryChange(c.code)}
+                    className={`w-full flex items-center gap-2 px-3 py-2 text-sm text-left hover:bg-white/5 transition-colors ${
+                      c.code === selectedCountry ? 'bg-white/10 text-white' : 'text-white/60'
+                    }`}
+                  >
+                    <span className="text-base leading-none">{c.flag}</span>
+                    <span>{c.name}</span>
+                  </button>
+                ))}
+              </div>
+            )}
           </div>
           <button
             onClick={() => window.open('/login', '_blank')}
@@ -417,7 +472,7 @@ const Landing = () => {
             <FadeUp className="relative z-10">
               <p className="text-xs uppercase tracking-widest text-white/30 mb-4">{t('landing.roiLabel')}</p>
               <h2 className="text-3xl sm:text-5xl font-bold tracking-tight mb-6">
-                {t('landing.roiH2a')}<br />
+                {t('landing.roiH2a', { price: roiPrice })}<br />
                 <span className="text-white/30">{t('landing.roiH2b')}</span>
               </h2>
               <p className="text-white/40 text-base max-w-2xl mx-auto leading-relaxed mb-10">
@@ -567,7 +622,7 @@ const Landing = () => {
       {/* PRICING */}
       <section id="precio" className="relative overflow-hidden py-32 px-6">
         <WavesBg p="pc" />
-        <div className="relative z-10 mx-auto max-w-4xl">
+        <div className="relative z-10 mx-auto max-w-5xl">
           <FadeUp>
             <p className="text-xs uppercase tracking-widest text-white/30 mb-3">{t('landing.pricingLabel')}</p>
             <div className="flex flex-wrap items-center gap-4 mb-4">
@@ -578,57 +633,119 @@ const Landing = () => {
                 {t('landing.freeTrial')}
               </span>
             </div>
-            <p className="text-white/40 mb-16 text-base">{t('landing.pricingDesc')}</p>
+            <p className="text-white/40 mb-10 text-base">{t('landing.pricingDesc')}</p>
           </FadeUp>
 
-          <div className="grid grid-cols-1 sm:grid-cols-2 gap-5 mb-5">
-            {plans.map((plan, i) => (
-              <FadeUp key={plan.period} delay={i * 0.1}>
-                <div
-                  className={`relative rounded-2xl border p-8 transition-all ${
-                    plan.highlight
-                      ? "border-white/25 bg-white/[0.06]"
-                      : "border-white/8 bg-white/[0.02]"
-                  }`}
-                >
-                  {plan.highlight && (
-                    <div className="absolute -top-3 left-1/2 -translate-x-1/2 rounded-full border border-white/15 bg-white/10 px-3 py-1 text-[10px] uppercase tracking-widest text-white/60">
-                      {t('landing.mostPopular')}
-                    </div>
-                  )}
-                  <p className="text-sm text-white/40 mb-4">{plan.period}</p>
-                  <div className="flex items-baseline gap-1 mb-1">
-                    <span className="text-5xl font-bold tracking-tight">{plan.price}</span>
-                    <span className="text-white/40 text-base">{plan.unit}</span>
-                  </div>
-                  <p className="text-xs text-white/25 mb-8">{plan.note}</p>
-                  <button onClick={() => window.open('/signup', '_blank')} className={`w-full rounded-full py-3 text-sm font-semibold transition-all ${
-                    plan.highlight
-                      ? "bg-white text-black hover:bg-white/90"
-                      : "border border-white/15 text-white hover:bg-white/5"
-                  }`}>
-                    {t('landing.planButton')}
-                  </button>
-                </div>
-              </FadeUp>
-            ))}
-          </div>
-
-          <FadeUp delay={0.2}>
-            <div className="rounded-2xl border border-white/8 bg-white/[0.02] p-8">
-              <p className="text-sm font-semibold text-white mb-5">{t('landing.includedLabel')}</p>
-              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-                {features.map((f) => (
-                  <div key={f} className="flex items-center gap-3">
-                    <div className="h-5 w-5 rounded-full border border-white/15 bg-white/5 flex items-center justify-center shrink-0">
-                      <Check className="h-3 w-3 text-white/60" />
-                    </div>
-                    <span className="text-sm text-white/50">{f}</span>
-                  </div>
-                ))}
-              </div>
+          {/* Billing toggle */}
+          <FadeUp delay={0.05}>
+            <div className="flex items-center justify-center gap-3 mb-10">
+              <span className={`text-sm transition-colors ${!billingAnnual ? 'text-white' : 'text-white/40'}`}>{t('landing.planMonthly')}</span>
+              <button
+                onClick={() => setBillingAnnual(!billingAnnual)}
+                className={`relative w-12 h-6 rounded-full transition-colors ${billingAnnual ? 'bg-white/20' : 'bg-white/10'}`}
+              >
+                <div className={`absolute top-0.5 h-5 w-5 rounded-full bg-white transition-all ${billingAnnual ? 'left-[26px]' : 'left-0.5'}`} />
+              </button>
+              <span className={`text-sm transition-colors ${billingAnnual ? 'text-white' : 'text-white/40'}`}>{t('landing.planAnnual')}</span>
             </div>
           </FadeUp>
+
+          {/* Plan cards */}
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-6 mb-6">
+            {/* Starter */}
+            <FadeUp delay={0.1}>
+              <div className="relative rounded-2xl border border-white/8 bg-white/[0.02] p-8 h-full">
+                <p className="text-sm font-semibold text-white mb-1">{t('landing.planStarterName')}</p>
+                <p className="text-xs text-white/30 mb-6">{t('landing.planStarterSub')}</p>
+                <div className="flex items-baseline gap-1 mb-1">
+                  <span className="text-5xl font-bold tracking-tight">{billingAnnual ? starterAnnual : starterMonthly}</span>
+                  <span className="text-white/40 text-base">{billingAnnual ? t('landing.perYear') : t('landing.perMonth')}</span>
+                </div>
+                <p className="text-xs text-white/25 mb-8">
+                  {billingAnnual
+                    ? t('landing.planAnnualEquiv', { perMonth: starterAnnualPerMonth, saving: starterSaving })
+                    : t('landing.planMonthlyNote')}
+                </p>
+                <button onClick={() => window.open('/signup', '_blank')} className="w-full rounded-full py-3 text-sm font-semibold border border-white/15 text-white hover:bg-white/5 transition-all">
+                  {t('landing.planButton')}
+                </button>
+                <ul className="mt-6 space-y-3">
+                  <li className="flex items-center gap-2 text-sm text-white/50">
+                    <Check className="h-3.5 w-3.5 text-white/40 shrink-0" />
+                    {t('landing.feat1')}
+                  </li>
+                  <li className="flex items-center gap-2 text-sm text-white/50">
+                    <Check className="h-3.5 w-3.5 text-white/40 shrink-0" />
+                    {t('landing.feat2')}
+                  </li>
+                  <li className="flex items-center gap-2 text-sm text-white/50">
+                    <Check className="h-3.5 w-3.5 text-white/40 shrink-0" />
+                    {t('landing.planStarterSubaccounts')}
+                  </li>
+                  <li className="flex items-center gap-2 text-sm text-white/50">
+                    <Check className="h-3.5 w-3.5 text-white/40 shrink-0" />
+                    {t('landing.feat4')}
+                  </li>
+                  <li className="flex items-center gap-2 text-sm text-white/50">
+                    <Check className="h-3.5 w-3.5 text-white/40 shrink-0" />
+                    {t('landing.feat5')}
+                  </li>
+                </ul>
+              </div>
+            </FadeUp>
+
+            {/* Advanced */}
+            <FadeUp delay={0.2}>
+              <div className="relative rounded-2xl border border-white/25 bg-white/[0.06] p-8 h-full">
+                <div className="absolute -top-3 left-1/2 -translate-x-1/2 rounded-full border border-white/15 bg-white/10 px-3 py-1 text-[10px] uppercase tracking-widest text-white/60">
+                  {t('landing.mostPopular')}
+                </div>
+                <p className="text-sm font-semibold text-white mb-1">{t('landing.planAdvancedName')}</p>
+                <p className="text-xs text-white/30 mb-6">{t('landing.planAdvancedSub')}</p>
+                <div className="flex items-baseline gap-1 mb-1">
+                  <span className="text-5xl font-bold tracking-tight">{billingAnnual ? advancedAnnual : advancedMonthly}</span>
+                  <span className="text-white/40 text-base">{billingAnnual ? t('landing.perYear') : t('landing.perMonth')}</span>
+                </div>
+                <p className="text-xs text-white/25 mb-8">
+                  {billingAnnual
+                    ? t('landing.planAnnualEquiv', { perMonth: advancedAnnualPerMonth, saving: advancedSaving })
+                    : t('landing.planMonthlyNote')}
+                </p>
+                <button onClick={() => window.open('/signup', '_blank')} className="w-full rounded-full py-3 text-sm font-semibold bg-white text-black hover:bg-white/90 transition-all">
+                  {t('landing.planButton')}
+                </button>
+                <ul className="mt-6 space-y-3">
+                  <li className="flex items-center gap-2 text-sm text-white/50">
+                    <Check className="h-3.5 w-3.5 text-white/40 shrink-0" />
+                    {t('landing.feat1')}
+                  </li>
+                  <li className="flex items-center gap-2 text-sm text-white/50">
+                    <Check className="h-3.5 w-3.5 text-white/40 shrink-0" />
+                    {t('landing.feat2')}
+                  </li>
+                  <li className="flex items-center gap-2 text-sm text-white/50">
+                    <Check className="h-3.5 w-3.5 text-white/40 shrink-0" />
+                    {t('landing.planAdvancedSubaccounts')}
+                  </li>
+                  <li className="flex items-center gap-2 text-sm text-white/50">
+                    <Check className="h-3.5 w-3.5 text-white/40 shrink-0" />
+                    {t('landing.feat4')}
+                  </li>
+                  <li className="flex items-center gap-2 text-sm text-white/50">
+                    <Check className="h-3.5 w-3.5 text-white/40 shrink-0" />
+                    {t('landing.feat5')}
+                  </li>
+                </ul>
+              </div>
+            </FadeUp>
+          </div>
+
+          {/* Billed in EUR note */}
+          {currency.code !== 'EUR' && (
+            <FadeUp delay={0.25}>
+              <p className="text-center text-xs text-white/20 mb-6">{t('landing.billedInEur')}</p>
+            </FadeUp>
+          )}
         </div>
       </section>
 

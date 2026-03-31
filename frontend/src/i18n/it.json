@@ -17,7 +17,7 @@
     "writing": "Scrittura",
     "settings": "Impostazioni",
     "logout": "Esci",
-    "taxCompliance": "Tax Compliance",
+    "taxCompliance": "Conformità Fiscale",
     "beta": "Beta"
   },
   "auth": {
@@ -756,7 +756,7 @@
     "currentPlan": "Piano attuale:",
     "monthly": "Mensile",
     "annual": "Annuale",
-    "savePerYear": "Risparmia {{amount}}€ all'anno",
+    "savePerYear": "Risparmia {{amount}} all'anno",
     "autoRenewLabel": "Rinnovo automatico",
     "autoRenewDesc": "Si rinnova automaticamente alla fine del periodo",
     "changePlan": "Cambia piano",
@@ -817,7 +817,24 @@
     "intWebhookCreated": "Webhook creato",
     "intWebhookDeleted": "Webhook eliminato",
     "intTestSent": "Evento di test inviato",
-    "intTestFailed": "Errore nell'invio dell'evento di test"
+    "intTestFailed": "Errore nell'invio dell'evento di test",
+    "billingProfileTitle": "Dati di fatturazione",
+    "billingProfileDesc": "Queste informazioni appariranno nelle fatture come dati del cliente.",
+    "companyNameLabel": "Nome dello studio",
+    "companyNamePlaceholder": "Es.: Studio Rossi & Associati",
+    "companyCIFLabel": "P.IVA / Codice Fiscale",
+    "companyCIFPlaceholder": "Es.: IT12345678901",
+    "companyAddressLabel": "Indirizzo",
+    "companyAddressPlaceholder": "Es.: Via Roma 10, 00100 Roma",
+    "companyPhoneLabel": "Telefono",
+    "companyPhonePlaceholder": "Es.: +39 06 1234567",
+    "companyEmailLabel": "Email di fatturazione",
+    "companyEmailPlaceholder": "Es.: admin@studio.it",
+    "invoiceNotesLabel": "Informazioni aggiuntive",
+    "invoiceNotesPlaceholder": "Informazioni extra da includere nella fattura",
+    "saveBillingProfile": "Salva dati di fatturazione",
+    "billingProfileSaved": "Dati di fatturazione salvati",
+    "errorSaveBillingProfile": "Errore nel salvataggio dei dati"
   },
   "renewal": {
     "title": "Rinnova abbonamento",
@@ -1125,7 +1142,7 @@
     "solution3": "Tutte le informazioni sui clienti centralizzate in un unico posto",
     "solution4": "E-mail e WhatsApp integrati in un unico pannello automatizzato",
     "roiLabel": "Investimento produttivo",
-    "roiH2a": "250€/mese.",
+    "roiH2a": "{{price}} / mese.",
     "roiH2b": "Recuperato al primo caso.",
     "roiDesc": "Un avvocato che fattura 150 €/ora recupera l'investimento mensile con solo 2 ore extra di lavoro produttivo. Lyrium ti restituisce più di 12 ore settimanali. Fai i conti.",
     "modulesLabel": "Moduli",
@@ -1150,7 +1167,7 @@
     "pricingLabel": "Prezzi",
     "pricingH2": "Semplice e senza sorprese",
     "freeTrial": "14 giorni di prova gratuita",
-    "pricingDesc": "Accesso completo a tutti i moduli. Senza limiti artificiali.",
+    "pricingDesc": "Accesso completo a tutti i moduli.",
     "planMonthly": "Mensile",
     "planMonthlyNote": "Fatturato mensilmente",
     "planUnitMonthly": "€ / mese",
@@ -1210,7 +1227,17 @@
     "integAITitle": "Personalizza la tua IA",
     "integAIDesc": "Carica giurisprudenza, strategie o casi passati in PDF e l’IA li utilizzerà per fornirti risposte più precise e adattate al tuo studio.",
     "integShareTitle": "Condividi file con il tuo team",
-    "integShareDesc": "Invia documenti tra l’account principale e i sottoaccount del tuo studio. Tutti i membri del team accedono ai file condivisi istantaneamente."
+    "integShareDesc": "Invia documenti tra l’account principale e i sottoaccount del tuo studio. Tutti i membri del team accedono ai file condivisi istantaneamente.",
+    "planStarterName": "Starter",
+    "planStarterSub": "Per piccoli studi",
+    "planStarterSubaccounts": "Fino a 4 sottoaccount",
+    "planAdvancedName": "Avanzato",
+    "planAdvancedSub": "Per team più grandi",
+    "planAdvancedSubaccounts": "Fino a 10 sottoaccount",
+    "perMonth": "/ mese",
+    "perYear": "/ anno",
+    "planAnnualEquiv": "Equivale a {{perMonth}} / mese — risparmia {{saving}}",
+    "billedInEur": "Prezzi indicativi. La fatturazione è in euro (EUR)."
   },
   "legal": {
     "backToHome": "Torna alla home",
@@ -1286,97 +1313,97 @@
     "documentName": "Nome del documento"
   },
   "taxCompliance": {
-    "title": "Tax Compliance",
-    "subtitle": "Complete tax tracking: calculated, filed and paid.",
-    "newObligation": "New obligation",
+    "title": "Conformità Fiscale",
+    "subtitle": "Monitoraggio fiscale completo: calcolato, dichiarato e pagato.",
+    "newObligation": "Nuovo obbligo",
     "tabs": {
-      "obligations": "Obligations",
-      "calendar": "Calendar",
-      "summary": "Summary"
+      "obligations": "Obblighi",
+      "calendar": "Calendario",
+      "summary": "Riepilogo"
     },
     "filters": {
-      "searchPlaceholder": "Search by client, model or period",
-      "status": "Status",
-      "client": "Client",
-      "all": "All",
-      "allClients": "All clients"
+      "searchPlaceholder": "Cerca per cliente, modello o periodo",
+      "status": "Stato",
+      "client": "Cliente",
+      "all": "Tutti",
+      "allClients": "Tutti i clienti"
     },
     "table": {
-      "client": "Client",
-      "model": "Model",
-      "period": "Period",
-      "amount": "Amount",
-      "status": "Status",
-      "actions": "Actions",
-      "noResults": "No obligations for the current filters."
+      "client": "Cliente",
+      "model": "Modello",
+      "period": "Periodo",
+      "amount": "Importo",
+      "status": "Stato",
+      "actions": "Azioni",
+      "noResults": "Nessun obbligo per i filtri attuali."
     },
     "actions": {
       "pdf": "PDF",
-      "markFiled": "Filed",
-      "markPaid": "Paid",
-      "officialPortal": "Official portal",
-      "delete": "Delete"
+      "markFiled": "Dichiarato",
+      "markPaid": "Pagato",
+      "officialPortal": "Portale ufficiale",
+      "delete": "Elimina"
     },
     "calendar": {
-      "title": "Upcoming deadlines",
-      "description": "Obligations due in the next 30 days.",
-      "empty": "No upcoming deadlines.",
-      "dueLabel": "Due"
+      "title": "Scadenze imminenti",
+      "description": "Obblighi in scadenza nei prossimi 30 giorni.",
+      "empty": "Nessuna scadenza imminente.",
+      "dueLabel": "Scadenza"
     },
     "summary": {
-      "totalObligations": "Total obligations",
-      "totalEstimated": "Total estimated",
-      "pendingPayment": "Pending payment",
-      "currentStatus": "Current status",
-      "currentStatusLine": "Calculated: {{calculated}} · Filed: {{filed}} · Paid: {{paid}}"
+      "totalObligations": "Totale obblighi",
+      "totalEstimated": "Totale stimato",
+      "pendingPayment": "In attesa di pagamento",
+      "currentStatus": "Stato attuale",
+      "currentStatusLine": "Calcolato: {{calculated}} · Dichiarato: {{filed}} · Pagato: {{paid}}"
     },
     "dialog": {
-      "title": "New tax obligation",
-      "description": "Select client, saved calculation and model to create a traceable obligation.",
-      "client": "Client",
-      "selectClient": "Select a client",
-      "savedCalculation": "Saved calculation",
-      "selectCalculation": "Select a calculation",
-      "taxModel": "Tax model",
-      "modelPlaceholder": "Model",
-      "period": "Period",
-      "notes": "Notes",
-      "optional": "Optional",
-      "creating": "Creating...",
-      "create": "Create obligation"
+      "title": "Nuovo obbligo fiscale",
+      "description": "Seleziona cliente, calcolo salvato e modello per creare un obbligo tracciabile.",
+      "client": "Cliente",
+      "selectClient": "Seleziona un cliente",
+      "savedCalculation": "Calcolo salvato",
+      "selectCalculation": "Seleziona un calcolo",
+      "taxModel": "Modello fiscale",
+      "modelPlaceholder": "Modello",
+      "period": "Periodo",
+      "notes": "Note",
+      "optional": "Facoltativo",
+      "creating": "Creazione...",
+      "create": "Crea obbligo"
     },
     "status": {
-      "draft": "Draft",
-      "calculated": "Calculated",
-      "filed": "Filed",
-      "paid": "Paid",
-      "overdue": "Overdue",
-      "error": "Error"
+      "draft": "Bozza",
+      "calculated": "Calcolato",
+      "filed": "Dichiarato",
+      "paid": "Pagato",
+      "overdue": "Scaduto",
+      "error": "Errore"
     },
     "toasts": {
-      "accountCountryRequiredTitle": "Account country required",
-      "accountCountryRequiredDesc": "The account has no configured country. Set the account country before creating obligations.",
-      "selectCalculation": "Select a saved calculation",
-      "selectTaxModel": "Select a tax model",
-      "createObligationFailed": "Could not create the obligation.",
-      "obligationCreatedTitle": "Obligation created",
-      "obligationCreatedDesc": "You can manage it from the table now.",
-      "updateStatusFailed": "Could not update the status.",
-      "downloadPdfFailed": "Could not download the PDF.",
-      "deleteFailed": "Could not delete the obligation.",
-      "deletedTitle": "Obligation deleted",
-      "deletedDesc": "The obligation was deleted successfully."
+      "accountCountryRequiredTitle": "Paese dell'account richiesto",
+      "accountCountryRequiredDesc": "L'account non ha un paese configurato. Imposta il paese dell'account prima di creare obblighi.",
+      "selectCalculation": "Seleziona un calcolo salvato",
+      "selectTaxModel": "Seleziona un modello fiscale",
+      "createObligationFailed": "Impossibile creare l'obbligo.",
+      "obligationCreatedTitle": "Obbligo creato",
+      "obligationCreatedDesc": "Puoi gestirlo dalla tabella.",
+      "updateStatusFailed": "Impossibile aggiornare lo stato.",
+      "downloadPdfFailed": "Impossibile scaricare il PDF.",
+      "deleteFailed": "Impossibile eliminare l'obbligo.",
+      "deletedTitle": "Obbligo eliminato",
+      "deletedDesc": "L'obbligo è stato eliminato con successo."
     },
     "beta": {
       "button": "Beta",
-      "title": "Tax Compliance (Beta)",
+      "title": "Conformità Fiscale (Beta)",
       "description": "Stai utilizzando una funzionalita in accesso anticipato, attiva e operativa, con miglioramenti continui. Sebbene puntiamo alla massima stabilita, durante la sua evoluzione possono verificarsi errori, interruzioni o risultati imprecisi. Usa questa funzionalita come supporto e verifica sempre il risultato prima di prendere decisioni fiscali o legali. Nel prossimo aggiornamento, questa funzionalita verra implementata in modo completo per garantire prestazioni ottimali in tutti i paesi. Lyrium non garantisce l assenza totale di errori in questa versione e non si assume responsabilita per decisioni prese esclusivamente sulla base di questa funzionalita beta."
     },
     "deleteDialog": {
-      "title": "Delete obligation?",
-      "description": "This action cannot be undone. The obligation will be permanently deleted.",
-      "confirm": "Delete obligation",
-      "deleting": "Deleting..."
+      "title": "Eliminare l'obbligo?",
+      "description": "Questa azione non può essere annullata. L'obbligo verrà eliminato definitivamente.",
+      "confirm": "Elimina obbligo",
+      "deleting": "Eliminazione..."
     }
   }
 }

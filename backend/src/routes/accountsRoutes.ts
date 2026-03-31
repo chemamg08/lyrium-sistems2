@@ -16,7 +16,9 @@ import {
   assignClientToSubaccount,
   getClientsBySubaccount,
   changeEmail,
-  changePassword
+  changePassword,
+  getBillingProfile,
+  updateBillingProfile
 } from '../controllers/accountsController.js';
 import { authMiddleware } from '../middleware/auth.js';
 import { loginLimiter, registerLimiter, passwordResetLimiter, twoFactorLimiter, resendVerificationLimiter } from '../middleware/rateLimiter.js';
@@ -53,5 +55,9 @@ router.get('/subaccounts/:subaccountId/clients', authMiddleware as any, getClien
 // Account information changes (auth required)
 router.post('/change-email', authMiddleware as any, changeEmail);
 router.post('/change-password', authMiddleware as any, changePassword);
+
+// Billing profile (auth required)
+router.get('/billing-profile', authMiddleware as any, getBillingProfile);
+router.put('/billing-profile', authMiddleware as any, updateBillingProfile);
 
 export default router;

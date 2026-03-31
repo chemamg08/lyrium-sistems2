@@ -16,7 +16,7 @@
     "writing": "Rašymas",
     "settings": "Nustatymai",
     "logout": "Atsijungti",
-    "taxCompliance": "Tax Compliance",
+    "taxCompliance": "Mokestinė atitiktis",
     "beta": "Beta"
   },
   "auth": {
@@ -755,7 +755,7 @@
     "currentPlan": "Dabartinis planas:",
     "monthly": "Menesinis",
     "annual": "Metinis",
-    "savePerYear": "Sutaupykite {{amount}} € per metus",
+    "savePerYear": "Sutaupykite {{amount}} per metus",
     "autoRenewLabel": "Automatinis atnaujinimas",
     "autoRenewDesc": "Atsinaujins automatiškai pasibaigus laikotarpiui",
     "changePlan": "Keisti plana",
@@ -816,7 +816,24 @@
     "intWebhookCreated": "Webhook sukurtas",
     "intWebhookDeleted": "Webhook ištrintas",
     "intTestSent": "Testinis įvykis išsiųstas",
-    "intTestFailed": "Klaida siunčiant testinį įvykį"
+    "intTestFailed": "Klaida siunčiant testinį įvykį",
+    "billingProfileTitle": "Sąskaitų duomenys",
+    "billingProfileDesc": "Ši informacija bus rodoma jūsų sąskaitose kaip kliento duomenys.",
+    "companyNameLabel": "Įmonės pavadinimas",
+    "companyNamePlaceholder": "Pvz.: Advokatų kontora Jonaitis",
+    "companyCIFLabel": "Įmonės kodas / PVM kodas",
+    "companyCIFPlaceholder": "Pvz.: LT123456789",
+    "companyAddressLabel": "Adresas",
+    "companyAddressPlaceholder": "Pvz.: Gedimino pr. 10, 01103 Vilnius",
+    "companyPhoneLabel": "Telefonas",
+    "companyPhonePlaceholder": "Pvz.: +370 5 123 4567",
+    "companyEmailLabel": "Sąskaitų el. paštas",
+    "companyEmailPlaceholder": "Pvz.: saskaitos@kontora.lt",
+    "invoiceNotesLabel": "Papildoma informacija",
+    "invoiceNotesPlaceholder": "Papildoma informacija sąskaitai",
+    "saveBillingProfile": "Išsaugoti sąskaitų duomenis",
+    "billingProfileSaved": "Sąskaitų duomenys išsaugoti",
+    "errorSaveBillingProfile": "Klaida išsaugant sąskaitų duomenis"
   },
   "renewal": {
     "title": "Atnaujinti prenumerata",
@@ -1124,7 +1141,7 @@
     "solution3": "Visa klientu informacija centralizuota vienoje vietoje",
     "solution4": "El. paštas ir WhatsApp integruoti viename automatizuotame skydelyje",
     "roiLabel": "Produktyvi investicija",
-    "roiH2a": "250 €/mėn.",
+    "roiH2a": "{{price}} / mėn.",
     "roiH2b": "Atsiperka pirmoje byloje.",
     "roiDesc": "Advokatas, atsiskaitantis 150 €/val., atperka mėnesines investicijas vos 2 papildomomis produktyvaus darbo valandomis. Lyrium grąžina daugiau nei 12 valandų per savaitę. Atlikite matematiką.",
     "modulesLabel": "Moduliai",
@@ -1149,7 +1166,7 @@
     "pricingLabel": "Kainos",
     "pricingH2": "Paprasta ir be staigmenu",
     "freeTrial": "14 dienų nemokama bandomoji versija",
-    "pricingDesc": "Pilna prieiga prie visu moduliu. Be dirbtiniu apribojimu.",
+    "pricingDesc": "Pilna prieiga prie visų modulių.",
     "planMonthly": "Menesinis",
     "planMonthlyNote": "Atsiskaitoma kas mėnesį",
     "planUnitMonthly": "€ / mėn.",
@@ -1209,7 +1226,17 @@
     "integAITitle": "Pritaikykite savo AI",
     "integAIDesc": "Įkelkite teismų praktiką, strategijas ar ankstesnes bylas PDF formatu ir AI jas panaudos, kad pateiktų tikslesnius ir jūsų kontoros poreikiams pritaikytus atsakymus.",
     "integShareTitle": "Dalinkiteės failais su savo komanda",
-    "integShareDesc": "Siųskite dokumentus tarp pagrindinės paskyros ir jūsų kontoros subpaskyrų. Visi komandos nariai iškart pasiekia bendrinamus failus."
+    "integShareDesc": "Siųskite dokumentus tarp pagrindinės paskyros ir jūsų kontoros subpaskyrų. Visi komandos nariai iškart pasiekia bendrinamus failus.",
+    "planStarterName": "Starter",
+    "planStarterSub": "Mažoms kontorams",
+    "planStarterSubaccounts": "Iki 4 subpaskyrų",
+    "planAdvancedName": "Pažangus",
+    "planAdvancedSub": "Didesnėms komandoms",
+    "planAdvancedSubaccounts": "Iki 10 subpaskyrų",
+    "perMonth": "/ mėn.",
+    "perYear": "/ m.",
+    "planAnnualEquiv": "Atitinka {{perMonth}} / mėn. — sutaupykite {{saving}}",
+    "billedInEur": "Kainos orientacinės. Sąskaitos išrašomos eurais (EUR)."
   },
   "legal": {
     "backToHome": "Grįžti į pradžią",
@@ -1285,97 +1312,97 @@
     "documentName": "Dokumento pavadinimas"
   },
   "taxCompliance": {
-    "title": "Tax Compliance",
-    "subtitle": "Complete tax tracking: calculated, filed and paid.",
-    "newObligation": "New obligation",
+    "title": "Mokestinė atitiktis",
+    "subtitle": "Pilnas mokesčių sekimas: apskaičiuota, pateikta ir sumokėta.",
+    "newObligation": "Nauja prievolė",
     "tabs": {
-      "obligations": "Obligations",
-      "calendar": "Calendar",
-      "summary": "Summary"
+      "obligations": "Prievolės",
+      "calendar": "Kalendorius",
+      "summary": "Santrauka"
     },
     "filters": {
-      "searchPlaceholder": "Search by client, model or period",
-      "status": "Status",
-      "client": "Client",
-      "all": "All",
-      "allClients": "All clients"
+      "searchPlaceholder": "Ieškoti pagal klientą, modelį ar laikotarpį",
+      "status": "Būsena",
+      "client": "Klientas",
+      "all": "Visi",
+      "allClients": "Visi klientai"
     },
     "table": {
-      "client": "Client",
-      "model": "Model",
-      "period": "Period",
-      "amount": "Amount",
-      "status": "Status",
-      "actions": "Actions",
-      "noResults": "No obligations for the current filters."
+      "client": "Klientas",
+      "model": "Modelis",
+      "period": "Laikotarpis",
+      "amount": "Suma",
+      "status": "Būsena",
+      "actions": "Veiksmai",
+      "noResults": "Nėra prievolių pagal esamus filtrus."
     },
     "actions": {
       "pdf": "PDF",
-      "markFiled": "Filed",
-      "markPaid": "Paid",
-      "officialPortal": "Official portal",
-      "delete": "Delete"
+      "markFiled": "Pateikta",
+      "markPaid": "Sumokėta",
+      "officialPortal": "Oficialus portalas",
+      "delete": "Ištrinti"
     },
     "calendar": {
-      "title": "Upcoming deadlines",
-      "description": "Obligations due in the next 30 days.",
-      "empty": "No upcoming deadlines.",
-      "dueLabel": "Due"
+      "title": "Artėjantys terminai",
+      "description": "Prievolės, kurių terminas per artimiausias 30 dienų.",
+      "empty": "Nėra artėjančių terminų.",
+      "dueLabel": "Terminas"
     },
     "summary": {
-      "totalObligations": "Total obligations",
-      "totalEstimated": "Total estimated",
-      "pendingPayment": "Pending payment",
-      "currentStatus": "Current status",
-      "currentStatusLine": "Calculated: {{calculated}} · Filed: {{filed}} · Paid: {{paid}}"
+      "totalObligations": "Iš viso prievolių",
+      "totalEstimated": "Iš viso numatyta",
+      "pendingPayment": "Laukiantis mokėjimas",
+      "currentStatus": "Dabartinė būsena",
+      "currentStatusLine": "Apskaičiuota: {{calculated}} · Pateikta: {{filed}} · Sumokėta: {{paid}}"
     },
     "dialog": {
-      "title": "New tax obligation",
-      "description": "Select client, saved calculation and model to create a traceable obligation.",
-      "client": "Client",
-      "selectClient": "Select a client",
-      "savedCalculation": "Saved calculation",
-      "selectCalculation": "Select a calculation",
-      "taxModel": "Tax model",
-      "modelPlaceholder": "Model",
-      "period": "Period",
-      "notes": "Notes",
-      "optional": "Optional",
-      "creating": "Creating...",
-      "create": "Create obligation"
+      "title": "Nauja mokestinė prievolė",
+      "description": "Pasirinkite klientą, išsaugotą skaičiavimą ir modelį, kad sukurtumėte atsekamą prievolę.",
+      "client": "Klientas",
+      "selectClient": "Pasirinkite klientą",
+      "savedCalculation": "Išsaugotas skaičiavimas",
+      "selectCalculation": "Pasirinkite skaičiavimą",
+      "taxModel": "Mokesčių modelis",
+      "modelPlaceholder": "Modelis",
+      "period": "Laikotarpis",
+      "notes": "Pastabos",
+      "optional": "Neprivaloma",
+      "creating": "Kuriama...",
+      "create": "Sukurti prievolę"
     },
     "status": {
-      "draft": "Draft",
-      "calculated": "Calculated",
-      "filed": "Filed",
-      "paid": "Paid",
-      "overdue": "Overdue",
-      "error": "Error"
+      "draft": "Juodraštis",
+      "calculated": "Apskaičiuota",
+      "filed": "Pateikta",
+      "paid": "Sumokėta",
+      "overdue": "Vėluojanti",
+      "error": "Klaida"
     },
     "toasts": {
-      "accountCountryRequiredTitle": "Account country required",
-      "accountCountryRequiredDesc": "The account has no configured country. Set the account country before creating obligations.",
-      "selectCalculation": "Select a saved calculation",
-      "selectTaxModel": "Select a tax model",
-      "createObligationFailed": "Could not create the obligation.",
-      "obligationCreatedTitle": "Obligation created",
-      "obligationCreatedDesc": "You can manage it from the table now.",
-      "updateStatusFailed": "Could not update the status.",
-      "downloadPdfFailed": "Could not download the PDF.",
-      "deleteFailed": "Could not delete the obligation.",
-      "deletedTitle": "Obligation deleted",
-      "deletedDesc": "The obligation was deleted successfully."
+      "accountCountryRequiredTitle": "Reikalinga paskyros šalis",
+      "accountCountryRequiredDesc": "Paskyra neturi sukonfigūruotos šalies. Nustatykite paskyros šalį prieš kurdami prievoles.",
+      "selectCalculation": "Pasirinkite išsaugotą skaičiavimą",
+      "selectTaxModel": "Pasirinkite mokesčių modelį",
+      "createObligationFailed": "Nepavyko sukurti prievolės.",
+      "obligationCreatedTitle": "Prievolė sukurta",
+      "obligationCreatedDesc": "Dabar galite ją valdyti iš lentelės.",
+      "updateStatusFailed": "Nepavyko atnaujinti būsenos.",
+      "downloadPdfFailed": "Nepavyko atsisiųsti PDF.",
+      "deleteFailed": "Nepavyko ištrinti prievolės.",
+      "deletedTitle": "Prievolė ištrinta",
+      "deletedDesc": "Prievolė buvo sėkmingai ištrinta."
     },
     "beta": {
       "button": "Beta",
-      "title": "Tax Compliance (Beta)",
+      "title": "Mokestinė atitiktis (Beta)",
       "description": "Naudojate ankstyvos prieigos funkcija, kuri yra aktyvi ir veikianti, nuolat tobulinama. Nors siekiame didziausio stabilumo, vystymo metu gali pasitaikyti klaidu, pertrukiu ar netiksliu rezultatu. Naudokite sia funkcija kaip pagalba ir visada patikrinkite rezultata pries priimdami mokestinius ar teisinius sprendimus. Kitoje versijoje si funkcija bus pilnai idiegta, kad butu uztikrintas optimalus veikimas visose salyse. Lyrium negarantuoja visisko klaidu nebuvimo sioje versijoje ir neprisiima atsakomybes uz sprendimus, priimtus vien tik remiantis sia beta funkcija."
     },
     "deleteDialog": {
-      "title": "Delete obligation?",
-      "description": "This action cannot be undone. The obligation will be permanently deleted.",
-      "confirm": "Delete obligation",
-      "deleting": "Deleting..."
+      "title": "Ištrinti prievolę?",
+      "description": "Šio veiksmo negalima atšaukti. Prievolė bus visam laikui ištrinta.",
+      "confirm": "Ištrinti prievolę",
+      "deleting": "Trinama..."
     }
   }
 }

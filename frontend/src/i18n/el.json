@@ -17,7 +17,7 @@
     "writing": "Γράψιμο",
     "settings": "Ρυθμίσεις",
     "logout": "Αποσυνδεθείτε",
-    "taxCompliance": "Tax Compliance",
+    "taxCompliance": "Φορολογική Συμμόρφωση",
     "beta": "Beta"
   },
   "auth": {
@@ -756,7 +756,7 @@
     "currentPlan": "Τρέχον σχέδιο:",
     "monthly": "Μηνιαίος",
     "annual": "?t?s?a",
-    "savePerYear": "Εξοικονομήστε {{amount}}€ ανά έτος",
+    "savePerYear": "Εξοικονομήστε {{amount}} ανά έτος",
     "autoRenewLabel": "Αυτόματη ανανέωση",
     "autoRenewDesc": "Θα ανανεωθεί αυτόματα στο τέλος της περιόδου",
     "changePlan": "Αλλαγή σχεδίου",
@@ -817,7 +817,24 @@
     "intWebhookCreated": "Webhook δημιουργήθηκε",
     "intWebhookDeleted": "Webhook διαγράφηκε",
     "intTestSent": "Δοκιμαστικό συμβάν εστάλη",
-    "intTestFailed": "Σφάλμα κατά την αποστολή δοκιμαστικού συμβάντος"
+    "intTestFailed": "Σφάλμα κατά την αποστολή δοκιμαστικού συμβάντος",
+    "billingProfileTitle": "Στοιχεία τιμολόγησης",
+    "billingProfileDesc": "Αυτές οι πληροφορίες θα εμφανίζονται στα τιμολόγιά σας ως δεδομένα πελάτη.",
+    "companyNameLabel": "Επωνυμία",
+    "companyNamePlaceholder": "π.χ.: Δικηγορικό Γραφείο Παπαδόπουλος",
+    "companyCIFLabel": "ΑΦΜ",
+    "companyCIFPlaceholder": "π.χ.: EL123456789",
+    "companyAddressLabel": "Διεύθυνση",
+    "companyAddressPlaceholder": "π.χ.: Σταδίου 10, 10564 Αθήνα",
+    "companyPhoneLabel": "Τηλέφωνο",
+    "companyPhonePlaceholder": "π.χ.: +30 21 0123 4567",
+    "companyEmailLabel": "Email τιμολόγησης",
+    "companyEmailPlaceholder": "π.χ.: info@grafeio.gr",
+    "invoiceNotesLabel": "Πρόσθετες πληροφορίες",
+    "invoiceNotesPlaceholder": "Επιπλέον πληροφορίες για το τιμολόγιο",
+    "saveBillingProfile": "Αποθήκευση στοιχείων τιμολόγησης",
+    "billingProfileSaved": "Τα στοιχεία τιμολόγησης αποθηκεύτηκαν",
+    "errorSaveBillingProfile": "Σφάλμα κατά την αποθήκευση"
   },
   "renewal": {
     "title": "Ανανέωση Συνδρομής",
@@ -1125,7 +1142,7 @@
     "solution3": "Όλες οι πληροφορίες πελατών συγκεντρωμένες σε ένα μέρος",
     "solution4": "Email και WhatsApp ενσωματωμένα σε ένα ενιαίο αυτοματοποιημένο πάνελ",
     "roiLabel": "Παραγωγική επένδυση",
-    "roiH2a": "250 € / μήνα.",
+    "roiH2a": "{{price}} / μήνα.",
     "roiH2b": "Ανακτήθηκε με την πρώτη περίπτωση.",
     "roiDesc": "Ένας δικηγόρος με χρέωση 150 €/ώρα αποκαθιστά τη μηνιαία επένδυση με μόλις 2 επιπλέον ώρες παραγωγικής εργασίας. Το Lyrium σας δίνει πίσω περισσότερες από 12 ώρες την εβδομάδα. Κάντε τα μαθηματικά.",
     "modulesLabel": "Ενότητες",
@@ -1150,7 +1167,7 @@
     "pricingLabel": "Τιμολόγηση",
     "pricingH2": "Απλό και χωρίς εκπλήξεις",
     "freeTrial": "Δωρεάν δοκιμή 14 ημερών",
-    "pricingDesc": "Πλήρης πρόσβαση σε όλες τις ενότητες. Χωρίς τεχνητά όρια.",
+    "pricingDesc": "Πλήρης πρόσβαση σε όλα τα modules.",
     "planMonthly": "Μηνιαίος",
     "planMonthlyNote": "Τιμολογείται μηνιαία",
     "planUnitMonthly": "€ / μήνα",
@@ -1210,7 +1227,17 @@
     "integAITitle": "Προσαρμόστε την AI σας",
     "integAIDesc": "Ανεβάστε νομολογία, στρατηγικές ή παλαιότερες υποθέσεις σε PDF και η AI θα τα χρησιμοποιήσει για να σας δώσει πιο ακριβείς και προσαρμοσμένες απαντήσεις για το γραφείο σας.",
     "integShareTitle": "Μοιραστείτε αρχεία με την ομάδα σας",
-    "integShareDesc": "Στείλτε έγγραφα μεταξύ του κύριου λογαριασμού και των υπολογαριασμών του γραφείου σας. Όλα τα μέλη της ομάδας έχουν άμεση πρόσβαση στα κοινόχρηστα αρχεία."
+    "integShareDesc": "Στείλτε έγγραφα μεταξύ του κύριου λογαριασμού και των υπολογαριασμών του γραφείου σας. Όλα τα μέλη της ομάδας έχουν άμεση πρόσβαση στα κοινόχρηστα αρχεία.",
+    "planStarterName": "Starter",
+    "planStarterSub": "Για μικρά γραφεία",
+    "planStarterSubaccounts": "Έως 4 υπολογαριασμοί",
+    "planAdvancedName": "Προηγμένο",
+    "planAdvancedSub": "Για μεγαλύτερες ομάδες",
+    "planAdvancedSubaccounts": "Έως 10 υπολογαριασμοί",
+    "perMonth": "/ μήνα",
+    "perYear": "/ έτος",
+    "planAnnualEquiv": "Ισοδυναμεί με {{perMonth}} / μήνα — εξοικονομήστε {{saving}}",
+    "billedInEur": "Οι τιμές εμφανίζονται ενδεικτικά. Η χρέωση γίνεται σε ευρώ (EUR)."
   },
   "legal": {
     "backToHome": "Επιστροφή στην αρχική",
@@ -1286,97 +1313,97 @@
     "documentName": "Όνομα εγγράφου"
   },
   "taxCompliance": {
-    "title": "Tax Compliance",
-    "subtitle": "Complete tax tracking: calculated, filed and paid.",
-    "newObligation": "New obligation",
+    "title": "Φορολογική Συμμόρφωση",
+    "subtitle": "Πλήρης φορολογική παρακολούθηση: υπολογισμένη, υποβληθείσα και πληρωμένη.",
+    "newObligation": "Νέα υποχρέωση",
     "tabs": {
-      "obligations": "Obligations",
-      "calendar": "Calendar",
-      "summary": "Summary"
+      "obligations": "Υποχρεώσεις",
+      "calendar": "Ημερολόγιο",
+      "summary": "Σύνοψη"
     },
     "filters": {
-      "searchPlaceholder": "Search by client, model or period",
-      "status": "Status",
-      "client": "Client",
-      "all": "All",
-      "allClients": "All clients"
+      "searchPlaceholder": "Αναζήτηση κατά πελάτη, μοντέλο ή περίοδο",
+      "status": "Κατάσταση",
+      "client": "Πελάτης",
+      "all": "Όλα",
+      "allClients": "Όλοι οι πελάτες"
     },
     "table": {
-      "client": "Client",
-      "model": "Model",
-      "period": "Period",
-      "amount": "Amount",
-      "status": "Status",
-      "actions": "Actions",
-      "noResults": "No obligations for the current filters."
+      "client": "Πελάτης",
+      "model": "Μοντέλο",
+      "period": "Περίοδος",
+      "amount": "Ποσό",
+      "status": "Κατάσταση",
+      "actions": "Ενέργειες",
+      "noResults": "Δεν υπάρχουν υποχρεώσεις για τα τρέχοντα φίλτρα."
     },
     "actions": {
       "pdf": "PDF",
-      "markFiled": "Filed",
-      "markPaid": "Paid",
-      "officialPortal": "Official portal",
-      "delete": "Delete"
+      "markFiled": "Υποβληθείσα",
+      "markPaid": "Πληρωμένη",
+      "officialPortal": "Επίσημη πύλη",
+      "delete": "Διαγραφή"
     },
     "calendar": {
-      "title": "Upcoming deadlines",
-      "description": "Obligations due in the next 30 days.",
-      "empty": "No upcoming deadlines.",
-      "dueLabel": "Due"
+      "title": "Επερχόμενες προθεσμίες",
+      "description": "Υποχρεώσεις που λήγουν τις επόμενες 30 ημέρες.",
+      "empty": "Δεν υπάρχουν επερχόμενες προθεσμίες.",
+      "dueLabel": "Λήγει"
     },
     "summary": {
-      "totalObligations": "Total obligations",
-      "totalEstimated": "Total estimated",
-      "pendingPayment": "Pending payment",
-      "currentStatus": "Current status",
-      "currentStatusLine": "Calculated: {{calculated}} · Filed: {{filed}} · Paid: {{paid}}"
+      "totalObligations": "Συνολικές υποχρεώσεις",
+      "totalEstimated": "Συνολικό εκτιμώμενο",
+      "pendingPayment": "Εκκρεμής πληρωμή",
+      "currentStatus": "Τρέχουσα κατάσταση",
+      "currentStatusLine": "Υπολογισμένες: {{calculated}} · Υποβληθείσες: {{filed}} · Πληρωμένες: {{paid}}"
     },
     "dialog": {
-      "title": "New tax obligation",
-      "description": "Select client, saved calculation and model to create a traceable obligation.",
-      "client": "Client",
-      "selectClient": "Select a client",
-      "savedCalculation": "Saved calculation",
-      "selectCalculation": "Select a calculation",
-      "taxModel": "Tax model",
-      "modelPlaceholder": "Model",
-      "period": "Period",
-      "notes": "Notes",
-      "optional": "Optional",
-      "creating": "Creating...",
-      "create": "Create obligation"
+      "title": "Νέα φορολογική υποχρέωση",
+      "description": "Επιλέξτε πελάτη, αποθηκευμένο υπολογισμό και μοντέλο για να δημιουργήσετε μια ιχνηλάσιμη υποχρέωση.",
+      "client": "Πελάτης",
+      "selectClient": "Επιλέξτε πελάτη",
+      "savedCalculation": "Αποθηκευμένος υπολογισμός",
+      "selectCalculation": "Επιλέξτε υπολογισμό",
+      "taxModel": "Φορολογικό μοντέλο",
+      "modelPlaceholder": "Μοντέλο",
+      "period": "Περίοδος",
+      "notes": "Σημειώσεις",
+      "optional": "Προαιρετικό",
+      "creating": "Δημιουργία...",
+      "create": "Δημιουργία υποχρέωσης"
     },
     "status": {
-      "draft": "Draft",
-      "calculated": "Calculated",
-      "filed": "Filed",
-      "paid": "Paid",
-      "overdue": "Overdue",
-      "error": "Error"
+      "draft": "Πρόχειρο",
+      "calculated": "Υπολογισμένη",
+      "filed": "Υποβληθείσα",
+      "paid": "Πληρωμένη",
+      "overdue": "Εκπρόθεσμη",
+      "error": "Σφάλμα"
     },
     "toasts": {
-      "accountCountryRequiredTitle": "Account country required",
-      "accountCountryRequiredDesc": "The account has no configured country. Set the account country before creating obligations.",
-      "selectCalculation": "Select a saved calculation",
-      "selectTaxModel": "Select a tax model",
-      "createObligationFailed": "Could not create the obligation.",
-      "obligationCreatedTitle": "Obligation created",
-      "obligationCreatedDesc": "You can manage it from the table now.",
-      "updateStatusFailed": "Could not update the status.",
-      "downloadPdfFailed": "Could not download the PDF.",
-      "deleteFailed": "Could not delete the obligation.",
-      "deletedTitle": "Obligation deleted",
-      "deletedDesc": "The obligation was deleted successfully."
+      "accountCountryRequiredTitle": "Απαιτείται χώρα λογαριασμού",
+      "accountCountryRequiredDesc": "Ο λογαριασμός δεν έχει διαμορφωμένη χώρα. Ορίστε τη χώρα του λογαριασμού πριν δημιουργήσετε υποχρεώσεις.",
+      "selectCalculation": "Επιλέξτε αποθηκευμένο υπολογισμό",
+      "selectTaxModel": "Επιλέξτε φορολογικό μοντέλο",
+      "createObligationFailed": "Δεν ήταν δυνατή η δημιουργία της υποχρέωσης.",
+      "obligationCreatedTitle": "Υποχρέωση δημιουργήθηκε",
+      "obligationCreatedDesc": "Μπορείτε να τη διαχειριστείτε από τον πίνακα.",
+      "updateStatusFailed": "Δεν ήταν δυνατή η ενημέρωση της κατάστασης.",
+      "downloadPdfFailed": "Δεν ήταν δυνατή η λήψη του PDF.",
+      "deleteFailed": "Δεν ήταν δυνατή η διαγραφή της υποχρέωσης.",
+      "deletedTitle": "Υποχρέωση διαγράφηκε",
+      "deletedDesc": "Η υποχρέωση διαγράφηκε επιτυχώς."
     },
     "beta": {
       "button": "Beta",
-      "title": "Tax Compliance (Beta)",
+      "title": "Φορολογική Συμμόρφωση (Beta)",
       "description": "Χρησιμοποιειτε μια λειτουργια πρωιμης προσβασης, ενεργη και λειτουργικη, με συνεχεις βελτιωσεις. Παροτι στοχευουμε στη μεγιστη σταθεροτητα, ενδεχεται να προκυψουν σφαλματα, διακοπες η ανακριβη αποτελεσματα κατα την εξελιξη της. Χρησιμοποιηστε τη λειτουργια ως υποστηριξη και επαληθευετε παντα το αποτελεσμα πριν λαβετε φορολογικες η νομικες αποφασεις. Στην επομενη ενημερωση, η λειτουργια θα υλοποιηθει πληρως ωστε να διασφαλιστει βελτιστη λειτουργια σε ολες τις χωρες. Η Lyrium δεν εγγυαται την πληρη απουσια σφαλματων σε αυτη την εκδοση και δεν αναλαμβανει ευθυνη για αποφασεις που λαμβανονται αποκλειστικα με βαση αυτη τη beta λειτουργια."
     },
     "deleteDialog": {
-      "title": "Delete obligation?",
-      "description": "This action cannot be undone. The obligation will be permanently deleted.",
-      "confirm": "Delete obligation",
-      "deleting": "Deleting..."
+      "title": "Διαγραφή υποχρέωσης;",
+      "description": "Αυτή η ενέργεια δεν μπορεί να αναιρεθεί. Η υποχρέωση θα διαγραφεί οριστικά.",
+      "confirm": "Διαγραφή υποχρέωσης",
+      "deleting": "Διαγραφή..."
     }
   }
 }

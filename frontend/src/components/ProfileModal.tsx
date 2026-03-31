@@ -7,6 +7,7 @@ import { Elements, CardElement, useStripe, useElements } from "@stripe/react-str
 import { useTranslation } from "react-i18next";
 import { useToast } from "@/components/ui/use-toast";
 import { authFetch } from '../lib/authFetch';
+import { formatPrice, getCurrencyForCountry } from '../i18n';
 
 const stripeKey = import.meta.env.VITE_STRIPE_PUBLISHABLE_KEY as string | undefined;
 const stripePromise = stripeKey ? loadStripe(stripeKey) : null;
@@ -233,12 +234,20 @@ const ProfileModal = ({ isOpen, onClose }: ProfileModalProps) => {
   const [showConfirmPassword, setShowConfirmPassword] = useState(false);
   const [isChangingEmail, setIsChangingEmail] = useState(false);
   const [isChangingPassword, setIsChangingPassword] = useState(false);
+
+  // Billing profile states
+  const [billingProfile, setBillingProfile] = useState({
+    companyName: '', companyAddress: '', companyPhone: '',
+    companyEmail: '', companyCIF: '', invoiceNotes: '',
+  });
+  const [isSavingBilling, setIsSavingBilling] = useState(false);
   
   // Billing states
   const [subscription, setSubscription] = useState<Subscription | null>(null);
   const [selectedPlan, setSelectedPlan] = useState<'starter' | 'advanced'>('starter');
   const [selectedInterval, setSelectedInterval] = useState<'monthly' | 'annual'>('monthly');
   const [autoRenew, setAutoRenew] = useState(false);
+  const currency = getCurrencyForCountry(sessionStorage.getItem('country') || 'ES');
   const [showCardModal, setShowCardModal] = useState(false);
   const [showPaymentModal, setShowPaymentModal] = useState(false);
   const [clientSecret, setClientSecret] = useState<string | null>(null);
@@ -250,8 +259,8 @@ const ProfileModal = ({ isOpen, onClose }: ProfileModalProps) => {
     {
       id: 'starter',
       name: t('profile.planStarter'),
-      monthlyPrice: 250,
-      annualPrice: 2700,
+      monthlyPrice: 197,
+      annualPrice: 2100,
       maxSubaccounts: 4,
       features: [t('profile.featureUpTo4'), t('profile.featureAllFeatures'), t('profile.featurePrioritySupport')]
     },
@@ -274,6 +283,8 @@ const ProfileModal = ({ isOpen, onClose }: ProfileModalProps) => {
       } else if (activeTab === "integrations") {
         loadApiKeys();
         loadWebhooks();
+      } else if (activeTab === "information") {
+        loadBillingProfile();
       }
     }
   }, [isOpen, activeTab]);
@@ -290,6 +301,40 @@ const ProfileModal = ({ isOpen, onClose }: ProfileModalProps) => {
       }
     } catch (error) {
       console.error('Error al cargar subcuentas:', error);
+    }
+  };
+
+  const loadBillingProfile = async () => {
+    try {
+      const res = await authFetch(`${API_URL}/accounts/billing-profile`);
+      if (res.ok) {
+        const data = await res.json();
+        setBillingProfile(data);
+      }
+    } catch (error) {
+      console.error('Error loading billing profile:', error);
+    }
+  };
+
+  const handleSaveBillingProfile = async () => {
+    setIsSavingBilling(true);
+    try {
+      const res = await authFetch(`${API_URL}/accounts/billing-profile`, {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(billingProfile),
+      });
+      if (res.ok) {
+        const data = await res.json();
+        setBillingProfile(data);
+        toast({ title: t('profile.billingProfileSaved') });
+      } else {
+        toast({ title: t('profile.errorSaveBillingProfile'), variant: 'destructive' });
+      }
+    } catch {
+      toast({ title: t('profile.errorSaveBillingProfile'), variant: 'destructive' });
+    } finally {
+      setIsSavingBilling(false);
     }
   };
 
@@ -844,7 +889,7 @@ const ProfileModal = ({ isOpen, onClose }: ProfileModalProps) => {
                             <Check className="h-5 w-5 text-primary" />
                           )}
                         </div>
-                        <p className="text-2xl font-bold mb-3">{plan.monthlyPrice}€<span className="text-sm font-normal text-muted-foreground">{t('profile.perMonth')}</span></p>
+                        <p className="text-2xl font-bold mb-3">{formatPrice(plan.monthlyPrice, currency)}<span className="text-sm font-normal text-muted-foreground">{t('profile.perMonth')}</span></p>
                         <ul className="space-y-1 text-xs text-muted-foreground">
                           {plan.features.map((feature, idx) => (
                             <li key={idx}>• {feature}</li>
@@ -873,9 +918,9 @@ const ProfileModal = ({ isOpen, onClose }: ProfileModalProps) => {
                             <Check className="h-5 w-5 text-primary" />
                           )}
                         </div>
-                        <p className="text-2xl font-bold mb-1">{plan.annualPrice}€<span className="text-sm font-normal text-muted-foreground">{t('profile.perYear')}</span></p>
+                        <p className="text-2xl font-bold mb-1">{formatPrice(plan.annualPrice, currency)}<span className="text-sm font-normal text-muted-foreground">{t('profile.perYear')}</span></p>
                         <p className="text-xs text-green-600 dark:text-green-400 mb-3">
-                          {t('profile.savePerYear', { amount: plan.monthlyPrice * 12 - plan.annualPrice })}
+                          {t('profile.savePerYear', { amount: formatPrice(plan.monthlyPrice * 12 - plan.annualPrice, currency) })}
                         </p>
                         <ul className="space-y-1 text-xs text-muted-foreground">
                           {plan.features.map((feature, idx) => (
@@ -1014,6 +1059,68 @@ const ProfileModal = ({ isOpen, onClose }: ProfileModalProps) => {
             {activeTab === "information" && (
               <div className="space-y-8">
                 <h3 className="text-lg font-semibold">{t('profile.information')}</h3>
+
+                {/* Billing Profile for Invoices */}
+                <div className="bg-muted/50 border border-border rounded-lg p-4 space-y-3">
+                  <h4 className="font-medium">{t('profile.billingProfileTitle')}</h4>
+                  <p className="text-xs text-muted-foreground">{t('profile.billingProfileDesc')}</p>
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+                    <div>
+                      <label className="text-sm font-medium">{t('profile.companyNameLabel')}</label>
+                      <Input
+                        value={billingProfile.companyName}
+                        onChange={(e) => setBillingProfile({ ...billingProfile, companyName: e.target.value })}
+                        placeholder={t('profile.companyNamePlaceholder')}
+                      />
+                    </div>
+                    <div>
+                      <label className="text-sm font-medium">{t('profile.companyCIFLabel')}</label>
+                      <Input
+                        value={billingProfile.companyCIF}
+                        onChange={(e) => setBillingProfile({ ...billingProfile, companyCIF: e.target.value })}
+                        placeholder={t('profile.companyCIFPlaceholder')}
+                      />
+                    </div>
+                    <div className="md:col-span-2">
+                      <label className="text-sm font-medium">{t('profile.companyAddressLabel')}</label>
+                      <Input
+                        value={billingProfile.companyAddress}
+                        onChange={(e) => setBillingProfile({ ...billingProfile, companyAddress: e.target.value })}
+                        placeholder={t('profile.companyAddressPlaceholder')}
+                      />
+                    </div>
+                    <div>
+                      <label className="text-sm font-medium">{t('profile.companyPhoneLabel')}</label>
+                      <Input
+                        value={billingProfile.companyPhone}
+                        onChange={(e) => setBillingProfile({ ...billingProfile, companyPhone: e.target.value })}
+                        placeholder={t('profile.companyPhonePlaceholder')}
+                      />
+                    </div>
+                    <div>
+                      <label className="text-sm font-medium">{t('profile.companyEmailLabel')}</label>
+                      <Input
+                        type="email"
+                        value={billingProfile.companyEmail}
+                        onChange={(e) => setBillingProfile({ ...billingProfile, companyEmail: e.target.value })}
+                        placeholder={t('profile.companyEmailPlaceholder')}
+                      />
+                    </div>
+                    <div className="md:col-span-2">
+                      <label className="text-sm font-medium">{t('profile.invoiceNotesLabel')}</label>
+                      <textarea
+                        className="flex min-h-[60px] w-full rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2"
+                        value={billingProfile.invoiceNotes}
+                        onChange={(e) => setBillingProfile({ ...billingProfile, invoiceNotes: e.target.value })}
+                        placeholder={t('profile.invoiceNotesPlaceholder')}
+                        rows={2}
+                      />
+                    </div>
+                  </div>
+                  <Button onClick={handleSaveBillingProfile} disabled={isSavingBilling}>
+                    {isSavingBilling ? t('profile.processing') : t('profile.saveBillingProfile')}
+                  </Button>
+                </div>
 
                 {/* Change Email */}
                 <div className="bg-muted/50 border border-border rounded-lg p-4 space-y-3">

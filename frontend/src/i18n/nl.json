@@ -17,7 +17,7 @@
     "writing": "Schrijven",
     "settings": "Instellingen",
     "logout": "Uitloggen",
-    "taxCompliance": "Tax Compliance",
+    "taxCompliance": "Belastingnaleving",
     "beta": "Beta"
   },
   "auth": {
@@ -756,7 +756,7 @@
     "currentPlan": "Huidig plan:",
     "monthly": "Maandelijks",
     "annual": "Jaarlijks",
-    "savePerYear": "Bespaar {{amount}}€ per jaar",
+    "savePerYear": "Bespaar {{amount}} per jaar",
     "autoRenewLabel": "Automatische verlenging",
     "autoRenewDesc": "Automatisch verlengd aan het einde van de periode",
     "changePlan": "Plan wijzigen",
@@ -817,7 +817,24 @@
     "intWebhookCreated": "Webhook aangemaakt",
     "intWebhookDeleted": "Webhook verwijderd",
     "intTestSent": "Testgebeurtenis verzonden",
-    "intTestFailed": "Fout bij verzenden testgebeurtenis"
+    "intTestFailed": "Fout bij verzenden testgebeurtenis",
+    "billingProfileTitle": "Facturatiegegevens",
+    "billingProfileDesc": "Deze informatie verschijnt op uw facturen als klantgegevens.",
+    "companyNameLabel": "Bedrijfsnaam",
+    "companyNamePlaceholder": "Bijv.: Advocatenkantoor De Vries",
+    "companyCIFLabel": "BTW-nummer",
+    "companyCIFPlaceholder": "Bijv.: NL123456789B01",
+    "companyAddressLabel": "Adres",
+    "companyAddressPlaceholder": "Bijv.: Keizersgracht 10, 1015 AA Amsterdam",
+    "companyPhoneLabel": "Telefoon",
+    "companyPhonePlaceholder": "Bijv.: +31 20 1234567",
+    "companyEmailLabel": "Facturatie-e-mail",
+    "companyEmailPlaceholder": "Bijv.: admin@kantoor.nl",
+    "invoiceNotesLabel": "Aanvullende informatie",
+    "invoiceNotesPlaceholder": "Extra informatie voor de factuur",
+    "saveBillingProfile": "Facturatiegegevens opslaan",
+    "billingProfileSaved": "Facturatiegegevens opgeslagen",
+    "errorSaveBillingProfile": "Fout bij opslaan facturatiegegevens"
   },
   "renewal": {
     "title": "Abonnement vernieuwen",
@@ -1125,7 +1142,7 @@
     "solution3": "Alle klantinformatie gecentraliseerd op één plek",
     "solution4": "E-mail en WhatsApp geïntegreerd in één geautomatiseerd paneel",
     "roiLabel": "Productieve investering",
-    "roiH2a": "250 € / maand.",
+    "roiH2a": "{{price}} / maand.",
     "roiH2b": "Terugverdiend bij de eerste zaak.",
     "roiDesc": "Een advocaat die 150 €/uur factureert, verdient de maandelijkse investering terug met slechts 2 extra uren productief werk. Lyrium geeft je ruim 12 uur per week terug. Doe de wiskunde.",
     "modulesLabel": "Modules",
@@ -1150,7 +1167,7 @@
     "pricingLabel": "Prijzen",
     "pricingH2": "Eenvoudig en zonder verrassingen",
     "freeTrial": "14 dagen gratis proberen",
-    "pricingDesc": "Volledige toegang tot alle modules. Geen kunstmatige beperkingen.",
+    "pricingDesc": "Volledige toegang tot alle modules.",
     "planMonthly": "Maandelijks",
     "planMonthlyNote": "Maandelijks gefactureerd",
     "planUnitMonthly": "€ / maand",
@@ -1210,7 +1227,17 @@
     "integAITitle": "Pas uw AI aan",
     "integAIDesc": "Upload jurisprudentie, strategieën of eerdere zaken als PDF en de AI zal deze gebruiken om u nauwkeurigere en op uw kantoor afgestemde antwoorden te geven.",
     "integShareTitle": "Deel bestanden met uw team",
-    "integShareDesc": "Verstuur documenten tussen het hoofdaccount en de subaccounts van uw kantoor. Alle teamleden hebben direct toegang tot gedeelde bestanden."
+    "integShareDesc": "Verstuur documenten tussen het hoofdaccount en de subaccounts van uw kantoor. Alle teamleden hebben direct toegang tot gedeelde bestanden.",
+    "planStarterName": "Starter",
+    "planStarterSub": "Voor kleine kantoren",
+    "planStarterSubaccounts": "Tot 4 subaccounts",
+    "planAdvancedName": "Geavanceerd",
+    "planAdvancedSub": "Voor grotere teams",
+    "planAdvancedSubaccounts": "Tot 10 subaccounts",
+    "perMonth": "/ maand",
+    "perYear": "/ jaar",
+    "planAnnualEquiv": "Gelijk aan {{perMonth}} / maand — bespaar {{saving}}",
+    "billedInEur": "Prijzen ter referentie. Facturering is in euro (EUR)."
   },
   "legal": {
     "backToHome": "Terug naar startpagina",
@@ -1286,97 +1313,97 @@
     "documentName": "Documentnaam"
   },
   "taxCompliance": {
-    "title": "Tax Compliance",
-    "subtitle": "Complete tax tracking: calculated, filed and paid.",
-    "newObligation": "New obligation",
+    "title": "Belastingnaleving",
+    "subtitle": "Volledige belastingopvolging: berekend, ingediend en betaald.",
+    "newObligation": "Nieuwe verplichting",
     "tabs": {
-      "obligations": "Obligations",
-      "calendar": "Calendar",
-      "summary": "Summary"
+      "obligations": "Verplichtingen",
+      "calendar": "Kalender",
+      "summary": "Samenvatting"
     },
     "filters": {
-      "searchPlaceholder": "Search by client, model or period",
+      "searchPlaceholder": "Zoek op cliënt, model of periode",
       "status": "Status",
-      "client": "Client",
-      "all": "All",
-      "allClients": "All clients"
+      "client": "Cliënt",
+      "all": "Alle",
+      "allClients": "Alle cliënten"
     },
     "table": {
-      "client": "Client",
+      "client": "Cliënt",
       "model": "Model",
-      "period": "Period",
-      "amount": "Amount",
+      "period": "Periode",
+      "amount": "Bedrag",
       "status": "Status",
-      "actions": "Actions",
-      "noResults": "No obligations for the current filters."
+      "actions": "Acties",
+      "noResults": "Geen verplichtingen voor de huidige filters."
     },
     "actions": {
       "pdf": "PDF",
-      "markFiled": "Filed",
-      "markPaid": "Paid",
-      "officialPortal": "Official portal",
-      "delete": "Delete"
+      "markFiled": "Ingediend",
+      "markPaid": "Betaald",
+      "officialPortal": "Officieel portaal",
+      "delete": "Verwijderen"
     },
     "calendar": {
-      "title": "Upcoming deadlines",
-      "description": "Obligations due in the next 30 days.",
-      "empty": "No upcoming deadlines.",
-      "dueLabel": "Due"
+      "title": "Aankomende deadlines",
+      "description": "Verplichtingen die binnen 30 dagen vervallen.",
+      "empty": "Geen aankomende deadlines.",
+      "dueLabel": "Vervalt"
     },
     "summary": {
-      "totalObligations": "Total obligations",
-      "totalEstimated": "Total estimated",
-      "pendingPayment": "Pending payment",
-      "currentStatus": "Current status",
-      "currentStatusLine": "Calculated: {{calculated}} · Filed: {{filed}} · Paid: {{paid}}"
+      "totalObligations": "Totale verplichtingen",
+      "totalEstimated": "Totaal geschat",
+      "pendingPayment": "Wachtende betaling",
+      "currentStatus": "Huidige status",
+      "currentStatusLine": "Berekend: {{calculated}} · Ingediend: {{filed}} · Betaald: {{paid}}"
     },
     "dialog": {
-      "title": "New tax obligation",
-      "description": "Select client, saved calculation and model to create a traceable obligation.",
-      "client": "Client",
-      "selectClient": "Select a client",
-      "savedCalculation": "Saved calculation",
-      "selectCalculation": "Select a calculation",
-      "taxModel": "Tax model",
+      "title": "Nieuwe belastingverplichting",
+      "description": "Selecteer cliënt, opgeslagen berekening en model om een traceerbare verplichting aan te maken.",
+      "client": "Cliënt",
+      "selectClient": "Selecteer een cliënt",
+      "savedCalculation": "Opgeslagen berekening",
+      "selectCalculation": "Selecteer een berekening",
+      "taxModel": "Belastingmodel",
       "modelPlaceholder": "Model",
-      "period": "Period",
-      "notes": "Notes",
-      "optional": "Optional",
-      "creating": "Creating...",
-      "create": "Create obligation"
+      "period": "Periode",
+      "notes": "Notities",
+      "optional": "Optioneel",
+      "creating": "Aanmaken...",
+      "create": "Verplichting aanmaken"
     },
     "status": {
-      "draft": "Draft",
-      "calculated": "Calculated",
-      "filed": "Filed",
-      "paid": "Paid",
-      "overdue": "Overdue",
-      "error": "Error"
+      "draft": "Concept",
+      "calculated": "Berekend",
+      "filed": "Ingediend",
+      "paid": "Betaald",
+      "overdue": "Vervallen",
+      "error": "Fout"
     },
     "toasts": {
-      "accountCountryRequiredTitle": "Account country required",
-      "accountCountryRequiredDesc": "The account has no configured country. Set the account country before creating obligations.",
-      "selectCalculation": "Select a saved calculation",
-      "selectTaxModel": "Select a tax model",
-      "createObligationFailed": "Could not create the obligation.",
-      "obligationCreatedTitle": "Obligation created",
-      "obligationCreatedDesc": "You can manage it from the table now.",
-      "updateStatusFailed": "Could not update the status.",
-      "downloadPdfFailed": "Could not download the PDF.",
-      "deleteFailed": "Could not delete the obligation.",
-      "deletedTitle": "Obligation deleted",
-      "deletedDesc": "The obligation was deleted successfully."
+      "accountCountryRequiredTitle": "Accountland vereist",
+      "accountCountryRequiredDesc": "Het account heeft geen geconfigureerd land. Stel het accountland in voordat u verplichtingen aanmaakt.",
+      "selectCalculation": "Selecteer een opgeslagen berekening",
+      "selectTaxModel": "Selecteer een belastingmodel",
+      "createObligationFailed": "Kon de verplichting niet aanmaken.",
+      "obligationCreatedTitle": "Verplichting aangemaakt",
+      "obligationCreatedDesc": "U kunt deze nu vanuit de tabel beheren.",
+      "updateStatusFailed": "Kon de status niet bijwerken.",
+      "downloadPdfFailed": "Kon de PDF niet downloaden.",
+      "deleteFailed": "Kon de verplichting niet verwijderen.",
+      "deletedTitle": "Verplichting verwijderd",
+      "deletedDesc": "De verplichting is succesvol verwijderd."
     },
     "beta": {
-      "button": "Beta",
-      "title": "Tax Compliance (Beta)",
+      "button": "Bèta",
+      "title": "Belastingnaleving (Bèta)",
       "description": "Je gebruikt een functie in vroegtijdige toegang die actief en operationeel is, met voortdurende verbeteringen. Hoewel we streven naar maximale stabiliteit, kunnen tijdens de verdere ontwikkeling fouten, onderbrekingen of onnauwkeurige resultaten optreden. Gebruik deze functie als ondersteuning en controleer het resultaat altijd voordat je fiscale of juridische beslissingen neemt. In de volgende update wordt deze functionaliteit volledig uitgerold om optimale werking in alle landen te garanderen. Lyrium garandeert in deze versie geen volledige foutloosheid en aanvaardt geen aansprakelijkheid voor beslissingen die uitsluitend op deze beta-functionaliteit zijn gebaseerd."
     },
     "deleteDialog": {
-      "title": "Delete obligation?",
-      "description": "This action cannot be undone. The obligation will be permanently deleted.",
-      "confirm": "Delete obligation",
-      "deleting": "Deleting..."
+      "title": "Verplichting verwijderen?",
+      "description": "Deze actie kan niet ongedaan worden gemaakt. De verplichting wordt permanent verwijderd.",
+      "confirm": "Verplichting verwijderen",
+      "deleting": "Verwijderen..."
     }
   }
 }

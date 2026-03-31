@@ -16,7 +16,7 @@
     "writing": "Psaní",
     "settings": "Nastavení",
     "logout": "Odhlaste se",
-    "taxCompliance": "Tax Compliance",
+    "taxCompliance": "Daňový soulad",
     "beta": "Beta"
   },
   "auth": {
@@ -755,7 +755,7 @@
     "currentPlan": "Aktuální plán:",
     "monthly": "Měsíční",
     "annual": "Rocne",
-    "savePerYear": "Ušetřete {{amount}}€ za rok",
+    "savePerYear": "Ušetřete {{amount}} za rok",
     "autoRenewLabel": "Automatické obnovení",
     "autoRenewDesc": "Na konci období se automaticky obnoví",
     "changePlan": "Změnit plán",
@@ -816,7 +816,24 @@
     "intWebhookCreated": "Webhook vytvořen",
     "intWebhookDeleted": "Webhook smazán",
     "intTestSent": "Testovací událost odeslána",
-    "intTestFailed": "Chyba při odesílání testovací události"
+    "intTestFailed": "Chyba při odesílání testovací události",
+    "billingProfileTitle": "Fakturační údaje",
+    "billingProfileDesc": "Tyto informace se zobrazí na vašich fakturách jako údaje klienta.",
+    "companyNameLabel": "Název firmy",
+    "companyNamePlaceholder": "Např.: Advokátní kancelář Novák",
+    "companyCIFLabel": "IČO / DIČ",
+    "companyCIFPlaceholder": "Např.: CZ12345678",
+    "companyAddressLabel": "Adresa",
+    "companyAddressPlaceholder": "Např.: Václavské náměstí 10, 110 00 Praha",
+    "companyPhoneLabel": "Telefon",
+    "companyPhonePlaceholder": "Např.: +420 123 456 789",
+    "companyEmailLabel": "Fakturační email",
+    "companyEmailPlaceholder": "Např.: fakturace@kancelar.cz",
+    "invoiceNotesLabel": "Doplňující informace",
+    "invoiceNotesPlaceholder": "Další informace na fakturu",
+    "saveBillingProfile": "Uložit fakturační údaje",
+    "billingProfileSaved": "Fakturační údaje uloženy",
+    "errorSaveBillingProfile": "Chyba při ukládání fakturačních údajů"
   },
   "renewal": {
     "title": "Obnovit předplatné",
@@ -1124,7 +1141,7 @@
     "solution3": "Všechny klientské informace centralizované na jednom místě",
     "solution4": "E-mail a WhatsApp integrované v jediném automatizovaném panelu",
     "roiLabel": "Produktivní investice",
-    "roiH2a": "250 €/měsíc.",
+    "roiH2a": "{{price}} / měsíc.",
     "roiH2b": "Obnoveno v prvním případě.",
     "roiDesc": "Účtování právníka ve výši 150 €/hodinu vrátí měsíční investici pouhými 2 hodinami produktivní práce navíc. Lyrium vám vrátí více než 12 hodin týdně. Spočítejte si to.",
     "modulesLabel": "Moduly",
@@ -1149,7 +1166,7 @@
     "pricingLabel": "Ceny",
     "pricingH2": "Jednoduché a žádné překvapení",
     "freeTrial": "14denní bezplatná zkušební verze",
-    "pricingDesc": "Plný přístup ke všem modulům. Žádné umělé limity.",
+    "pricingDesc": "Plný přístup ke všem modulům.",
     "planMonthly": "Měsíční",
     "planMonthlyNote": "Účtováno měsíčně",
     "planUnitMonthly": "€ / měs.",
@@ -1209,7 +1226,17 @@
     "integAITitle": "Přizpůsobte si svou AI",
     "integAIDesc": "Nahrajte judikaturu, strategie nebo předchozí případy ve formátu PDF a AI je využije k poskytování přesnějších a na míru přizpůsobených odpovědí pro vaši kancelář.",
     "integShareTitle": "Sdílejte soubory se svým týmem",
-    "integShareDesc": "Posílejte dokumenty mezi hlavním účtem a podúčty vaší kanceláře. Všichni členové týmu mají okamžitý přístup ke sdíleným souborům."
+    "integShareDesc": "Posílejte dokumenty mezi hlavním účtem a podúčty vaší kanceláře. Všichni členové týmu mají okamžitý přístup ke sdíleným souborům.",
+    "planStarterName": "Starter",
+    "planStarterSub": "Pro malé kanceláře",
+    "planStarterSubaccounts": "Až 4 podúčty",
+    "planAdvancedName": "Pokročilý",
+    "planAdvancedSub": "Pro větší týmy",
+    "planAdvancedSubaccounts": "Až 10 podúčtů",
+    "perMonth": "/ měs.",
+    "perYear": "/ rok",
+    "planAnnualEquiv": "Odpovídá {{perMonth}} / měs. — ušetřete {{saving}}",
+    "billedInEur": "Ceny jsou orientační. Fakturace probíhá v eurech (EUR)."
   },
   "legal": {
     "backToHome": "Zpět na hlavní stránku",
@@ -1285,97 +1312,97 @@
     "documentName": "Název dokumentu"
   },
   "taxCompliance": {
-    "title": "Tax Compliance",
-    "subtitle": "Complete tax tracking: calculated, filed and paid.",
-    "newObligation": "New obligation",
+    "title": "Daňový soulad",
+    "subtitle": "Kompletní daňové sledování: vypočteno, podáno a zaplaceno.",
+    "newObligation": "Nová povinnost",
     "tabs": {
-      "obligations": "Obligations",
-      "calendar": "Calendar",
-      "summary": "Summary"
+      "obligations": "Povinnosti",
+      "calendar": "Kalendář",
+      "summary": "Souhrn"
     },
     "filters": {
-      "searchPlaceholder": "Search by client, model or period",
-      "status": "Status",
-      "client": "Client",
-      "all": "All",
-      "allClients": "All clients"
+      "searchPlaceholder": "Hledat podle klienta, modelu nebo období",
+      "status": "Stav",
+      "client": "Klient",
+      "all": "Vše",
+      "allClients": "Všichni klienti"
     },
     "table": {
-      "client": "Client",
+      "client": "Klient",
       "model": "Model",
-      "period": "Period",
-      "amount": "Amount",
-      "status": "Status",
-      "actions": "Actions",
-      "noResults": "No obligations for the current filters."
+      "period": "Období",
+      "amount": "Částka",
+      "status": "Stav",
+      "actions": "Akce",
+      "noResults": "Žádné povinnosti pro aktuální filtry."
     },
     "actions": {
       "pdf": "PDF",
-      "markFiled": "Filed",
-      "markPaid": "Paid",
-      "officialPortal": "Official portal",
-      "delete": "Delete"
+      "markFiled": "Podáno",
+      "markPaid": "Zaplaceno",
+      "officialPortal": "Oficiální portál",
+      "delete": "Smazat"
     },
     "calendar": {
-      "title": "Upcoming deadlines",
-      "description": "Obligations due in the next 30 days.",
-      "empty": "No upcoming deadlines.",
-      "dueLabel": "Due"
+      "title": "Nadcházející termíny",
+      "description": "Povinnosti splatné v příštích 30 dnech.",
+      "empty": "Žádné nadcházející termíny.",
+      "dueLabel": "Splatnost"
     },
     "summary": {
-      "totalObligations": "Total obligations",
-      "totalEstimated": "Total estimated",
-      "pendingPayment": "Pending payment",
-      "currentStatus": "Current status",
-      "currentStatusLine": "Calculated: {{calculated}} · Filed: {{filed}} · Paid: {{paid}}"
+      "totalObligations": "Celkové povinnosti",
+      "totalEstimated": "Celkový odhad",
+      "pendingPayment": "Čekající platba",
+      "currentStatus": "Aktuální stav",
+      "currentStatusLine": "Vypočteno: {{calculated}} · Podáno: {{filed}} · Zaplaceno: {{paid}}"
     },
     "dialog": {
-      "title": "New tax obligation",
-      "description": "Select client, saved calculation and model to create a traceable obligation.",
-      "client": "Client",
-      "selectClient": "Select a client",
-      "savedCalculation": "Saved calculation",
-      "selectCalculation": "Select a calculation",
-      "taxModel": "Tax model",
+      "title": "Nová daňová povinnost",
+      "description": "Vyberte klienta, uložený výpočet a model pro vytvoření sledovatelné povinnosti.",
+      "client": "Klient",
+      "selectClient": "Vyberte klienta",
+      "savedCalculation": "Uložený výpočet",
+      "selectCalculation": "Vyberte výpočet",
+      "taxModel": "Daňový model",
       "modelPlaceholder": "Model",
-      "period": "Period",
-      "notes": "Notes",
-      "optional": "Optional",
-      "creating": "Creating...",
-      "create": "Create obligation"
+      "period": "Období",
+      "notes": "Poznámky",
+      "optional": "Volitelné",
+      "creating": "Vytváření...",
+      "create": "Vytvořit povinnost"
     },
     "status": {
-      "draft": "Draft",
-      "calculated": "Calculated",
-      "filed": "Filed",
-      "paid": "Paid",
-      "overdue": "Overdue",
-      "error": "Error"
+      "draft": "Koncept",
+      "calculated": "Vypočteno",
+      "filed": "Podáno",
+      "paid": "Zaplaceno",
+      "overdue": "Po splatnosti",
+      "error": "Chyba"
     },
     "toasts": {
-      "accountCountryRequiredTitle": "Account country required",
-      "accountCountryRequiredDesc": "The account has no configured country. Set the account country before creating obligations.",
-      "selectCalculation": "Select a saved calculation",
-      "selectTaxModel": "Select a tax model",
-      "createObligationFailed": "Could not create the obligation.",
-      "obligationCreatedTitle": "Obligation created",
-      "obligationCreatedDesc": "You can manage it from the table now.",
-      "updateStatusFailed": "Could not update the status.",
-      "downloadPdfFailed": "Could not download the PDF.",
-      "deleteFailed": "Could not delete the obligation.",
-      "deletedTitle": "Obligation deleted",
-      "deletedDesc": "The obligation was deleted successfully."
+      "accountCountryRequiredTitle": "Vyžadována země účtu",
+      "accountCountryRequiredDesc": "Účet nemá nakonfigurovanou zemi. Nastavte zemi účtu před vytvořením povinností.",
+      "selectCalculation": "Vyberte uložený výpočet",
+      "selectTaxModel": "Vyberte daňový model",
+      "createObligationFailed": "Nepodařilo se vytvořit povinnost.",
+      "obligationCreatedTitle": "Povinnost vytvořena",
+      "obligationCreatedDesc": "Nyní ji můžete spravovat z tabulky.",
+      "updateStatusFailed": "Nepodařilo se aktualizovat stav.",
+      "downloadPdfFailed": "Nepodařilo se stáhnout PDF.",
+      "deleteFailed": "Nepodařilo se smazat povinnost.",
+      "deletedTitle": "Povinnost smazána",
+      "deletedDesc": "Povinnost byla úspěšně smazána."
     },
     "beta": {
       "button": "Beta",
-      "title": "Tax Compliance (Beta)",
+      "title": "Daňový soulad (Beta)",
       "description": "Pouzivate funkci v predbeznem pristupu, ktera je aktivni a provozne dostupna, s neustalymi vylepsenimi. Ackoli usilujeme o maximalni stabilitu, behem jejiho vyvoje mohou nastat chyby, preruseni nebo nepresne vysledky. Pouzivejte tuto funkci jako podporu a vzdy overte vysledek pred prijetim danovych nebo pravnich rozhodnuti. V pristi aktualizaci bude tato funkcionalita plne nasazena, aby byl zajisten optimalni provoz ve vsech zemich. Lyrium negarantuje v teto verzi uplnou bezchybnost a nenese odpovednost za rozhodnuti prijata vyhradne na zaklade teto beta funkcionality."
     },
     "deleteDialog": {
-      "title": "Delete obligation?",
-      "description": "This action cannot be undone. The obligation will be permanently deleted.",
-      "confirm": "Delete obligation",
-      "deleting": "Deleting..."
+      "title": "Smazat povinnost?",
+      "description": "Tuto akci nelze vrátit. Povinnost bude trvale smazána.",
+      "confirm": "Smazat povinnost",
+      "deleting": "Mazání..."
     }
   }
 }

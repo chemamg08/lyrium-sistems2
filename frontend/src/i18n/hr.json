@@ -16,7 +16,7 @@
     "writing": "Pisanje",
     "settings": "Postavke",
     "logout": "Odjava",
-    "taxCompliance": "Tax Compliance",
+    "taxCompliance": "Porezna usklađenost",
     "beta": "Beta"
   },
   "auth": {
@@ -755,7 +755,7 @@
     "currentPlan": "Trenutni plan:",
     "monthly": "Mjesecno",
     "annual": "Godišnji",
-    "savePerYear": "Uštedite {{amount}} € godišnje",
+    "savePerYear": "Uštedite {{amount}} godišnje",
     "autoRenewLabel": "Automatsko obnavljanje",
     "autoRenewDesc": "Automatski se obnavlja na kraju razdoblja",
     "changePlan": "Promijeni plan",
@@ -816,7 +816,24 @@
     "intWebhookCreated": "Webhook stvoren",
     "intWebhookDeleted": "Webhook obrisan",
     "intTestSent": "Testni događaj poslan",
-    "intTestFailed": "Greška pri slanju testnog događaja"
+    "intTestFailed": "Greška pri slanju testnog događaja",
+    "billingProfileTitle": "Podaci za fakturiranje",
+    "billingProfileDesc": "Ovi podaci će se pojaviti na vašim računima kao podaci klijenta.",
+    "companyNameLabel": "Naziv tvrtke",
+    "companyNamePlaceholder": "Npr.: Odvjetnički ured Horvat",
+    "companyCIFLabel": "OIB",
+    "companyCIFPlaceholder": "Npr.: HR12345678901",
+    "companyAddressLabel": "Adresa",
+    "companyAddressPlaceholder": "Npr.: Ilica 10, 10000 Zagreb",
+    "companyPhoneLabel": "Telefon",
+    "companyPhonePlaceholder": "Npr.: +385 1 234 5678",
+    "companyEmailLabel": "Email za fakture",
+    "companyEmailPlaceholder": "Npr.: fakture@ured.hr",
+    "invoiceNotesLabel": "Dodatne informacije",
+    "invoiceNotesPlaceholder": "Dodatne informacije za račun",
+    "saveBillingProfile": "Spremi podatke za fakturiranje",
+    "billingProfileSaved": "Podaci za fakturiranje spremljeni",
+    "errorSaveBillingProfile": "Greška pri spremanju"
   },
   "renewal": {
     "title": "Obnovi pretplatu",
@@ -1124,7 +1141,7 @@
     "solution3": "Sve informacije o klijentima centralizirane na jednom mjestu",
     "solution4": "E-mail i WhatsApp integrirani u jednu automatiziranu plocu",
     "roiLabel": "Produktivna investicija",
-    "roiH2a": "250 € / mjesec.",
+    "roiH2a": "{{price}} / mjesec.",
     "roiH2b": "Vraca se na prvom predmetu.",
     "roiDesc": "Odvjetnik koji naplaćuje 150 €/sat vraća mjesečnu investiciju sa samo 2 dodatna sata produktivnog rada. Lyrium vam vraća više od 12 sati tjedno. Izračunaj.",
     "modulesLabel": "Moduli",
@@ -1149,7 +1166,7 @@
     "pricingLabel": "Cijene",
     "pricingH2": "Jednostavno i bez iznenadenja",
     "freeTrial": "14 dana besplatnog isprobavanja",
-    "pricingDesc": "Potpun pristup svim modulima. Bez umjetnih ogranicenja.",
+    "pricingDesc": "Potpuni pristup svim modulima.",
     "planMonthly": "Mjesecno",
     "planMonthlyNote": "Naplacuje se mjesecno",
     "planUnitMonthly": "€ / mj.",
@@ -1209,7 +1226,17 @@
     "integAITitle": "Prilagodite svoju AI",
     "integAIDesc": "Učitajte sudsku praksu, strategije ili prethodne slučajeve u PDF formatu i AI će ih koristiti kako bi vam pružila preciznije i prilagođene odgovore za vaš ured.",
     "integShareTitle": "Dijelite datoteke sa svojim timom",
-    "integShareDesc": "Šaljite dokumente između glavnog računa i podračuna vašeg ureda. Svi članovi tima imaju trenutni pristup dijeljenim datotekama."
+    "integShareDesc": "Šaljite dokumente između glavnog računa i podračuna vašeg ureda. Svi članovi tima imaju trenutni pristup dijeljenim datotekama.",
+    "planStarterName": "Starter",
+    "planStarterSub": "Za male urede",
+    "planStarterSubaccounts": "Do 4 podračuna",
+    "planAdvancedName": "Napredni",
+    "planAdvancedSub": "Za veće timove",
+    "planAdvancedSubaccounts": "Do 10 podračuna",
+    "perMonth": "/ mj.",
+    "perYear": "/ god.",
+    "planAnnualEquiv": "Jednako {{perMonth}} / mj. — uštedite {{saving}}",
+    "billedInEur": "Cijene su okvirne. Naplata je u eurima (EUR)."
   },
   "legal": {
     "backToHome": "Natrag na početnu",
@@ -1285,97 +1312,97 @@
     "documentName": "Naziv dokumenta"
   },
   "taxCompliance": {
-    "title": "Tax Compliance",
-    "subtitle": "Complete tax tracking: calculated, filed and paid.",
-    "newObligation": "New obligation",
+    "title": "Porezna usklađenost",
+    "subtitle": "Potpuno praćenje poreza: izračunato, predano i plaćeno.",
+    "newObligation": "Nova obveza",
     "tabs": {
-      "obligations": "Obligations",
-      "calendar": "Calendar",
-      "summary": "Summary"
+      "obligations": "Obveze",
+      "calendar": "Kalendar",
+      "summary": "Sažetak"
     },
     "filters": {
-      "searchPlaceholder": "Search by client, model or period",
+      "searchPlaceholder": "Pretraži po klijentu, modelu ili razdoblju",
       "status": "Status",
-      "client": "Client",
-      "all": "All",
-      "allClients": "All clients"
+      "client": "Klijent",
+      "all": "Sve",
+      "allClients": "Svi klijenti"
     },
     "table": {
-      "client": "Client",
+      "client": "Klijent",
       "model": "Model",
-      "period": "Period",
-      "amount": "Amount",
+      "period": "Razdoblje",
+      "amount": "Iznos",
       "status": "Status",
-      "actions": "Actions",
-      "noResults": "No obligations for the current filters."
+      "actions": "Radnje",
+      "noResults": "Nema obveza za trenutne filtre."
     },
     "actions": {
       "pdf": "PDF",
-      "markFiled": "Filed",
-      "markPaid": "Paid",
-      "officialPortal": "Official portal",
-      "delete": "Delete"
+      "markFiled": "Predano",
+      "markPaid": "Plaćeno",
+      "officialPortal": "Službeni portal",
+      "delete": "Obriši"
     },
     "calendar": {
-      "title": "Upcoming deadlines",
-      "description": "Obligations due in the next 30 days.",
-      "empty": "No upcoming deadlines.",
-      "dueLabel": "Due"
+      "title": "Nadolazeći rokovi",
+      "description": "Obveze koje dospijevaju u sljedećih 30 dana.",
+      "empty": "Nema nadolazećih rokova.",
+      "dueLabel": "Dospijeva"
     },
     "summary": {
-      "totalObligations": "Total obligations",
-      "totalEstimated": "Total estimated",
-      "pendingPayment": "Pending payment",
-      "currentStatus": "Current status",
-      "currentStatusLine": "Calculated: {{calculated}} · Filed: {{filed}} · Paid: {{paid}}"
+      "totalObligations": "Ukupno obveza",
+      "totalEstimated": "Ukupno procijenjeno",
+      "pendingPayment": "Čeka plaćanje",
+      "currentStatus": "Trenutni status",
+      "currentStatusLine": "Izračunato: {{calculated}} · Predano: {{filed}} · Plaćeno: {{paid}}"
     },
     "dialog": {
-      "title": "New tax obligation",
-      "description": "Select client, saved calculation and model to create a traceable obligation.",
-      "client": "Client",
-      "selectClient": "Select a client",
-      "savedCalculation": "Saved calculation",
-      "selectCalculation": "Select a calculation",
-      "taxModel": "Tax model",
+      "title": "Nova porezna obveza",
+      "description": "Odaberite klijenta, spremljeni izračun i model za stvaranje sljedive obveze.",
+      "client": "Klijent",
+      "selectClient": "Odaberite klijenta",
+      "savedCalculation": "Spremljeni izračun",
+      "selectCalculation": "Odaberite izračun",
+      "taxModel": "Porezni model",
       "modelPlaceholder": "Model",
-      "period": "Period",
-      "notes": "Notes",
-      "optional": "Optional",
-      "creating": "Creating...",
-      "create": "Create obligation"
+      "period": "Razdoblje",
+      "notes": "Bilješke",
+      "optional": "Neobvezno",
+      "creating": "Stvaranje...",
+      "create": "Stvori obvezu"
     },
     "status": {
-      "draft": "Draft",
-      "calculated": "Calculated",
-      "filed": "Filed",
-      "paid": "Paid",
-      "overdue": "Overdue",
-      "error": "Error"
+      "draft": "Skica",
+      "calculated": "Izračunato",
+      "filed": "Predano",
+      "paid": "Plaćeno",
+      "overdue": "Zakašnjelo",
+      "error": "Greška"
     },
     "toasts": {
-      "accountCountryRequiredTitle": "Account country required",
-      "accountCountryRequiredDesc": "The account has no configured country. Set the account country before creating obligations.",
-      "selectCalculation": "Select a saved calculation",
-      "selectTaxModel": "Select a tax model",
-      "createObligationFailed": "Could not create the obligation.",
-      "obligationCreatedTitle": "Obligation created",
-      "obligationCreatedDesc": "You can manage it from the table now.",
-      "updateStatusFailed": "Could not update the status.",
-      "downloadPdfFailed": "Could not download the PDF.",
-      "deleteFailed": "Could not delete the obligation.",
-      "deletedTitle": "Obligation deleted",
-      "deletedDesc": "The obligation was deleted successfully."
+      "accountCountryRequiredTitle": "Potrebna je država računa",
+      "accountCountryRequiredDesc": "Račun nema konfiguriranu državu. Postavite državu računa prije stvaranja obveza.",
+      "selectCalculation": "Odaberite spremljeni izračun",
+      "selectTaxModel": "Odaberite porezni model",
+      "createObligationFailed": "Nije moguće stvoriti obvezu.",
+      "obligationCreatedTitle": "Obveza stvorena",
+      "obligationCreatedDesc": "Sada je možete upravljati iz tablice.",
+      "updateStatusFailed": "Nije moguće ažurirati status.",
+      "downloadPdfFailed": "Nije moguće preuzeti PDF.",
+      "deleteFailed": "Nije moguće obrisati obvezu.",
+      "deletedTitle": "Obveza obrisana",
+      "deletedDesc": "Obveza je uspješno obrisana."
     },
     "beta": {
       "button": "Beta",
-      "title": "Tax Compliance (Beta)",
+      "title": "Porezna usklađenost (Beta)",
       "description": "Koristite funkcionalnost u ranom pristupu koja je aktivna i operativna, uz kontinuirana poboljsanja. Iako tezimo maksimalnoj stabilnosti, tijekom daljnjeg razvoja mogu se pojaviti greske, prekidi ili netocni rezultati. Koristite ovu funkcionalnost kao podrsku i uvijek provjerite rezultat prije donosenja poreznih ili pravnih odluka. U sljedecem azuriranju ova ce funkcionalnost biti u potpunosti implementirana kako bi se osiguralo optimalno funkcioniranje u svim drzavama. Lyrium ne jamci potpunu odsutnost pogresaka u ovoj verziji i ne preuzima odgovornost za odluke donesene iskljucivo na temelju ove beta funkcionalnosti."
     },
     "deleteDialog": {
-      "title": "Delete obligation?",
-      "description": "This action cannot be undone. The obligation will be permanently deleted.",
-      "confirm": "Delete obligation",
-      "deleting": "Deleting..."
+      "title": "Obrisati obvezu?",
+      "description": "Ova radnja se ne može poništiti. Obveza će biti trajno obrisana.",
+      "confirm": "Obriši obvezu",
+      "deleting": "Brisanje..."
     }
   }
 }

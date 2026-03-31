@@ -7,6 +7,7 @@ import { Elements, CardElement, useStripe, useElements } from '@stripe/react-str
 import { useTranslation } from 'react-i18next';
 import { useToast } from '@/components/ui/use-toast';
 import { authFetch } from '../lib/authFetch';
+import { formatPrice, getCurrencyForCountry } from '../i18n';
 
 const stripeKey = import.meta.env.VITE_STRIPE_PUBLISHABLE_KEY as string | undefined;
 const stripePromise = stripeKey ? loadStripe(stripeKey) : null;
@@ -18,6 +19,7 @@ interface RenewalModalProps {
   onSuccess?: () => void;
   accountId: string;
   userEmail: string;
+  userCountry?: string;
 }
 
 interface PlanConfig {
@@ -188,9 +190,10 @@ const PaymentForm = ({ clientSecret, accountId, plan, interval, paymentIntentId,
   );
 };
 
-const RenewalModal = ({ isOpen, onClose, onSuccess, accountId, userEmail }: RenewalModalProps) => {
+const RenewalModal = ({ isOpen, onClose, onSuccess, accountId, userEmail, userCountry = 'ES' }: RenewalModalProps) => {
   const { t } = useTranslation();
   const { toast } = useToast();
+  const currency = getCurrencyForCountry(userCountry);
   const [selectedPlan, setSelectedPlan] = useState<'starter' | 'advanced'>('starter');
   const [selectedInterval, setSelectedInterval] = useState<'monthly' | 'annual'>('monthly');
   const [autoRenew, setAutoRenew] = useState(false);
@@ -205,8 +208,8 @@ const RenewalModal = ({ isOpen, onClose, onSuccess, accountId, userEmail }: Rene
     {
       id: 'starter',
       name: t('profile.planStarter'),
-      monthlyPrice: 250,
-      annualPrice: 2700,
+      monthlyPrice: 197,
+      annualPrice: 2100,
       maxSubaccounts: 4,
       features: [t('profile.featureUpTo4'), t('profile.featureAllFeatures'), t('profile.featurePrioritySupport')]
     },
@@ -326,7 +329,7 @@ const RenewalModal = ({ isOpen, onClose, onSuccess, accountId, userEmail }: Rene
                       )}
                     </div>
                     <p className="text-2xl font-bold mb-3">
-                      {plan.monthlyPrice}€<span className="text-sm font-normal text-muted-foreground">{t('profile.perMonth')}</span>
+                      {formatPrice(plan.monthlyPrice, currency)}<span className="text-sm font-normal text-muted-foreground">{t('profile.perMonth')}</span>
                     </p>
                     <ul className="space-y-1 text-xs text-muted-foreground">
                       {plan.features.map((feature, idx) => (
@@ -357,10 +360,10 @@ const RenewalModal = ({ isOpen, onClose, onSuccess, accountId, userEmail }: Rene
                       )}
                     </div>
                     <p className="text-2xl font-bold mb-1">
-                      {plan.annualPrice}€<span className="text-sm font-normal text-muted-foreground">{t('profile.perYear')}</span>
+                      {formatPrice(plan.annualPrice, currency)}<span className="text-sm font-normal text-muted-foreground">{t('profile.perYear')}</span>
                     </p>
                     <p className="text-xs text-green-600 dark:text-green-400 mb-3">
-                      {t('profile.savePerYear', { amount: plan.monthlyPrice * 12 - plan.annualPrice })}
+                      {t('profile.savePerYear', { amount: formatPrice(plan.monthlyPrice * 12 - plan.annualPrice, currency) })}
                     </p>
                     <ul className="space-y-1 text-xs text-muted-foreground">
                       {plan.features.map((feature, idx) => (

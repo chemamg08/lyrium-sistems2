@@ -3,6 +3,14 @@ import Stripe from 'stripe';
 import dotenv from 'dotenv';
 import { Subscription } from './models/Subscription.js';
 import { Account } from './models/Account.js';
+import {
+  generateInvoicePDF,
+  sendInvoiceEmail,
+  buildInvoiceNumber,
+  buildConcept,
+  formatShortDate,
+  type InvoiceData,
+} from './services/invoiceService.js';
 
 // Cargar variables de entorno
 dotenv.config();
@@ -27,8 +35,8 @@ interface PlanConfig {
 const PLANS: Record<'starter' | 'advanced', PlanConfig> = {
   starter: {
     name: 'Starter',
-    monthlyPrice: 250,
-    annualPrice: 2700,
+    monthlyPrice: 197,
+    annualPrice: 2100,
     stripePriceIdMonthly: process.env.STRIPE_PRICE_STARTER_MONTHLY || 'price_starter_monthly',
     stripePriceIdAnnual: process.env.STRIPE_PRICE_STARTER_ANNUAL || 'price_starter_annual',
     maxSubaccounts: 4,
@@ -48,6 +56,64 @@ const calculateTrialEndDate = (): string => {
   date.setDate(date.getDate() + 14); // 14 días de prueba
   return date.toISOString();
 };
+
+/**
+ * Generate a PDF invoice and email it to the account holder.
+ * Called after a successful payment (first or renewal).
+ * Runs asynchronously — errors are logged but don't block payment flow.
+ */
+async function generateAndSendInvoice(
+  accountId: string,
+  plan: string,
+  interval: string,
+  totalAmount: number,
+  periodStart: Date,
+  periodEnd: Date,
+  cardBrand: string,
+  cardLast4: string,
+): Promise<void> {
+  try {
+    const account = await Account.findById(accountId);
+    if (!account) {
+      console.error(`[Invoice] Account ${accountId} not found, skipping invoice`);
+      return;
+    }
+
+    // Get and increment the invoice number
+    const currentNumber = account.nextInvoiceNumber || 1;
+    const invoiceNumber = buildInvoiceNumber(currentNumber);
+    account.nextInvoiceNumber = currentNumber + 1;
+    await account.save();
+
+    const invoiceData: InvoiceData = {
+      invoiceNumber,
+      date: new Date(),
+      clientName: account.companyName || account.name || '',
+      clientAddress: account.companyAddress || '',
+      clientPhone: account.companyPhone || '',
+      clientEmail: account.companyEmail || account.email,
+      clientCIF: account.companyCIF || '',
+      clientNotes: account.invoiceNotes || '',
+      concept: buildConcept(plan, interval),
+      periodStart: formatShortDate(periodStart),
+      periodEnd: formatShortDate(periodEnd),
+      totalAmount,
+      countryCode: account.country || 'ES',
+      cardBrand: cardBrand || '',
+      cardLast4: cardLast4 || '****',
+      ownerName: process.env.INVOICE_OWNER_NAME || '',
+      ownerNIF: process.env.INVOICE_OWNER_NIF || '',
+      ownerAddress: process.env.INVOICE_OWNER_ADDRESS || '',
+    };
+
+    const pdfBuffer = await generateInvoicePDF(invoiceData);
+    await sendInvoiceEmail(account.email, invoiceNumber, pdfBuffer);
+
+    console.log(`[Invoice] Sent ${invoiceNumber} to ${account.email}`);
+  } catch (error) {
+    console.error('[Invoice] Error generating/sending invoice:', error);
+  }
+}
 
 // ============= CONTROLLERS =============
 
@@ -506,6 +572,22 @@ export const confirmPayment = async (req: Request, res: Response) => {
 
     await subscription.save();
 
+    // Generate and send invoice asynchronously (don't block response)
+    const planConfig = PLANS[plan as 'starter' | 'advanced'];
+    if (planConfig) {
+      const invoiceAmount = interval === 'monthly' ? planConfig.monthlyPrice : planConfig.annualPrice;
+      generateAndSendInvoice(
+        accountId,
+        plan,
+        interval,
+        invoiceAmount,
+        new Date(now),
+        periodEnd,
+        paymentMethod?.brand || '',
+        paymentMethod?.last4 || '',
+      ).catch(err => console.error('[Invoice] async error:', err));
+    }
+
     res.json({ success: true, subscription: subscription.toJSON() });
   } catch (error) {
     console.error('Error al confirmar pago:', error);
@@ -658,6 +740,24 @@ export const handleWebhook = async (req: Request, res: Response) => {
           subscription.status = 'active';
           subscription.updatedAt = now;
           await subscription.save();
+
+          // Generate and send invoice for renewal payment
+          const renewalPlanConfig = PLANS[subscription.plan as 'starter' | 'advanced'];
+          if (renewalPlanConfig) {
+            const renewalAmount = subscription.interval === 'monthly'
+              ? renewalPlanConfig.monthlyPrice
+              : renewalPlanConfig.annualPrice;
+            generateAndSendInvoice(
+              subscription.accountId,
+              subscription.plan,
+              subscription.interval,
+              renewalAmount,
+              new Date(now),
+              periodEnd,
+              subscription.paymentMethod?.brand || '',
+              subscription.paymentMethod?.last4 || '',
+            ).catch(err => console.error('[Invoice] async renewal error:', err));
+          }
         }
         break;
       }

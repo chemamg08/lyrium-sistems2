@@ -16,7 +16,7 @@
     "writing": "Skrivande",
     "settings": "Inställningar",
     "logout": "Logga ut",
-    "taxCompliance": "Tax Compliance",
+    "taxCompliance": "Skatteefterlevnad",
     "beta": "Beta"
   },
   "auth": {
@@ -755,7 +755,7 @@
     "currentPlan": "Nuvarande plan:",
     "monthly": "Månatlig",
     "annual": "Årlig",
-    "savePerYear": "Spara {{amount}}€ per år",
+    "savePerYear": "Spara {{amount}} per år",
     "autoRenewLabel": "Automatisk förnyelse",
     "autoRenewDesc": "Förnyas automatiskt i slutet av perioden",
     "changePlan": "Byta plan",
@@ -816,7 +816,24 @@
     "intWebhookCreated": "Webhook skapad",
     "intWebhookDeleted": "Webhook borttagen",
     "intTestSent": "Testhändelse skickad",
-    "intTestFailed": "Fel vid sändning av testhändelse"
+    "intTestFailed": "Fel vid sändning av testhändelse",
+    "billingProfileTitle": "Faktureringsuppgifter",
+    "billingProfileDesc": "Denna information visas på dina fakturor som kunddata.",
+    "companyNameLabel": "Företagsnamn",
+    "companyNamePlaceholder": "T.ex.: Advokatfirman Svensson",
+    "companyCIFLabel": "Organisationsnummer",
+    "companyCIFPlaceholder": "T.ex.: SE123456789001",
+    "companyAddressLabel": "Adress",
+    "companyAddressPlaceholder": "T.ex.: Storgatan 10, 111 23 Stockholm",
+    "companyPhoneLabel": "Telefon",
+    "companyPhonePlaceholder": "T.ex.: +46 8 123 45 67",
+    "companyEmailLabel": "Faktura-e-post",
+    "companyEmailPlaceholder": "T.ex.: faktura@byrå.se",
+    "invoiceNotesLabel": "Ytterligare information",
+    "invoiceNotesPlaceholder": "Extra information att inkludera på fakturan",
+    "saveBillingProfile": "Spara faktureringsuppgifter",
+    "billingProfileSaved": "Faktureringsuppgifter sparade",
+    "errorSaveBillingProfile": "Fel vid sparande av faktureringsuppgifter"
   },
   "renewal": {
     "title": "Förnya prenumeration",
@@ -1124,7 +1141,7 @@
     "solution3": "All kundinformation centraliserad på ett ställe",
     "solution4": "E-post och WhatsApp integrerade i en enda automatiserad panel",
     "roiLabel": "Produktiv investering",
-    "roiH2a": "250 € / månad.",
+    "roiH2a": "{{price}} / månad.",
     "roiH2b": "Återställd på det första fallet.",
     "roiDesc": "En advokat som debiterar 150 €/timme får tillbaka den månatliga investeringen med bara 2 extra timmars produktivt arbete. Lyrium ger dig tillbaka mer än 12 timmar i veckan. Gör matten.",
     "modulesLabel": "Moduler",
@@ -1149,7 +1166,7 @@
     "pricingLabel": "Priser",
     "pricingH2": "Enkelt och inga överraskningar",
     "freeTrial": "14 dagars gratis provperiod",
-    "pricingDesc": "Full tillgång till alla moduler. Inga konstgjorda gränser.",
+    "pricingDesc": "Full tillgång till alla moduler.",
     "planMonthly": "Månatlig",
     "planMonthlyNote": "Faktureras månadsvis",
     "planUnitMonthly": "€ / mån",
@@ -1209,7 +1226,17 @@
     "integAITitle": "Anpassa din AI",
     "integAIDesc": "Ladda upp rättspraxis, strategier eller tidigare ärenden som PDF och AI:n kommer att använda dem för att ge dig mer precisa och anpassade svar för din byrå.",
     "integShareTitle": "Dela filer med ditt team",
-    "integShareDesc": "Skicka dokument mellan huvudkontot och underkontona på din byrå. Alla teammedlemmar får omedelbar tillgång till delade filer."
+    "integShareDesc": "Skicka dokument mellan huvudkontot och underkontona på din byrå. Alla teammedlemmar får omedelbar tillgång till delade filer.",
+    "planStarterName": "Starter",
+    "planStarterSub": "För små byråer",
+    "planStarterSubaccounts": "Upp till 4 underkonton",
+    "planAdvancedName": "Avancerad",
+    "planAdvancedSub": "För större team",
+    "planAdvancedSubaccounts": "Upp till 10 underkonton",
+    "perMonth": "/ mån",
+    "perYear": "/ år",
+    "planAnnualEquiv": "Motsvarar {{perMonth}} / mån — spara {{saving}}",
+    "billedInEur": "Priserna visas som referens. Faktureringen sker i euro (EUR)."
   },
   "legal": {
     "backToHome": "Tillbaka till startsidan",
@@ -1285,97 +1312,97 @@
     "documentName": "Dokumentnamn"
   },
   "taxCompliance": {
-    "title": "Tax Compliance",
-    "subtitle": "Complete tax tracking: calculated, filed and paid.",
-    "newObligation": "New obligation",
+    "title": "Skatteefterlevnad",
+    "subtitle": "Fullständig skatteuppföljning: beräknad, inlämnad och betald.",
+    "newObligation": "Ny skyldighet",
     "tabs": {
-      "obligations": "Obligations",
-      "calendar": "Calendar",
-      "summary": "Summary"
+      "obligations": "Skyldigheter",
+      "calendar": "Kalender",
+      "summary": "Sammanfattning"
     },
     "filters": {
-      "searchPlaceholder": "Search by client, model or period",
+      "searchPlaceholder": "Sök efter klient, modell eller period",
       "status": "Status",
-      "client": "Client",
-      "all": "All",
-      "allClients": "All clients"
+      "client": "Klient",
+      "all": "Alla",
+      "allClients": "Alla klienter"
     },
     "table": {
-      "client": "Client",
-      "model": "Model",
+      "client": "Klient",
+      "model": "Modell",
       "period": "Period",
-      "amount": "Amount",
+      "amount": "Belopp",
       "status": "Status",
-      "actions": "Actions",
-      "noResults": "No obligations for the current filters."
+      "actions": "Åtgärder",
+      "noResults": "Inga skyldigheter för aktuella filter."
     },
     "actions": {
       "pdf": "PDF",
-      "markFiled": "Filed",
-      "markPaid": "Paid",
-      "officialPortal": "Official portal",
-      "delete": "Delete"
+      "markFiled": "Inlämnad",
+      "markPaid": "Betald",
+      "officialPortal": "Officiell portal",
+      "delete": "Radera"
     },
     "calendar": {
-      "title": "Upcoming deadlines",
-      "description": "Obligations due in the next 30 days.",
-      "empty": "No upcoming deadlines.",
-      "dueLabel": "Due"
+      "title": "Kommande förfallodatum",
+      "description": "Skyldigheter som förfaller inom 30 dagar.",
+      "empty": "Inga kommande förfallodatum.",
+      "dueLabel": "Förfaller"
     },
     "summary": {
-      "totalObligations": "Total obligations",
-      "totalEstimated": "Total estimated",
-      "pendingPayment": "Pending payment",
-      "currentStatus": "Current status",
-      "currentStatusLine": "Calculated: {{calculated}} · Filed: {{filed}} · Paid: {{paid}}"
+      "totalObligations": "Totala skyldigheter",
+      "totalEstimated": "Totalt uppskattat",
+      "pendingPayment": "Väntande betalning",
+      "currentStatus": "Aktuell status",
+      "currentStatusLine": "Beräknad: {{calculated}} · Inlämnad: {{filed}} · Betald: {{paid}}"
     },
     "dialog": {
-      "title": "New tax obligation",
-      "description": "Select client, saved calculation and model to create a traceable obligation.",
-      "client": "Client",
-      "selectClient": "Select a client",
-      "savedCalculation": "Saved calculation",
-      "selectCalculation": "Select a calculation",
-      "taxModel": "Tax model",
-      "modelPlaceholder": "Model",
+      "title": "Ny skatteskyldighet",
+      "description": "Välj klient, sparad beräkning och modell för att skapa en spårbar skyldighet.",
+      "client": "Klient",
+      "selectClient": "Välj en klient",
+      "savedCalculation": "Sparad beräkning",
+      "selectCalculation": "Välj en beräkning",
+      "taxModel": "Skattemodell",
+      "modelPlaceholder": "Modell",
       "period": "Period",
-      "notes": "Notes",
-      "optional": "Optional",
-      "creating": "Creating...",
-      "create": "Create obligation"
+      "notes": "Anteckningar",
+      "optional": "Valfritt",
+      "creating": "Skapar...",
+      "create": "Skapa skyldighet"
     },
     "status": {
-      "draft": "Draft",
-      "calculated": "Calculated",
-      "filed": "Filed",
-      "paid": "Paid",
-      "overdue": "Overdue",
-      "error": "Error"
+      "draft": "Utkast",
+      "calculated": "Beräknad",
+      "filed": "Inlämnad",
+      "paid": "Betald",
+      "overdue": "Försenad",
+      "error": "Fel"
     },
     "toasts": {
-      "accountCountryRequiredTitle": "Account country required",
-      "accountCountryRequiredDesc": "The account has no configured country. Set the account country before creating obligations.",
-      "selectCalculation": "Select a saved calculation",
-      "selectTaxModel": "Select a tax model",
-      "createObligationFailed": "Could not create the obligation.",
-      "obligationCreatedTitle": "Obligation created",
-      "obligationCreatedDesc": "You can manage it from the table now.",
-      "updateStatusFailed": "Could not update the status.",
-      "downloadPdfFailed": "Could not download the PDF.",
-      "deleteFailed": "Could not delete the obligation.",
-      "deletedTitle": "Obligation deleted",
-      "deletedDesc": "The obligation was deleted successfully."
+      "accountCountryRequiredTitle": "Kontoland krävs",
+      "accountCountryRequiredDesc": "Kontot har inget konfigurerat land. Ange kontoland innan du skapar skyldigheter.",
+      "selectCalculation": "Välj en sparad beräkning",
+      "selectTaxModel": "Välj en skattemodell",
+      "createObligationFailed": "Kunde inte skapa skyldigheten.",
+      "obligationCreatedTitle": "Skyldighet skapad",
+      "obligationCreatedDesc": "Du kan hantera den från tabellen nu.",
+      "updateStatusFailed": "Kunde inte uppdatera status.",
+      "downloadPdfFailed": "Kunde inte ladda ner PDF.",
+      "deleteFailed": "Kunde inte radera skyldigheten.",
+      "deletedTitle": "Skyldighet raderad",
+      "deletedDesc": "Skyldigheten raderades framgångsrikt."
     },
     "beta": {
       "button": "Beta",
-      "title": "Tax Compliance (Beta)",
+      "title": "Skatteefterlevnad (Beta)",
       "description": "Du anvander en funktion i tidig atkomst som ar aktiv och i drift, med kontinuerliga forbattringar. Trots att vi stravar efter maximal stabilitet kan fel, avbrott eller felaktiga resultat forekomma under vidareutvecklingen. Anvand funktionen som stod och verifiera alltid resultatet innan du fattar skatte- eller juridiska beslut. I nasta uppdatering kommer funktionen att implementeras fullt ut for att sakerstalla optimal funktion i alla lander. Lyrium garanterar inte fullstandig felfrihet i denna version och tar inget ansvar for beslut som fattas enbart baserat pa denna beta-funktion."
     },
     "deleteDialog": {
-      "title": "Delete obligation?",
-      "description": "This action cannot be undone. The obligation will be permanently deleted.",
-      "confirm": "Delete obligation",
-      "deleting": "Deleting..."
+      "title": "Radera skyldighet?",
+      "description": "Denna åtgärd kan inte ångras. Skyldigheten raderas permanent.",
+      "confirm": "Radera skyldighet",
+      "deleting": "Raderar..."
     }
   }
 }
