@@ -49,7 +49,7 @@ export function setAuthCookies(res: Response, accessToken: string, refreshToken:
   const cookieBase = {
     httpOnly: true,
     secure: isProduction,
-    sameSite: (isProduction ? 'strict' : 'lax') as 'strict' | 'lax',
+    sameSite: (isProduction ? 'none' : 'lax') as 'none' | 'lax',
     path: '/',
   };
 
@@ -70,7 +70,7 @@ export function setAuthCookie(res: Response, token: string) {
   res.cookie('authToken', token, {
     httpOnly: true,
     secure: isProduction,
-    sameSite: isProduction ? 'strict' : 'lax',
+    sameSite: isProduction ? 'none' : 'lax',
     maxAge: 30 * 60 * 1000, // 30 minutes
     path: '/',
   });
@@ -81,7 +81,7 @@ export function clearAuthCookies(res: Response) {
   const cookieBase = {
     httpOnly: true,
     secure: isProduction,
-    sameSite: (isProduction ? 'strict' : 'lax') as 'strict' | 'lax',
+    sameSite: (isProduction ? 'none' : 'lax') as 'none' | 'lax',
     maxAge: 0,
     path: '/',
   };
