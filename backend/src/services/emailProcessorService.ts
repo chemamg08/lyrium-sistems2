@@ -43,12 +43,17 @@ export function decryptPassword(ciphertext: string): string {
   if (!ciphertext.includes(':')) return ciphertext;
   const parts = ciphertext.split(':');
   if (parts.length !== 3) return ciphertext;
-  const iv = Buffer.from(parts[0], 'hex');
-  const tag = Buffer.from(parts[1], 'hex');
-  const encrypted = Buffer.from(parts[2], 'hex');
-  const decipher = crypto.createDecipheriv('aes-256-gcm', ENCRYPTION_KEY, iv);
-  decipher.setAuthTag(tag);
-  return decipher.update(encrypted) + decipher.final('utf8');
+  try {
+    const iv = Buffer.from(parts[0], 'hex');
+    const tag = Buffer.from(parts[1], 'hex');
+    const encrypted = Buffer.from(parts[2], 'hex');
+    const decipher = crypto.createDecipheriv('aes-256-gcm', ENCRYPTION_KEY, iv);
+    decipher.setAuthTag(tag);
+    return decipher.update(encrypted) + decipher.final('utf8');
+  } catch (err) {
+    console.error('[decryptPassword] Failed to decrypt — JWT_SECRET may differ from when password was encrypted');
+    return '';
+  }
 }
 
 // ── AI clients ───────────────────────────────────────────────────────
