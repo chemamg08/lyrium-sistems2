@@ -48,6 +48,7 @@ import { cn } from "@/lib/utils";
 import { useTranslation } from "react-i18next";
 import { useStreamingChat } from "@/hooks/useStreamingChat";
 import { authFetch } from '../lib/authFetch';
+import { getCurrencyForCountry } from '../i18n';
 
 const API_URL = import.meta.env.VITE_API_URL;
 
@@ -245,6 +246,12 @@ export default function FiscalAdvisory() {
   const { t, i18n } = useTranslation();
   const { toast } = useToast();
   const messagesEndRef = useRef<HTMLDivElement>(null);
+
+  const accountCurrencyInfo = getCurrencyForCountry(sessionStorage.getItem('country') || 'ES');
+  const cSym = accountCurrencyInfo.symbol;
+  const cCode = accountCurrencyInfo.code;
+  /** Replace (€) in any field label with the user's currency symbol */
+  const locLabel = (label: string) => label.replace(/\(€\)/g, `(${cSym})`);
 
   // Auth
   const [accountId, setAccountId] = useState<string>("");
@@ -1650,7 +1657,7 @@ export default function FiscalAdvisory() {
         const renderField = (field: FieldDef) => (
           <div key={field.key}>
             <label className="text-xs font-medium text-muted-foreground mb-1 block">
-              {field.label}
+              {locLabel(field.label)}
             </label>
             <input
               type="number"
@@ -1729,7 +1736,7 @@ export default function FiscalAdvisory() {
                     <>
                       <span className="text-muted-foreground">{t(calcResult.etiquetaTotal)}:</span>
                       <span className={`font-semibold text-base ${calcResult.total >= 0 ? "text-destructive" : "text-emerald-600 dark:text-emerald-400"}`}>
-                        {new Intl.NumberFormat(i18n.language, { style: "currency", currency: calcResult.currency || "EUR" }).format(calcResult.total)}
+                        {new Intl.NumberFormat(i18n.language, { style: "currency", currency: calcResult.currency || cCode }).format(calcResult.total)}
                       </span>
                       <button
                         onClick={() => setShowDesglose(true)}
@@ -1799,7 +1806,7 @@ export default function FiscalAdvisory() {
                       <tr key={i} className="border-b border-border/50 last:border-0">
                         <td className="py-1.5 text-muted-foreground pr-4">{t(line.concepto, line.params)}</td>
                         <td className={`py-1.5 text-right font-medium tabular-nums ${line.valor < 0 ? "text-emerald-600 dark:text-emerald-400" : line.valor > 0 ? "text-foreground" : "text-muted-foreground"}`}>
-                          {line.valor === 0 ? "—" : new Intl.NumberFormat(i18n.language, { style: "currency", currency: calcResult?.currency || "EUR" }).format(line.valor)}
+                          {line.valor === 0 ? "—" : new Intl.NumberFormat(i18n.language, { style: "currency", currency: calcResult?.currency || cCode }).format(line.valor)}
                         </td>
                       </tr>
                     )
@@ -1810,7 +1817,7 @@ export default function FiscalAdvisory() {
             <div className="p-4 border-t border-border flex justify-between items-center">
               <span className="text-sm text-muted-foreground">{t(calcResult.etiquetaTotal)}</span>
               <span className={`text-lg font-bold tabular-nums ${calcResult.total >= 0 ? "text-destructive" : "text-emerald-600 dark:text-emerald-400"}`}>
-                {new Intl.NumberFormat(i18n.language, { style: "currency", currency: calcResult.currency || "EUR" }).format(calcResult.total)}
+                {new Intl.NumberFormat(i18n.language, { style: "currency", currency: calcResult.currency || cCode }).format(calcResult.total)}
               </span>
             </div>
           </div>

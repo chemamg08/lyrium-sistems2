@@ -289,7 +289,7 @@
       "payOther": "Altele",
       "timeCalc": "Calculează prețul timpului",
       "selectAll": "Selectează tot",
-      "pricePerHour": "Preț pe oră (€)",
+      "pricePerHour": "Preț pe oră ({{currencySymbol}})",
       "calcPrice": "Calculează",
       "lines": "Linii factură",
       "addLine": "Adaugă linie",

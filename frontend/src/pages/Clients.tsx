@@ -5,6 +5,7 @@ import { useTranslation } from "react-i18next";
 import { useToast } from "@/components/ui/use-toast";
 import { useStreamingChat } from "@/hooks/useStreamingChat";
 import { authFetch } from '../lib/authFetch';
+import { getCurrencyForCountry } from '../i18n';
 
 interface Client {
   id: string;
@@ -307,6 +308,9 @@ const Clients = () => {
   }, []);
 
   const cf = countryConfig?.clientForm;
+
+  const currencyInfo = getCurrencyForCountry(sessionStorage.getItem('country') || 'ES');
+  const cSym = currencyInfo.symbol;
 
   // Close client dropdowns on click outside
   useEffect(() => {
@@ -944,7 +948,7 @@ const Clients = () => {
     const totalHours = totalSecs / 3600;
     const priceH = parseFloat(calcPricePerHour) || 0;
     const total = Math.round(totalHours * priceH * 100) / 100;
-    setCalcResult(`${totalHours.toFixed(2)}h × ${priceH.toFixed(2)} €/h = ${total.toFixed(2)} €`);
+    setCalcResult(`${totalHours.toFixed(2)}h × ${priceH.toFixed(2)} ${cSym}/h = ${total.toFixed(2)} ${cSym}`);
   };
 
   const toggleAllTimerEntries = () => {
@@ -2420,7 +2424,7 @@ const Clients = () => {
                   </div>
                   <div className="flex gap-2 items-end">
                     <div className="flex-1">
-                      <label className="text-xs text-muted-foreground">{t('clients.invoice.pricePerHour')}</label>
+                      <label className="text-xs text-muted-foreground">{t('clients.invoice.pricePerHour', { currencySymbol: cSym })}</label>
                       <input type="number" value={calcPricePerHour} onChange={e => setCalcPricePerHour(e.target.value)} placeholder="0.00" className="w-full px-3 py-2 text-sm rounded-md border border-border bg-card text-foreground focus:outline-none focus:ring-1 focus:ring-ring" />
                     </div>
                     <button onClick={calculateTimePrice} className="px-4 py-2 text-xs bg-accent hover:bg-accent/80 text-foreground rounded-md transition-colors whitespace-nowrap">
@@ -2451,7 +2455,7 @@ const Clients = () => {
                         <input value={line.concept} onChange={e => updateInvoiceLine(line.id, 'concept', e.target.value)} placeholder={t('clients.invoice.conceptPh')} className="px-2 py-1.5 text-sm rounded-md border border-border bg-card text-foreground focus:outline-none focus:ring-1 focus:ring-ring" />
                         <input type="number" value={line.quantity || ''} onChange={e => updateInvoiceLine(line.id, 'quantity', parseFloat(e.target.value) || 0)} className="px-2 py-1.5 text-sm rounded-md border border-border bg-card text-foreground text-center focus:outline-none focus:ring-1 focus:ring-ring" />
                         <input type="number" value={line.price || ''} onChange={e => updateInvoiceLine(line.id, 'price', parseFloat(e.target.value) || 0)} placeholder="0.00" className="px-2 py-1.5 text-sm rounded-md border border-border bg-card text-foreground text-right focus:outline-none focus:ring-1 focus:ring-ring" />
-                        <span className="text-sm text-right font-medium">{line.subtotal.toFixed(2)} €</span>
+                        <span className="text-sm text-right font-medium">{line.subtotal.toFixed(2)} {cSym}</span>
                         <button onClick={() => removeInvoiceLine(line.id)} className="p-1 hover:bg-destructive/10 rounded text-muted-foreground hover:text-destructive"><X className="h-3.5 w-3.5" /></button>
                       </div>
                     ))}
@@ -2463,7 +2467,7 @@ const Clients = () => {
               <div className="mb-6 border-t border-border pt-4 space-y-2">
                 <div className="flex justify-between text-sm">
                   <span className="text-muted-foreground">{t('clients.invoice.baseAmount')}</span>
-                  <span className="font-medium">{baseAmount.toFixed(2)} €</span>
+                  <span className="font-medium">{baseAmount.toFixed(2)} {cSym}</span>
                 </div>
                 <div className="flex justify-between items-center text-sm">
                   <div className="flex items-center gap-2">
@@ -2471,11 +2475,11 @@ const Clients = () => {
                     <input type="number" value={invoiceTaxRate} onChange={e => setInvoiceTaxRate(parseFloat(e.target.value) || 0)} className="w-16 px-2 py-1 text-xs rounded border border-border bg-card text-foreground text-center focus:outline-none focus:ring-1 focus:ring-ring" />
                     <span className="text-muted-foreground">%</span>
                   </div>
-                  <span className="font-medium">{taxAmount.toFixed(2)} €</span>
+                  <span className="font-medium">{taxAmount.toFixed(2)} {cSym}</span>
                 </div>
                 <div className="flex justify-between text-lg font-bold pt-2 border-t border-border">
                   <span>{t('clients.invoice.total')}</span>
-                  <span className="text-primary">{totalAmount.toFixed(2)} €</span>
+                  <span className="text-primary">{totalAmount.toFixed(2)} {cSym}</span>
                 </div>
               </div>
 
@@ -2508,7 +2512,7 @@ const Clients = () => {
                           <p className="text-xs text-muted-foreground">{inv.date}</p>
                         </div>
                         <div className="text-right">
-                          <p className="text-sm font-bold text-primary">{inv.totalAmount.toFixed(2)} €</p>
+                          <p className="text-sm font-bold text-primary">{inv.totalAmount.toFixed(2)} {cSym}</p>
                           {inv.sentAt && <p className="text-xs text-green-600">{t('clients.invoice.sentLabel')}</p>}
                         </div>
                       </button>
@@ -2604,8 +2608,8 @@ const Clients = () => {
                     <tr key={i} className="border-b border-gray-100">
                       <td className="py-4 px-2 font-medium text-gray-900">{line.concept}</td>
                       <td className="py-4 px-2 text-center text-gray-700">{line.quantity}</td>
-                      <td className="py-4 px-2 text-right text-gray-700">{line.price.toFixed(2)} €</td>
-                      <td className="py-4 px-2 text-right font-medium text-gray-900">{line.subtotal.toFixed(2)} €</td>
+                      <td className="py-4 px-2 text-right text-gray-700">{line.price.toFixed(2)} {cSym}</td>
+                      <td className="py-4 px-2 text-right font-medium text-gray-900">{line.subtotal.toFixed(2)} {cSym}</td>
                     </tr>
                   ))}
                 </tbody>
@@ -2619,15 +2623,15 @@ const Clients = () => {
                 <div className="w-1/3 space-y-2">
                   <div className="flex justify-between text-xs">
                     <span className="text-gray-500 uppercase tracking-widest">{t('clients.invoice.baseAmount')}</span>
-                    <span className="text-gray-900 font-medium">{viewInvoice.baseAmount.toFixed(2)} €</span>
+                    <span className="text-gray-900 font-medium">{viewInvoice.baseAmount.toFixed(2)} {cSym}</span>
                   </div>
                   <div className="flex justify-between text-xs">
                     <span className="text-gray-500 uppercase tracking-widest">{t('clients.invoice.tax')} ({viewInvoice.taxRate}%)</span>
-                    <span className="text-gray-900 font-medium">{viewInvoice.taxAmount.toFixed(2)} €</span>
+                    <span className="text-gray-900 font-medium">{viewInvoice.taxAmount.toFixed(2)} {cSym}</span>
                   </div>
                   <div className="flex justify-between items-end pt-4">
                     <span className="text-[10px] uppercase tracking-widest font-bold text-gray-900">{t('clients.invoice.total')}</span>
-                    <span className="text-4xl font-bold text-gray-900">{viewInvoice.totalAmount.toFixed(2)} €</span>
+                    <span className="text-4xl font-bold text-gray-900">{viewInvoice.totalAmount.toFixed(2)} {cSym}</span>
                   </div>
                 </div>
               </div>
@@ -2730,8 +2734,8 @@ const Clients = () => {
                       <tr key={i} style={{ borderBottom: '1px solid #f3f4f6' }}>
                         <td style={{ padding: '12px 8px', fontWeight: 500 }}>{line.concept}</td>
                         <td style={{ padding: '12px 8px', textAlign: 'center' }}>{line.quantity}</td>
-                        <td style={{ padding: '12px 8px', textAlign: 'right' }}>{line.price.toFixed(2)} €</td>
-                        <td style={{ padding: '12px 8px', textAlign: 'right', fontWeight: 500 }}>{line.subtotal.toFixed(2)} €</td>
+                        <td style={{ padding: '12px 8px', textAlign: 'right' }}>{line.price.toFixed(2)} {cSym}</td>
+                        <td style={{ padding: '12px 8px', textAlign: 'right', fontWeight: 500 }}>{line.subtotal.toFixed(2)} {cSym}</td>
                       </tr>
                     ))}
                   </tbody>
@@ -2742,11 +2746,11 @@ const Clients = () => {
                     <p style={{ fontSize: '13px', color: '#374151' }}>{showSendInvoice.paymentMethod === 'transfer' ? t('clients.invoice.payTransfer') : showSendInvoice.paymentMethod === 'card' ? t('clients.invoice.payCard') : showSendInvoice.paymentMethod === 'cash' ? t('clients.invoice.payCash') : showSendInvoice.paymentMethod || '-'}</p>
                   </div>
                   <div style={{ width: '33%' }}>
-                    <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '11px', padding: '4px 0' }}><span style={{ color: '#6b7280', textTransform: 'uppercase', letterSpacing: '2px' }}>{t('clients.invoice.baseAmount')}</span><span style={{ fontWeight: 500 }}>{showSendInvoice.baseAmount.toFixed(2)} €</span></div>
-                    <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '11px', padding: '4px 0' }}><span style={{ color: '#6b7280', textTransform: 'uppercase', letterSpacing: '2px' }}>{t('clients.invoice.tax')} ({showSendInvoice.taxRate}%)</span><span style={{ fontWeight: 500 }}>{showSendInvoice.taxAmount.toFixed(2)} €</span></div>
+                    <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '11px', padding: '4px 0' }}><span style={{ color: '#6b7280', textTransform: 'uppercase', letterSpacing: '2px' }}>{t('clients.invoice.baseAmount')}</span><span style={{ fontWeight: 500 }}>{showSendInvoice.baseAmount.toFixed(2)} {cSym}</span></div>
+                    <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '11px', padding: '4px 0' }}><span style={{ color: '#6b7280', textTransform: 'uppercase', letterSpacing: '2px' }}>{t('clients.invoice.tax')} ({showSendInvoice.taxRate}%)</span><span style={{ fontWeight: 500 }}>{showSendInvoice.taxAmount.toFixed(2)} {cSym}</span></div>
                     <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-end', paddingTop: '10px' }}>
                       <span style={{ fontSize: '10px', textTransform: 'uppercase', letterSpacing: '3px', fontWeight: 'bold' }}>{t('clients.invoice.total')}</span>
-                      <span style={{ fontSize: '24px', fontWeight: 'bold' }}>{showSendInvoice.totalAmount.toFixed(2)} €</span>
+                      <span style={{ fontSize: '24px', fontWeight: 'bold' }}>{showSendInvoice.totalAmount.toFixed(2)} {cSym}</span>
                 </div>
               </div>
             </div>
@@ -2859,7 +2863,7 @@ const Clients = () => {
                   }
                 }
                 const fieldLabel = (key: string) => dynamicLabels[key] || FIELD_LABELS[key] || key;
-                const currencySymbol = countryConfig?.currency || 'EUR';
+                const currencySymbol = cSym;
                 return (
                   <div className="grid grid-cols-2 gap-3">
                     {entries.map(([key, value]) => (

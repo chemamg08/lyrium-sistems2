@@ -20,6 +20,7 @@ import {
 import { useToast } from '@/hooks/use-toast';
 import { authFetch } from '@/lib/authFetch';
 import { useTranslation } from 'react-i18next';
+import { getCurrencyForCountry } from '../i18n';
 
 const API_URL = import.meta.env.VITE_API_URL;
 
@@ -87,6 +88,7 @@ export default function TaxCompliance() {
   const { toast } = useToast();
   const { t, i18n } = useTranslation();
   const [accountId, setAccountId] = useState('');
+  const accountCurrency = getCurrencyForCountry(sessionStorage.getItem('country') || 'ES').code;
 
   const [clients, setClients] = useState<Client[]>([]);
   const [obligations, setObligations] = useState<TaxObligation[]>([]);
@@ -527,7 +529,7 @@ export default function TaxCompliance() {
                           <td className="px-3 py-2">{ob.clientName}</td>
                           <td className="px-3 py-2">{ob.modelCode} - {ob.modelName}</td>
                           <td className="px-3 py-2">{ob.period}</td>
-                          <td className="px-3 py-2 font-medium">{new Intl.NumberFormat(i18n.language, { style: 'currency', currency: ob.currency || 'EUR' }).format(ob.taxDue || 0)}</td>
+                          <td className="px-3 py-2 font-medium">{new Intl.NumberFormat(i18n.language, { style: 'currency', currency: ob.currency || accountCurrency }).format(ob.taxDue || 0)}</td>
                           <td className="px-3 py-2">
                             <span className={`px-2 py-1 rounded-full text-xs font-medium ${statusBadgeClass(ob.status)}`}>
                               {t(`taxCompliance.status.${ob.status}`)}
@@ -601,13 +603,13 @@ export default function TaxCompliance() {
             <Card>
               <CardHeader className="pb-3">
                 <CardDescription>{t('taxCompliance.summary.totalEstimated')}</CardDescription>
-                <CardTitle className="text-2xl">{new Intl.NumberFormat(i18n.language, { style: 'currency', currency: 'EUR' }).format(summary.totalDue)}</CardTitle>
+                <CardTitle className="text-2xl">{new Intl.NumberFormat(i18n.language, { style: 'currency', currency: accountCurrency }).format(summary.totalDue)}</CardTitle>
               </CardHeader>
             </Card>
             <Card>
               <CardHeader className="pb-3">
                 <CardDescription>{t('taxCompliance.summary.pendingPayment')}</CardDescription>
-                <CardTitle className="text-2xl">{new Intl.NumberFormat(i18n.language, { style: 'currency', currency: 'EUR' }).format(summary.pendingDue)}</CardTitle>
+                <CardTitle className="text-2xl">{new Intl.NumberFormat(i18n.language, { style: 'currency', currency: accountCurrency }).format(summary.pendingDue)}</CardTitle>
               </CardHeader>
             </Card>
             <Card>

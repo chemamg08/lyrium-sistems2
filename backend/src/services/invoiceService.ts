@@ -40,6 +40,62 @@ function formatCurrency(amount: number): string {
   return amount.toFixed(2).replace('.', ',') + ' €';
 }
 
+// ── Currency equivalence for non-EUR countries ──
+
+interface LocalCurrency {
+  code: string;
+  symbol: string;
+  rate: number; // 1 EUR = X local
+  position: 'before' | 'after';
+}
+
+const CURRENCY_MAP: Record<string, LocalCurrency> = {
+  USD: { code: 'USD', symbol: '$', rate: 1.08, position: 'before' },
+  GBP: { code: 'GBP', symbol: '£', rate: 0.86, position: 'before' },
+  PLN: { code: 'PLN', symbol: 'PLN', rate: 4.32, position: 'after' },
+  SEK: { code: 'SEK', symbol: 'kr', rate: 11.20, position: 'after' },
+  NOK: { code: 'NOK', symbol: 'kr', rate: 11.50, position: 'after' },
+  DKK: { code: 'DKK', symbol: 'kr', rate: 7.46, position: 'after' },
+  CZK: { code: 'CZK', symbol: 'CZK', rate: 25.30, position: 'after' },
+  HUF: { code: 'HUF', symbol: 'Ft', rate: 395, position: 'after' },
+  RON: { code: 'RON', symbol: 'lei', rate: 4.97, position: 'after' },
+  BGN: { code: 'BGN', symbol: 'BGN', rate: 1.96, position: 'after' },
+  CHF: { code: 'CHF', symbol: 'CHF', rate: 0.94, position: 'before' },
+  BRL: { code: 'BRL', symbol: 'R$', rate: 5.50, position: 'before' },
+  MXN: { code: 'MXN', symbol: '$', rate: 18.50, position: 'before' },
+  ARS: { code: 'ARS', symbol: '$', rate: 950, position: 'before' },
+  CLP: { code: 'CLP', symbol: '$', rate: 1020, position: 'before' },
+  COP: { code: 'COP', symbol: '$', rate: 4300, position: 'before' },
+  PEN: { code: 'PEN', symbol: 'S/', rate: 4.05, position: 'before' },
+  UYU: { code: 'UYU', symbol: '$U', rate: 42, position: 'before' },
+  AUD: { code: 'AUD', symbol: 'A$', rate: 1.65, position: 'before' },
+  NZD: { code: 'NZD', symbol: 'NZ$', rate: 1.78, position: 'before' },
+  CAD: { code: 'CAD', symbol: 'C$', rate: 1.47, position: 'before' },
+  SGD: { code: 'SGD', symbol: 'S$', rate: 1.45, position: 'before' },
+};
+
+const COUNTRY_TO_CURRENCY: Record<string, string> = {
+  GB: 'GBP', US: 'USD', PL: 'PLN', SE: 'SEK', NO: 'NOK', DK: 'DKK',
+  CZ: 'CZK', HU: 'HUF', RO: 'RON', BG: 'BGN', CH: 'CHF',
+  BR: 'BRL', MX: 'MXN', AR: 'ARS', CL: 'CLP', CO: 'COP',
+  PE: 'PEN', UY: 'UYU', PA: 'USD', DO: 'USD', EC: 'USD',
+  BO: 'USD', PY: 'USD', CR: 'USD', GT: 'USD', HN: 'USD',
+  SV: 'USD', NI: 'USD', AU: 'AUD', NZ: 'NZD', CA: 'CAD', SG: 'SGD',
+};
+
+function getLocalCurrency(countryCode: string): LocalCurrency | null {
+  const code = COUNTRY_TO_CURRENCY[countryCode?.toUpperCase()];
+  return code ? (CURRENCY_MAP[code] || null) : null;
+}
+
+function formatLocalCurrency(eurAmount: number, lc: LocalCurrency): string {
+  const converted = eurAmount * lc.rate;
+  const formatted = converted.toFixed(2).replace('.', ',');
+  return lc.position === 'before'
+    ? `${lc.symbol}${formatted}`
+    : `${formatted} ${lc.symbol}`;
+}
+
 /**
  * Generate a PDF invoice buffer matching the LYRIUM design:
  * - Black/gray/white only (no blue)
@@ -261,8 +317,22 @@ export function generateInvoicePDF(data: InvoiceData): Promise<Buffer> {
         .fillColor('#1a1a1a')
         .text(formatCurrency(data.totalAmount), totalsX, ty - 2, { width: totalsW, align: 'right' });
 
+      // Approximate equivalence in local currency (non-EUR countries)
+      const localCurrency = getLocalCurrency(data.countryCode);
+      let equivOffset = 0;
+      if (localCurrency) {
+        equivOffset = 18;
+        doc.font('Helvetica-Oblique')
+          .fontSize(7.5)
+          .fillColor('#999999')
+          .text(
+            `~ ${formatLocalCurrency(data.totalAmount, localCurrency)}  (approximate equivalent)`,
+            totalsX, ty + 16, { width: totalsW, align: 'right' }
+          );
+      }
+
       // ====== PAYMENT METHOD ======
-      const payY = ty + 45;
+      const payY = ty + 45 + equivOffset;
       const brandDisplay = data.cardBrand ? (data.cardBrand.charAt(0).toUpperCase() + data.cardBrand.slice(1)) : 'Card';
       doc.font('Helvetica')
         .fontSize(8)
