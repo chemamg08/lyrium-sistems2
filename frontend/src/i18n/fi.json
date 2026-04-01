@@ -1403,6 +1403,19 @@
       "description": "Tätä toimintoa ei voi kumota. Velvoite poistetaan pysyvästi.",
       "confirm": "Poista velvoite",
       "deleting": "Poistetaan..."
+    },
+    "howItWorks": {
+      "title": "Miten se toimii?",
+      "intro": "Verosäännöstenmukaisuus mahdollistaa verovelvoitteiden (tulovero, ALV, yhteisövero jne) seuraamisen laskennasta maksuun.",
+      "startTitle": "Aloittaaksesi:",
+      "step1": "Siirry kohtaan Veroneuvonta → Laskelmat ja tee verolaskelma asiakkaalle (syötä tulot, menot, ALV jne).",
+      "step2": "Palaa tänne ja napsauta \"Uusi velvoite\" — valitse tallennettu laskelma, veromalli ja kausi.",
+      "step3": "Järjestelmä laskee määräajan automaattisesti valitun maan ja mallin perusteella.",
+      "thenTitle": "Sen jälkeen voit:",
+      "then1": "Päivittää kunkin velvoitteen tilan: laskettu → jätetty → maksettu.",
+      "then2": "Tarkistaa tulevat määräajat Kalenteri-välilehdeltä.",
+      "then3": "Asettaa sähköpostihälytykset Veroneuvonnassa, jotta et missaa jättöpäiviä.",
+      "then4": "Käyttää AI-keskustelua Veroneuvonnassa selvittääksesi, mitkä veromallit koskevat kutakin asiakasta."
     }
   }
 }

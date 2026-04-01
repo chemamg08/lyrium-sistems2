@@ -1403,6 +1403,19 @@
       "description": "Tej akcji nie można cofnąć. Obowiązek zostanie trwale usunięty.",
       "confirm": "Usuń obowiązek",
       "deleting": "Usuwanie..."
+    },
+    "howItWorks": {
+      "title": "Jak to działa?",
+      "intro": "Zgodność Podatkowa pozwala śledzić zobowiązania podatkowe (PIT, VAT, CIT itp.) od obliczenia do zapłaty.",
+      "startTitle": "Aby rozpocząć:",
+      "step1": "Przejdź do Doradztwo Podatkowe → Obliczenia i wykonaj obliczenie podatkowe dla klienta (wprowadź przychody, wydatki, VAT itp.).",
+      "step2": "Wróć tutaj i kliknij \"Nowe zobowiązanie\" — wybierz zapisane obliczenie, model podatkowy i okres.",
+      "step3": "System automatycznie obliczy termin na podstawie wybranego kraju i modelu.",
+      "thenTitle": "Następnie możesz:",
+      "then1": "Aktualizować status każdego zobowiązania: obliczone → złożone → zapłacone.",
+      "then2": "Sprawdzać nadchodzące terminy w zakładce Kalendarz.",
+      "then3": "Ustawić powiadomienia e-mail w Doradztwie Podatkowym, aby nie przegapić terminów składania.",
+      "then4": "Korzystać z czatu AI w Doradztwie Podatkowym, aby ustalić, które modele podatkowe dotyczą danego klienta."
     }
   }
 }

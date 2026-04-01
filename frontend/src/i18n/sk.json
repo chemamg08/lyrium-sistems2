@@ -1403,6 +1403,19 @@
       "description": "Túto akciu nie je možné vrátiť. Povinnosť bude natrvalo zmazaná.",
       "confirm": "Zmazať povinnosť",
       "deleting": "Mazanie..."
+    },
+    "howItWorks": {
+      "title": "Ako to funguje?",
+      "intro": "Daňový súlad vám umožňuje sledovať daňové povinnosti (daň z príjmov, DPH, daň z príjmov právnických osôb atď.) od výpočtu po platbu.",
+      "startTitle": "Na začiatok:",
+      "step1": "Prejdite na Daňové poradenstvo → Výpočty a vykonajte daňový výpočet pre klienta (zadajte príjmy, výdavky, DPH atď.).",
+      "step2": "Vráťte sa sem a kliknite na \"Nová povinnosť\" — vyberte uložený výpočet, daňový model a obdobie.",
+      "step3": "Systém automaticky vypočíta termín na základe zvolenej krajiny a modelu.",
+      "thenTitle": "Potom môžete:",
+      "then1": "Aktualizovať stav každej povinnosti: vypočítané → podané → zaplatené.",
+      "then2": "Skontrolovať blížiace sa termíny na záložke Kalendár.",
+      "then3": "Nastaviť e-mailové upozornenia v Daňovom poradenstve, aby ste nezmeškali termíny podania.",
+      "then4": "Použiť AI chat v Daňovom poradenstve na objasnenie, ktoré daňové modely sa vzťahujú na jednotlivých klientov."
     }
   }
 }

@@ -1403,6 +1403,19 @@
       "description": "Denna åtgärd kan inte ångras. Skyldigheten raderas permanent.",
       "confirm": "Radera skyldighet",
       "deleting": "Raderar..."
+    },
+    "howItWorks": {
+      "title": "Hur fungerar det?",
+      "intro": "Skatteefterlevnad gör det möjligt att spåra dina skatteförpliktelser (inkomstskatt, moms, bolagsskatt osv.) från beräkning till betalning.",
+      "startTitle": "För att komma igång:",
+      "step1": "Gå till Skatterådgivning → Beräkningar och gör en skatteberäkning för en kund (ange inkomster, utgifter, moms osv.).",
+      "step2": "Kom tillbaka hit och klicka på \"Ny förpliktelse\" — välj den sparade beräkningen, skattemodellen och perioden.",
+      "step3": "Systemet beräknar automatiskt tidsfristen baserat på valt land och modell.",
+      "thenTitle": "Sedan kan du:",
+      "then1": "Uppdatera status för varje förpliktelse: beräknad → inlämnad → betald.",
+      "then2": "Kontrollera kommande tidsfrister under fliken Kalender.",
+      "then3": "Ställa in e-postvarningar från Skatterådgivning så att du aldrig missar inlämningsdatum.",
+      "then4": "Använda AI-chatten i Skatterådgivning för att klargöra vilka skattemodeller som gäller för varje kund."
     }
   }
 }

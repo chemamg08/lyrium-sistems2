@@ -1404,6 +1404,19 @@
       "description": "Esta ação não pode ser desfeita. A obrigação será eliminada permanentemente.",
       "confirm": "Eliminar obrigação",
       "deleting": "A eliminar..."
+    },
+    "howItWorks": {
+      "title": "Como funciona?",
+      "intro": "O Cumprimento Fiscal permite acompanhar as suas obrigações fiscais (IRS, IVA, IRC, etc.) desde o cálculo até ao pagamento.",
+      "startTitle": "Para começar:",
+      "step1": "Vá a Consultoria Fiscal → Cálculos e faça um cálculo fiscal para um cliente (introduza rendimentos, despesas, IVA, etc.).",
+      "step2": "Volte aqui e clique em \"Nova obrigação\" — selecione o cálculo guardado, escolha o modelo fiscal e o período.",
+      "step3": "O sistema calculará o prazo automaticamente com base no país e modelo selecionados.",
+      "thenTitle": "Depois pode:",
+      "then1": "Atualizar o estado de cada obrigação: calculada → apresentada → paga.",
+      "then2": "Consultar os prazos próximos no separador Calendário.",
+      "then3": "Configurar alertas por email na Consultoria Fiscal para não perder datas de entrega.",
+      "then4": "Usar o chat IA na Consultoria Fiscal para esclarecer quais modelos fiscais se aplicam a cada cliente."
     }
   }
 }

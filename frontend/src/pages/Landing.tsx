@@ -818,7 +818,7 @@ const Landing = () => {
             <Scale className="h-4 w-4" />
             <span className="text-sm font-medium">Lyrium</span>
             <span className="text-white/15">·</span>
-            <span className="text-xs text-white/25">{t('landing.footerCustomerService')} <a href="mailto:customerservice@lyrium.io" className="hover:text-white/50 transition-colors">customerservice@lyrium.io</a></span>
+            <span className="text-xs text-white/25">{t('landing.footerCustomerService')} <a href="mailto:support@lyrium.io" className="hover:text-white/50 transition-colors">support@lyrium.io</a></span>
           </div>
           <div className="flex flex-wrap items-center justify-center gap-4 sm:ml-40">
             <a href="/terminos" target="_blank" rel="noopener noreferrer" className="text-xs text-white/25 hover:text-white/50 transition-colors">{t('landing.footerTerms')}</a>

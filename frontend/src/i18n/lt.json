@@ -1403,6 +1403,19 @@
       "description": "Šio veiksmo negalima atšaukti. Prievolė bus visam laikui ištrinta.",
       "confirm": "Ištrinti prievolę",
       "deleting": "Trinama..."
+    },
+    "howItWorks": {
+      "title": "Kaip tai veikia?",
+      "intro": "Mokestinė atitiktis leidžia sekti mokestinius įsipareigojimus (pajamų mokestis, PVM, pelno mokestis ir kt.) nuo skaičiavimo iki mokėjimo.",
+      "startTitle": "Norėdami pradėti:",
+      "step1": "Eikite į Mokesčių konsultavimas → Skaičiavimai ir atlikite mokestinį skaičiavimą klientui (įveskite pajamas, išlaidas, PVM ir kt.).",
+      "step2": "Grįžkite čia ir spauskite \"Naujas įsipareigojimas\" — pasirinkite išsaugotą skaičiavimą, mokesčių modelį ir laikotarpį.",
+      "step3": "Sistema automatiškai apskaičiuos terminą pagal pasirinktą šalį ir modelį.",
+      "thenTitle": "Po to galite:",
+      "then1": "Atnaujinti kiekvieno įsipareigojimo būseną: apskaičiuota → pateikta → sumokėta.",
+      "then2": "Patikrinti artėjančius terminus skirtuke Kalendorius.",
+      "then3": "Nustatyti el. pašto priminimus Mokesčių konsultavime, kad nepraleiistumėte pateikimo datų.",
+      "then4": "Naudoti AI pokalbį Mokesčių konsultavime, kad išsiaiškintumėte, kurie mokesčių modeliai taikomi kiekvienam klientui."
     }
   }
 }

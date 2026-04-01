@@ -1403,6 +1403,19 @@
       "description": "Ova radnja se ne može poništiti. Obveza će biti trajno obrisana.",
       "confirm": "Obriši obvezu",
       "deleting": "Brisanje..."
+    },
+    "howItWorks": {
+      "title": "Kako funkcionira?",
+      "intro": "Porezna usklađenost omogućuje praćenje vaših poreznih obveza (porez na dohodak, PDV, porez na dobit itd.) od izračuna do plaćanja.",
+      "startTitle": "Za početak:",
+      "step1": "Idite na Porezno savjetovanje → Izračuni i napravite porezni izračun za klijenta (unesite prihode, rashode, PDV itd.).",
+      "step2": "Vratite se ovdje i kliknite \"Nova obveza\" — odaberite spremljeni izračun, porezni model i razdoblje.",
+      "step3": "Sustav će automatski izračunati rok na temelju odabrane zemlje i modela.",
+      "thenTitle": "Nakon toga možete:",
+      "then1": "Ažurirati status svake obveze: izračunato → podneseno → plaćeno.",
+      "then2": "Provjeriti nadolazeće rokove na kartici Kalendar.",
+      "then3": "Postaviti obavijesti e-poštom iz Poreznog savjetovanja kako ne biste propustili rokove podnošenja.",
+      "then4": "Koristiti AI chat u Poreznom savjetovanju kako biste razjasnili koji se porezni modeli primjenjuju na svakog klijenta."
     }
   }
 }

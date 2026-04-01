@@ -1403,6 +1403,19 @@
       "description": "Denne handlingen kan ikke angres. Forpliktelsen slettes permanent.",
       "confirm": "Slett forpliktelse",
       "deleting": "Sletter..."
+    },
+    "howItWorks": {
+      "title": "Hvordan fungerer det?",
+      "intro": "Skatteoverholdelse lar deg spore skatteforpliktelsene dine (inntektsskatt, mva, selskapsskatt osv.) fra beregning til betaling.",
+      "startTitle": "For å komme i gang:",
+      "step1": "Gå til Skatterådgivning → Beregninger og utfør en skatteberegning for en kunde (oppgi inntekt, utgifter, mva osv.).",
+      "step2": "Kom tilbake hit og klikk på \"Ny forpliktelse\" — velg den lagrede beregningen, skattemodellen og perioden.",
+      "step3": "Systemet vil automatisk beregne fristen basert på valgt land og modell.",
+      "thenTitle": "Deretter kan du:",
+      "then1": "Oppdatere status for hver forpliktelse: beregnet → innlevert → betalt.",
+      "then2": "Sjekke kommende frister under fanen Kalender.",
+      "then3": "Sette opp e-postvarsler fra Skatterådgivning slik at du aldri går glipp av innleveringsfrister.",
+      "then4": "Bruke AI-chatten i Skatterådgivning for å avklare hvilke skattemodeller som gjelder for hver kunde."
     }
   }
 }

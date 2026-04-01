@@ -1431,6 +1431,19 @@
       "description": "Diese Aktion kann nicht rückgängig gemacht werden. Die Verpflichtung wird dauerhaft gelöscht.",
       "confirm": "Verpflichtung löschen",
       "deleting": "Wird gelöscht..."
+    },
+    "howItWorks": {
+      "title": "Wie funktioniert es?",
+      "intro": "Die Steuer-Compliance ermöglicht die Nachverfolgung Ihrer Steuerpflichten (Einkommensteuer, MwSt., Körperschaftsteuer usw.) von der Berechnung bis zur Zahlung.",
+      "startTitle": "So starten Sie:",
+      "step1": "Gehen Sie zu Steuerberatung → Berechnungen und führen Sie eine Steuerberechnung für einen Mandanten durch (Einnahmen, Ausgaben, MwSt. usw. eingeben).",
+      "step2": "Kommen Sie hierher zurück und klicken Sie auf \"Neue Verpflichtung\" — wählen Sie die gespeicherte Berechnung, das Steuermodell und den Zeitraum.",
+      "step3": "Das System berechnet die Frist automatisch basierend auf dem ausgewählten Land und Modell.",
+      "thenTitle": "Danach können Sie:",
+      "then1": "Den Status jeder Verpflichtung aktualisieren: berechnet → eingereicht → bezahlt.",
+      "then2": "Anstehende Fristen im Reiter Kalender prüfen.",
+      "then3": "E-Mail-Benachrichtigungen in der Steuerberatung einrichten, um keine Einreichungsfristen zu verpassen.",
+      "then4": "Den KI-Chat in der Steuerberatung nutzen, um zu klären, welche Steuermodelle für jeden Mandanten gelten."
     }
   }
 }

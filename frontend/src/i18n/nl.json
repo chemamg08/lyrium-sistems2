@@ -1404,6 +1404,19 @@
       "description": "Deze actie kan niet ongedaan worden gemaakt. De verplichting wordt permanent verwijderd.",
       "confirm": "Verplichting verwijderen",
       "deleting": "Verwijderen..."
+    },
+    "howItWorks": {
+      "title": "Hoe werkt het?",
+      "intro": "Belastingnaleving stelt u in staat uw belastingverplichtingen (inkomstenbelasting, btw, vennootschapsbelasting, enz.) bij te houden van berekening tot betaling.",
+      "startTitle": "Om te beginnen:",
+      "step1": "Ga naar Fiscaal Advies → Berekeningen en voer een fiscale berekening uit voor een klant (voer inkomsten, uitgaven, btw, enz. in).",
+      "step2": "Kom hier terug en klik op \"Nieuwe verplichting\" — selecteer de opgeslagen berekening, kies het belastingmodel en de periode.",
+      "step3": "Het systeem berekent de deadline automatisch op basis van het geselecteerde land en model.",
+      "thenTitle": "Daarna kunt u:",
+      "then1": "De status van elke verplichting bijwerken: berekend → ingediend → betaald.",
+      "then2": "Komende deadlines bekijken in het tabblad Kalender.",
+      "then3": "E-mailwaarschuwingen instellen vanuit Fiscaal Advies om geen indieningsdata te missen.",
+      "then4": "De AI-chat in Fiscaal Advies gebruiken om te verduidelijken welke belastingmodellen van toepassing zijn op elke klant."
     }
   }
 }

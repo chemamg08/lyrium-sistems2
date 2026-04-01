@@ -1403,6 +1403,19 @@
       "description": "Această acțiune nu poate fi anulată. Obligația va fi ștearsă permanent.",
       "confirm": "Șterge obligația",
       "deleting": "Se șterge..."
+    },
+    "howItWorks": {
+      "title": "Cum funcționează?",
+      "intro": "Conformitatea Fiscală vă permite să urmăriți obligațiile fiscale (impozit pe venit, TVA, impozit pe profit etc.) de la calcul până la plată.",
+      "startTitle": "Pentru a începe:",
+      "step1": "Mergeți la Consultanță Fiscală → Calcule și efectuați un calcul fiscal pentru un client (introduceți venituri, cheltuieli, TVA etc.).",
+      "step2": "Reveniți aici și apăsați \"Obligație nouă\" — selectați calculul salvat, alegeți modelul fiscal și perioada.",
+      "step3": "Sistemul va calcula automat termenul limită în funcție de țara și modelul selectate.",
+      "thenTitle": "Apoi puteți:",
+      "then1": "Actualiza starea fiecărei obligații: calculată → depusă → plătită.",
+      "then2": "Verifica termenele apropiate în fila Calendar.",
+      "then3": "Configura alerte prin email din Consultanță Fiscală pentru a nu rata datele de depunere.",
+      "then4": "Folosi chatul AI din Consultanță Fiscală pentru a clarifica ce modele fiscale se aplică fiecărui client."
     }
   }
 }

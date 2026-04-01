@@ -1403,6 +1403,19 @@
       "description": "Šo darbību nevar atsaukt. Pienākums tiks neatgriezeniski dzēsts.",
       "confirm": "Dzēst pienākumu",
       "deleting": "Dzēš..."
+    },
+    "howItWorks": {
+      "title": "Kā tas darbojas?",
+      "intro": "Nodokļu atbilstība ļauj izsekot nodokļu saistības (ienākuma nodoklis, PVN, uzņēmumu ienākuma nodoklis u.c.) no aprēķina līdz maksājumam.",
+      "startTitle": "Lai sāktu:",
+      "step1": "Dodieties uz Nodokļu konsultācijas → Aprēķini un veiciet nodokļu aprēķinu klientam (ievadiet ieņēmumus, izdevumus, PVN u.c.).",
+      "step2": "Atgriezieties šeit un noklikšķiniet uz \"Jauna saistība\" — izvēlieties saglabāto aprēķinu, nodokļu modeli un periodu.",
+      "step3": "Sistēma automātiski aprēķinās termiņu, pamatojoties uz izvēlēto valsti un modeli.",
+      "thenTitle": "Pēc tam varat:",
+      "then1": "Atjaunināt katras saistības statusu: aprēķināts → iesniegts → samaksāts.",
+      "then2": "Pārbaudīt tuvākos termiņus cilnē Kalendārs.",
+      "then3": "Iestatīt e-pasta brīdinājumus Nodokļu konsultācijās, lai nepalaistu iesniegšanas termiņus.",
+      "then4": "Izmantot AI čatu Nodokļu konsultācijās, lai noskaidrotu, kuri nodokļu modeļi attiecas uz katru klientu."
     }
   }
 }

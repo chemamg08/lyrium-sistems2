@@ -1403,6 +1403,19 @@
       "description": "Ez a művelet nem vonható vissza. A kötelezettség véglegesen törlődik.",
       "confirm": "Kötelezettség törlése",
       "deleting": "Törlés..."
+    },
+    "howItWorks": {
+      "title": "Hogyan működik?",
+      "intro": "Az Adómegfelelőség lehetővé teszi adókötelezettségei (személyi jövedelemadó, ÁFA, társasági adó stb.) nyomon követését a számítástól a fizetésig.",
+      "startTitle": "Akezdéshez:",
+      "step1": "Lépjen az Adótanácsadás → Számítások menüpontra, és végezzen adószámítást egy ügyfélnek (adja meg a bevételeket, kiadásokat, ÁFÁ-t stb.).",
+      "step2": "Térjen vissza ide és kattintson az \"Új kötelezettség\" gombra — válassza ki a mentett számítást, az adómodellt és az időszakot.",
+      "step3": "A rendszer automatikusan kiszámítja a határidőt a kiválasztott ország és modell alapján.",
+      "thenTitle": "Ezután:",
+      "then1": "Fríssítheti minden kötelezettség állapotát: kiszámított → benyújtott → kifizetett.",
+      "then2": "Ellenőrizheti a közelgő határidőket a Naptár fülön.",
+      "then3": "Beállíthat e-mail értesítéseket az Adótanácsadásban, hogy ne mulasszon el benyújtási határidőket.",
+      "then4": "Használhatja az AI csevegést az Adótanácsadásban, hogy tisztázza, mely adómodellek vonatkoznak az egyes ügyfelekre."
     }
   }
 }

@@ -1408,6 +1408,19 @@
       "description": "This action cannot be undone. The obligation will be permanently deleted.",
       "confirm": "Delete obligation",
       "deleting": "Deleting..."
+    },
+    "howItWorks": {
+      "title": "How does it work?",
+      "intro": "Tax Compliance lets you track your tax obligations (Income Tax, VAT, Corporate Tax, etc.) from calculation to payment.",
+      "startTitle": "To get started:",
+      "step1": "Go to Tax Advisory → Calculations and run a tax calculation for a client (enter income, expenses, VAT, etc.).",
+      "step2": "Come back here and click \"New obligation\" — select the saved calculation, choose the tax model and period.",
+      "step3": "The system will calculate the deadline automatically based on the selected country and model.",
+      "thenTitle": "Then you can:",
+      "then1": "Update each obligation's status: calculated → filed → paid.",
+      "then2": "Check upcoming deadlines in the Calendar tab.",
+      "then3": "Set up email alerts from Tax Advisory so you never miss a filing date.",
+      "then4": "Use the AI chat in Tax Advisory to clarify which tax models apply to each client."
     }
   }
 }

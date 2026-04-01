@@ -1,5 +1,6 @@
 import { useEffect, useMemo, useState } from 'react';
-import { BadgeCheck, CalendarClock, CheckCircle2, Download, Filter, PlusCircle, ReceiptText, Trash2, XCircle } from 'lucide-react';
+import { BadgeCheck, CalendarClock, CheckCircle2, ChevronDown, Download, Filter, Info, PlusCircle, ReceiptText, Trash2, XCircle } from 'lucide-react';
+import { Collapsible, CollapsibleContent, CollapsibleTrigger } from '@/components/ui/collapsible';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -113,6 +114,7 @@ export default function TaxCompliance() {
   const [isBetaOpen, setIsBetaOpen] = useState(false);
   const [deleteObligationId, setDeleteObligationId] = useState<string | null>(null);
   const [deleting, setDeleting] = useState(false);
+  const [howItWorksOpen, setHowItWorksOpen] = useState(false);
 
   const selectedModel = useMemo(() => models.find((m) => m.code === selectedModelCode) || null, [models, selectedModelCode]);
 
@@ -422,6 +424,34 @@ export default function TaxCompliance() {
           </Button>
         </div>
       </div>
+
+      <Collapsible open={howItWorksOpen} onOpenChange={setHowItWorksOpen}>
+        <CollapsibleTrigger asChild>
+          <button className="flex w-full items-center gap-2 rounded-lg border border-border/50 bg-muted/30 px-4 py-3 text-left text-sm font-medium text-muted-foreground hover:bg-muted/50 transition-colors">
+            <Info className="h-4 w-4 shrink-0 text-blue-500" />
+            <span className="flex-1">{t('taxCompliance.howItWorks.title')}</span>
+            <ChevronDown className={`h-4 w-4 shrink-0 transition-transform duration-200 ${howItWorksOpen ? 'rotate-180' : ''}`} />
+          </button>
+        </CollapsibleTrigger>
+        <CollapsibleContent>
+          <div className="mt-2 rounded-lg border border-border/50 bg-muted/20 px-5 py-4 text-sm text-muted-foreground space-y-3">
+            <p>{t('taxCompliance.howItWorks.intro')}</p>
+            <p className="font-semibold text-foreground">{t('taxCompliance.howItWorks.startTitle')}</p>
+            <ol className="list-decimal list-inside space-y-1 pl-1">
+              <li>{t('taxCompliance.howItWorks.step1')}</li>
+              <li>{t('taxCompliance.howItWorks.step2')}</li>
+              <li>{t('taxCompliance.howItWorks.step3')}</li>
+            </ol>
+            <p className="font-semibold text-foreground">{t('taxCompliance.howItWorks.thenTitle')}</p>
+            <ul className="list-disc list-inside space-y-1 pl-1">
+              <li>{t('taxCompliance.howItWorks.then1')}</li>
+              <li>{t('taxCompliance.howItWorks.then2')}</li>
+              <li>{t('taxCompliance.howItWorks.then3')}</li>
+              <li>{t('taxCompliance.howItWorks.then4')}</li>
+            </ul>
+          </div>
+        </CollapsibleContent>
+      </Collapsible>
 
       <Tabs defaultValue="obligations" className="w-full">
         <TabsList>

@@ -1410,6 +1410,19 @@
       "description": "Esta acción no se puede deshacer. La obligación se eliminará permanentemente.",
       "confirm": "Eliminar obligación",
       "deleting": "Eliminando..."
+    },
+    "howItWorks": {
+      "title": "¿Cómo funciona?",
+      "intro": "El Cumplimiento Fiscal te permite hacer seguimiento de tus obligaciones tributarias (IRPF, IVA, Impuesto de Sociedades, etc.) desde el cálculo hasta el pago.",
+      "startTitle": "Para empezar:",
+      "step1": "Ve a Asesoramiento Fiscal → Cálculos y realiza un cálculo fiscal para un cliente (introduce ingresos, gastos, IVA, etc.).",
+      "step2": "Vuelve aquí y pulsa \"Nueva obligación\" — selecciona el cálculo guardado, elige el modelo fiscal y el periodo.",
+      "step3": "El sistema calculará la fecha límite automáticamente según el país y modelo seleccionado.",
+      "thenTitle": "Después puedes:",
+      "then1": "Actualizar el estado de cada obligación: calculada → presentada → pagada.",
+      "then2": "Consultar los plazos próximos en la pestaña Calendario.",
+      "then3": "Configurar alertas por email desde Asesoramiento Fiscal para no olvidar fechas de presentación.",
+      "then4": "Usar el chat IA de Asesoramiento Fiscal para resolver dudas sobre qué modelos aplican a cada cliente."
     }
   }
 }

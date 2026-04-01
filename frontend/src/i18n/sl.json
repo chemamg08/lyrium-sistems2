@@ -1403,6 +1403,19 @@
       "description": "Tega dejanja ni mogoče razveljaviti. Obveznost bo trajno izbrisana.",
       "confirm": "Izbriši obveznost",
       "deleting": "Brisanje..."
+    },
+    "howItWorks": {
+      "title": "Kako deluje?",
+      "intro": "Davčna skladnost vam omogoča sledenje davčnih obveznosti (dohodnina, DDV, davek od dohodkov pravnih oseb itd.) od izračuna do plačila.",
+      "startTitle": "Za začetek:",
+      "step1": "Pojdite na Davčno svetovanje → Izračuni in izvedite davčni izračun za stranko (vnesite prihodke, odhodke, DDV itd.).",
+      "step2": "Vrnite se sem in kliknite \"Nova obveznost\" — izberite shranjeni izračun, davčni model in obdobje.",
+      "step3": "Sistem bo samodejno izračunal rok na podlagi izbrane države in modela.",
+      "thenTitle": "Nato lahko:",
+      "then1": "Posodobite stanje vsake obveznosti: izračunano → oddano → plačano.",
+      "then2": "Preverite prihajajoce roke na zavihku Koledar.",
+      "then3": "Nastavite e-poštna opozorila v Davčnem svetovanju, da ne zamudite rokov oddaje.",
+      "then4": "Uporabite AI klepet v Davčnem svetovanju, da pojasnite, kateri davčni modeli veljajo za posamezno stranko."
     }
   }
 }

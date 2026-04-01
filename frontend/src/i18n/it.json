@@ -1404,6 +1404,19 @@
       "description": "Questa azione non può essere annullata. L'obbligo verrà eliminato definitivamente.",
       "confirm": "Elimina obbligo",
       "deleting": "Eliminazione..."
+    },
+    "howItWorks": {
+      "title": "Come funziona?",
+      "intro": "La Conformità Fiscale ti permette di monitorare i tuoi obblighi fiscali (IRPEF, IVA, IRES, ecc.) dal calcolo al pagamento.",
+      "startTitle": "Per iniziare:",
+      "step1": "Vai in Consulenza Fiscale → Calcoli ed esegui un calcolo fiscale per un cliente (inserisci entrate, spese, IVA, ecc.).",
+      "step2": "Torna qui e clicca su \"Nuovo obbligo\" — seleziona il calcolo salvato, scegli il modello fiscale e il periodo.",
+      "step3": "Il sistema calcolerai automaticamente la scadenza in base al paese e al modello selezionati.",
+      "thenTitle": "Poi puoi:",
+      "then1": "Aggiornare lo stato di ogni obbligo: calcolato → presentato → pagato.",
+      "then2": "Controllare le scadenze imminenti nella scheda Calendario.",
+      "then3": "Configurare avvisi via email dalla Consulenza Fiscale per non dimenticare le date di presentazione.",
+      "then4": "Usare la chat IA nella Consulenza Fiscale per chiarire quali modelli fiscali si applicano a ciascun cliente."
     }
   }
 }

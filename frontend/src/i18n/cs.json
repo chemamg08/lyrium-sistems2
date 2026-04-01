@@ -1403,6 +1403,19 @@
       "description": "Tuto akci nelze vrátit. Povinnost bude trvale smazána.",
       "confirm": "Smazat povinnost",
       "deleting": "Mazání..."
+    },
+    "howItWorks": {
+      "title": "Jak to funguje?",
+      "intro": "Daňový soulad vám umožňuje sledovat daňové povinnosti (daň z příjmů, DPH, daň z příjmů právnických osob atd.) od výpočtu po platbu.",
+      "startTitle": "Pro začátek:",
+      "step1": "Přejděte na Daňové poradenství → Výpočty a proveďte daňový výpočet pro klienta (zadejte příjmy, výdaje, DPH atd.).",
+      "step2": "Vraťte se sem a klikněte na \"Nová povinnost\" — vyberte uložený výpočet, daňový model a období.",
+      "step3": "Systém automaticky vypočítá termín na základě vybrané země a modelu.",
+      "thenTitle": "Poté můžete:",
+      "then1": "Aktualizovat stav každé povinnosti: vypočteno → podáno → zaplaceno.",
+      "then2": "Zkontrolovat nadcházející termíny na záložce Kalendář.",
+      "then3": "Nastavit e-mailová upozornění v Daňovém poradenství, abyste nezmeškali termíny podání.",
+      "then4": "Použít AI chat v Daňovém poradenství k objasnění, které daňové modely se vztahují na jednotlivé klienty."
     }
   }
 }

@@ -1407,6 +1407,19 @@
       "description": "Cette action est irréversible. L'obligation sera définitivement supprimée.",
       "confirm": "Supprimer l'obligation",
       "deleting": "Suppression..."
+    },
+    "howItWorks": {
+      "title": "Comment ça fonctionne ?",
+      "intro": "La Conformité Fiscale vous permet de suivre vos obligations fiscales (Impôt sur le revenu, TVA, Impôt sur les sociétés, etc.) du calcul au paiement.",
+      "startTitle": "Pour commencer :",
+      "step1": "Allez dans Conseil Fiscal → Calculs et effectuez un calcul fiscal pour un client (saisissez revenus, dépenses, TVA, etc.).",
+      "step2": "Revenez ici et cliquez sur \"Nouvelle obligation\" — sélectionnez le calcul enregistré, choisissez le modèle fiscal et la période.",
+      "step3": "Le système calculera automatiquement la date limite en fonction du pays et du modèle sélectionnés.",
+      "thenTitle": "Ensuite vous pouvez :",
+      "then1": "Mettre à jour le statut de chaque obligation : calculée → déposée → payée.",
+      "then2": "Consulter les échéances à venir dans l'onglet Calendrier.",
+      "then3": "Configurer des alertes par email depuis le Conseil Fiscal pour ne manquer aucune date de dépôt.",
+      "then4": "Utiliser le chat IA du Conseil Fiscal pour clarifier quels modèles fiscaux s'appliquent à chaque client."
     }
   }
 }

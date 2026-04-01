@@ -1403,6 +1403,19 @@
       "description": "Seda toimingut ei saa tagasi võtta. Kohustus kustutatakse jäädavalt.",
       "confirm": "Kustuta kohustus",
       "deleting": "Kustutamine..."
+    },
+    "howItWorks": {
+      "title": "Kuidas see toimib?",
+      "intro": "Maksunõuetele vastavus võimaldab teil jälgida oma maksukohustusi (tulumaks, käibemaks, ettevõtte tulumaks jne) arvutusest kuni maksmiseni.",
+      "startTitle": "Alustamiseks:",
+      "step1": "Minge Maksunõustamine → Arvutused ja tehke kliendile maksuarvutus (sisestage tulud, kulud, käibemaks jne).",
+      "step2": "Tulge siia tagasi ja klõpsake \"Uus kohustus\" — valige salvestatud arvutus, maksumudel ja periood.",
+      "step3": "Süsteem arvutab tähtaja automaatselt valitud riigi ja mudeli põhjal.",
+      "thenTitle": "Seejärel saate:",
+      "then1": "Uuendada iga kohustuse staatust: arvutatud → esitatud → makstud.",
+      "then2": "Kontrollida eelseisvaid tähtaegu vahekaardil Kalender.",
+      "then3": "Seadistada e-posti teavitused Maksunõustamises, et mitte unustada esitamistähtaegu.",
+      "then4": "Kasutada AI vestlust Maksunõustamises, et selgitada, millised maksumudelid kehtivad iga kliendi puhul."
     }
   }
 }
