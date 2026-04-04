@@ -1038,7 +1038,7 @@ const Clients = () => {
         html2canvas: { scale: 2, useCORS: true, scrollY: 0, height: elHeight, windowHeight: elHeight },
         jsPDF: { unit: 'mm', format: 'a4', orientation: 'portrait' },
         pagebreak: { mode: ['avoid-all', 'css'] },
-      }).from(el).outputPdf('blob');
+      } as any).from(el).outputPdf('blob');
       // Convert to base64
       const reader = new FileReader();
       const base64 = await new Promise<string>((resolve) => {
@@ -1077,7 +1077,7 @@ const Clients = () => {
       html2canvas: { scale: 2, useCORS: true, scrollY: 0, height: elHeight, windowHeight: elHeight },
       jsPDF: { unit: 'mm', format: 'a4', orientation: 'portrait' },
       pagebreak: { mode: ['avoid-all', 'css'] },
-    }).from(el).save();
+    } as any).from(el).save();
   };
 
   // Add email account from invoice send modal

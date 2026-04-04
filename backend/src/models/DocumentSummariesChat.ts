@@ -27,6 +27,7 @@ export interface IDocumentSummariesChat {
   uploadedFiles: IUploadedFile[];
   messages: IDocSummaryMessage[];
   lastModified: string;
+  chatSummary?: string;
 }
 
 const uploadedFileSchema = new Schema({
@@ -56,6 +57,7 @@ const documentSummariesChatSchema = new Schema<IDocumentSummariesChat>({
   uploadedFiles: { type: [uploadedFileSchema], default: [] },
   messages: { type: [docSummaryMessageSchema], default: [] },
   lastModified: { type: String, default: () => new Date().toISOString() },
+  chatSummary: { type: String, default: null },
 }, { _id: false, versionKey: false });
 
 documentSummariesChatSchema.set('toJSON', {

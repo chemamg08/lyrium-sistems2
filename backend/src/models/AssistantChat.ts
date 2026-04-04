@@ -13,6 +13,7 @@ export interface IAssistantChat {
   name: string;
   createdAt: string;
   messages: IAssistantMessage[];
+  summary?: string;
 }
 
 const assistantMessageSchema = new Schema({
@@ -28,6 +29,7 @@ const assistantChatSchema = new Schema<IAssistantChat>({
   name: { type: String, required: true },
   createdAt: { type: String, default: () => new Date().toISOString() },
   messages: { type: [assistantMessageSchema], default: [] },
+  summary: { type: String, default: null },
 }, { _id: false, versionKey: false });
 
 assistantChatSchema.set('toJSON', {

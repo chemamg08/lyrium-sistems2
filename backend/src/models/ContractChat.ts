@@ -24,6 +24,7 @@ export interface IContractChat {
     analyzedStructure?: any;
   };
   isTemporary: boolean;
+  summary?: string;
 }
 
 const contractChatMessageSchema = new Schema({
@@ -46,6 +47,7 @@ const contractChatSchema = new Schema<IContractChat>({
   hasGeneratedContract: { type: Boolean, default: false },
   temporaryContractFile: { type: Schema.Types.Mixed, default: undefined },
   isTemporary: { type: Boolean, default: false },
+  summary: { type: String, default: null },
 }, { _id: false, versionKey: false });
 
 contractChatSchema.set('toJSON', {

@@ -171,26 +171,30 @@ async function waitForTestClock(clockId: string, maxWaitMs = 90_000): Promise<vo
 }
 
 // =============================================================================
-// SECCIÓN 1: PAGOS REALES EN STRIPE
+// SECCIÓN 1: PAGOS REALES EN STRIPE + confirmPayment
 // =============================================================================
 
-describe('1. Pagos reales en Stripe', () => {
+describe('1. Pagos reales en Stripe + confirmPayment', () => {
   let customer: Stripe.Customer;
   let pm: Stripe.PaymentMethod;
+  let confirmPayment: any;
 
   beforeAll(async () => {
     customer = await makeCustomer('pagos-test@lyrium-test.io');
     pm = await makePM();
     await stripe.paymentMethods.attach(pm.id, { customer: customer.id });
+    const mod = await import('../subscriptions.js');
+    confirmPayment = mod.confirmPayment;
   });
 
-  it('Test 1 — Pago único Starter mensual (€197)', async () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+  });
+
+  it('Test 1 — Pago Starter mensual → confirmPayment actualiza BD correctamente', async () => {
     const pi = await stripe.paymentIntents.create({
-      amount: 19700,
-      currency: 'eur',
-      customer: customer.id,
-      payment_method: pm.id,
-      confirm: true,
+      amount: 19700, currency: 'eur',
+      customer: customer.id, payment_method: pm.id, confirm: true,
       metadata: { plan: 'starter', interval: 'monthly', autoRenew: 'false' },
       automatic_payment_methods: { enabled: true, allow_redirects: 'never' },
     });
@@ -198,60 +202,135 @@ describe('1. Pagos reales en Stripe', () => {
     expect(pi.status).toBe('succeeded');
     expect(pi.amount).toBe(19700);
     expect(pi.currency).toBe('eur');
-    expect(pi.metadata.plan).toBe('starter');
 
     // Verificar en Stripe que el pago existe
     const retrieved = await stripe.paymentIntents.retrieve(pi.id);
     expect(retrieved.status).toBe('succeeded');
     expect(retrieved.amount_received).toBe(19700);
+
+    // Llamar a confirmPayment del código real y verificar que la BD se actualiza
+    const fakeSub = mockDoc({
+      _id: 'sub_t1', accountId: 'acc_t1', plan: 'starter', interval: 'monthly',
+      status: 'trial', stripeCustomerId: customer.id,
+      trialEndDate: null, currentPeriodEnd: null,
+    });
+    SubMock.findOne.mockResolvedValue(fakeSub);
+    AccMock.findById.mockResolvedValue(mockDoc({ _id: 'acc_t1', email: 'test@test.com' }));
+
+    const req = mockReq({ accountId: 'acc_t1', plan: 'starter', interval: 'monthly', paymentIntentId: pi.id });
+    const res = mockRes();
+    await confirmPayment(req, res);
+
+    expect(res.json).toHaveBeenCalled();
+    const data = res.json.mock.calls[0][0];
+    expect(data.success).toBe(true);
+    expect(fakeSub.status).toBe('active');
+    expect(fakeSub.plan).toBe('starter');
+    expect(fakeSub.interval).toBe('monthly');
+    expect(fakeSub.autoRenew).toBe(false);
+    // currentPeriodEnd debe ser ~1 mes desde ahora
+    const periodEnd = new Date(fakeSub.currentPeriodEnd);
+    const daysDiff = (periodEnd.getTime() - Date.now()) / 86400000;
+    expect(daysDiff).toBeGreaterThanOrEqual(27);
+    expect(daysDiff).toBeLessThanOrEqual(32);
+    // PaymentMethod debe estar guardado (brand + last4 de tok_visa)
+    expect(fakeSub.paymentMethod).toBeDefined();
+    expect(fakeSub.paymentMethod.brand).toBe('visa');
+    expect(fakeSub.paymentMethod.last4).toBe('4242');
+    expect(fakeSub.save).toHaveBeenCalled();
   });
 
-  it('Test 2 — Pago único Starter anual (€2100)', async () => {
+  it('Test 2 — Pago Starter anual → confirmPayment guarda periodo de ~1 año', async () => {
     const pi = await stripe.paymentIntents.create({
-      amount: 210000,
-      currency: 'eur',
-      customer: customer.id,
-      payment_method: pm.id,
-      confirm: true,
+      amount: 210000, currency: 'eur',
+      customer: customer.id, payment_method: pm.id, confirm: true,
       metadata: { plan: 'starter', interval: 'annual', autoRenew: 'false' },
       automatic_payment_methods: { enabled: true, allow_redirects: 'never' },
     });
 
     expect(pi.status).toBe('succeeded');
-    expect(pi.amount).toBe(210000);
+    expect(pi.amount_received).toBe(210000);
 
-    const retrieved = await stripe.paymentIntents.retrieve(pi.id);
-    expect(retrieved.amount_received).toBe(210000);
+    const fakeSub = mockDoc({
+      _id: 'sub_t2', accountId: 'acc_t2', plan: 'starter', interval: 'monthly',
+      status: 'trial', stripeCustomerId: customer.id,
+      trialEndDate: null, currentPeriodEnd: null,
+    });
+    SubMock.findOne.mockResolvedValue(fakeSub);
+    AccMock.findById.mockResolvedValue(mockDoc({ _id: 'acc_t2', email: 'test@test.com' }));
+
+    const req = mockReq({ accountId: 'acc_t2', plan: 'starter', interval: 'annual', paymentIntentId: pi.id });
+    const res = mockRes();
+    await confirmPayment(req, res);
+
+    expect(res.json.mock.calls[0][0].success).toBe(true);
+    expect(fakeSub.status).toBe('active');
+    expect(fakeSub.interval).toBe('annual');
+    // currentPeriodEnd debe ser ~1 año desde ahora
+    const periodEnd = new Date(fakeSub.currentPeriodEnd);
+    const daysDiff = (periodEnd.getTime() - Date.now()) / 86400000;
+    expect(daysDiff).toBeGreaterThanOrEqual(363);
+    expect(daysDiff).toBeLessThanOrEqual(367);
   });
 
-  it('Test 3 — Pago único Advanced mensual (€350)', async () => {
+  it('Test 3 — Pago Advanced mensual → confirmPayment guarda plan advanced', async () => {
     const pi = await stripe.paymentIntents.create({
-      amount: 35000,
-      currency: 'eur',
-      customer: customer.id,
-      payment_method: pm.id,
-      confirm: true,
+      amount: 35000, currency: 'eur',
+      customer: customer.id, payment_method: pm.id, confirm: true,
       metadata: { plan: 'advanced', interval: 'monthly', autoRenew: 'false' },
       automatic_payment_methods: { enabled: true, allow_redirects: 'never' },
     });
 
     expect(pi.status).toBe('succeeded');
-    expect(pi.amount).toBe(35000);
+
+    const fakeSub = mockDoc({
+      _id: 'sub_t3', accountId: 'acc_t3', plan: 'starter', interval: 'monthly',
+      status: 'trial', stripeCustomerId: customer.id,
+      trialEndDate: null, currentPeriodEnd: null,
+    });
+    SubMock.findOne.mockResolvedValue(fakeSub);
+    AccMock.findById.mockResolvedValue(mockDoc({ _id: 'acc_t3', email: 'test@test.com' }));
+
+    const req = mockReq({ accountId: 'acc_t3', plan: 'advanced', interval: 'monthly', paymentIntentId: pi.id });
+    const res = mockRes();
+    await confirmPayment(req, res);
+
+    expect(fakeSub.plan).toBe('advanced');
+    expect(fakeSub.status).toBe('active');
+    expect(fakeSub.autoRenew).toBe(false);
+    expect(fakeSub.paymentMethod.brand).toBe('visa');
   });
 
-  it('Test 4 — Pago único Advanced anual (€3700)', async () => {
+  it('Test 4 — Pago Advanced anual → confirmPayment guarda periodo ~1 año', async () => {
     const pi = await stripe.paymentIntents.create({
-      amount: 370000,
-      currency: 'eur',
-      customer: customer.id,
-      payment_method: pm.id,
-      confirm: true,
+      amount: 370000, currency: 'eur',
+      customer: customer.id, payment_method: pm.id, confirm: true,
       metadata: { plan: 'advanced', interval: 'annual', autoRenew: 'false' },
       automatic_payment_methods: { enabled: true, allow_redirects: 'never' },
     });
 
     expect(pi.status).toBe('succeeded');
     expect(pi.amount).toBe(370000);
+
+    const fakeSub = mockDoc({
+      _id: 'sub_t4', accountId: 'acc_t4', plan: 'starter', interval: 'monthly',
+      status: 'trial', stripeCustomerId: customer.id,
+      trialEndDate: null, currentPeriodEnd: null,
+    });
+    SubMock.findOne.mockResolvedValue(fakeSub);
+    AccMock.findById.mockResolvedValue(mockDoc({ _id: 'acc_t4', email: 'test@test.com' }));
+
+    const req = mockReq({ accountId: 'acc_t4', plan: 'advanced', interval: 'annual', paymentIntentId: pi.id });
+    const res = mockRes();
+    await confirmPayment(req, res);
+
+    expect(fakeSub.plan).toBe('advanced');
+    expect(fakeSub.interval).toBe('annual');
+    expect(fakeSub.status).toBe('active');
+    const periodEnd = new Date(fakeSub.currentPeriodEnd);
+    const daysDiff = (periodEnd.getTime() - Date.now()) / 86400000;
+    expect(daysDiff).toBeGreaterThanOrEqual(363);
+    expect(daysDiff).toBeLessThanOrEqual(367);
   });
 
   it('Test 5 — Suscripción auto-renew (guarda tarjeta + crea suscripción)', async () => {
@@ -275,7 +354,6 @@ describe('1. Pagos reales en Stripe', () => {
     expect(retrieved.id).toBe(sub.id);
     expect(retrieved.customer).toBe(customer.id);
 
-    // Limpiar
     await stripe.subscriptions.cancel(sub.id);
   });
 
@@ -293,7 +371,12 @@ describe('1. Pagos reales en Stripe', () => {
     expect(sub.status).toBe('trialing');
     expect(sub.trial_end).toBe(trialEnd);
 
-    // Verificar que la fecha de trial en Stripe coincide
+    // Verificar que Stripe no ha cobrado nada
+    const invoices = await stripe.invoices.list({ subscription: sub.id, limit: 5 });
+    const paidInvoices = invoices.data.filter(i => i.amount_paid > 0);
+    expect(paidInvoices.length).toBe(0);
+
+    // Verificar fecha de trial exacta
     const retrieved = await stripe.subscriptions.retrieve(sub.id);
     expect(retrieved.trial_end).toBe(trialEnd);
 
@@ -444,7 +527,7 @@ describe('3. Webhooks con firma real', () => {
     vi.clearAllMocks();
   });
 
-  it('Test 12 — invoice.paid (subscription_cycle) → renueva periodo', async () => {
+  it('Test 12 — invoice.paid (subscription_cycle) → renueva periodo exactamente +1 mes', async () => {
     const existingSub = mockDoc({
       _id: 'sub_1', accountId: 'acc_1', plan: 'starter', interval: 'monthly',
       status: 'active', stripeCustomerId: 'cus_test_12',
@@ -476,9 +559,13 @@ describe('3. Webhooks con firma real', () => {
     expect(res.json).toHaveBeenCalledWith({ received: true });
     expect(existingSub.status).toBe('active');
     expect(existingSub.save).toHaveBeenCalled();
-    // Verifica que currentPeriodEnd se actualizó al futuro
+    // Verifica que currentPeriodEnd sea exactamente ~1 mes desde ahora (no solo "en el futuro")
     const newEnd = new Date(existingSub.currentPeriodEnd);
-    expect(newEnd.getTime()).toBeGreaterThan(Date.now());
+    const daysDiff = (newEnd.getTime() - Date.now()) / 86400000;
+    expect(daysDiff).toBeGreaterThanOrEqual(27);
+    expect(daysDiff).toBeLessThanOrEqual(32);
+    // currentPeriodStart debe haberse actualizado
+    expect(existingSub.currentPeriodStart).toBeDefined();
   });
 
   it('Test 13 — invoice.paid (subscription_create) → IGNORA', async () => {
@@ -530,12 +617,13 @@ describe('3. Webhooks con firma real', () => {
     expect(SubMock.findOne).not.toHaveBeenCalled();
   });
 
-  it('Test 15 — payment_intent.succeeded → activa suscripción', async () => {
+  it('Test 15 — payment_intent.succeeded → activa suscripción con fechas correctas', async () => {
+    const trialRemaining5Days = new Date(Date.now() + 5 * 86400000).toISOString();
     const existingSub = mockDoc({
       _id: 'sub_15', accountId: 'acc_15', plan: 'starter', interval: 'monthly',
       status: 'trial', stripeCustomerId: 'cus_test_15',
-      trialEndDate: new Date(Date.now() + 5 * 86400000).toISOString(),
-      currentPeriodEnd: new Date(Date.now() + 5 * 86400000).toISOString(),
+      trialEndDate: trialRemaining5Days,
+      currentPeriodEnd: trialRemaining5Days,
     });
     SubMock.findOne.mockResolvedValue(existingSub);
 
@@ -566,6 +654,15 @@ describe('3. Webhooks con firma real', () => {
     expect(res.json).toHaveBeenCalledWith({ received: true });
     expect(existingSub.status).toBe('active');
     expect(existingSub.autoRenew).toBe(false);
+    expect(existingSub.plan).toBe('starter');
+    expect(existingSub.interval).toBe('monthly');
+    // trialEndDate debe borrarse al activar
+    expect(existingSub.trialEndDate).toBeNull();
+    // currentPeriodEnd = ~1 mes + 5 días de trial restantes
+    const periodEnd = new Date(existingSub.currentPeriodEnd);
+    const daysDiff = (periodEnd.getTime() - Date.now()) / 86400000;
+    expect(daysDiff).toBeGreaterThanOrEqual(32); // 30 + 5 - margen
+    expect(daysDiff).toBeLessThanOrEqual(37);    // 31 + 5 + margen
     expect(existingSub.save).toHaveBeenCalled();
   });
 
@@ -600,7 +697,7 @@ describe('3. Webhooks con firma real', () => {
     expect(existingSub.save).toHaveBeenCalled();
   });
 
-  it('Test 17 — customer.subscription.deleted → marca autoRenew=false', async () => {
+  it('Test 17 — customer.subscription.deleted (periodo expirado) → canceled', async () => {
     const pastDate = new Date(Date.now() - 86400000).toISOString();
     const existingSub = mockDoc({
       _id: 'sub_17', accountId: 'acc_17',
@@ -631,6 +728,42 @@ describe('3. Webhooks con firma real', () => {
     expect(existingSub.autoRenew).toBe(false);
     expect(existingSub.stripeSubscriptionId).toBeNull();
     expect(existingSub.status).toBe('canceled');
+    expect(existingSub.save).toHaveBeenCalled();
+  });
+
+  it('Test 17b — customer.subscription.deleted (periodo aún vigente) → sigue active', async () => {
+    // Periodo expira mañana — el usuario canceló autoRenew pero tiene días pagados
+    const futureDate = new Date(Date.now() + 86400000).toISOString();
+    const existingSub = mockDoc({
+      _id: 'sub_17b', accountId: 'acc_17b',
+      stripeSubscriptionId: 'sub_stripe_17b', stripeCustomerId: 'cus_test_17b',
+      status: 'active', autoRenew: true,
+      currentPeriodEnd: futureDate,
+    });
+    SubMock.findOne.mockResolvedValue(existingSub);
+
+    const event = {
+      id: 'evt_test_17b',
+      type: 'customer.subscription.deleted',
+      data: {
+        object: {
+          id: 'sub_stripe_17b',
+          customer: 'cus_test_17b',
+        },
+      },
+    };
+
+    const payload = JSON.stringify(event);
+    const sig = signWebhookPayload(payload);
+    const req = mockReq(payload, {}, { 'stripe-signature': sig });
+    const res = mockRes();
+
+    await handleWebhook(req, res);
+
+    // Periodo aún vigente → NO debe ponerse canceled (tiene días pagados)
+    expect(existingSub.status).toBe('active');
+    expect(existingSub.autoRenew).toBe(false);
+    expect(existingSub.stripeSubscriptionId).toBeNull();
     expect(existingSub.save).toHaveBeenCalled();
   });
 
@@ -666,65 +799,126 @@ describe('3. Webhooks con firma real', () => {
 });
 
 // =============================================================================
-// SECCIÓN 4: FECHAS Y EDGE CASES
+// SECCIÓN 4: FECHAS REALES — VERIFICACIÓN CON STRIPE + confirmPayment
 // =============================================================================
 
-describe('4. Fechas y edge cases', () => {
-  it('Test 19 — Periodo mensual = exactamente +1 mes', () => {
-    const now = new Date('2026-03-15T12:00:00Z');
-    const end = new Date(now);
-    end.setMonth(end.getMonth() + 1);
+describe('4. Fechas reales — periodos verificados contra Stripe y confirmPayment', () => {
+  let customer: Stripe.Customer;
+  let pm: Stripe.PaymentMethod;
+  let confirmPayment: any;
 
-    expect(end.getFullYear()).toBe(2026);
-    expect(end.getMonth()).toBe(3); // Abril
-    expect(end.getDate()).toBe(15);
+  beforeAll(async () => {
+    customer = await makeCustomer('dates-real@lyrium-test.io');
+    pm = await makePM();
+    await stripe.paymentMethods.attach(pm.id, { customer: customer.id });
+    const mod = await import('../subscriptions.js');
+    confirmPayment = mod.confirmPayment;
   });
 
-  it('Test 20 — Periodo anual = exactamente +1 año', () => {
-    const now = new Date('2026-03-15T12:00:00Z');
-    const end = new Date(now);
-    end.setFullYear(end.getFullYear() + 1);
-
-    expect(end.getFullYear()).toBe(2027);
-    expect(end.getMonth()).toBe(2); // Marzo
-    expect(end.getDate()).toBe(15);
+  beforeEach(() => {
+    vi.clearAllMocks();
   });
 
-  it('Test 21 — Días restantes de trial se suman al periodo', () => {
-    const now = new Date('2026-03-15T12:00:00Z');
-    const trialEnd = new Date('2026-03-20T12:00:00Z'); // 5 días de trial restantes
+  it('Test 19 — Suscripción mensual en Stripe → periodo = 28-31 días', async () => {
+    const sub = await stripe.subscriptions.create({
+      customer: customer.id,
+      items: [{ price: PRICES.starterMonthly }],
+      default_payment_method: pm.id,
+    });
+    expect(sub.status).toBe('active');
 
-    // Cálculo: periodo base (1 mes) + días de trial restantes
-    const periodEnd = new Date(now);
-    periodEnd.setMonth(periodEnd.getMonth() + 1);
+    const item = sub.items.data[0];
+    const periodDays = (item.current_period_end - item.current_period_start) / 86400;
+    expect(periodDays).toBeGreaterThanOrEqual(28);
+    expect(periodDays).toBeLessThanOrEqual(31);
 
-    const remainingDays = Math.ceil(
-      (trialEnd.getTime() - now.getTime()) / (1000 * 60 * 60 * 24)
-    );
-    periodEnd.setDate(periodEnd.getDate() + remainingDays);
-
-    expect(remainingDays).toBe(5);
-    expect(periodEnd.getDate()).toBe(20); // 15 abril + 5 = 20 abril
-    expect(periodEnd.getMonth()).toBe(3); // Abril
+    await stripe.subscriptions.cancel(sub.id);
   });
 
-  it('Test 22 — Días de plan activo se suman al cambiar plan', () => {
-    const now = new Date('2026-03-15T12:00:00Z');
-    const prevPeriodEnd = new Date('2026-03-25T12:00:00Z'); // 10 días restantes
+  it('Test 20 — Suscripción anual en Stripe → periodo = 364-366 días', async () => {
+    const sub = await stripe.subscriptions.create({
+      customer: customer.id,
+      items: [{ price: PRICES.starterAnnual }],
+      default_payment_method: pm.id,
+    });
+    expect(sub.status).toBe('active');
 
-    const newPeriodEnd = new Date(now);
-    newPeriodEnd.setMonth(newPeriodEnd.getMonth() + 1);
+    const item = sub.items.data[0];
+    const periodDays = (item.current_period_end - item.current_period_start) / 86400;
+    expect(periodDays).toBeGreaterThanOrEqual(364);
+    expect(periodDays).toBeLessThanOrEqual(366);
 
-    if (prevPeriodEnd > now) {
-      const remainingDays = Math.ceil(
-        (prevPeriodEnd.getTime() - now.getTime()) / (1000 * 60 * 60 * 24)
-      );
-      newPeriodEnd.setDate(newPeriodEnd.getDate() + remainingDays);
-    }
+    await stripe.subscriptions.cancel(sub.id);
+  });
 
-    // 15 abril + 10 = 25 abril
-    expect(newPeriodEnd.getDate()).toBe(25);
-    expect(newPeriodEnd.getMonth()).toBe(3);
+  it('Test 21 — confirmPayment con trial de 5 días → periodo = 1 mes + 5 días', async () => {
+    // Pago real en Stripe
+    const pi = await stripe.paymentIntents.create({
+      amount: 19700, currency: 'eur',
+      customer: customer.id, payment_method: pm.id, confirm: true,
+      metadata: { plan: 'starter', interval: 'monthly', autoRenew: 'false' },
+      automatic_payment_methods: { enabled: true, allow_redirects: 'never' },
+    });
+    expect(pi.status).toBe('succeeded');
+
+    // Simular suscripción en estado trial con 5 días restantes
+    const trialEnd5Days = new Date(Date.now() + 5 * 86400000).toISOString();
+    const fakeSub = mockDoc({
+      _id: 'sub_t21', accountId: 'acc_t21', plan: 'starter', interval: 'monthly',
+      status: 'trial', stripeCustomerId: customer.id,
+      trialEndDate: trialEnd5Days,
+      currentPeriodEnd: trialEnd5Days,
+    });
+    SubMock.findOne.mockResolvedValue(fakeSub);
+    AccMock.findById.mockResolvedValue(mockDoc({ _id: 'acc_t21', email: 'test@test.com' }));
+
+    const req = mockReq({ accountId: 'acc_t21', plan: 'starter', interval: 'monthly', paymentIntentId: pi.id });
+    const res = mockRes();
+    await confirmPayment(req, res);
+
+    expect(fakeSub.status).toBe('active');
+    expect(fakeSub.trialEndDate).toBeNull();
+
+    // currentPeriodEnd debe ser ~1 mes + 5 días = ~35 días desde ahora
+    const periodEnd = new Date(fakeSub.currentPeriodEnd);
+    const daysDiff = (periodEnd.getTime() - Date.now()) / 86400000;
+    expect(daysDiff).toBeGreaterThanOrEqual(32); // 28 + 5 - margen
+    expect(daysDiff).toBeLessThanOrEqual(37);    // 31 + 5 + margen
+  });
+
+  it('Test 22 — confirmPayment con plan activo (10 días restantes) → periodo = 1 mes + 10 días', async () => {
+    // Pago real en Stripe
+    const pi = await stripe.paymentIntents.create({
+      amount: 35000, currency: 'eur',
+      customer: customer.id, payment_method: pm.id, confirm: true,
+      metadata: { plan: 'advanced', interval: 'monthly', autoRenew: 'false' },
+      automatic_payment_methods: { enabled: true, allow_redirects: 'never' },
+    });
+    expect(pi.status).toBe('succeeded');
+
+    // Simular suscripción activa con 10 días restantes de periodo anterior
+    const periodEnd10Days = new Date(Date.now() + 10 * 86400000).toISOString();
+    const fakeSub = mockDoc({
+      _id: 'sub_t22', accountId: 'acc_t22', plan: 'starter', interval: 'monthly',
+      status: 'active', stripeCustomerId: customer.id,
+      trialEndDate: null,
+      currentPeriodEnd: periodEnd10Days,
+    });
+    SubMock.findOne.mockResolvedValue(fakeSub);
+    AccMock.findById.mockResolvedValue(mockDoc({ _id: 'acc_t22', email: 'test@test.com' }));
+
+    const req = mockReq({ accountId: 'acc_t22', plan: 'advanced', interval: 'monthly', paymentIntentId: pi.id });
+    const res = mockRes();
+    await confirmPayment(req, res);
+
+    expect(fakeSub.status).toBe('active');
+    expect(fakeSub.plan).toBe('advanced');
+
+    // currentPeriodEnd debe ser ~1 mes + 10 días = ~40 días desde ahora
+    const periodEnd = new Date(fakeSub.currentPeriodEnd);
+    const daysDiff = (periodEnd.getTime() - Date.now()) / 86400000;
+    expect(daysDiff).toBeGreaterThanOrEqual(37); // 28 + 10 - margen
+    expect(daysDiff).toBeLessThanOrEqual(42);    // 31 + 10 + margen
   });
 
   it('Test 23 — Firma webhook inválida → rechaza con 400', async () => {
@@ -899,6 +1093,680 @@ describe('5. Test Clocks — ciclo de vida real en Stripe', () => {
 });
 
 // =============================================================================
+// SECCIÓN 7: REEMBOLSOS REALES
+// =============================================================================
+
+describe('7. Reembolsos reales', () => {
+  let customer: Stripe.Customer;
+  let pm: Stripe.PaymentMethod;
+
+  beforeAll(async () => {
+    customer = await makeCustomer('refunds@lyrium-test.io');
+    pm = await makePM();
+    await stripe.paymentMethods.attach(pm.id, { customer: customer.id });
+  });
+
+  it('Test 27 — Reembolso completo de pago €197', async () => {
+    const pi = await stripe.paymentIntents.create({
+      amount: 19700, currency: 'eur',
+      customer: customer.id, payment_method: pm.id,
+      confirm: true,
+      automatic_payment_methods: { enabled: true, allow_redirects: 'never' },
+    });
+    expect(pi.status).toBe('succeeded');
+
+    const refund = await stripe.refunds.create({ payment_intent: pi.id });
+    expect(refund.status).toBe('succeeded');
+    expect(refund.amount).toBe(19700);
+    expect(refund.currency).toBe('eur');
+
+    // Verificar en Stripe
+    const retrieved = await stripe.refunds.retrieve(refund.id);
+    expect(retrieved.amount).toBe(19700);
+    expect(retrieved.status).toBe('succeeded');
+  });
+
+  it('Test 28 — Reembolso parcial €100 de €350', async () => {
+    const pi = await stripe.paymentIntents.create({
+      amount: 35000, currency: 'eur',
+      customer: customer.id, payment_method: pm.id,
+      confirm: true,
+      automatic_payment_methods: { enabled: true, allow_redirects: 'never' },
+    });
+    expect(pi.status).toBe('succeeded');
+
+    const refund = await stripe.refunds.create({ payment_intent: pi.id, amount: 10000 });
+    expect(refund.status).toBe('succeeded');
+    expect(refund.amount).toBe(10000);
+
+    // El charge original tiene amount_refunded = 10000
+    const charges = await stripe.charges.list({ payment_intent: pi.id });
+    expect(charges.data[0].amount_refunded).toBe(10000);
+    expect(charges.data[0].refunded).toBe(false); // No es reembolso completo
+  });
+
+  it('Test 29 — Doble reembolso completo → error InvalidRequestError', async () => {
+    const pi = await stripe.paymentIntents.create({
+      amount: 19700, currency: 'eur',
+      customer: customer.id, payment_method: pm.id,
+      confirm: true,
+      automatic_payment_methods: { enabled: true, allow_redirects: 'never' },
+    });
+    expect(pi.status).toBe('succeeded');
+
+    // Primer reembolso completo
+    await stripe.refunds.create({ payment_intent: pi.id });
+
+    // Segundo reembolso → debe fallar
+    await expect(
+      stripe.refunds.create({ payment_intent: pi.id })
+    ).rejects.toMatchObject({ type: 'StripeInvalidRequestError' });
+  });
+
+  it('Test 30 — Reembolso €2100 (pago anual)', async () => {
+    const pi = await stripe.paymentIntents.create({
+      amount: 210000, currency: 'eur',
+      customer: customer.id, payment_method: pm.id,
+      confirm: true,
+      automatic_payment_methods: { enabled: true, allow_redirects: 'never' },
+    });
+    expect(pi.amount).toBe(210000);
+
+    const refund = await stripe.refunds.create({ payment_intent: pi.id });
+    expect(refund.amount).toBe(210000);
+    expect(refund.status).toBe('succeeded');
+  });
+});
+
+// =============================================================================
+// SECCIÓN 8: VERIFICACIÓN DE PRECIOS EN STRIPE
+// =============================================================================
+
+describe('8. Verificación de precios en Stripe', () => {
+  it('Test 31 — Starter mensual existe y vale €197/mes', async () => {
+    const price = await stripe.prices.retrieve(PRICES.starterMonthly);
+    expect(price.active).toBe(true);
+    expect(price.currency).toBe('eur');
+    expect(price.unit_amount).toBe(19700);
+    expect(price.recurring?.interval).toBe('month');
+    expect(price.type).toBe('recurring');
+  });
+
+  it('Test 32 — Starter anual existe y vale €2100/año', async () => {
+    const price = await stripe.prices.retrieve(PRICES.starterAnnual);
+    expect(price.active).toBe(true);
+    expect(price.currency).toBe('eur');
+    expect(price.unit_amount).toBe(210000);
+    expect(price.recurring?.interval).toBe('year');
+    expect(price.type).toBe('recurring');
+  });
+
+  it('Test 33 — Advanced mensual existe y vale €350/mes', async () => {
+    const price = await stripe.prices.retrieve(PRICES.advancedMonthly);
+    expect(price.active).toBe(true);
+    expect(price.currency).toBe('eur');
+    expect(price.unit_amount).toBe(35000);
+    expect(price.recurring?.interval).toBe('month');
+    expect(price.type).toBe('recurring');
+  });
+
+  it('Test 34 — Advanced anual existe y vale €3700/año', async () => {
+    const price = await stripe.prices.retrieve(PRICES.advancedAnnual);
+    expect(price.active).toBe(true);
+    expect(price.currency).toBe('eur');
+    expect(price.unit_amount).toBe(370000);
+    expect(price.recurring?.interval).toBe('year');
+    expect(price.type).toBe('recurring');
+  });
+
+  it('Test 35 — Los 4 precios pertenecen al mismo producto o productos activos', async () => {
+    const prices = await Promise.all([
+      stripe.prices.retrieve(PRICES.starterMonthly, { expand: ['product'] }),
+      stripe.prices.retrieve(PRICES.starterAnnual, { expand: ['product'] }),
+      stripe.prices.retrieve(PRICES.advancedMonthly, { expand: ['product'] }),
+      stripe.prices.retrieve(PRICES.advancedAnnual, { expand: ['product'] }),
+    ]);
+
+    for (const price of prices) {
+      expect(price.active).toBe(true);
+      // El producto asociado debe estar activo
+      const product = price.product as Stripe.Product;
+      expect(product.active).toBe(true);
+    }
+  });
+});
+
+// =============================================================================
+// SECCIÓN 9: TARJETAS ESPECIALES — FALLOS DE PAGO REALES
+// =============================================================================
+
+describe('9. Tarjetas especiales y fallos de pago reales', () => {
+  let customer: Stripe.Customer;
+
+  beforeAll(async () => {
+    customer = await makeCustomer('card-failures@lyrium-test.io');
+  });
+
+  it('Test 36 — Tarjeta Mastercard funciona correctamente', async () => {
+    const masterPM = await stripe.paymentMethods.create({
+      type: 'card',
+      card: { token: 'tok_mastercard' },
+    });
+    await stripe.paymentMethods.attach(masterPM.id, { customer: customer.id });
+
+    const pi = await stripe.paymentIntents.create({
+      amount: 19700, currency: 'eur',
+      customer: customer.id,
+      payment_method: masterPM.id,
+      confirm: true,
+      automatic_payment_methods: { enabled: true, allow_redirects: 'never' },
+    });
+    expect(pi.status).toBe('succeeded');
+
+    // Verificar que es Mastercard
+    const retrievedPM = await stripe.paymentMethods.retrieve(masterPM.id);
+    expect(retrievedPM.card?.brand).toBe('mastercard');
+    expect(retrievedPM.card?.last4).toBeDefined();
+  });
+
+  it('Test 40 — Visa Debit funciona correctamente', async () => {
+    const debitPM = await stripe.paymentMethods.create({
+      type: 'card',
+      card: { token: 'tok_visa_debit' },
+    });
+    await stripe.paymentMethods.attach(debitPM.id, { customer: customer.id });
+
+    const pi = await stripe.paymentIntents.create({
+      amount: 35000, currency: 'eur',
+      customer: customer.id,
+      payment_method: debitPM.id,
+      confirm: true,
+      automatic_payment_methods: { enabled: true, allow_redirects: 'never' },
+    });
+    expect(pi.status).toBe('succeeded');
+    expect(pi.amount).toBe(35000);
+
+    const retrievedPM = await stripe.paymentMethods.retrieve(debitPM.id);
+    expect(retrievedPM.card?.brand).toBe('visa');
+    expect(retrievedPM.card?.funding).toBe('debit');
+  });
+
+  it('Test 40b — createPaymentIntent (app) con sub existente → devuelve paymentIntentId y clientSecret', async () => {
+    const { createPaymentIntent } = await import('../subscriptions.js');
+
+    // Simular sub existente con stripeCustomerId real
+    const existingSub = mockDoc({
+      _id: 'sub_card_1',
+      accountId: 'acc_card_1',
+      stripeCustomerId: customer.id,
+      status: 'trial',
+      save: vi.fn(),
+    });
+    SubMock.findOne.mockResolvedValue(existingSub);
+    AccMock.findById.mockResolvedValue(mockDoc({ _id: 'acc_card_1', email: 'card-failures@lyrium-test.io' }));
+
+    const req = mockReq({ accountId: 'acc_card_1', plan: 'starter', interval: 'monthly', autoRenew: false });
+    const res = mockRes();
+    await createPaymentIntent(req, res);
+
+    expect(res.json).toHaveBeenCalled();
+    const data = res.json.mock.calls[0][0];
+    expect(data.paymentIntentId).toBeDefined();
+    expect(data.clientSecret).toBeDefined();
+    expect(data.customerId).toBe(customer.id);
+
+    // Verificar que Stripe creó un PaymentIntent real
+    const pi = await stripe.paymentIntents.retrieve(data.paymentIntentId);
+    expect(pi.amount).toBe(19700); // starter monthly = 197€ = 19700 cents
+    expect(pi.currency).toBe('eur');
+    expect(pi.metadata.plan).toBe('starter');
+    expect(pi.metadata.interval).toBe('monthly');
+  });
+
+  it('Test 40c — createPaymentIntent (app) sin parámetros → 400', async () => {
+    const { createPaymentIntent } = await import('../subscriptions.js');
+
+    const req = mockReq({ accountId: 'acc_card_2' }); // falta plan e interval
+    const res = mockRes();
+    await createPaymentIntent(req, res);
+
+    expect(res.status).toHaveBeenCalledWith(400);
+    expect(res.json.mock.calls[0][0].error).toBeDefined();
+  });
+});
+
+// =============================================================================
+// SECCIÓN 10: SETUP INTENTS — GUARDAR TARJETA SIN COBRAR
+// =============================================================================
+
+describe('10. Setup Intents — guardar tarjeta sin cobrar', () => {
+  let customer: Stripe.Customer;
+
+  beforeAll(async () => {
+    customer = await makeCustomer('setup-intent@lyrium-test.io');
+  });
+
+  it('Test 41 — Crear SetupIntent, guardar tarjeta y usarla después', async () => {
+    const si = await stripe.setupIntents.create({
+      customer: customer.id,
+      automatic_payment_methods: { enabled: true, allow_redirects: 'never' },
+    });
+    expect(si.status).toBe('requires_payment_method');
+    expect(si.customer).toBe(customer.id);
+
+    // Confirmar SetupIntent con tok_visa
+    const pm = await makePM();
+    const confirmed = await stripe.setupIntents.confirm(si.id, {
+      payment_method: pm.id,
+    });
+    expect(confirmed.status).toBe('succeeded');
+
+    // Usar la tarjeta guardada para hacer un pago real
+    const pi = await stripe.paymentIntents.create({
+      amount: 19700, currency: 'eur',
+      customer: customer.id,
+      payment_method: pm.id,
+      confirm: true,
+      automatic_payment_methods: { enabled: true, allow_redirects: 'never' },
+    });
+    expect(pi.status).toBe('succeeded');
+    expect(pi.amount_received).toBe(19700);
+  });
+
+  it('Test 42 — SetupIntent cancelado → no puede confirmarse', async () => {
+    const si = await stripe.setupIntents.create({
+      customer: customer.id,
+      automatic_payment_methods: { enabled: true, allow_redirects: 'never' },
+    });
+
+    const canceled = await stripe.setupIntents.cancel(si.id);
+    expect(canceled.status).toBe('canceled');
+
+    // Intentar confirmar → error
+    const pm = await makePM();
+    let caught: any;
+    try {
+      await stripe.setupIntents.confirm(si.id, { payment_method: pm.id });
+    } catch (err: any) {
+      caught = err;
+    }
+    expect(caught).toBeDefined();
+    expect(caught.type).toBe('StripeInvalidRequestError');
+  });
+
+  it('Test 43 — SetupIntent para suscripción futura → PM guardado disponible', async () => {
+    // Crear una sub con un setup intent previo (like en autoRenew)
+    const si = await stripe.setupIntents.create({
+      customer: customer.id,
+      usage: 'off_session', // para cargos futuros sin que el usuario esté presente
+      automatic_payment_methods: { enabled: true, allow_redirects: 'never' },
+    });
+
+    const pm = await makePM();
+    await stripe.setupIntents.confirm(si.id, { payment_method: pm.id });
+
+    // Crear suscripción usando el PM guardado
+    const sub = await stripe.subscriptions.create({
+      customer: customer.id,
+      items: [{ price: PRICES.starterMonthly }],
+      default_payment_method: pm.id,
+    });
+    expect(sub.status).toBe('active');
+    expect(sub.default_payment_method).toBe(pm.id);
+
+    await stripe.subscriptions.cancel(sub.id);
+  });
+
+  it('Test 43b — createPaymentIntent (app) con autoRenew=true + trial activo → devuelve setupIntentId', async () => {
+    const { createPaymentIntent } = await import('../subscriptions.js');
+
+    vi.clearAllMocks();
+
+    const trialEnd = new Date();
+    trialEnd.setDate(trialEnd.getDate() + 5); // 5 días de trial restantes
+
+    const trialSub = mockDoc({
+      _id: 'sub_setup_1',
+      accountId: 'acc_setup_1',
+      stripeCustomerId: customer.id,
+      stripeSubscriptionId: null,
+      status: 'trial',
+      trialEndDate: trialEnd.toISOString(),
+      currentPeriodEnd: trialEnd.toISOString(),
+      save: vi.fn(async function (this: any) { return this; }),
+    });
+    SubMock.findOne.mockResolvedValue(trialSub);
+    AccMock.findById.mockResolvedValue(mockDoc({ _id: 'acc_setup_1', email: 'setup-intent@lyrium-test.io' }));
+
+    const req = mockReq({ accountId: 'acc_setup_1', plan: 'starter', interval: 'monthly', autoRenew: true });
+    const res = mockRes();
+    await createPaymentIntent(req, res);
+
+    expect(res.json).toHaveBeenCalled();
+    const data = res.json.mock.calls[0][0];
+    // autoRenew con trial activo → SetupIntent (no PaymentIntent)
+    expect(data.setupIntentId).toBeDefined();
+    expect(data.clientSecret).toBeDefined();
+    expect(data.subscriptionId).toBeDefined();
+    expect(data.customerId).toBe(customer.id);
+
+    // Verificar que Stripe creó un SetupIntent real
+    const si = await stripe.setupIntents.retrieve(data.setupIntentId);
+    expect(si.status).toBe('requires_payment_method');
+    expect(si.customer).toBe(customer.id);
+    expect(si.usage).toBe('off_session');
+
+    // Verificar que la suscripción Stripe tiene trial_end
+    const stripeSub = await stripe.subscriptions.retrieve(data.subscriptionId);
+    expect(stripeSub.trial_end).toBeDefined();
+    expect(stripeSub.trial_end! * 1000).toBeGreaterThan(Date.now());
+
+    // Cleanup: cancelar la sub creada
+    await stripe.subscriptions.cancel(data.subscriptionId);
+  });
+});
+
+// =============================================================================
+// SECCIÓN 11: GESTIÓN DE CLIENTES EN STRIPE
+// =============================================================================
+
+describe('11. Gestión de clientes en Stripe', () => {
+  it('Test 44 — Crear, actualizar y eliminar cliente', async () => {
+    const created = await stripe.customers.create({
+      email: 'lifecycle-customer@lyrium-test.io',
+      name: 'Test User',
+      metadata: { plan: 'starter', source: 'integration-test' },
+    });
+    // Se borra en el test, no añadir a toCleanup
+
+    expect(created.email).toBe('lifecycle-customer@lyrium-test.io');
+    expect(created.name).toBe('Test User');
+    expect(created.metadata.plan).toBe('starter');
+
+    // Actualizar
+    const updated = await stripe.customers.update(created.id, {
+      name: 'Updated Name',
+      email: 'updated@lyrium-test.io',
+      metadata: { plan: 'advanced' },
+    });
+    expect(updated.name).toBe('Updated Name');
+    expect(updated.metadata.plan).toBe('advanced');
+
+    // Eliminar
+    const deleted = await stripe.customers.del(created.id);
+    expect(deleted.deleted).toBe(true);
+
+    // Verificar que está marcado como eliminado
+    const retrieved = await stripe.customers.retrieve(created.id) as any;
+    expect(retrieved.deleted).toBe(true);
+  });
+
+  it('Test 45 — Listar y gestionar múltiples tarjetas de un cliente', async () => {
+    const customer = await makeCustomer('multi-card@lyrium-test.io');
+
+    const pm1 = await makePM();
+    const pm2 = await stripe.paymentMethods.create({ type: 'card', card: { token: 'tok_mastercard' } });
+    await stripe.paymentMethods.attach(pm1.id, { customer: customer.id });
+    await stripe.paymentMethods.attach(pm2.id, { customer: customer.id });
+
+    const pms = await stripe.paymentMethods.list({ customer: customer.id, type: 'card' });
+    expect(pms.data.length).toBeGreaterThanOrEqual(2);
+
+    const pmIds = pms.data.map(p => p.id);
+    expect(pmIds).toContain(pm1.id);
+    expect(pmIds).toContain(pm2.id);
+
+    // Verificar marcas
+    const brands = pms.data.map(p => p.card?.brand);
+    expect(brands).toContain('visa');
+    expect(brands).toContain('mastercard');
+  });
+
+  it('Test 46 — Desvincular tarjeta → ya no está asociada al cliente', async () => {
+    const customer = await makeCustomer('detach-card@lyrium-test.io');
+    const pm = await makePM();
+    await stripe.paymentMethods.attach(pm.id, { customer: customer.id });
+
+    let retrieved = await stripe.paymentMethods.retrieve(pm.id);
+    expect(retrieved.customer).toBe(customer.id);
+
+    const detached = await stripe.paymentMethods.detach(pm.id);
+    expect(detached.customer).toBeNull();
+
+    retrieved = await stripe.paymentMethods.retrieve(pm.id);
+    expect(retrieved.customer).toBeNull();
+  });
+
+  it('Test 47 — Tarjeta predeterminada de cliente → usada en suscripción', async () => {
+    const customer = await makeCustomer('default-pm@lyrium-test.io');
+    const pm = await makePM();
+    await stripe.paymentMethods.attach(pm.id, { customer: customer.id });
+
+    // Establecer como método de pago predeterminado para facturas
+    await stripe.customers.update(customer.id, {
+      invoice_settings: { default_payment_method: pm.id },
+    });
+
+    const retrievedCustomer = await stripe.customers.retrieve(customer.id) as Stripe.Customer;
+    expect(
+      (retrievedCustomer.invoice_settings as any).default_payment_method
+    ).toBe(pm.id);
+
+    // Crear sub sin especificar PM → usa el predeterminado del cliente
+    const sub = await stripe.subscriptions.create({
+      customer: customer.id,
+      items: [{ price: PRICES.starterMonthly }],
+    });
+    expect(sub.status).toBe('active');
+
+    await stripe.subscriptions.cancel(sub.id);
+  });
+
+  it('Test 47b — createPaymentIntent (app) sin customer previo → crea customer nuevo en Stripe', async () => {
+    const { createPaymentIntent } = await import('../subscriptions.js');
+
+    vi.clearAllMocks();
+
+    // Sub sin stripeCustomerId → la app debe crear el customer
+    const subWithoutCustomer = mockDoc({
+      _id: 'sub_cust_1',
+      accountId: 'acc_cust_1',
+      stripeCustomerId: null,
+      status: 'trial',
+      save: vi.fn(async function (this: any) { return this; }),
+    });
+    SubMock.findOne.mockResolvedValue(subWithoutCustomer);
+    SubMock.updateOne.mockResolvedValue({});
+    AccMock.findById.mockResolvedValue(mockDoc({ _id: 'acc_cust_1', email: 'new-customer@lyrium-test.io' }));
+
+    const req = mockReq({ accountId: 'acc_cust_1', plan: 'starter', interval: 'monthly', autoRenew: false });
+    const res = mockRes();
+    await createPaymentIntent(req, res);
+
+    expect(res.json).toHaveBeenCalled();
+    const data = res.json.mock.calls[0][0];
+    expect(data.customerId).toBeDefined();
+
+    // Verificar que Stripe tiene un customer real con ese email
+    const stripeCustomer = await stripe.customers.retrieve(data.customerId) as Stripe.Customer;
+    expect(stripeCustomer.email).toBe('new-customer@lyrium-test.io');
+    expect(stripeCustomer.metadata.accountId).toBe('acc_cust_1');
+
+    // Verificar que updateOne fue llamado para persistir el customerId
+    expect(SubMock.updateOne).toHaveBeenCalled();
+    const updateCall = SubMock.updateOne.mock.calls[0];
+    expect(updateCall[0]).toEqual({ accountId: 'acc_cust_1' });
+    expect(updateCall[1].stripeCustomerId).toBe(data.customerId);
+
+    // Cleanup
+    toCleanup.customers.push(data.customerId);
+  });
+
+  it('Test 47c — createPaymentIntent (app) con customer previo → reutiliza el mismo', async () => {
+    const { createPaymentIntent } = await import('../subscriptions.js');
+
+    vi.clearAllMocks();
+
+    const existingCustomer = await makeCustomer('existing-customer@lyrium-test.io');
+
+    const subWithCustomer = mockDoc({
+      _id: 'sub_cust_2',
+      accountId: 'acc_cust_2',
+      stripeCustomerId: existingCustomer.id,
+      status: 'trial',
+      save: vi.fn(async function (this: any) { return this; }),
+    });
+    SubMock.findOne.mockResolvedValue(subWithCustomer);
+    AccMock.findById.mockResolvedValue(mockDoc({ _id: 'acc_cust_2', email: 'existing-customer@lyrium-test.io' }));
+
+    const req = mockReq({ accountId: 'acc_cust_2', plan: 'advanced', interval: 'annual', autoRenew: false });
+    const res = mockRes();
+    await createPaymentIntent(req, res);
+
+    expect(res.json).toHaveBeenCalled();
+    const data = res.json.mock.calls[0][0];
+    // Debe reutilizar el mismo customer
+    expect(data.customerId).toBe(existingCustomer.id);
+
+    // Verificar el monto correcto para advanced annual = 3700€ = 370000 cents
+    const pi = await stripe.paymentIntents.retrieve(data.paymentIntentId);
+    expect(pi.amount).toBe(370000);
+    expect(pi.metadata.plan).toBe('advanced');
+    expect(pi.metadata.interval).toBe('annual');
+    expect(pi.customer).toBe(existingCustomer.id);
+  });
+});
+
+// =============================================================================
+// SECCIÓN 12: TEST CLOCKS AVANZADOS
+// =============================================================================
+
+describe('12. Test Clocks avanzados', () => {
+  it('Test 48 — Renovación anual → 366 días después Stripe genera nueva factura', async () => {
+    const now = Math.floor(Date.now() / 1000);
+    const testClock = await stripe.testHelpers.testClocks.create({ frozen_time: now });
+    toCleanup.testClocks.push(testClock.id);
+
+    const customer = await stripe.customers.create({
+      email: 'annual-clock@lyrium-test.io',
+      test_clock: testClock.id,
+    });
+    toCleanup.customers.push(customer.id);
+
+    const pm = await makePM();
+    await stripe.paymentMethods.attach(pm.id, { customer: customer.id });
+    await stripe.customers.update(customer.id, {
+      invoice_settings: { default_payment_method: pm.id },
+    });
+
+    const sub = await stripe.subscriptions.create({
+      customer: customer.id,
+      items: [{ price: PRICES.starterAnnual }],
+    });
+    expect(sub.status).toBe('active');
+
+    const originalPeriodEnd = sub.items.data[0].current_period_end;
+
+    // Avanzar 366 días
+    await stripe.testHelpers.testClocks.advance(testClock.id, { frozen_time: now + 366 * 86400 });
+    await waitForTestClock(testClock.id);
+
+    const updatedSub = await stripe.subscriptions.retrieve(sub.id);
+    expect(updatedSub.status).toBe('active');
+    expect(updatedSub.items.data[0].current_period_start).toBeGreaterThanOrEqual(originalPeriodEnd);
+
+    // Al menos 2 facturas pagadas
+    const invoices = await stripe.invoices.list({ subscription: sub.id, limit: 10 });
+    const paid = invoices.data.filter(i => i.status === 'paid');
+    expect(paid.length).toBeGreaterThanOrEqual(2);
+
+    // Monto de renovación = €2100
+    const renewalInvoice = paid.find(i => i.billing_reason === 'subscription_cycle');
+    expect(renewalInvoice).toBeDefined();
+    expect(renewalInvoice!.amount_paid).toBe(210000);
+  });
+
+  it('Test 49 — Cancel at period end → activa hasta fin, luego canceled', async () => {
+    const now = Math.floor(Date.now() / 1000);
+    const testClock = await stripe.testHelpers.testClocks.create({ frozen_time: now });
+    toCleanup.testClocks.push(testClock.id);
+
+    const customer = await stripe.customers.create({
+      email: 'cancel-end-clock@lyrium-test.io',
+      test_clock: testClock.id,
+    });
+    toCleanup.customers.push(customer.id);
+
+    const pm = await makePM();
+    await stripe.paymentMethods.attach(pm.id, { customer: customer.id });
+    await stripe.customers.update(customer.id, {
+      invoice_settings: { default_payment_method: pm.id },
+    });
+
+    const sub = await stripe.subscriptions.create({
+      customer: customer.id,
+      items: [{ price: PRICES.starterMonthly }],
+    });
+
+    // Marcar cancel_at_period_end
+    const cancelScheduled = await stripe.subscriptions.update(sub.id, {
+      cancel_at_period_end: true,
+    });
+    expect(cancelScheduled.status).toBe('active');
+    expect(cancelScheduled.cancel_at_period_end).toBe(true);
+
+    // Avanzar 32 días (pasa el fin del periodo mensual)
+    await stripe.testHelpers.testClocks.advance(testClock.id, { frozen_time: now + 32 * 86400 });
+    await waitForTestClock(testClock.id);
+
+    const finalSub = await stripe.subscriptions.retrieve(sub.id);
+    expect(finalSub.status).toBe('canceled');
+  });
+
+  it('Test 50 — Upgrade Starter→Advanced a mitad de mes → factura de proration', async () => {
+    const now = Math.floor(Date.now() / 1000);
+    const testClock = await stripe.testHelpers.testClocks.create({ frozen_time: now });
+    toCleanup.testClocks.push(testClock.id);
+
+    const customer = await stripe.customers.create({
+      email: 'upgrade-proration@lyrium-test.io',
+      test_clock: testClock.id,
+    });
+    toCleanup.customers.push(customer.id);
+
+    const pm = await makePM();
+    await stripe.paymentMethods.attach(pm.id, { customer: customer.id });
+    await stripe.customers.update(customer.id, {
+      invoice_settings: { default_payment_method: pm.id },
+    });
+
+    const sub = await stripe.subscriptions.create({
+      customer: customer.id,
+      items: [{ price: PRICES.starterMonthly }],
+    });
+    expect(sub.status).toBe('active');
+
+    // Avanzar 15 días (mitad del mes)
+    await stripe.testHelpers.testClocks.advance(testClock.id, { frozen_time: now + 15 * 86400 });
+    await waitForTestClock(testClock.id);
+
+    // Upgrade con proration
+    const updated = await stripe.subscriptions.update(sub.id, {
+      items: [{ id: sub.items.data[0].id, price: PRICES.advancedMonthly }],
+      proration_behavior: 'always_invoice',
+    });
+    expect(updated.items.data[0].price.id).toBe(PRICES.advancedMonthly);
+
+    // Verificar factura de proration
+    const invoices = await stripe.invoices.list({ subscription: sub.id, limit: 10 });
+    const proratedInvoice = invoices.data.find(i => i.billing_reason === 'subscription_update');
+    expect(proratedInvoice).toBeDefined();
+    // Upgrade = cargo positivo (Advanced > Starter)
+    expect(proratedInvoice!.amount_due).toBeGreaterThan(0);
+  });
+});
+
+// =============================================================================
 // SECCIÓN 6: LOGIN CON SUSCRIPCIÓN EXPIRADA
 // =============================================================================
 
@@ -915,7 +1783,7 @@ describe('6. Login con suscripción expirada', () => {
     BcryptMock.compare.mockResolvedValue(true);
   });
 
-  it('Test 27 — Login cuenta principal con suscripción expirada → 403 + needsPayment', async () => {
+  it('Test 51 — Login cuenta principal con suscripción expirada → 403 + needsPayment', async () => {
     // Usuario con email verificado, 2FA activado (para pasar el check 2FA)
     const mockUser = {
       _id: 'acc_27',
@@ -961,7 +1829,7 @@ describe('6. Login con suscripción expirada', () => {
     expect(responseData.type).toBe('main');
   });
 
-  it('Test 28 — Login subcuenta con suscripción expirada → 403 SIN needsPayment', async () => {
+  it('Test 52 — Login subcuenta con suscripción expirada → 403 SIN needsPayment', async () => {
     const mockSubUser = {
       _id: 'subacc_28',
       name: 'Sub User',
@@ -1003,7 +1871,11 @@ describe('6. Login con suscripción expirada', () => {
     expect(responseData.accountId).toBeUndefined();
   });
 
-  it('Test 29 — Usuario paga desde login expirado → siguiente login exitoso', async () => {
+  it('Test 53 — Usuario paga desde login expirado → confirmPayment → siguiente login exitoso', async () => {
+    let confirmPayment: any;
+    const subsMod = await import('../subscriptions.js');
+    confirmPayment = subsMod.confirmPayment;
+
     // Paso 1: Login con sub expirada → 403
     const mockUser = {
       _id: 'acc_29',
@@ -1027,6 +1899,10 @@ describe('6. Login con suscripción expirada', () => {
       accountId: 'acc_29',
       status: 'expired',
       currentPeriodEnd: new Date(Date.now() - 86400000).toISOString(),
+      stripeCustomerId: null,
+      trialEndDate: null,
+      plan: 'starter',
+      interval: 'monthly',
     });
 
     AccMock.findOne.mockResolvedValue(mockUser);
@@ -1040,7 +1916,7 @@ describe('6. Login con suscripción expirada', () => {
     expect(res1.status).toHaveBeenCalledWith(403);
     expect(res1.json.mock.calls[0][0].needsPayment).toBe(true);
 
-    // Paso 2: Pago real en Stripe (simula lo que hace RenewalModal)
+    // Paso 2: Pago real en Stripe
     const customer = await makeCustomer('renew@lyrium.io');
     const pm = await makePM();
     await stripe.paymentMethods.attach(pm.id, { customer: customer.id });
@@ -1057,35 +1933,37 @@ describe('6. Login con suscripción expirada', () => {
 
     expect(pi.status).toBe('succeeded');
 
-    // Paso 3: La app actualiza la suscripción (simula lo que hace confirmPayment)
-    const now = new Date();
-    const periodEnd = new Date(now);
-    periodEnd.setMonth(periodEnd.getMonth() + 1);
+    // Paso 3: Llamar a confirmPayment REAL (no simulación manual)
+    vi.clearAllMocks();
+    expiredSub.stripeCustomerId = customer.id;
+    SubMock.findOne.mockResolvedValue(expiredSub);
+    AccMock.findById.mockResolvedValue(mockDoc({ _id: 'acc_29', email: 'renew@lyrium.io' }));
 
-    const activeSub = mockDoc({
-      _id: 'sub_29',
-      accountId: 'acc_29',
-      status: 'active',
-      plan: 'starter',
-      interval: 'monthly',
-      currentPeriodStart: now.toISOString(),
-      currentPeriodEnd: periodEnd.toISOString(),
-      stripeCustomerId: customer.id,
-      paymentMethod: { brand: 'visa', last4: '4242' },
-    });
+    const reqConfirm = mockReq({ accountId: 'acc_29', plan: 'starter', interval: 'monthly', paymentIntentId: pi.id });
+    const resConfirm = mockRes();
+    await confirmPayment(reqConfirm, resConfirm);
 
-    // Paso 4: Siguiente login con sub activa → 200
+    expect(resConfirm.json).toHaveBeenCalled();
+    expect(resConfirm.json.mock.calls[0][0].success).toBe(true);
+    // La suscripción ahora debe estar activa
+    expect(expiredSub.status).toBe('active');
+    expect(expiredSub.plan).toBe('starter');
+    expect(expiredSub.paymentMethod.brand).toBe('visa');
+    expect(expiredSub.paymentMethod.last4).toBe('4242');
+    const periodEnd = new Date(expiredSub.currentPeriodEnd);
+    expect(periodEnd.getTime()).toBeGreaterThan(Date.now());
+
+    // Paso 4: Siguiente login con sub ahora activa → 200
     vi.clearAllMocks();
     BcryptMock.compare.mockResolvedValue(true);
     AccMock.findOne.mockResolvedValue(mockUser);
     SubaccMock.findOne.mockResolvedValue(null);
-    SubMock.findOne.mockResolvedValue(activeSub);
+    SubMock.findOne.mockResolvedValue(expiredSub);
 
     const req2 = mockReq({ email: 'renew@lyrium.io', password: 'Test1234!', totpCode: '123456' });
     const res2 = mockRes();
     await login(req2, res2);
 
-    // Ahora debe pasar: 200 con token
     expect(res2.json).toHaveBeenCalled();
     const successData = res2.json.mock.calls[0][0];
     expect(successData.success).toBe(true);

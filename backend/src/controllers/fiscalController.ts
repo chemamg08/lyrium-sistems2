@@ -1,6 +1,6 @@
 import { Request, Response } from 'express';
 import { sendEmail, getEmailConfig, saveEmailConfig } from '../services/emailService.js';
-import { callFiscalAI, streamFiscalAI, getAiClient, AI_MODEL } from '../services/aiService.js';
+import { callFiscalAI, streamFiscalAI, getAiClient, AI_MODEL, buildContextMessages } from '../services/aiService.js';
 import { generateFiscalReportPDF } from '../services/pdfService.js';
 import { getAccountSpecialties } from '../services/specialtiesService.js';
 import { getLegalContextForAccount, buildCountryLegalSystemPrompt , getAccountCountry } from '../services/legalKnowledgeService.js';
@@ -469,9 +469,11 @@ export async function sendAccountMessage(req: Request, res: Response) {
       legalCountryPrompt = buildCountryLegalSystemPrompt(legalContext.country, legalContext.context);
     }
 
+    const { contextMessages: acctCtx, newSummary: acctSummary } = await buildContextMessages(chat.messages as any, chat.summary);
+    if (acctSummary !== null) { chat.summary = acctSummary; }
     const aiResponse = await callFiscalAI(
       null,
-      chat.messages as any,
+      acctCtx as any,
       selectedSpecialties,
       legalCountryPrompt || undefined,
       undefined,
@@ -596,9 +598,11 @@ export async function sendMessage(req: Request, res: Response) {
     }
 
     // Get AI response
+    const { contextMessages: sendCtx, newSummary: sendSummary } = await buildContextMessages(chat.messages as any, chat.summary);
+    if (sendSummary !== null) { chat.summary = sendSummary; }
     const aiResponse = await callFiscalAI(
       profile || null,
-      chat.messages as any,
+      sendCtx as any,
       selectedSpecialties,
       legalCountryPrompt || undefined,
       undefined,
@@ -906,9 +910,11 @@ export async function sendFiscalChatMessage(req: Request, res: Response) {
       legalCountryPrompt = buildCountryLegalSystemPrompt(legalContext.country, legalContext.context);
     }
 
+    const { contextMessages: fiscalCtx, newSummary: fiscalSummary } = await buildContextMessages(chat.messages as any, chat.summary);
+    if (fiscalSummary !== null) { chat.summary = fiscalSummary; }
     const aiResponse = await callFiscalAI(
       null,
-      chat.messages as any,
+      fiscalCtx as any,
       selectedSpecialties,
       legalCountryPrompt || undefined,
       clientContext,
@@ -1053,7 +1059,9 @@ export async function streamFiscalChatMessage(req: Request, res: Response) {
       legalCountryPrompt = buildCountryLegalSystemPrompt(legalContext.country, legalContext.context);
     }
 
-    const fullText = await streamFiscalAI(res, null, chat.messages as any, selectedSpecialties, legalCountryPrompt || undefined, clientContext, accountCountryName, accountCountry);
+    const { contextMessages: streamFiscalCtx, newSummary: streamFiscalSummary } = await buildContextMessages(chat.messages as any, chat.summary);
+    if (streamFiscalSummary !== null) { chat.summary = streamFiscalSummary; }
+    const fullText = await streamFiscalAI(res, null, streamFiscalCtx as any, selectedSpecialties, legalCountryPrompt || undefined, clientContext, accountCountryName, accountCountry);
 
     const aiMessage = { role: 'assistant' as const, content: fullText, timestamp: new Date().toISOString() };
     chat.messages.push(aiMessage);

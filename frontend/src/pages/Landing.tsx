@@ -219,9 +219,12 @@ const Landing = () => {
       {/* NAV */}
       <nav className={`fixed top-0 left-0 right-0 z-50 flex items-center justify-between px-4 md:px-8 py-4 border-b transition-all duration-300 ${scrolled ? "border-white/8 bg-[#080808]/90 backdrop-blur-md" : "border-transparent bg-transparent"}`}>
         {/* Logo */}
-        <div className="flex items-center gap-2.5">
-          <Scale className="h-5 w-5 text-white" />
-          <span className="text-lg font-semibold tracking-tight">Lyrium</span>
+        <div className="flex flex-col gap-0.5">
+          <div className="flex items-center gap-2.5">
+            <Scale className="h-5 w-5 text-white" />
+            <span className="text-lg font-semibold tracking-tight">Lyrium</span>
+          </div>
+          <span className="text-[9px] text-white/25 tracking-widest uppercase ml-0.5">Powered by Claude</span>
         </div>
 
         {/* Central nav links */}

@@ -1,6 +1,6 @@
 import { Request, Response } from 'express';
 import fs from 'fs/promises';
-import { callAssistantAI, streamAssistantAI } from '../services/aiService.js';
+import { callAssistantAI, streamAssistantAI, buildContextMessages } from '../services/aiService.js';
 import { getAccountSpecialties } from '../services/specialtiesService.js';
 import { getLegalContextForAccount, buildCountryLegalSystemPrompt, getAccountCountry } from '../services/legalKnowledgeService.js';
 import { hasLegalIntent } from '../services/legalIntentService.js';
@@ -201,12 +201,10 @@ export const sendAssistantMessage = async (req: Request, res: Response) => {
       legalCountryPrompt = buildCountryLegalSystemPrompt(legalContext.country, legalContext.context);
     }
 
-    const aiMessages = accountChat.messages.map((m) => ({
-      role: m.role,
-      content: m.content
-    }));
+    const { contextMessages: assistCtx, newSummary: assistSummary } = await buildContextMessages(accountChat.messages as any, accountChat.summary);
+    if (assistSummary !== null) { accountChat.summary = assistSummary; }
 
-    const aiResponse = await callAssistantAI(aiMessages, selectedSpecialties, legalCountryPrompt || undefined, accountCountry);
+    const aiResponse = await callAssistantAI(assistCtx, selectedSpecialties, legalCountryPrompt || undefined, accountCountry);
 
     const assistantMessage: Message = {
       id: (Date.now() + 1).toString(),
@@ -259,21 +257,23 @@ export const streamAssistantMessage = async (req: Request, res: Response) => {
       legalCountryPrompt = buildCountryLegalSystemPrompt(legalContext.country, legalContext.context);
     }
 
-    const aiMessages = accountChat.messages.map((m) => ({ role: m.role, content: m.content }));
+    const rawAssistMsgs = accountChat.messages.map((m) => ({ role: m.role, content: m.content }));
+    const { contextMessages: assistStreamCtx, newSummary: assistStreamSummary } = await buildContextMessages(rawAssistMsgs, accountChat.summary);
+    if (assistStreamSummary !== null) { accountChat.summary = assistStreamSummary; }
 
     // RAG: Search improve AI files if ragEnabled
     let ragContext: string | undefined;
     let ragFound = false;
     if (req.body.ragEnabled) {
       const { searchImproveAIContext } = await import('../services/ragService.js');
-      const ragResult = await searchImproveAIContext(accountId, aiMessages);
+      const ragResult = await searchImproveAIContext(accountId, rawAssistMsgs);
       if (ragResult.found) {
         ragContext = ragResult.context;
         ragFound = true;
       }
     }
 
-    const fullText = await streamAssistantAI(res, aiMessages, selectedSpecialties, legalCountryPrompt || undefined, accountCountry, fileContext || undefined, ragContext, ragFound);
+    const fullText = await streamAssistantAI(res, assistStreamCtx, selectedSpecialties, legalCountryPrompt || undefined, accountCountry, fileContext || undefined, ragContext, ragFound);
 
     // Save assistant message after stream completes
     const assistantContent = ragFound ? `${fullText}\n<!-- rag-enhanced -->` : fullText;

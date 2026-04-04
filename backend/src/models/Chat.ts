@@ -15,6 +15,7 @@ export interface IChat {
   source: string;
   createdBy: string;
   messages: IMessage[];
+  summary?: string;
 }
 
 const messageSchema = new Schema({
@@ -32,6 +33,7 @@ const chatSchema = new Schema<IChat>({
   source: { type: String, default: 'client' },
   createdBy: { type: String, default: '' },
   messages: { type: [messageSchema], default: [] },
+  summary: { type: String, default: null },
 }, { _id: false, versionKey: false });
 
 chatSchema.set('toJSON', {

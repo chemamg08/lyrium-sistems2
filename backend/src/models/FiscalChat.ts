@@ -15,6 +15,7 @@ export interface IFiscalChat {
   messages: IFiscalMessage[];
   createdAt: string;
   updatedAt: string;
+  summary?: string;
 }
 
 const fiscalMessageSchema = new Schema({
@@ -32,6 +33,7 @@ const fiscalChatSchema = new Schema<IFiscalChat>({
   messages: { type: [fiscalMessageSchema], default: [] },
   createdAt: { type: String, default: () => new Date().toISOString() },
   updatedAt: { type: String, default: () => new Date().toISOString() },
+  summary: { type: String, default: null },
 }, { _id: false, versionKey: false });
 
 fiscalChatSchema.set('toJSON', {

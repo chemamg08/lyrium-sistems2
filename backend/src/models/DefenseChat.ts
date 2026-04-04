@@ -33,6 +33,7 @@ export interface IDefenseChat {
   messages: IDefenseMessage[];
   savedStrategies: ISavedStrategy[];
   awaitingStrategyConfirmation: boolean;
+  summary?: string;
 }
 
 const defenseMessageSchema = new Schema({
@@ -61,6 +62,7 @@ const defenseChatSchema = new Schema<IDefenseChat>({
   messages: { type: [defenseMessageSchema], default: [] },
   savedStrategies: { type: [savedStrategySchema], default: [] },
   awaitingStrategyConfirmation: { type: Boolean, default: false },
+  summary: { type: String, default: null },
 }, { _id: false, versionKey: false });
 
 defenseChatSchema.set('toJSON', {

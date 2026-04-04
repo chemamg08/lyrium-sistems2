@@ -1,5 +1,5 @@
 import { Request, Response } from 'express';
-import { callClientAI, streamClientAI } from '../services/aiService.js';
+import { callClientAI, streamClientAI, buildContextMessages } from '../services/aiService.js';
 import { getAccountSpecialties, filterContextBySpecialties } from '../services/specialtiesService.js';
 import { getLegalContextForAccount, buildCountryLegalSystemPrompt, getAccountCountry } from '../services/legalKnowledgeService.js';
 import { hasLegalIntent } from '../services/legalIntentService.js';
@@ -122,11 +122,9 @@ export const sendClientMessage = async (req: Request, res: Response) => {
       console.error('Error al obtener documentos del cliente:', error);
     }
 
-    // Preparar mensajes para IA
-    const aiMessages = chat.messages.map((m: any) => ({
-      role: m.role as 'user' | 'assistant',
-      content: m.content
-    }));
+    // Preparar mensajes para IA (con token-budget)
+    const { contextMessages, newSummary } = await buildContextMessages(chat.messages as any, chat.summary);
+    if (newSummary !== null) { chat.summary = newSummary; }
 
     const selectedSpecialties = accountIdForSpecialties
       ? await getAccountSpecialties(accountIdForSpecialties)
@@ -157,7 +155,7 @@ export const sendClientMessage = async (req: Request, res: Response) => {
 
     // Llamar a IA con contexto de documentos
     const aiResponse = await callClientAI(
-      aiMessages,
+      contextMessages,
       filteredDocumentsContext || undefined,
       selectedSpecialties,
       legalCountryPrompt || undefined,
@@ -211,7 +209,8 @@ export const streamClientMessage = async (req: Request, res: Response) => {
       }
     } catch (e) { /* ignore */ }
 
-    const aiMessages = chat.messages.map((m: any) => ({ role: m.role as 'user' | 'assistant', content: m.content }));
+    const { contextMessages: streamCtx, newSummary: streamSummary } = await buildContextMessages(chat.messages as any, chat.summary);
+    if (streamSummary !== null) { chat.summary = streamSummary; }
     const selectedSpecialties = accountIdForSpecialties ? await getAccountSpecialties(accountIdForSpecialties) : [];
     const filteredDocumentsContext = filterContextBySpecialties(documentsContext, selectedSpecialties, content.trim(), 12000);
     let legalCountryPrompt = '';
@@ -224,7 +223,7 @@ export const streamClientMessage = async (req: Request, res: Response) => {
       }
     }
 
-    const fullText = await streamClientAI(res, aiMessages, filteredDocumentsContext || undefined, selectedSpecialties, legalCountryPrompt || undefined, accountCountry);
+    const fullText = await streamClientAI(res, streamCtx, filteredDocumentsContext || undefined, selectedSpecialties, legalCountryPrompt || undefined, accountCountry);
 
     const assistantMessage: Message = { id: (Date.now() + 1).toString(), role: 'assistant', content: fullText };
     chat.messages.push(assistantMessage);

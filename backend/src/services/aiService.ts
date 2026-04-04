@@ -148,6 +148,97 @@ IMPORTANTE: Debes responder ÚNICAMENTE con un JSON válido (sin markdown, sin b
 
 Si no encuentras mejoras, devuelve: {"suggestions": []}`;
 
+// ── Token-budget context management ──────────────────────────────────────────
+// Each character ≈ 0.25 tokens. Budget = 320k chars ≈ 80k tokens.
+// With 120k context window and ~25k system overhead, this leaves ~95k for
+// history. We budget conservatively at 80k so there is always room for the
+// response. In practice, most conversations never approach this limit.
+const HISTORY_CHAR_BUDGET = 320_000;
+
+async function generateChatSummary(
+  messages: { role: string; content: string }[],
+  existingSummary?: string | null
+): Promise<string> {
+  const previousContext = existingSummary
+    ? `Current summary to update:\n${existingSummary}\n\nNew messages to integrate:\n`
+    : '';
+  const conversationText = messages
+    .map(m => `${m.role === 'user' ? 'User' : 'Assistant'}: ${m.content}`)
+    .join('\n\n');
+  const response = await getClient().chat.completions.create({
+    model: AI_MODEL,
+    messages: [
+      {
+        role: 'system',
+        content:
+          'You are a legal assistant summarizer. Create a concise but thorough summary of the conversation, preserving all key facts, decisions, legal issues, dates, amounts, and important context. Write in the same language as the conversation. This summary will replace the full history for future AI calls.',
+      },
+      {
+        role: 'user',
+        content: `${previousContext}${conversationText}\n\nCreate a comprehensive summary of the key points discussed.`,
+      },
+    ],
+    max_tokens: 800,
+    temperature: 0.1,
+  });
+  return response.choices[0].message.content || '';
+}
+
+export interface ContextResult {
+  contextMessages: Message[];
+  newSummary: string | null;
+}
+
+/**
+ * Trims chat history to fit within the token budget.
+ * - If everything fits → returns messages as-is (prepending existing summary if any).
+ * - If overflow → keeps the most-recent messages that fit, compacts the rest
+ *   into a new summary, and returns that summary + recent messages.
+ * Returns { contextMessages, newSummary } where newSummary is non-null only
+ * when a new compaction was performed and must be persisted by the caller.
+ */
+export async function buildContextMessages(
+  rawMessages: { role: string; content: string }[],
+  existingSummary?: string | null
+): Promise<ContextResult> {
+  const totalChars = rawMessages.reduce((sum, m) => sum + m.content.length, 0);
+
+  // Happy path: everything fits — just prepend summary if present
+  if (totalChars <= HISTORY_CHAR_BUDGET) {
+    const contextMessages: Message[] = [];
+    if (existingSummary) {
+      contextMessages.push({
+        role: 'system',
+        content: `[RESUMEN DE CONVERSACIÓN PREVIA — Esta conversación ya está en curso. Ya te has presentado al usuario. NO te vuelvas a presentar ni digas "Hola". Continúa directamente con el tema.]\n\n${existingSummary}`,
+      });
+    }
+    contextMessages.push(
+      ...rawMessages.map(m => ({ role: m.role as Message['role'], content: m.content }))
+    );
+    return { contextMessages, newSummary: null };
+  }
+
+  // Overflow path: keep the most-recent messages that fit the budget
+  const recent: { role: string; content: string }[] = [];
+  let accumulated = 0;
+  for (let i = rawMessages.length - 1; i >= 0; i--) {
+    const len = rawMessages[i].content.length;
+    if (accumulated + len > HISTORY_CHAR_BUDGET) break;
+    recent.unshift(rawMessages[i]);
+    accumulated += len;
+  }
+
+  const toCompact = rawMessages.slice(0, rawMessages.length - recent.length);
+  const newSummary = await generateChatSummary(toCompact, existingSummary);
+
+  const contextMessages: Message[] = [
+    { role: 'system', content: `[RESUMEN DE CONVERSACIÓN PREVIA — Esta conversación ya está en curso. Ya te has presentado al usuario. NO te vuelvas a presentar ni digas "Hola". Continúa directamente con el tema.]\n\n${newSummary}` },
+    ...recent.map(m => ({ role: m.role as Message['role'], content: m.content })),
+  ];
+
+  return { contextMessages, newSummary };
+}
+
 export async function callDefenseAI(messages: Message[], specialties: string[] = [], legalCountryContext?: string, country?: string): Promise<string> {
   try {
     const identityContext = buildIdentityContext();

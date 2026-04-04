@@ -2,7 +2,7 @@ import { Request, Response } from 'express';
 import fs from 'fs/promises';
 import path from 'path';
 import { fileURLToPath } from 'url';
-import { callDefenseAI, extractDefenseStrategy, streamDefenseAI, getAiClient, AI_MODEL } from '../services/aiService.js';
+import { callDefenseAI, extractDefenseStrategy, streamDefenseAI, getAiClient, AI_MODEL, buildContextMessages } from '../services/aiService.js';
 import { generateDefensePDF } from '../services/pdfService.js';
 import { getAccountSpecialties } from '../services/specialtiesService.js';
 import { getLegalContextForAccount, buildCountryLegalSystemPrompt, getAccountCountry } from '../services/legalKnowledgeService.js';
@@ -346,11 +346,9 @@ export const sendDefenseMessage = async (req: Request, res: Response) => {
     chat.messages.push(userMessage);
     chat.lastModified = new Date().toISOString();
 
-    // Preparar mensajes para IA (convertir a formato OpenAI)
-    const aiMessages = chat.messages.map(m => ({
-      role: m.role as 'user' | 'assistant',
-      content: m.content
-    }));
+    // Preparar mensajes para IA (con token-budget)
+    const { contextMessages, newSummary } = await buildContextMessages(chat.messages as any, chat.summary);
+    if (newSummary !== null) { chat.summary = newSummary; }
 
     const selectedSpecialties = await getAccountSpecialties(accountId);
     const accountCountry = await getAccountCountry(accountId);
@@ -361,7 +359,7 @@ export const sendDefenseMessage = async (req: Request, res: Response) => {
     }
 
     // Llamar a IA
-    const aiResponse = await callDefenseAI(aiMessages, selectedSpecialties, legalCountryPrompt || undefined, accountCountry);
+    const aiResponse = await callDefenseAI(contextMessages, selectedSpecialties, legalCountryPrompt || undefined, accountCountry);
 
     // Detectar si la IA está preguntando por guardar/actualizar estrategia
     const aiTextLower2 = aiResponse.toLowerCase();
@@ -548,7 +546,9 @@ export const streamDefenseMessage = async (req: Request, res: Response) => {
       }
     }
 
-    const aiMessages = chat.messages.map(m => ({ role: m.role as 'user' | 'assistant', content: m.content }));
+    const rawDefMsgs = chat.messages.map(m => ({ role: m.role as 'user' | 'assistant', content: m.content }));
+    const { contextMessages: defStreamCtx, newSummary: defStreamSummary } = await buildContextMessages(rawDefMsgs, chat.summary);
+    if (defStreamSummary !== null) { chat.summary = defStreamSummary; }
     const selectedSpecialties = await getAccountSpecialties(accountId);
     const accountCountry = await getAccountCountry(accountId);
     let legalCountryPrompt = '';
@@ -562,14 +562,14 @@ export const streamDefenseMessage = async (req: Request, res: Response) => {
     let ragFound = false;
     if (req.body.ragEnabled) {
       const { searchImproveAIContext } = await import('../services/ragService.js');
-      const ragResult = await searchImproveAIContext(accountId, aiMessages);
+      const ragResult = await searchImproveAIContext(accountId, rawDefMsgs);
       if (ragResult.found) {
         ragContext = ragResult.context;
         ragFound = true;
       }
     }
 
-    const fullText = await streamDefenseAI(res, aiMessages, selectedSpecialties, legalCountryPrompt || undefined, accountCountry, ragContext, ragFound);
+    const fullText = await streamDefenseAI(res, defStreamCtx, selectedSpecialties, legalCountryPrompt || undefined, accountCountry, ragContext, ragFound);
 
     const defAssistantContent = ragFound ? `${fullText}\n<!-- rag-enhanced -->` : fullText;
     const assistantMessage: Message = { id: (Date.now() + 1).toString(), role: 'assistant', content: defAssistantContent };

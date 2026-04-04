@@ -7,7 +7,7 @@ import { getAccountSpecialties, filterContextBySpecialties, buildSpecialtiesSyst
 import { getLegalContextForAccount, buildCountryLegalSystemPrompt, getAccountCountry, getCountryName } from '../services/legalKnowledgeService.js';
 import { searchWeb } from '../services/tavilyService.js';
 import { hasLegalIntent } from '../services/legalIntentService.js';
-import { streamAIResponse, AI_MODEL } from '../services/aiService.js';
+import { streamAIResponse, AI_MODEL, buildContextMessages } from '../services/aiService.js';
 import { DocumentSummariesChat } from '../models/DocumentSummariesChat.js';
 import { sanitizeFilename } from '../utils/sanitizeFilename.js';
 import { verifyOwnership } from '../middleware/auth.js';
@@ -623,13 +623,15 @@ export const sendMessage = async (req: Request, res: Response) => {
       (webContext ? `\n\n${webContext}` : '') +
       documentsContext;
     
-    // Preparar mensajes para IA (historial completo)
+    // Preparar mensajes para IA (con token-budget)
+    const { contextMessages: docCtxMsgs, newSummary: docNewSummary } = await buildContextMessages(
+      chat.messages.map((m: any) => ({ role: m.role, content: m.content })),
+      (chat as any).chatSummary
+    );
+    if (docNewSummary !== null) { (chat as any).chatSummary = docNewSummary; }
     const aiMessages: any[] = [
       { role: 'system', content: systemContent },
-      ...chat.messages.map((m: any) => ({
-        role: m.role,
-        content: m.content
-      }))
+      ...docCtxMsgs
     ];
     
     // Llamar a IA
@@ -724,9 +726,13 @@ export const streamMessage = async (req: Request, res: Response) => {
       documentsContext +
       (ragContext ? `\n\n${ragContext}` : '');
     const systemMessages = [{ role: 'system', content: systemContent }];
-    const chatMessages = chat.messages.map((m: any) => ({ role: m.role, content: m.content }));
+    const { contextMessages: docStreamCtx, newSummary: docStreamSummary } = await buildContextMessages(
+      chat.messages.map((m: any) => ({ role: m.role, content: m.content })),
+      (chat as any).chatSummary
+    );
+    if (docStreamSummary !== null) { (chat as any).chatSummary = docStreamSummary; }
 
-    const fullText = await streamAIResponse(res, systemMessages, chatMessages, 2000, 0.3, ragFound ? { ragEnhanced: true } : undefined);
+    const fullText = await streamAIResponse(res, systemMessages, docStreamCtx, 2000, 0.3, ragFound ? { ragEnhanced: true } : undefined);
 
     const docAssistantContent = ragFound ? `${fullText}\n<!-- rag-enhanced -->` : fullText;
     const assistantMessage: Message = { id: (Date.now() + 1).toString(), role: 'assistant', content: docAssistantContent };

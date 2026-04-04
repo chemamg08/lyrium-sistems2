@@ -13,7 +13,7 @@ import { getAccountSpecialties, buildSpecialtiesSystemPrompt } from '../services
 import { getLegalContextForAccount, buildCountryLegalSystemPrompt, getAccountCountry, getCountryName } from '../services/legalKnowledgeService.js';
 import { searchWeb } from '../services/tavilyService.js';
 import { hasLegalIntent } from '../services/legalIntentService.js';
-import { streamAIResponse, AI_MODEL } from '../services/aiService.js';
+import { streamAIResponse, AI_MODEL, buildContextMessages } from '../services/aiService.js';
 import { ContractChat } from '../models/ContractChat.js';
 import { GeneratedContract } from '../models/GeneratedContract.js';
 import { Contract } from '../models/Contract.js';
@@ -514,12 +514,17 @@ export const sendContractMessage = async (req: Request, res: Response) => {
         const freeChatCountry = chat.accountId ? await getAccountCountry(chat.accountId) : 'ES';
         const freeChatFecha = getDateForCountry(freeChatCountry);
         const countryLine = `\nJurisdicción del usuario: ${getCountryName(freeChatCountry)}. Toda referencia a normativa, legislación o jurisdicción debe corresponder a ${getCountryName(freeChatCountry)}.`;
+        const { contextMessages: freeCtxMsgs, newSummary: freeNewSummary } = await buildContextMessages(
+          chat.messages.map((m: any) => ({ role: m.role === 'system' ? 'assistant' : m.role, content: m.content })),
+          chat.summary
+        );
+        if (freeNewSummary !== null) { chat.summary = freeNewSummary; }
         const freeAiMessages: any[] = [
           {
             role: 'system',
             content: buildContractSystemPrompt(freeChatFecha) + countryLine + '\n\nEstás en modo consulta libre / redacción desde cero. No hay contrato base cargado. Si el usuario pide redactar un contrato, aplica el MODO B del flujo. Si es una consulta legal general, responde de forma precisa y profesional.'
           },
-          ...chat.messages.map((m: any) => ({ role: m.role === 'system' ? 'assistant' : m.role, content: m.content }))
+          ...freeCtxMsgs
         ];
 
         const freeResponse = await getClient().chat.completions.create({
@@ -606,9 +611,14 @@ El abogado quiere ${isTemporary ? 'analizar y modificar' : 'modificar'} este con
       if (webResult) webContext = webResult;
     }
 
-    // Preparar mensajes para IA
+    // Preparar mensajes para IA (con token-budget)
     const fecha = getDateForCountry(accountCountry);
     const alwaysCountryLine = `\nJurisdicción del usuario: ${getCountryName(accountCountry)}. Toda referencia a normativa, legislación o jurisdicción debe corresponder a ${getCountryName(accountCountry)}.`;
+    const { contextMessages: mainCtxMsgs, newSummary: mainNewSummary } = await buildContextMessages(
+      chat.messages.map((m: any) => ({ role: m.role === 'system' ? 'assistant' : m.role, content: m.content })),
+      chat.summary
+    );
+    if (mainNewSummary !== null) { chat.summary = mainNewSummary; }
     const aiMessages: any[] = [
       {
         role: 'system',
@@ -620,10 +630,7 @@ El abogado quiere ${isTemporary ? 'analizar y modificar' : 'modificar'} este con
           '\n\n' +
           contractContext
       },
-      ...chat.messages.map((m: any) => ({
-        role: m.role === 'system' ? 'assistant' : m.role,
-        content: m.content
-      }))
+      ...mainCtxMsgs
     ];
 
     // Llamar a IA
@@ -819,9 +826,13 @@ export const streamContractMessage = async (req: Request, res: Response) => {
         (contractContext ? `\n\n${contractContext}` : '') +
         (ragContext ? `\n\n${ragContext}` : '')
     }];
-    const chatMessages = chat.messages.map((m: any) => ({ role: m.role === 'system' ? 'assistant' : m.role, content: m.content }));
+    const { contextMessages: streamCtxMsgs, newSummary: streamNewSummary } = await buildContextMessages(
+      chat.messages.map((m: any) => ({ role: m.role === 'system' ? 'assistant' : m.role, content: m.content })),
+      chat.summary
+    );
+    if (streamNewSummary !== null) { chat.summary = streamNewSummary; }
 
-    const fullText = await streamAIResponse(res, systemMessages, chatMessages, 4000, 0.3, ragFound ? { ragEnhanced: true } : undefined);
+    const fullText = await streamAIResponse(res, systemMessages, streamCtxMsgs, 4000, 0.3, ragFound ? { ragEnhanced: true } : undefined);
 
     // Detectar si la IA quiere generar el contrato completo
     const generateMatch = fullText.includes('[GENERAR_CONTRATO_COMPLETO]');
