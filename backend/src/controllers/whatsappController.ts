@@ -104,7 +104,7 @@ export const connectWhatsApp: RequestHandler = async (req, res) => {
 
     const redirectUri = getMetaCallbackUrl(req);
     const result = await waService.createInstance(accountId, redirectUri);
-    res.json({ ok: true, instanceName: result.instanceName, authUrl: result.authUrl });
+    res.json({ ok: true, instanceName: result.instanceName, authUrl: result.authUrl, redirectUri });
   } catch (err: any) {
     console.error('[WA] connectWhatsApp error:', err);
     res.status(500).json({ error: err.message });
