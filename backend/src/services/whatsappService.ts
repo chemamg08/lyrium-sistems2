@@ -598,8 +598,9 @@ async function connectMetaWithCodeInternal(
   const tokenUrl = new URL(`${META_GRAPH_BASE}/oauth/access_token`);
   tokenUrl.searchParams.set('client_id', appId);
   tokenUrl.searchParams.set('client_secret', appSecret);
-  // Embedded Signup flow: omit redirect_uri (Meta JS SDK handles internally)
-  if (redirectUri) tokenUrl.searchParams.set('redirect_uri', redirectUri);
+  // Embedded Signup (FB.login) always uses this URI internally — must match exactly
+  const finalRedirectUri = redirectUri || 'https://www.facebook.com/connect/login_success.html';
+  tokenUrl.searchParams.set('redirect_uri', finalRedirectUri);
   tokenUrl.searchParams.set('code', code);
 
   const tokenRes = await fetch(tokenUrl.toString());
