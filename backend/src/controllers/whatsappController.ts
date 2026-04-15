@@ -102,7 +102,7 @@ export const connectWhatsApp: RequestHandler = async (req, res) => {
       return;
     }
 
-    const redirectUri = getMetaCallbackUrl(req);
+    const redirectUri = `${getFrontendAutomationsUrl()}?wa_meta=1`;
     const result = await waService.createInstance(accountId, redirectUri);
     res.json({ ok: true, instanceName: result.instanceName, authUrl: result.authUrl, redirectUri });
   } catch (err: any) {
