@@ -704,19 +704,31 @@ export async function connectMetaWithToken(
     // Keep short-lived token if exchange fails
   }
 
-  // User tokens from FB.login don't support /me/whatsapp_business_accounts directly.
-  // Try it first (works with some token types), then fall back via /me/businesses.
-  const wabaResp = await graphFetchJson<any>('/me/whatsapp_business_accounts', accessToken);
-  let waba: any = Array.isArray(wabaResp?.data) && wabaResp.data.length > 0 ? wabaResp.data[0] : null;
+  // graphFetchJson throws on non-2xx, so wrap the first attempt to enable fallback.
+  // User tokens from FB.login do NOT support /me/whatsapp_business_accounts — must go via /me/businesses.
+  let waba: any = null;
+
+  try {
+    const wabaResp = await graphFetchJson<any>('/me/whatsapp_business_accounts', accessToken);
+    if (Array.isArray(wabaResp?.data) && wabaResp.data.length > 0) {
+      waba = wabaResp.data[0];
+    }
+  } catch {
+    // expected for user tokens from FB.login — fall through to /me/businesses
+  }
 
   if (!waba?.id) {
     const bizResp = await graphFetchJson<any>('/me/businesses', accessToken);
     const businesses: any[] = Array.isArray(bizResp?.data) ? bizResp.data : [];
     for (const biz of businesses) {
-      const bwabaResp = await graphFetchJson<any>(`/${biz.id}/whatsapp_business_accounts`, accessToken);
-      if (Array.isArray(bwabaResp?.data) && bwabaResp.data.length > 0) {
-        waba = bwabaResp.data[0];
-        break;
+      try {
+        const bwabaResp = await graphFetchJson<any>(`/${biz.id}/whatsapp_business_accounts`, accessToken);
+        if (Array.isArray(bwabaResp?.data) && bwabaResp.data.length > 0) {
+          waba = bwabaResp.data[0];
+          break;
+        }
+      } catch {
+        // try next business
       }
     }
   }
