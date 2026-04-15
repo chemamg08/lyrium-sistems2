@@ -2,6 +2,7 @@ import { Router } from 'express';
 import {
   connectWhatsApp,
   connectWhatsAppWithCode,
+  connectWhatsAppWithToken,
   getWhatsAppStatus,
   disconnectWhatsApp,
   updateWhatsAppSwitch,
@@ -30,6 +31,7 @@ const router = Router();
 // Instance management
 router.post('/connect', connectWhatsApp);
 router.post('/meta/connect', connectWhatsAppWithCode);
+router.post('/meta/connect-token', connectWhatsAppWithToken);
 router.get('/status', getWhatsAppStatus);
 router.post('/disconnect', disconnectWhatsApp);
 

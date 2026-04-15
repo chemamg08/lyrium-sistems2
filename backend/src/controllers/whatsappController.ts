@@ -137,6 +137,32 @@ export const connectWhatsAppWithCode: RequestHandler = async (req, res) => {
   }
 };
 
+export const connectWhatsAppWithToken: RequestHandler = async (req, res) => {
+  try {
+    const { accountId, state, accessToken } = req.body;
+    if (!accountId || !state || !accessToken) {
+      res.status(400).json({ error: 'accountId, state y accessToken requeridos' });
+      return;
+    }
+    if (!verifyOwnership(req as AuthRequest, accountId)) {
+      res.status(403).json({ error: 'Acceso denegado' });
+      return;
+    }
+
+    const missingRequired = getMissingEnvVars(REQUIRED_META_CONNECT_ENV);
+    if (missingRequired.length > 0) {
+      sendMetaConfigError(res);
+      return;
+    }
+
+    const data = await waService.connectMetaWithToken(accountId, state, accessToken);
+    res.json({ ok: true, ...data });
+  } catch (err: any) {
+    console.error('[WA] connectWhatsAppWithToken error:', err);
+    res.status(500).json({ error: err.message || 'Error conectando WhatsApp con Meta' });
+  }
+};
+
 export const whatsappMetaCallback: RequestHandler = async (req, res) => {
   try {
     const code = String(req.query.code || '');

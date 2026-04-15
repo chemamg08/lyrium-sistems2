@@ -670,6 +670,70 @@ export async function connectMetaWithCode(
   return connectMetaWithCodeInternal(account, code, state, redirectUri);
 }
 
+export async function connectMetaWithToken(
+  accountId: string,
+  state: string,
+  shortLivedToken: string,
+): Promise<{ connected: boolean; phoneNumber?: string; phoneNumberId?: string }> {
+  const account = await Automation.findById(accountId);
+  if (!account) throw new Error('Cuenta no encontrada');
+
+  const expectedState = account.whatsappOAuthState || '';
+  const expectedExp = account.whatsappOAuthStateExpires || '';
+  if (!expectedState || expectedState !== state) throw new Error('State OAuth inválido');
+  if (!expectedExp || new Date(expectedExp).getTime() < Date.now()) throw new Error('State OAuth expirado');
+
+  const appId = getMetaAppId();
+  const appSecret = getMetaAppSecret();
+
+  let accessToken = shortLivedToken;
+
+  // Exchange short-lived token for long-lived token
+  try {
+    const llUrl = new URL(`${META_GRAPH_BASE}/oauth/access_token`);
+    llUrl.searchParams.set('grant_type', 'fb_exchange_token');
+    llUrl.searchParams.set('client_id', appId);
+    llUrl.searchParams.set('client_secret', appSecret);
+    llUrl.searchParams.set('fb_exchange_token', shortLivedToken);
+    const llRes = await fetch(llUrl.toString());
+    if (llRes.ok) {
+      const llData = await llRes.json();
+      if (llData?.access_token) accessToken = llData.access_token;
+    }
+  } catch {
+    // Keep short-lived token if exchange fails
+  }
+
+  const wabaResp = await graphFetchJson<any>('/me/whatsapp_business_accounts', accessToken);
+  const waba = Array.isArray(wabaResp?.data) ? wabaResp.data[0] : null;
+  if (!waba?.id) throw new Error('No se encontró ninguna cuenta de WhatsApp Business en Meta');
+
+  const phoneResp = await graphFetchJson<any>(`/${waba.id}/phone_numbers?fields=id,display_phone_number,verified_name`, accessToken);
+  const phone = Array.isArray(phoneResp?.data) ? phoneResp.data[0] : null;
+  if (!phone?.id) throw new Error('No se encontró ningún número en la cuenta de WhatsApp Business');
+
+  account.whatsappSession = {
+    ...(account.whatsappSession || {}),
+    provider: 'meta',
+    instanceName: account.whatsappSession?.instanceName || `lyrium_${String(account._id)}`,
+    connected: true,
+    connectedAt: new Date().toISOString(),
+    phoneNumber: phone.display_phone_number || '',
+    businessAccountId: waba.id,
+    phoneNumberId: phone.id,
+    accessToken: encryptPassword(accessToken),
+  } as any;
+  account.whatsappOAuthState = '';
+  account.whatsappOAuthStateExpires = '';
+  await account.save();
+
+  return {
+    connected: true,
+    phoneNumber: phone.display_phone_number || '',
+    phoneNumberId: phone.id,
+  };
+}
+
 export async function connectMetaWithCodeByState(
   code: string,
   state: string,

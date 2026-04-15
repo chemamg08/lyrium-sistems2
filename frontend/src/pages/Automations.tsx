@@ -431,8 +431,8 @@ const Automations = () => {
       setWaOAuthProcessing(true);
 
       (window as any).FB.login((response: any) => {
-        const code = response?.authResponse?.code;
-        if (!code) {
+        const accessToken = response?.authResponse?.accessToken;
+        if (!accessToken) {
           setWaConnectError('No se recibió autorización de Meta. Inténtalo de nuevo.');
           setWaOAuthProcessing(false);
           return;
@@ -440,11 +440,11 @@ const Automations = () => {
         // FB.login callback must be synchronous — run async work in IIFE
         (async () => {
           try {
-            // Step 4: Exchange code on backend
-            const connectRes = await authFetch(`${WA_API}/meta/connect`, {
+            // Step 4: Send access token to backend
+            const connectRes = await authFetch(`${WA_API}/meta/connect-token`, {
               method: 'POST',
               headers: { 'Content-Type': 'application/json' },
-              body: JSON.stringify({ accountId, code, state: oauthState }),
+              body: JSON.stringify({ accountId, state: oauthState, accessToken }),
             });
             if (connectRes.ok) {
               await loadWaData();
@@ -470,8 +470,6 @@ const Automations = () => {
         })();
       }, {
         scope: 'whatsapp_business_management,whatsapp_business_messaging,business_management',
-        response_type: 'code',
-        override_default_response_type: true,
       });
     } catch (err: any) {
       setWaConnectError(err?.message || 'No fue posible iniciar la conexion con Meta. Revisa tu conexion e intentalo de nuevo.');
