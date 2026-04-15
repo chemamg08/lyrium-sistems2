@@ -496,7 +496,7 @@ const ContractChatInterface = ({
     return (
       <div className="flex flex-col h-full items-center justify-center">
         <Loader2 className="h-8 w-8 animate-spin text-primary" />
-        <p className="text-sm text-muted-foreground mt-4">Preparando el chat...</p>
+        <p className="text-sm text-muted-foreground mt-4">{t('contractChat.initializing')}</p>
       </div>
     );
   }
@@ -639,7 +639,7 @@ const ContractChatInterface = ({
                     <div className="flex items-start justify-between gap-4">
                       <div>
                         <p className="text-sm font-medium text-foreground">
-                          Contrato Generado
+                          {t('contractChat.contractGenerated')}
                         </p>
                         <p className="text-xs text-muted-foreground mt-0.5">
                           {msg.metadata.fileName}
@@ -702,7 +702,7 @@ const ContractChatInterface = ({
           <div className="flex items-center gap-2 mb-2">
             <div className="flex items-center gap-2 bg-primary/10 border border-primary/30 rounded-md px-3 py-1.5 text-xs text-primary">
               <FileText className="h-3.5 w-3.5 shrink-0" />
-              <span className="font-medium">PDF adjunto como base del contrato</span>
+              <span className="font-medium">{t('contractChat.pdfAttachedBase')}</span>
               <button onClick={() => setHasUploadedPdf(false)} className="ml-1 hover:text-destructive transition-colors">
                 <X className="h-3 w-3" />
               </button>
@@ -741,7 +741,7 @@ const ContractChatInterface = ({
               }
             }}
             onKeyDown={(e) => { if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); if (!isLoading) send(); } }}
-            placeholder={isTemporary ? "Pregunta sobre el contrato..." : "Describe los cambios que necesitas..."}
+            placeholder={isTemporary ? t('contractChat.placeholderAnalysis') : t('contractChat.placeholderGeneration')}
             disabled={isLoading || (isTemporary && !hasUploadedPdf)}
             className="flex-1 bg-accent/50 border border-border rounded-md px-4 py-2.5 text-sm text-foreground placeholder:text-muted-foreground focus:outline-none focus:ring-1 focus:ring-ring disabled:opacity-50 resize-none overflow-hidden"
           />

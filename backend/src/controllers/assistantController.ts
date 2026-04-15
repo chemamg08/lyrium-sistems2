@@ -310,6 +310,33 @@ export const deleteAssistantChat = async (req: Request, res: Response) => {
   }
 };
 
+// Renombrar un chat específico
+export const renameAssistantChat = async (req: Request, res: Response) => {
+  try {
+    const { chatId } = req.params;
+    const { accountId, name } = req.body;
+
+    if (!chatId || !accountId || !name) {
+      return res.status(400).json({ error: 'chatId, accountId y name son requeridos' });
+    }
+    if (!verifyOwnership(req, accountId)) return res.status(403).json({ error: 'Acceso denegado' });
+
+    const result = await AssistantChat.updateOne(
+      { _id: chatId, accountId },
+      { $set: { name: name.trim() } }
+    );
+
+    if (result.matchedCount === 0) {
+      return res.status(404).json({ error: 'Chat no encontrado' });
+    }
+
+    res.json({ success: true });
+  } catch (error) {
+    console.error('Error al renombrar chat de asistente:', error);
+    res.status(500).json({ error: 'Error al renombrar chat de asistente' });
+  }
+};
+
 // Mantener compatibilidad con función antigua
 export const clearAssistantChat = async (req: Request, res: Response) => {
   try {

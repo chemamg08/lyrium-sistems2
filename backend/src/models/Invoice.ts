@@ -17,6 +17,8 @@ export interface IInvoice {
   firmName: string;
   firmAddress: string;
   firmPhone: string;
+  firmNIF: string;
+  firmInfo: string;
   paymentMethod: string;
   clientName: string;
   clientEmail: string;
@@ -28,6 +30,10 @@ export interface IInvoice {
   totalAmount: number;
   sentAt: string;
   sentFrom: string;
+  // VeriFactu
+  huella: string;
+  huellaAnterior: string;
+  verifactuTimestamp: string;
 }
 
 export interface IInvoiceSettings {
@@ -36,6 +42,9 @@ export interface IInvoiceSettings {
   firmName: string;
   firmAddress: string;
   firmPhone: string;
+  firmNIF: string;
+  firmInfo: string;
+  fiscalTerritory: string;
   paymentMethod: string;
   defaultTaxRate: number;
   nextInvoiceNumber: number;
@@ -58,6 +67,8 @@ const invoiceSchema = new Schema<IInvoice>({
   firmName: { type: String, default: '' },
   firmAddress: { type: String, default: '' },
   firmPhone: { type: String, default: '' },
+  firmNIF: { type: String, default: '' },
+  firmInfo: { type: String, default: '' },
   paymentMethod: { type: String, default: '' },
   clientName: { type: String, default: '' },
   clientEmail: { type: String, default: '' },
@@ -69,6 +80,9 @@ const invoiceSchema = new Schema<IInvoice>({
   totalAmount: { type: Number, default: 0 },
   sentAt: { type: String, default: '' },
   sentFrom: { type: String, default: '' },
+  huella: { type: String, default: '' },
+  huellaAnterior: { type: String, default: '' },
+  verifactuTimestamp: { type: String, default: '' },
 }, { _id: false, versionKey: false });
 
 invoiceSchema.set('toJSON', {
@@ -85,6 +99,9 @@ const invoiceSettingsSchema = new Schema<IInvoiceSettings>({
   firmName: { type: String, default: '' },
   firmAddress: { type: String, default: '' },
   firmPhone: { type: String, default: '' },
+  firmNIF: { type: String, default: '' },
+  firmInfo: { type: String, default: '' },
+  fiscalTerritory: { type: String, default: 'comun' },
   paymentMethod: { type: String, default: '' },
   defaultTaxRate: { type: Number, default: 21 },
   nextInvoiceNumber: { type: Number, default: 1 },

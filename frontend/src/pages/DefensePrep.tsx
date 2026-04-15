@@ -87,6 +87,8 @@ const DefensePrep = () => {
   const [editingTitle, setEditingTitle] = useState("");
   const [showInfoModal, setShowInfoModal] = useState(false);
   const [isPollingForResponse, setIsPollingForResponse] = useState(false);
+  const [exportClientSearch, setExportClientSearch] = useState("");
+  const [importClientSearch, setImportClientSearch] = useState("");
   const pollingRef = useRef<ReturnType<typeof setInterval> | null>(null);
 
   // Mantener ref sincronizado con el estado para evitar stale closures
@@ -431,6 +433,7 @@ const DefensePrep = () => {
     const defaultTitle = `Defensa - ${new Date().toLocaleDateString('es-ES')}`;
     setExportTitle(defaultTitle);
     setSelectedExportClient(null);
+    setExportClientSearch("");
     setShowExport(true);
   };
 
@@ -521,6 +524,7 @@ const DefensePrep = () => {
     setImportStep("clients");
     setSelectedImportClient(null);
     setClientChats([]);
+    setImportClientSearch("");
     setShowImport(true);
   };
 
@@ -900,8 +904,17 @@ const DefensePrep = () => {
             {!selectedExportClient ? (
               <>
                 <p className="text-xs text-muted-foreground mb-4">{t('defense.exportModal.subtitle')}</p>
-                <div className="space-y-2">
-                  {clients.map((client) => (
+                <div className="relative mb-3">
+                  <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-3.5 w-3.5 text-muted-foreground pointer-events-none" />
+                  <input
+                    value={exportClientSearch}
+                    onChange={(e) => setExportClientSearch(e.target.value)}
+                    className="w-full bg-accent/50 border border-border rounded-md pl-8 pr-3 py-2 text-sm focus:outline-none focus:ring-1 focus:ring-ring placeholder:text-muted-foreground"
+                    placeholder={t('clients.search')}
+                  />
+                </div>
+                <div className="space-y-2 max-h-[280px] overflow-y-auto pr-1">
+                  {clients.filter(c => c.name.toLowerCase().includes(exportClientSearch.toLowerCase()) || c.email.toLowerCase().includes(exportClientSearch.toLowerCase())).map((client) => (
                     <div key={client.id} className="flex items-center justify-between bg-accent/50 rounded-md px-4 py-3">
                       <div>
                         <p className="text-sm font-medium text-foreground">{client.name}</p>
@@ -973,8 +986,17 @@ const DefensePrep = () => {
             {importStep === "clients" && (
               <>
                 <p className="text-xs text-muted-foreground mb-4">{t('defense.importModal.selectClient')}</p>
-                <div className="space-y-2">
-                  {clients.map((client) => (
+                <div className="relative mb-3">
+                  <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-3.5 w-3.5 text-muted-foreground pointer-events-none" />
+                  <input
+                    value={importClientSearch}
+                    onChange={(e) => setImportClientSearch(e.target.value)}
+                    className="w-full bg-accent/50 border border-border rounded-md pl-8 pr-3 py-2 text-sm focus:outline-none focus:ring-1 focus:ring-ring placeholder:text-muted-foreground"
+                    placeholder={t('clients.search')}
+                  />
+                </div>
+                <div className="space-y-2 max-h-[280px] overflow-y-auto pr-1">
+                  {clients.filter(c => c.name.toLowerCase().includes(importClientSearch.toLowerCase()) || c.email.toLowerCase().includes(importClientSearch.toLowerCase())).map((client) => (
                     <div key={client.id} className="flex items-center justify-between bg-accent/50 rounded-md px-4 py-3">
                       <div>
                         <p className="text-sm font-medium text-foreground">{client.name}</p>

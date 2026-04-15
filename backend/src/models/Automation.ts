@@ -88,6 +88,67 @@ export interface IEmailFolder {
   conversationIds: string[];
 }
 
+export interface IEmailClassifyRule {
+  id: string;
+  name: string;
+  description: string;
+  folderIds: string[];
+  createdAt: string;
+}
+
+export interface IWhatsAppClassifyRule {
+  id: string;
+  name: string;
+  description: string;
+  folderIds: string[];
+  createdAt: string;
+}
+
+// ── WhatsApp ─────────────────────────────────────────────────────────
+export interface IWhatsAppAttachment {
+  id: string;
+  filename: string;
+  originalName: string;
+  mimeType: string;
+  size: number;
+}
+
+export interface IWhatsAppMessage {
+  id: string;
+  from: string;
+  text: string;
+  time: string;
+  sent: boolean;
+  attachments?: IWhatsAppAttachment[];
+}
+
+export interface IWhatsAppConversation {
+  id: string;
+  contactName: string;
+  contactPhone: string;
+  messages: IWhatsAppMessage[];
+  lastMessageTime: string;
+  unread: number;
+  autoReplyPaused?: boolean;
+}
+
+export interface IWhatsAppFolder {
+  id: string;
+  name: string;
+  conversationIds: string[];
+}
+
+export interface IWhatsAppSession {
+  provider?: 'meta';
+  instanceName?: string;
+  connected: boolean;
+  phoneNumber?: string;
+  connectedAt?: string;
+  businessAccountId?: string;
+  phoneNumberId?: string;
+  accessToken?: string;
+}
+
 export interface IAutomation {
   _id: string;
   accountId: string;
@@ -102,10 +163,23 @@ export interface IAutomation {
   emailConversations: IEmailConversation[];
   pendingConsultas: IPendingConsulta[];
   emailFolders: IEmailFolder[];
+  emailClassifyRules: IEmailClassifyRule[];
   pendingReplies: IPendingReply[];
   respondConsultasGenerales: boolean;
   respondSolicitudesServicio: boolean;
   soloContactosConocidos: boolean;
+  // WhatsApp
+  whatsappSession?: IWhatsAppSession;
+  whatsappSwitchActivo: boolean;
+  whatsappConversations: IWhatsAppConversation[];
+  whatsappFolders: IWhatsAppFolder[];
+  whatsappCorreosConsultas: string[];
+  whatsappClassifyRules: IWhatsAppClassifyRule[];
+  whatsappRespondConsultasGenerales: boolean;
+  whatsappRespondSolicitudesServicio: boolean;
+  whatsappSoloContactosConocidos: boolean;
+  whatsappOAuthState?: string;
+  whatsappOAuthStateExpires?: string;
 }
 
 const especialidadSchema = new Schema({
@@ -170,6 +244,67 @@ const emailFolderSchema = new Schema({
   conversationIds: { type: [String], default: [] },
 }, { _id: false });
 
+const emailClassifyRuleSchema = new Schema({
+  id: String,
+  name: String,
+  description: String,
+  folderIds: { type: [String], default: [] },
+  createdAt: String,
+}, { _id: false });
+
+const waClassifyRuleSchema = new Schema({
+  id: String,
+  name: String,
+  description: String,
+  folderIds: { type: [String], default: [] },
+  createdAt: String,
+}, { _id: false });
+
+// ── WhatsApp schemas ─────────────────────────────────────────────────
+const waAttachmentSchema = new Schema({
+  id: String,
+  filename: String,
+  originalName: String,
+  mimeType: String,
+  size: Number,
+}, { _id: false });
+
+const waMessageSchema = new Schema({
+  id: String,
+  from: String,
+  text: String,
+  time: String,
+  sent: Boolean,
+  attachments: { type: [waAttachmentSchema], default: [] },
+}, { _id: false });
+
+const waConversationSchema = new Schema({
+  id: String,
+  contactName: String,
+  contactPhone: String,
+  messages: { type: [waMessageSchema], default: [] },
+  lastMessageTime: String,
+  unread: { type: Number, default: 0 },
+  autoReplyPaused: { type: Boolean, default: false },
+}, { _id: false });
+
+const waFolderSchema = new Schema({
+  id: String,
+  name: String,
+  conversationIds: { type: [String], default: [] },
+}, { _id: false });
+
+const waSessionSchema = new Schema({
+  provider: { type: String, default: 'meta' },
+  instanceName: String,
+  connected: { type: Boolean, default: false },
+  phoneNumber: String,
+  connectedAt: String,
+  businessAccountId: String,
+  phoneNumberId: String,
+  accessToken: String,
+}, { _id: false });
+
 const pendingConsultaSchema = new Schema({
   id: String,
   originalFrom: String,
@@ -181,6 +316,9 @@ const pendingConsultaSchema = new Schema({
   forwardedAt: String,
   type: String,
   especialidadId: String,
+  channel: { type: String, default: 'email' },
+  waContactPhone: String,
+  waConversationId: String,
 }, { _id: false });
 
 const pendingReplySchema = new Schema({
@@ -210,10 +348,23 @@ const automationSchema = new Schema<IAutomation>({
   emailConversations: { type: [emailConversationSchema], default: [] },
   pendingConsultas: { type: [pendingConsultaSchema], default: [] },
   emailFolders: { type: [emailFolderSchema], default: [] },
+  emailClassifyRules: { type: [emailClassifyRuleSchema], default: [] },
   pendingReplies: { type: [pendingReplySchema], default: [] },
   respondConsultasGenerales: { type: Boolean, default: true },
   respondSolicitudesServicio: { type: Boolean, default: true },
   soloContactosConocidos: { type: Boolean, default: false },
+  // WhatsApp
+  whatsappSession: { type: waSessionSchema, default: null },
+  whatsappSwitchActivo: { type: Boolean, default: false },
+  whatsappConversations: { type: [waConversationSchema], default: [] },
+  whatsappFolders: { type: [waFolderSchema], default: [] },
+  whatsappCorreosConsultas: { type: [String], default: [] },
+  whatsappClassifyRules: { type: [waClassifyRuleSchema], default: [] },
+  whatsappRespondConsultasGenerales: { type: Boolean, default: true },
+  whatsappRespondSolicitudesServicio: { type: Boolean, default: true },
+  whatsappSoloContactosConocidos: { type: Boolean, default: false },
+  whatsappOAuthState: { type: String, default: null },
+  whatsappOAuthStateExpires: { type: String, default: null },
 }, { _id: false, versionKey: false });
 
 automationSchema.set('toJSON', {

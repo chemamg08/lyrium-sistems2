@@ -27,6 +27,8 @@ import apiKeyRoutes from './apiKeyRoutes.js';
 import webhookRoutes from './webhookRoutes.js';
 import publicApiRoutes from './publicApiRoutes.js';
 import taxComplianceRoutes from './taxComplianceRoutes.js';
+import whatsappRoutes from './whatsappRoutes.js';
+import { whatsappWebhook, whatsappWebhookVerify } from '../controllers/whatsappController.js';
 import { getStats, incrementStat } from '../controllers/statsController.js';
 
 const router = Router();
@@ -38,6 +40,8 @@ router.use('/subscriptions', subscriptionsRoutes); // webhook needs to be public
 router.get('/calendar/callback', handleCallback); // Google OAuth callback (no JWT)
 router.use('/sign', signPublicRoutes); // Public signing page API
 router.use('/v1', publicApiRoutes); // Public API (API key auth inside)
+router.get('/whatsapp/webhook', whatsappWebhookVerify); // WhatsApp webhook verify (Meta, no auth)
+router.post('/whatsapp/webhook', whatsappWebhook); // WhatsApp webhook events (Meta, no auth)
 
 // Admin routes (auth + admin middleware inside)
 router.use('/admin', adminRoutes);
@@ -58,6 +62,7 @@ router.use('/fiscal', fiscalRoutes);
 router.use('/tax-compliance', taxComplianceRoutes);
 router.use('/jobs', jobsRoutes);
 router.use('/automatizaciones', automatizacionesRoutes);
+router.use('/whatsapp', whatsappRoutes);
 router.use('/shared-files', sharedFilesRoutes);
 router.use('/improve-ai', improveAIRoutes);
 router.use('/signatures', signatureRoutes);

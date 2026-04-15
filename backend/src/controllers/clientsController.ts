@@ -2,6 +2,7 @@ import { Request, Response } from 'express';
 import fs from 'fs/promises';
 import path from 'path';
 import { fileURLToPath } from 'url';
+import crypto from 'crypto';
 import { Client } from '../models/Client.js';
 import { verifyOwnership } from '../middleware/auth.js';
 import { Invoice, InvoiceSettings } from '../models/Invoice.js';
@@ -478,7 +479,7 @@ export const getInvoiceSettings = async (req: Request, res: Response) => {
       settings = await InvoiceSettings.create({
         _id: (accountId as string) + '_settings',
         accountId: accountId as string,
-        firmName: '', firmAddress: '', firmPhone: '', paymentMethod: '',
+        firmName: '', firmAddress: '', firmPhone: '', firmNIF: '', firmInfo: '', fiscalTerritory: 'comun', paymentMethod: '',
         defaultTaxRate: 21, nextInvoiceNumber: 1,
       });
     }
@@ -491,12 +492,12 @@ export const getInvoiceSettings = async (req: Request, res: Response) => {
 // PUT /api/invoice-settings
 export const updateInvoiceSettings = async (req: Request, res: Response) => {
   try {
-    const { accountId, firmName, firmAddress, firmPhone, paymentMethod, defaultTaxRate } = req.body;
+    const { accountId, firmName, firmAddress, firmPhone, firmNIF, firmInfo, fiscalTerritory, paymentMethod, defaultTaxRate } = req.body;
     if (!accountId) return res.status(400).json({ error: 'accountId requerido' });
     if (!verifyOwnership(req, accountId)) return res.status(403).json({ error: 'Acceso denegado' });
     const settings = await InvoiceSettings.findOneAndUpdate(
       { accountId },
-      { $set: { firmName, firmAddress, firmPhone, paymentMethod, defaultTaxRate } },
+      { $set: { firmName, firmAddress, firmPhone, firmNIF: firmNIF ?? '', firmInfo: firmInfo ?? '', fiscalTerritory: fiscalTerritory ?? 'comun', paymentMethod, defaultTaxRate } },
       { upsert: true, returnDocument: 'after', setDefaultsOnInsert: true }
     );
     if (!settings) return res.status(500).json({ error: 'Error al guardar' });
@@ -522,12 +523,24 @@ export const getClientInvoices = async (req: Request, res: Response) => {
   }
 };
 
+const FORAL_TERRITORIES = ['bizkaia', 'gipuzkoa', 'araba', 'navarra'];
+
+function calcularHuellaVeriFactu(firmNIF: string, invoiceNumber: string, date: string, totalAmount: number, huellaAnterior: string): string {
+  const input = `${firmNIF}|${invoiceNumber}|${date}|${totalAmount.toFixed(2)}|${huellaAnterior}`;
+  return crypto.createHash('sha256').update(input, 'utf8').digest('hex').toUpperCase();
+}
+
 // POST /api/clients/:id/invoices
 export const createInvoice = async (req: Request, res: Response) => {
   try {
     const { id } = req.params;
-    const { accountId, firmName, firmAddress, firmPhone, paymentMethod, taxRate, lines } = req.body;
+    const { accountId, firmName, firmAddress, firmPhone, firmNIF, firmInfo, fiscalTerritory, paymentMethod, taxRate, lines, country } = req.body;
     if (!accountId) return res.status(400).json({ error: 'accountId requerido' });
+
+    // Bloquear territorios forales (TicketBAI)
+    if (country === 'ES' && FORAL_TERRITORIES.includes((fiscalTerritory || '').toLowerCase())) {
+      return res.status(403).json({ error: 'La facturación no está disponible en territorios TicketBAI' });
+    }
 
     const client = await Client.findById(id);
     if (!client) return res.status(404).json({ error: 'Cliente no encontrado' });
@@ -538,7 +551,7 @@ export const createInvoice = async (req: Request, res: Response) => {
     if (!settings) {
       settings = await InvoiceSettings.create({
         _id: accountId + '_settings', accountId,
-        firmName: '', firmAddress: '', firmPhone: '', paymentMethod: '',
+        firmName: '', firmAddress: '', firmPhone: '', firmNIF: '', fiscalTerritory: 'comun', paymentMethod: '',
         defaultTaxRate: 21, nextInvoiceNumber: 1,
       });
     }
@@ -554,6 +567,19 @@ export const createInvoice = async (req: Request, res: Response) => {
     const taxAmount = Math.round(baseAmount * rate) / 100;
     const totalAmount = baseAmount + taxAmount;
 
+    // VeriFactu: calcular hash encadenado (solo cuentas ES territorio común)
+    let huella = '';
+    let huellaAnterior = '';
+    let verifactuTimestamp = '';
+    const isSpainComun = country === 'ES' && !FORAL_TERRITORIES.includes((fiscalTerritory || '').toLowerCase());
+    if (isSpainComun && firmNIF) {
+      const lastInvoice = await Invoice.findOne({ accountId, huella: { $ne: '' } }).sort({ verifactuTimestamp: -1 });
+      huellaAnterior = lastInvoice?.huella || '';
+      const dateStr = new Date().toISOString().split('T')[0];
+      huella = calcularHuellaVeriFactu(firmNIF || '', invoiceNumber, dateStr, totalAmount, huellaAnterior);
+      verifactuTimestamp = new Date().toISOString();
+    }
+
     const invoice = await Invoice.create({
       _id: Date.now().toString(),
       clientId: id,
@@ -563,6 +589,8 @@ export const createInvoice = async (req: Request, res: Response) => {
       firmName: firmName || '',
       firmAddress: firmAddress || '',
       firmPhone: firmPhone || '',
+      firmNIF: firmNIF || '',
+      firmInfo: firmInfo || '',
       paymentMethod: paymentMethod || '',
       clientName: client.name,
       clientEmail: client.email,
@@ -578,6 +606,9 @@ export const createInvoice = async (req: Request, res: Response) => {
       baseAmount,
       taxAmount,
       totalAmount,
+      huella,
+      huellaAnterior,
+      verifactuTimestamp,
     });
 
     dispatchWebhook(accountId, 'invoice_created', { invoiceId: invoice._id, invoiceNumber, clientId: id, clientName: client.name, totalAmount });

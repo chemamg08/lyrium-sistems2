@@ -1,9 +1,8 @@
 import { useEffect, useRef, useState } from "react";
-import { MessageSquarePlus, Send, StopCircle, Trash2, PanelLeft, Paperclip, FileText, Brain, FolderOpen } from "lucide-react";
+import { Send, StopCircle, Trash2, Paperclip, FileText, Brain, FolderOpen, MessageSquare, Search, Plus, Pencil, Check, X } from "lucide-react";
 import ReactMarkdown from "react-markdown";
 import { useTranslation } from "react-i18next";
 import { useToast } from "@/components/ui/use-toast";
-import { useIsMobile } from "@/hooks/use-mobile";
 import { useStreamingChat } from "@/hooks/useStreamingChat";
 import { authFetch } from '../lib/authFetch';
 
@@ -26,8 +25,12 @@ const ACTIVE_CHAT_KEY = "assistantActiveChatId";
 const AIAssistant = () => {
   const { t } = useTranslation();
   const { toast } = useToast();
-  const isMobile = useIsMobile();
-  const [showPanel, setShowPanel] = useState(false);
+  const [showChatsSelector, setShowChatsSelector] = useState(false);
+  const [chatSearchQuery, setChatSearchQuery] = useState("");
+  const [editingChatId, setEditingChatId] = useState<string | null>(null);
+  const [editingTitle, setEditingTitle] = useState("");
+  const [showDeleteChatConfirm, setShowDeleteChatConfirm] = useState(false);
+  const [chatToDelete, setChatToDelete] = useState<string | null>(null);
   const [chats, setChats] = useState<Chat[]>([]);
   const [activeChatId, setActiveChatId] = useState<string | null>(null);
   const [messages, setMessages] = useState<Message[]>([]);
@@ -292,61 +295,162 @@ const AIAssistant = () => {
     }
   };
 
+  const filteredChats = chats.filter(chat =>
+    chat.name.toLowerCase().includes(chatSearchQuery.toLowerCase())
+  );
+
+  const renameChat = async (chatId: string, newName: string) => {
+    if (!newName.trim()) return;
+    try {
+      const accountId = sessionStorage.getItem("accountId");
+      if (!accountId) return;
+      const response = await authFetch(`${API_URL}/assistant/chats/${chatId}`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ accountId, name: newName.trim() })
+      });
+      if (response.ok) {
+        setChats(prev => prev.map(c => c.id === chatId ? { ...c, name: newName.trim() } : c));
+      }
+    } catch (error) {
+      console.error("Error al renombrar chat:", error);
+    } finally {
+      setEditingChatId(null);
+      setEditingTitle("");
+    }
+  };
+
+  const confirmDeleteChat = (chatId: string) => {
+    setChatToDelete(chatId);
+    setShowDeleteChatConfirm(true);
+  };
+
   return (
     <div className="flex h-[calc(100vh-0px)] relative">
-      {/* Mobile backdrop */}
-      {isMobile && showPanel && (
-        <div className="fixed inset-0 z-30 bg-black/50" onClick={() => setShowPanel(false)} />
-      )}
-      {/* Panel lateral de chats */}
-      <div className={`${isMobile ? `fixed left-0 top-0 z-40 h-full w-72 transition-transform duration-300 ${showPanel ? 'translate-x-0' : '-translate-x-full'}` : 'w-64'} border-r border-border flex flex-col bg-muted/30 bg-card`}>
-        <div className="p-4 border-b border-border flex items-center justify-between">
-          <h3 className="text-sm font-medium text-foreground">{t('assistant.conversations')}</h3>
-          <button
-            onClick={createChat}
-            className="p-1.5 rounded-md hover:bg-accent transition-colors"
-            title={t('assistant.newChat')}
-          >
-            <MessageSquarePlus className="h-4 w-4 text-muted-foreground" />
-          </button>
-        </div>
-
-        <div className="flex-1 overflow-y-auto p-2 space-y-1">
-          {chats.map((chat) => (
-            <div
-              key={chat.id}
-              className={`group flex items-center justify-between px-3 py-2 rounded-md cursor-pointer transition-colors ${
-                activeChatId === chat.id
-                  ? "bg-primary/10 text-primary"
-                  : "text-muted-foreground hover:bg-accent hover:text-foreground"
-              }`}
-              onClick={() => { setActiveChatId(chat.id); if (isMobile) setShowPanel(false); }}
-            >
-              <span className="text-sm truncate flex-1">{chat.name}</span>
+      {/* Delete chat modal */}
+      {showDeleteChatConfirm && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 backdrop-blur-sm">
+          <div className="bg-card border border-border rounded-xl shadow-xl p-6 w-full max-w-sm mx-4">
+            <h3 className="text-base font-semibold text-foreground mb-2">{t('assistant.deleteConfirm')}</h3>
+            <div className="flex gap-3 justify-end mt-6">
               <button
-                onClick={(e) => {
-                  e.stopPropagation();
-                  if (confirm(t('assistant.deleteConfirm'))) {
-                    deleteChat(chat.id);
-                  }
-                }}
-                className="p-1 rounded opacity-0 group-hover:opacity-100 hover:bg-destructive/10 transition-all"
+                onClick={() => { setShowDeleteChatConfirm(false); setChatToDelete(null); }}
+                className="px-4 py-2 text-sm rounded-md border border-border hover:bg-accent transition-colors"
               >
-                <Trash2 className="h-3 w-3 text-destructive" />
+                {t('common.cancel')}
+              </button>
+              <button
+                onClick={() => {
+                  if (chatToDelete) deleteChat(chatToDelete);
+                  setShowDeleteChatConfirm(false);
+                  setChatToDelete(null);
+                }}
+                className="px-4 py-2 text-sm rounded-md bg-destructive text-destructive-foreground hover:opacity-90 transition-opacity"
+              >
+                {t('common.delete')}
               </button>
             </div>
-          ))}
+          </div>
         </div>
-      </div>
+      )}
 
       {/* Panel principal del chat */}
       <div className="flex-1 flex flex-col">
         <div className="border-b border-border px-4 md:px-6 py-3 md:py-4 flex items-center gap-3">
-          {isMobile && (
-            <button onClick={() => setShowPanel(true)} className="p-1.5 rounded-md hover:bg-accent transition-colors">
-              <PanelLeft className="h-4 w-4 text-muted-foreground" />
+          <div className="relative">
+            <button
+              onClick={() => setShowChatsSelector(!showChatsSelector)}
+              className="flex items-center gap-2 bg-accent text-foreground px-3 py-1.5 rounded-md text-xs font-medium hover:bg-accent/80 transition-colors"
+            >
+              <MessageSquare className="h-3.5 w-3.5" /> {t('assistant.conversations')}
             </button>
-          )}
+            {showChatsSelector && (
+              <div className="absolute left-0 top-full mt-1 w-80 bg-card border border-border rounded-lg shadow-lg z-10 overflow-hidden">
+                <div className="p-2 border-b border-border">
+                  <div className="relative">
+                    <Search className="absolute left-2 top-1/2 -translate-y-1/2 h-3.5 w-3.5 text-muted-foreground" />
+                    <input
+                      type="text"
+                      placeholder={t('common.searchChats')}
+                      value={chatSearchQuery}
+                      onChange={(e) => setChatSearchQuery(e.target.value)}
+                      className="w-full pl-7 pr-2 py-1.5 text-xs bg-accent/50 border border-border rounded-md focus:outline-none focus:ring-1 focus:ring-ring"
+                    />
+                  </div>
+                </div>
+                <button
+                  onClick={() => { createChat(); setShowChatsSelector(false); }}
+                  className="w-full flex items-center gap-2 px-3 py-2.5 text-xs font-medium text-foreground hover:bg-accent transition-colors border-b border-border"
+                >
+                  <Plus className="h-3.5 w-3.5" /> {t('assistant.newChat')}
+                </button>
+                <div className="max-h-[280px] overflow-y-auto">
+                  {filteredChats.length === 0 ? (
+                    <p className="px-3 py-3 text-xs text-muted-foreground text-center">{t('common.noResults')}</p>
+                  ) : (
+                    filteredChats.map((chat) => (
+                      <div
+                        key={chat.id}
+                        className={`group relative px-3 py-2.5 hover:bg-accent transition-colors border-b border-border/50 ${activeChatId === chat.id ? 'bg-accent/50' : ''}`}
+                      >
+                        <div className="flex items-start gap-2">
+                          <div className="flex-1 min-w-0">
+                            {editingChatId === chat.id ? (
+                              <div className="flex items-center gap-1">
+                                <input
+                                  type="text"
+                                  value={editingTitle}
+                                  onChange={(e) => setEditingTitle(e.target.value)}
+                                  onKeyDown={(e) => {
+                                    if (e.key === 'Enter') renameChat(chat.id, editingTitle);
+                                    if (e.key === 'Escape') { setEditingChatId(null); setEditingTitle(""); }
+                                  }}
+                                  className="flex-1 px-1.5 py-0.5 text-xs bg-background border border-border rounded focus:outline-none focus:ring-1 focus:ring-ring"
+                                  autoFocus
+                                />
+                                <button onClick={() => renameChat(chat.id, editingTitle)}
+                                  className="p-0.5 hover:bg-accent rounded text-green-600">
+                                  <Check className="h-3 w-3" />
+                                </button>
+                                <button onClick={() => { setEditingChatId(null); setEditingTitle(""); }}
+                                  className="p-0.5 hover:bg-accent rounded text-muted-foreground">
+                                  <X className="h-3 w-3" />
+                                </button>
+                              </div>
+                            ) : (
+                              <button onClick={() => { setActiveChatId(chat.id); setShowChatsSelector(false); }} className="w-full text-left">
+                                <div className="flex items-center gap-1.5 mb-1">
+                                  <span className="text-xs font-medium text-foreground truncate">{chat.name}</span>
+                                  {chat.messageCount > 0 && (
+                                    <span className="text-[9px] text-muted-foreground/70">{chat.messageCount}</span>
+                                  )}
+                                </div>
+                                <p className="text-[9px] text-muted-foreground/70">
+                                  {new Date(chat.createdAt).toLocaleString('es-ES', { day: '2-digit', month: '2-digit', year: '2-digit', hour: '2-digit', minute: '2-digit' })}
+                                </p>
+                              </button>
+                            )}
+                          </div>
+                          {editingChatId !== chat.id && (
+                            <div className="flex items-center gap-0.5 opacity-0 group-hover:opacity-100 transition-opacity">
+                              <button onClick={(e) => { e.stopPropagation(); setEditingChatId(chat.id); setEditingTitle(chat.name); }}
+                                className="p-1 rounded hover:bg-background text-muted-foreground hover:text-foreground transition-colors">
+                                <Pencil className="h-3 w-3" />
+                              </button>
+                              <button onClick={(e) => { e.stopPropagation(); confirmDeleteChat(chat.id); }}
+                                className="p-1 rounded hover:bg-destructive/10 text-muted-foreground hover:text-destructive transition-colors">
+                                <Trash2 className="h-3 w-3" />
+                              </button>
+                            </div>
+                          )}
+                        </div>
+                      </div>
+                    ))
+                  )}
+                </div>
+              </div>
+            )}
+          </div>
           <div>
             <h2 className="text-lg md:text-xl font-semibold text-foreground">{t('assistant.title')}</h2>
             <p className="text-sm text-muted-foreground mt-1">{t('assistant.subtitle')}</p>
@@ -402,8 +506,10 @@ const AIAssistant = () => {
 
           {(isLoading || isPollingForResponse) && !isStreaming && (
             <div className="flex justify-start">
-              <div className="max-w-[70%] rounded-lg px-4 py-3 text-sm leading-relaxed bg-chat-ai text-chat-ai-foreground opacity-80">
-                {t('assistant.loading')}
+              <div className="rounded-lg px-4 py-3 bg-chat-ai text-chat-ai-foreground flex items-center gap-1">
+                <span className="h-2 w-2 rounded-full bg-current animate-bounce [animation-delay:-0.3s]" />
+                <span className="h-2 w-2 rounded-full bg-current animate-bounce [animation-delay:-0.15s]" />
+                <span className="h-2 w-2 rounded-full bg-current animate-bounce" />
               </div>
             </div>
           )}

@@ -594,3 +594,51 @@ export const downloadEmailAttachment: RequestHandler = async (req, res) => {
   if (!fs.existsSync(filePath)) { res.status(404).json({ error: 'Archivo no encontrado' }); return; }
   res.download(filePath, sanitized);
 };
+
+// GET classify rules
+export const getClassifyRules: RequestHandler = async (req, res) => {
+  const accountId = req.query.accountId as string;
+  if (!accountId) { res.status(400).json({ error: 'accountId requerido' }); return; }
+  if (!verifyOwnership(req as AuthRequest, accountId)) { res.status(403).json({ error: 'Acceso denegado' }); return; }
+  try {
+    const account = await getAccount(accountId);
+    res.json({ rules: account.emailClassifyRules || [] });
+  } catch (err: any) {
+    res.status(500).json({ error: err.message });
+  }
+};
+
+// POST create classify rule
+export const createClassifyRule: RequestHandler = async (req, res) => {
+  const { accountId, name, description, folderIds } = req.body;
+  if (!accountId || !name?.trim() || !description?.trim() || !Array.isArray(folderIds) || folderIds.length === 0) {
+    res.status(400).json({ error: 'accountId, name, description y folderIds requeridos' }); return;
+  }
+  if (!verifyOwnership(req as AuthRequest, accountId)) { res.status(403).json({ error: 'Acceso denegado' }); return; }
+  try {
+    const account = await getAccount(accountId);
+    const rules = account.emailClassifyRules || [];
+    const newRule = { id: Date.now().toString(), name: name.trim(), description: description.trim(), folderIds, createdAt: new Date().toISOString() };
+    rules.push(newRule);
+    await saveAccount(accountId, { emailClassifyRules: rules });
+    res.json({ ok: true, rule: newRule });
+  } catch (err: any) {
+    res.status(500).json({ error: err.message });
+  }
+};
+
+// DELETE classify rule
+export const deleteClassifyRule: RequestHandler = async (req, res) => {
+  const accountId = req.query.accountId as string;
+  const { id } = req.params;
+  if (!accountId || !id) { res.status(400).json({ error: 'accountId e id requeridos' }); return; }
+  if (!verifyOwnership(req as AuthRequest, accountId)) { res.status(403).json({ error: 'Acceso denegado' }); return; }
+  try {
+    const account = await getAccount(accountId);
+    const rules = (account.emailClassifyRules || []).filter((r: any) => r.id !== id);
+    await saveAccount(accountId, { emailClassifyRules: rules });
+    res.json({ ok: true });
+  } catch (err: any) {
+    res.status(500).json({ error: err.message });
+  }
+};

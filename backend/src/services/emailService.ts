@@ -217,6 +217,7 @@ export async function sendEmailViaCuenta(
   to: string,
   subject: string,
   body: string,
+  attachments?: Array<{ filename: string; content: Buffer; mimeType: string }>,
 ): Promise<string> {
   const config = getPlatformConfig(cuenta.plataforma);
   const useSecure = config.secure === true || config.smtpPort === 465;
@@ -234,6 +235,7 @@ export async function sendEmailViaCuenta(
       to,
       subject,
       text: body + '\n\n\u2014 Asistente del despacho',
+      attachments: attachments?.map(a => ({ filename: a.filename, content: a.content, contentType: a.mimeType })),
     });
     return info.messageId;
   } finally {

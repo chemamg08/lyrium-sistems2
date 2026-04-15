@@ -5,6 +5,7 @@ import {
   deleteAssistantChat, 
   getAssistantChat, 
   getAssistantChats,
+  renameAssistantChat,
   sendAssistantMessage,
   streamAssistantMessage,
   uploadAssistantFile
@@ -15,6 +16,7 @@ const router = Router();
 
 router.get('/chats', getAssistantChats);
 router.post('/chats', createAssistantChat);
+router.patch('/chats/:chatId', renameAssistantChat);
 router.delete('/chats/:chatId', deleteAssistantChat);
 
 router.get('/chat', getAssistantChat);

@@ -33,6 +33,9 @@ import {
   assignConversationToFolder,
   removeConversationFromFolder,
   downloadEmailAttachment,
+  getClassifyRules,
+  createClassifyRule,
+  deleteClassifyRule,
 } from '../controllers/automatizacionesController.js';
 
 const router = Router();
@@ -79,5 +82,10 @@ router.post('/email-folders', createEmailFolder);
 router.delete('/email-folders/:id', deleteEmailFolder);
 router.put('/email-folders/assign', assignConversationToFolder);
 router.put('/email-folders/remove', removeConversationFromFolder);
+
+// Email classify rules
+router.get('/email-classify-rules', getClassifyRules);
+router.post('/email-classify-rules', createClassifyRule);
+router.delete('/email-classify-rules/:id', deleteClassifyRule);
 
 export default router;

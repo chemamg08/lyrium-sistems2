@@ -6,6 +6,7 @@ import { useToast } from "@/components/ui/use-toast";
 import { useStreamingChat } from "@/hooks/useStreamingChat";
 import { authFetch } from '../lib/authFetch';
 import { getCurrencyForCountry } from '../i18n';
+import { QRCodeSVG } from 'qrcode.react';
 
 interface Client {
   id: string;
@@ -47,6 +48,8 @@ interface InvoiceData {
   firmName: string;
   firmAddress: string;
   firmPhone: string;
+  firmNIF?: string;
+  firmInfo?: string;
   paymentMethod: string;
   clientName: string;
   clientEmail: string;
@@ -58,6 +61,8 @@ interface InvoiceData {
   totalAmount: number;
   sentAt?: string;
   sentFrom?: string;
+  huella?: string;
+  verifactuTimestamp?: string;
 }
 
 interface EmailAccount {
@@ -228,7 +233,7 @@ const Clients = () => {
 
   // Invoice creation state
   const [showCreateInvoice, setShowCreateInvoice] = useState(false);
-  const [invoiceSettings, setInvoiceSettings] = useState({ firmName: '', firmAddress: '', firmPhone: '', paymentMethod: '', defaultTaxRate: 21 });
+  const [invoiceSettings, setInvoiceSettings] = useState({ firmName: '', firmAddress: '', firmPhone: '', firmNIF: '', firmInfo: '', fiscalTerritory: 'comun', paymentMethod: '', defaultTaxRate: 21 });
   const [invoiceTaxRate, setInvoiceTaxRate] = useState(21);
   const [invoiceLines, setInvoiceLines] = useState<InvoiceLine[]>([]);
   const [calcPricePerHour, setCalcPricePerHour] = useState('');
@@ -907,7 +912,7 @@ const Clients = () => {
       const res = await authFetch(`${API_URL}/invoice-settings?accountId=${accountId}`);
       if (res.ok) {
         const data = await res.json();
-        setInvoiceSettings({ firmName: data.firmName || '', firmAddress: data.firmAddress || '', firmPhone: data.firmPhone || '', paymentMethod: data.paymentMethod || '', defaultTaxRate: data.defaultTaxRate ?? 21 });
+        setInvoiceSettings({ firmName: data.firmName || '', firmAddress: data.firmAddress || '', firmPhone: data.firmPhone || '', firmNIF: data.firmNIF || '', firmInfo: data.firmInfo || '', fiscalTerritory: data.fiscalTerritory || 'comun', paymentMethod: data.paymentMethod || '', defaultTaxRate: data.defaultTaxRate ?? 21 });
         setInvoiceTaxRate(data.defaultTaxRate ?? 21);
       }
     } catch { /* silent */ }
@@ -964,6 +969,7 @@ const Clients = () => {
   const saveInvoice = async () => {
     if (!timerClientId) return;
     const accountId = sessionStorage.getItem('accountId') || '';
+    const country = sessionStorage.getItem('country') || 'ES';
     // Save settings first
     try {
       await authFetch(`${API_URL}/invoice-settings`, {
@@ -980,6 +986,10 @@ const Clients = () => {
           firmName: invoiceSettings.firmName,
           firmAddress: invoiceSettings.firmAddress,
           firmPhone: invoiceSettings.firmPhone,
+          firmNIF: invoiceSettings.firmNIF,
+          firmInfo: invoiceSettings.firmInfo,
+          fiscalTerritory: invoiceSettings.fiscalTerritory,
+          country,
           paymentMethod: invoiceSettings.paymentMethod,
           taxRate: invoiceTaxRate,
           lines: invoiceLines,
@@ -1126,13 +1136,16 @@ const Clients = () => {
   // Open edit invoice (reuse create form with existing data)
   const openEditInvoice = (invoice: InvoiceData) => {
     setEditingInvoice(invoice);
-    setInvoiceSettings({
+    setInvoiceSettings(prev => ({
       firmName: invoice.firmName,
       firmAddress: invoice.firmAddress,
       firmPhone: invoice.firmPhone,
+      firmNIF: invoice.firmNIF || prev.firmNIF || '',
+      firmInfo: invoice.firmInfo || prev.firmInfo || '',
+      fiscalTerritory: prev.fiscalTerritory || 'comun',
       paymentMethod: invoice.paymentMethod,
       defaultTaxRate: invoice.taxRate,
-    });
+    }));
     setInvoiceTaxRate(invoice.taxRate);
     setInvoiceLines(invoice.lines.map(l => ({ ...l })));
     setSelectedTimerEntries([]);
@@ -2372,6 +2385,10 @@ const Clients = () => {
         const baseAmount = invoiceLines.reduce((s, l) => s + l.subtotal, 0);
         const taxAmount = Math.round(baseAmount * invoiceTaxRate) / 100;
         const totalAmount = baseAmount + taxAmount;
+        const userCountry = sessionStorage.getItem('country') || 'ES';
+        const isSpain = userCountry === 'ES';
+        const FORAL_TERRITORIES = ['bizkaia', 'gipuzkoa', 'araba', 'navarra'];
+        const isForalTerritory = isSpain && FORAL_TERRITORIES.includes((invoiceSettings.fiscalTerritory || '').toLowerCase());
         return (
           <div className="fixed inset-0 bg-black/50 backdrop-blur-sm z-50 flex items-center justify-center" onClick={() => setShowCreateInvoice(false)}>
             <div className="bg-card border border-border rounded-lg w-[95vw] max-w-2xl shadow-lg max-h-[90vh] overflow-y-auto p-4 md:p-6" onClick={(e) => e.stopPropagation()}>
@@ -2386,6 +2403,22 @@ const Clients = () => {
                 <input value={invoiceSettings.firmName} onChange={e => setInvoiceSettings(s => ({ ...s, firmName: e.target.value }))} placeholder={t('clients.invoice.firmName')} className="w-full px-3 py-2 text-sm rounded-md border border-border bg-card text-foreground placeholder:text-muted-foreground focus:outline-none focus:ring-1 focus:ring-ring" />
                 <input value={invoiceSettings.firmAddress} onChange={e => setInvoiceSettings(s => ({ ...s, firmAddress: e.target.value }))} placeholder={t('clients.invoice.firmAddress')} className="w-full px-3 py-2 text-sm rounded-md border border-border bg-card text-foreground placeholder:text-muted-foreground focus:outline-none focus:ring-1 focus:ring-ring" />
                 <input value={invoiceSettings.firmPhone} onChange={e => setInvoiceSettings(s => ({ ...s, firmPhone: e.target.value }))} placeholder={t('clients.invoice.firmPhoneLabel')} className="w-full px-3 py-2 text-sm rounded-md border border-border bg-card text-foreground placeholder:text-muted-foreground focus:outline-none focus:ring-1 focus:ring-ring" />
+                <textarea value={invoiceSettings.firmInfo} onChange={e => setInvoiceSettings(s => ({ ...s, firmInfo: e.target.value }))} placeholder={t('clients.invoice.firmInfo')} rows={2} className="w-full px-3 py-2 text-sm rounded-md border border-border bg-card text-foreground placeholder:text-muted-foreground focus:outline-none focus:ring-1 focus:ring-ring resize-none" />
+                {isSpain && (
+                  <>
+                    <input value={invoiceSettings.firmNIF} onChange={e => setInvoiceSettings(s => ({ ...s, firmNIF: e.target.value }))} placeholder={t('clients.invoice.firmNIF')} className="w-full px-3 py-2 text-sm rounded-md border border-border bg-card text-foreground placeholder:text-muted-foreground focus:outline-none focus:ring-1 focus:ring-ring" />
+                    <div>
+                      <p className="text-xs text-muted-foreground mb-2">{t('clients.invoice.fiscalTerritory')}</p>
+                      <select value={invoiceSettings.fiscalTerritory} onChange={e => setInvoiceSettings(s => ({ ...s, fiscalTerritory: e.target.value }))} className="w-full px-3 py-2 text-sm rounded-md border border-border bg-card text-foreground focus:outline-none focus:ring-1 focus:ring-ring">
+                        <option value="comun">{t('clients.invoice.territoryComun')}</option>
+                        <option value="bizkaia">Bizkaia</option>
+                        <option value="gipuzkoa">Gipuzkoa</option>
+                        <option value="araba">Álava / Araba</option>
+                        <option value="navarra">Navarra</option>
+                      </select>
+                    </div>
+                  </>
+                )}
                 <div>
                   <p className="text-xs text-muted-foreground mb-2">{t('clients.invoice.paymentSelect')}</p>
                   <div className="flex flex-wrap gap-2">
@@ -2405,6 +2438,14 @@ const Clients = () => {
                   </div>
                 </div>
               </div>
+
+              {/* Aviso TicketBAI */}
+              {isForalTerritory && (
+                <div className="mb-6 p-4 border border-amber-500/40 bg-amber-500/10 rounded-lg flex items-start gap-3">
+                  <AlertTriangle className="h-4 w-4 text-amber-500 mt-0.5 shrink-0" />
+                  <p className="text-sm text-amber-700 dark:text-amber-400">{t('clients.invoice.ticketbaiWarning')}</p>
+                </div>
+              )}
 
               {/* Calculadora de tiempo */}
               {entries.length > 0 && (
@@ -2483,7 +2524,7 @@ const Clients = () => {
                 </div>
               </div>
 
-              <button onClick={editingInvoice ? updateExistingInvoice : saveInvoice} disabled={invoiceLines.length === 0} className="w-full bg-primary text-primary-foreground py-2.5 rounded-md text-sm font-medium hover:opacity-90 transition-opacity disabled:opacity-50">
+              <button onClick={editingInvoice ? updateExistingInvoice : saveInvoice} disabled={invoiceLines.length === 0 || isForalTerritory} className="w-full bg-primary text-primary-foreground py-2.5 rounded-md text-sm font-medium hover:opacity-90 transition-opacity disabled:opacity-50">
                 {editingInvoice ? t('clients.invoice.update') : t('clients.invoice.create')}
               </button>
             </div>
@@ -2570,6 +2611,8 @@ const Clients = () => {
                   <p className="text-lg font-bold text-gray-900 mb-2">{viewInvoice.firmName}</p>
                   <p>{viewInvoice.firmAddress}</p>
                   <p>{viewInvoice.firmPhone}</p>
+                  {viewInvoice.firmNIF && <p>{viewInvoice.firmNIF}</p>}
+                  {viewInvoice.firmInfo && <p style={{ whiteSpace: 'pre-line' }}>{viewInvoice.firmInfo}</p>}
                 </div>
               </div>
               {/* Meta */}
@@ -2635,6 +2678,19 @@ const Clients = () => {
                   </div>
                 </div>
               </div>
+              {/* QR VeriFactu — solo facturas con huella (España territorio común) */}
+              {viewInvoice.huella && viewInvoice.firmNIF && (() => {
+                const qrUrl = `https://www2.agenciatributaria.gob.es/wlpl/TIKE-CONT/ValidarQR?nif=${encodeURIComponent(viewInvoice.firmNIF)}&numserie=${encodeURIComponent(viewInvoice.invoiceNumber)}&fecha=${encodeURIComponent(viewInvoice.date)}&importe=${encodeURIComponent(viewInvoice.totalAmount.toFixed(2))}`;
+                return (
+                  <div className="mt-8 pt-6 border-t border-gray-100 flex items-center gap-4">
+                    <QRCodeSVG value={qrUrl} size={64} level="M" />
+                    <div>
+                      <p className="text-[8px] uppercase tracking-widest text-gray-400 mb-1">{t('clients.invoice.verifactuLabel')}</p>
+                      <p className="text-[7px] text-gray-400 break-all max-w-xs">{viewInvoice.huella.substring(0, 32)}...</p>
+                    </div>
+                  </div>
+                );
+              })()}
             </div>
           </div>
         </div>
@@ -2704,6 +2760,8 @@ const Clients = () => {
                     <p style={{ fontSize: '16px', fontWeight: 'bold', color: '#1a1c1c', marginBottom: '8px' }}>{showSendInvoice.firmName}</p>
                     <p>{showSendInvoice.firmAddress}</p>
                     <p>{showSendInvoice.firmPhone}</p>
+                    {showSendInvoice.firmNIF && <p>{showSendInvoice.firmNIF}</p>}
+                    {showSendInvoice.firmInfo && <p style={{ whiteSpace: 'pre-line' }}>{showSendInvoice.firmInfo}</p>}
                   </div>
                 </div>
                 <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '24px', marginBottom: '20px' }}>
@@ -2754,6 +2812,19 @@ const Clients = () => {
                 </div>
               </div>
             </div>
+            {/* QR VeriFactu — solo facturas con huella (España territorio común) */}
+            {showSendInvoice.huella && showSendInvoice.firmNIF && (() => {
+              const qrUrl = `https://www2.agenciatributaria.gob.es/wlpl/TIKE-CONT/ValidarQR?nif=${encodeURIComponent(showSendInvoice.firmNIF)}&numserie=${encodeURIComponent(showSendInvoice.invoiceNumber)}&fecha=${encodeURIComponent(showSendInvoice.date)}&importe=${encodeURIComponent(showSendInvoice.totalAmount.toFixed(2))}`;
+              return (
+                <div style={{ marginTop: '20px', paddingTop: '16px', borderTop: '1px solid #f3f4f6', display: 'flex', alignItems: 'center', gap: '12px' }}>
+                  <QRCodeSVG value={qrUrl} size={64} level="M" />
+                  <div>
+                    <p style={{ fontSize: '8px', textTransform: 'uppercase', letterSpacing: '2px', color: '#9ca3af', marginBottom: '4px' }}>{t('clients.invoice.verifactuLabel')}</p>
+                    <p style={{ fontSize: '7px', color: '#9ca3af', wordBreak: 'break-all', maxWidth: '200px' }}>{showSendInvoice.huella.substring(0, 32)}...</p>
+                  </div>
+                </div>
+              );
+            })()}
           </div>
         </div>
       </>)}
@@ -2948,7 +3019,7 @@ const Clients = () => {
                   </div>
                 </div>
               ))}
-              {isSendingMessage && !lyriIsStreaming && (
+              {isSendingMessage && (!lyriIsStreaming || !lyriStreamingText) && (
                 <div className="flex justify-start">
                   <div className="bg-accent text-accent-foreground rounded-lg px-4 py-3 text-sm">
                     <span className="inline-block animate-pulse">{t('clients.lyraModal.typing')}</span>
