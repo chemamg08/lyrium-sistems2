@@ -704,9 +704,24 @@ export async function connectMetaWithToken(
     // Keep short-lived token if exchange fails
   }
 
+  // User tokens from FB.login don't support /me/whatsapp_business_accounts directly.
+  // Try it first (works with some token types), then fall back via /me/businesses.
   const wabaResp = await graphFetchJson<any>('/me/whatsapp_business_accounts', accessToken);
-  const waba = Array.isArray(wabaResp?.data) ? wabaResp.data[0] : null;
-  if (!waba?.id) throw new Error('No se encontró ninguna cuenta de WhatsApp Business en Meta');
+  let waba: any = Array.isArray(wabaResp?.data) && wabaResp.data.length > 0 ? wabaResp.data[0] : null;
+
+  if (!waba?.id) {
+    const bizResp = await graphFetchJson<any>('/me/businesses', accessToken);
+    const businesses: any[] = Array.isArray(bizResp?.data) ? bizResp.data : [];
+    for (const biz of businesses) {
+      const bwabaResp = await graphFetchJson<any>(`/${biz.id}/whatsapp_business_accounts`, accessToken);
+      if (Array.isArray(bwabaResp?.data) && bwabaResp.data.length > 0) {
+        waba = bwabaResp.data[0];
+        break;
+      }
+    }
+  }
+
+  if (!waba?.id) throw new Error('No se encontró ninguna cuenta de WhatsApp Business en Meta. Asegúrate de que tu cuenta de Meta tiene una cuenta de WhatsApp Business vinculada.');
 
   const phoneResp = await graphFetchJson<any>(`/${waba.id}/phone_numbers?fields=id,display_phone_number,verified_name`, accessToken);
   const phone = Array.isArray(phoneResp?.data) ? phoneResp.data[0] : null;
