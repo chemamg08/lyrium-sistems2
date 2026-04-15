@@ -583,7 +583,7 @@ async function connectMetaWithCodeInternal(
   account: any,
   code: string,
   state: string,
-  redirectUri: string,
+  redirectUri?: string,
 ): Promise<{ connected: boolean; phoneNumber?: string; phoneNumberId?: string }> {
   if (!account) throw new Error('Cuenta no encontrada');
 
@@ -598,7 +598,8 @@ async function connectMetaWithCodeInternal(
   const tokenUrl = new URL(`${META_GRAPH_BASE}/oauth/access_token`);
   tokenUrl.searchParams.set('client_id', appId);
   tokenUrl.searchParams.set('client_secret', appSecret);
-  tokenUrl.searchParams.set('redirect_uri', redirectUri);
+  // Embedded Signup flow: omit redirect_uri (Meta JS SDK handles internally)
+  if (redirectUri) tokenUrl.searchParams.set('redirect_uri', redirectUri);
   tokenUrl.searchParams.set('code', code);
 
   const tokenRes = await fetch(tokenUrl.toString());
@@ -663,8 +664,8 @@ export async function connectMetaWithCode(
   redirectUri?: string,
 ): Promise<{ connected: boolean; phoneNumber?: string; phoneNumberId?: string }> {
   const account = await Automation.findById(accountId);
-  const finalRedirectUri = redirectUri || getMetaRedirectUri();
-  return connectMetaWithCodeInternal(account, code, state, finalRedirectUri);
+  // redirectUri undefined → embedded signup flow (no redirect_uri in token exchange)
+  return connectMetaWithCodeInternal(account, code, state, redirectUri);
 }
 
 export async function connectMetaWithCodeByState(
@@ -677,13 +678,36 @@ export async function connectMetaWithCodeByState(
   const account = await Automation.findOne({ whatsappOAuthState: state });
   if (!account) throw new Error('State OAuth inválido');
 
-  const finalRedirectUri = redirectUri || getMetaRedirectUri();
-  const result = await connectMetaWithCodeInternal(account, code, state, finalRedirectUri);
+  const result = await connectMetaWithCodeInternal(account, code, state, redirectUri);
 
   return {
     ...result,
     accountId: String(account._id),
   };
+}
+
+export async function initMetaEmbeddedSignup(accountId: string): Promise<{ instanceName: string; state: string; appId: string }> {
+  const appId = getMetaAppId();
+  const state = crypto.randomBytes(24).toString('hex');
+  const expires = new Date(Date.now() + 10 * 60 * 1000).toISOString();
+  const instanceName = `lyrium_${accountId}`;
+
+  await Automation.findByIdAndUpdate(
+    accountId,
+    {
+      $set: {
+        accountId,
+        whatsappOAuthState: state,
+        whatsappOAuthStateExpires: expires,
+        'whatsappSession.provider': 'meta',
+        'whatsappSession.instanceName': instanceName,
+        'whatsappSession.connected': false,
+      },
+    },
+    { upsert: true },
+  );
+
+  return { instanceName, state, appId };
 }
 
 export async function getInstanceStatus(instanceName: string): Promise<{ connected: boolean; phoneNumber?: string }> {

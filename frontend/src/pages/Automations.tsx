@@ -70,6 +70,27 @@ const PLATFORMS = [
 
 const WA_API = `${import.meta.env.VITE_API_URL}/whatsapp`;
 
+// Facebook JS SDK loader for WhatsApp Embedded Signup
+function loadFbSdk(appId: string): Promise<void> {
+  return new Promise((resolve, reject) => {
+    if ((window as any).FB) {
+      (window as any).FB.init({ appId, autoLogAppEvents: true, xfbml: true, version: 'v22.0' });
+      resolve();
+      return;
+    }
+    (window as any).fbAsyncInit = function () {
+      (window as any).FB.init({ appId, autoLogAppEvents: true, xfbml: true, version: 'v22.0' });
+      resolve();
+    };
+    const script = document.createElement('script');
+    script.src = 'https://connect.facebook.net/en_US/sdk.js';
+    script.async = true;
+    script.defer = true;
+    script.onerror = () => reject(new Error('No se pudo cargar el SDK de Facebook'));
+    document.head.appendChild(script);
+  });
+}
+
 interface WAMessage { id: string; from: string; text: string; time: string; sent: boolean; attachments?: { id: string; filename: string; originalName: string; mimeType: string; size: number }[]; }
 interface WAConversation { id: string; contactName: string; contactPhone: string; messages: WAMessage[]; lastMessageTime: string; unread: number; autoReplyPaused?: boolean; }
 interface WAFolder { id: string; name: string; color: string; conversationIds: string[]; }
@@ -382,29 +403,78 @@ const Automations = () => {
     setQrLoading(true);
     setWaConnectError('');
     try {
-      const res = await waApi('POST', '/connect', {});
-      if (res.ok) {
-        const data = await res.json();
-        if (data.authUrl) {
-          window.location.href = data.authUrl;
+      // Step 1: Init session on backend → get state + appId
+      const initRes = await waApi('POST', '/connect', {});
+      if (!initRes.ok) {
+        let errorMessage = 'No fue posible iniciar la conexion con Meta.';
+        try {
+          const data = await initRes.json();
+          if (Array.isArray(data?.missingEnv) && data.missingEnv.length > 0) {
+            errorMessage = `Faltan variables de entorno en backend: ${data.missingEnv.join(', ')}`;
+          } else if (data?.error) {
+            errorMessage = String(data.error);
+          }
+        } catch { /* ignore */ }
+        setWaConnectError(errorMessage);
+        setQrLoading(false);
+        setShowWaConnectModal(true);
+        return;
+      }
+      const { state: oauthState, appId } = await initRes.json();
+
+      // Step 2: Load Facebook JS SDK
+      await loadFbSdk(appId);
+      setQrLoading(false);
+
+      // Step 3: Open Meta Embedded Signup popup
+      setShowWaConnectModal(true);
+      setWaOAuthProcessing(true);
+
+      (window as any).FB.login(async (response: any) => {
+        const code = response?.authResponse?.code;
+        if (!code) {
+          setWaConnectError('No se recibió autorización de Meta. Inténtalo de nuevo.');
+          setWaOAuthProcessing(false);
           return;
         }
-      }
-
-      let errorMessage = 'No fue posible iniciar la conexion con Meta.';
-      try {
-        const data = await res.json();
-        if (Array.isArray(data?.missingEnv) && data.missingEnv.length > 0) {
-          errorMessage = `Faltan variables de entorno en backend: ${data.missingEnv.join(', ')}`;
-        } else if (data?.error) {
-          errorMessage = String(data.error);
+        try {
+          // Step 4: Exchange code on backend
+          const connectRes = await authFetch(`${WA_API}/meta/connect`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ accountId, code, state: oauthState }),
+          });
+          if (connectRes.ok) {
+            await loadWaData();
+            await loadWaClassifyRules();
+            setShowWaConnectModal(false);
+          } else {
+            let errorMessage = 'No fue posible finalizar la conexion con Meta.';
+            try {
+              const data = await connectRes.json();
+              if (Array.isArray(data?.missingEnv) && data.missingEnv.length > 0) {
+                errorMessage = `Faltan variables de entorno en backend: ${data.missingEnv.join(', ')}`;
+              } else if (data?.error) {
+                errorMessage = String(data.error);
+              }
+            } catch { /* ignore */ }
+            setWaConnectError(errorMessage);
+          }
+        } catch {
+          setWaConnectError('No fue posible finalizar la conexion con Meta. Revisa tu configuracion e intentalo de nuevo.');
+        } finally {
+          setWaOAuthProcessing(false);
         }
-      } catch { /* ignore */ }
-      setWaConnectError(errorMessage);
-    } catch {
-      setWaConnectError('No fue posible iniciar la conexion con Meta. Revisa tu conexion e intentalo de nuevo.');
+      }, {
+        scope: 'whatsapp_business_management,whatsapp_business_messaging,business_management',
+        response_type: 'code',
+        override_default_response_type: true,
+      });
+    } catch (err: any) {
+      setWaConnectError(err?.message || 'No fue posible iniciar la conexion con Meta. Revisa tu conexion e intentalo de nuevo.');
+      setQrLoading(false);
+      setShowWaConnectModal(true);
     }
-    setQrLoading(false);
   };
 
   const disconnectWa = async () => {

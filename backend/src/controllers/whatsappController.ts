@@ -102,9 +102,8 @@ export const connectWhatsApp: RequestHandler = async (req, res) => {
       return;
     }
 
-    const redirectUri = `${getFrontendAutomationsUrl()}?wa_meta=1`;
-    const result = await waService.createInstance(accountId, redirectUri);
-    res.json({ ok: true, instanceName: result.instanceName, authUrl: result.authUrl, redirectUri });
+    const result = await waService.initMetaEmbeddedSignup(accountId);
+    res.json({ ok: true, ...result });
   } catch (err: any) {
     console.error('[WA] connectWhatsApp error:', err);
     res.status(500).json({ error: err.message });
@@ -113,7 +112,7 @@ export const connectWhatsApp: RequestHandler = async (req, res) => {
 
 export const connectWhatsAppWithCode: RequestHandler = async (req, res) => {
   try {
-    const { accountId, code, state, redirectUri } = req.body;
+    const { accountId, code, state } = req.body;
     if (!accountId || !code || !state) {
       res.status(400).json({ error: 'accountId, code y state requeridos' });
       return;
@@ -129,7 +128,8 @@ export const connectWhatsAppWithCode: RequestHandler = async (req, res) => {
       return;
     }
 
-    const data = await waService.connectMetaWithCode(accountId, code, state, redirectUri);
+    // No redirectUri → Embedded Signup flow (redirect_uri omitted in token exchange)
+    const data = await waService.connectMetaWithCode(accountId, code, state);
     res.json({ ok: true, ...data });
   } catch (err: any) {
     console.error('[WA] connectWhatsAppWithCode error:', err);
