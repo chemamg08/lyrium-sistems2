@@ -3,6 +3,7 @@ import {
   connectWhatsApp,
   connectWhatsAppWithCode,
   connectWhatsAppWithToken,
+  connectWhatsAppManual,
   getWhatsAppStatus,
   disconnectWhatsApp,
   updateWhatsAppSwitch,
@@ -32,6 +33,7 @@ const router = Router();
 router.post('/connect', connectWhatsApp);
 router.post('/meta/connect', connectWhatsAppWithCode);
 router.post('/meta/connect-token', connectWhatsAppWithToken);
+router.post('/meta/connect-manual', connectWhatsAppManual);
 router.get('/status', getWhatsAppStatus);
 router.post('/disconnect', disconnectWhatsApp);
 

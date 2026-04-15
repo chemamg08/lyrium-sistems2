@@ -153,6 +153,10 @@ const Automations = () => {
   const [waOAuthProcessing, setWaOAuthProcessing] = useState(false);
   const [showWaConnectModal, setShowWaConnectModal] = useState(false);
   const [waConnectError, setWaConnectError] = useState('');
+  const [waManualMode, setWaManualMode] = useState(false);
+  const [waManualToken, setWaManualToken] = useState('');
+  const [waManualPhoneId, setWaManualPhoneId] = useState('');
+  const [waManualWabaId, setWaManualWabaId] = useState('');
   const [showWaCorreosConsultas, setShowWaCorreosConsultas] = useState(false);
   const [waCorreoInput, setWaCorreoInput] = useState('');
   const [waCorreosConsultas, setWaCorreosConsultas] = useState<string[]>([]);
@@ -481,6 +485,44 @@ const Automations = () => {
   const disconnectWa = async () => {
     await waApi('POST', '/disconnect', {});
     setWaConnected(false);
+  };
+
+  const connectWaManual = async () => {
+    if (!accountId) return;
+    if (!waManualToken.trim() || !waManualPhoneId.trim()) {
+      setWaConnectError('El token y el Phone Number ID son obligatorios.');
+      return;
+    }
+    setWaOAuthProcessing(true);
+    setWaConnectError('');
+    try {
+      const res = await authFetch(`${WA_API}/meta/connect-manual`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          accountId,
+          accessToken: waManualToken.trim(),
+          phoneNumberId: waManualPhoneId.trim(),
+          wabaId: waManualWabaId.trim() || undefined,
+        }),
+      });
+      if (res.ok) {
+        await loadWaData();
+        await loadWaClassifyRules();
+        setShowWaConnectModal(false);
+        setWaManualToken('');
+        setWaManualPhoneId('');
+        setWaManualWabaId('');
+        setWaManualMode(false);
+      } else {
+        const data = await res.json().catch(() => ({}));
+        setWaConnectError(data?.error || 'No fue posible conectar con las credenciales proporcionadas.');
+      }
+    } catch {
+      setWaConnectError('Error de conexión. Verifica las credenciales e inténtalo de nuevo.');
+    } finally {
+      setWaOAuthProcessing(false);
+    }
   };
 
   const toggleWaSwitch = async () => {
@@ -2106,42 +2148,131 @@ const Automations = () => {
           onClose={() => {
             if (waOAuthProcessing || qrLoading) return;
             setShowWaConnectModal(false);
+            setWaManualMode(false);
+            setWaConnectError('');
           }}
         >
           <div className="space-y-4">
-            <p className="text-xs text-muted-foreground">
-              Este es el proceso oficial: conectar tu cuenta de WhatsApp Business en Meta y volver automaticamente a Lyrium.
-            </p>
+            {!waManualMode ? (
+              <>
+                <p className="text-xs text-muted-foreground">
+                  Conecta tu cuenta de WhatsApp Business a través de Meta. Necesitas tener una cuenta de WhatsApp Business registrada en Meta Business Manager.
+                </p>
 
-            <div className="p-3 rounded-lg border border-border bg-muted/20 text-xs text-foreground space-y-2">
-              <p className="font-medium">Pasos</p>
-              <p>1. Pulsa "Continuar con Meta".</p>
-              <p>2. Inicia sesion en Meta y selecciona tu negocio y numero de WhatsApp.</p>
-              <p>3. Al terminar, volveras a esta pantalla y se completara la conexion.</p>
-            </div>
+                <div className="p-3 rounded-lg border border-border bg-muted/20 text-xs text-foreground space-y-2">
+                  <p className="font-medium">Pasos</p>
+                  <p>1. Pulsa "Continuar con Meta".</p>
+                  <p>2. Inicia sesion en Meta y selecciona tu negocio y numero de WhatsApp.</p>
+                  <p>3. Al terminar, volveras a esta pantalla y se completara la conexion.</p>
+                </div>
 
-            {waConnectError && (
-              <div className="p-3 rounded-lg border border-red-300 bg-red-50 text-red-700 text-xs">
-                {waConnectError}
-              </div>
+                {waConnectError && (
+                  <div className="p-3 rounded-lg border border-red-300 bg-red-50 text-red-700 text-xs">
+                    {waConnectError}
+                  </div>
+                )}
+
+                <div className="flex justify-between items-center pt-1">
+                  <button
+                    onClick={() => { setWaManualMode(true); setWaConnectError(''); }}
+                    disabled={waOAuthProcessing || qrLoading}
+                    className="text-xs text-muted-foreground underline underline-offset-2 hover:text-foreground disabled:opacity-50"
+                  >
+                    Configurar con credenciales manuales
+                  </button>
+                  <div className="flex gap-2">
+                    <button
+                      onClick={() => setShowWaConnectModal(false)}
+                      disabled={waOAuthProcessing || qrLoading}
+                      className="px-3 py-1.5 text-xs rounded-md border border-border hover:bg-accent text-muted-foreground disabled:opacity-50"
+                    >
+                      Cerrar
+                    </button>
+                    <button
+                      onClick={connectWa}
+                      disabled={qrLoading || waOAuthProcessing}
+                      className="px-3 py-1.5 text-xs rounded-md bg-foreground text-background hover:opacity-90 disabled:opacity-50"
+                    >
+                      {waOAuthProcessing ? 'Finalizando conexion...' : qrLoading ? 'Abriendo Meta...' : 'Continuar con Meta'}
+                    </button>
+                  </div>
+                </div>
+              </>
+            ) : (
+              <>
+                <p className="text-xs text-muted-foreground">
+                  Introduce las credenciales de tu número de WhatsApp Business desde el panel de Meta Developers → WhatsApp → Configuración de API.
+                </p>
+
+                <div className="space-y-3">
+                  <div>
+                    <label className="block text-xs font-medium text-foreground mb-1">Token de acceso *</label>
+                    <input
+                      type="password"
+                      value={waManualToken}
+                      onChange={e => setWaManualToken(e.target.value)}
+                      placeholder="EAAxxxxxxx..."
+                      className="w-full px-3 py-1.5 text-xs rounded-md border border-border bg-background text-foreground placeholder:text-muted-foreground focus:outline-none focus:ring-1 focus:ring-ring"
+                    />
+                    <p className="text-[10px] text-muted-foreground mt-0.5">Token temporal o permanente de la sección "Configuración de API" en Meta Developers.</p>
+                  </div>
+                  <div>
+                    <label className="block text-xs font-medium text-foreground mb-1">Phone Number ID *</label>
+                    <input
+                      type="text"
+                      value={waManualPhoneId}
+                      onChange={e => setWaManualPhoneId(e.target.value)}
+                      placeholder="1234567890"
+                      className="w-full px-3 py-1.5 text-xs rounded-md border border-border bg-background text-foreground placeholder:text-muted-foreground focus:outline-none focus:ring-1 focus:ring-ring"
+                    />
+                    <p className="text-[10px] text-muted-foreground mt-0.5">Lo encuentras en Meta Developers → WhatsApp → Configuración de API, junto al número de teléfono.</p>
+                  </div>
+                  <div>
+                    <label className="block text-xs font-medium text-foreground mb-1">WABA ID (opcional)</label>
+                    <input
+                      type="text"
+                      value={waManualWabaId}
+                      onChange={e => setWaManualWabaId(e.target.value)}
+                      placeholder="9876543210"
+                      className="w-full px-3 py-1.5 text-xs rounded-md border border-border bg-background text-foreground placeholder:text-muted-foreground focus:outline-none focus:ring-1 focus:ring-ring"
+                    />
+                    <p className="text-[10px] text-muted-foreground mt-0.5">ID de la cuenta de WhatsApp Business. Se detecta automáticamente si se deja vacío.</p>
+                  </div>
+                </div>
+
+                {waConnectError && (
+                  <div className="p-3 rounded-lg border border-red-300 bg-red-50 text-red-700 text-xs">
+                    {waConnectError}
+                  </div>
+                )}
+
+                <div className="flex justify-between items-center pt-1">
+                  <button
+                    onClick={() => { setWaManualMode(false); setWaConnectError(''); }}
+                    disabled={waOAuthProcessing}
+                    className="text-xs text-muted-foreground underline underline-offset-2 hover:text-foreground disabled:opacity-50"
+                  >
+                    ← Volver a conexión con Meta
+                  </button>
+                  <div className="flex gap-2">
+                    <button
+                      onClick={() => { setShowWaConnectModal(false); setWaManualMode(false); setWaConnectError(''); }}
+                      disabled={waOAuthProcessing}
+                      className="px-3 py-1.5 text-xs rounded-md border border-border hover:bg-accent text-muted-foreground disabled:opacity-50"
+                    >
+                      Cerrar
+                    </button>
+                    <button
+                      onClick={connectWaManual}
+                      disabled={waOAuthProcessing || !waManualToken.trim() || !waManualPhoneId.trim()}
+                      className="px-3 py-1.5 text-xs rounded-md bg-foreground text-background hover:opacity-90 disabled:opacity-50"
+                    >
+                      {waOAuthProcessing ? 'Conectando...' : 'Conectar'}
+                    </button>
+                  </div>
+                </div>
+              </>
             )}
-
-            <div className="flex justify-end gap-2 pt-1">
-              <button
-                onClick={() => setShowWaConnectModal(false)}
-                disabled={waOAuthProcessing || qrLoading}
-                className="px-3 py-1.5 text-xs rounded-md border border-border hover:bg-accent text-muted-foreground disabled:opacity-50"
-              >
-                Cerrar
-              </button>
-              <button
-                onClick={connectWa}
-                disabled={qrLoading || waOAuthProcessing}
-                className="px-3 py-1.5 text-xs rounded-md bg-foreground text-background hover:opacity-90 disabled:opacity-50"
-              >
-                {waOAuthProcessing ? 'Finalizando conexion...' : qrLoading ? 'Abriendo Meta...' : 'Continuar con Meta'}
-              </button>
-            </div>
           </div>
         </Modal>
       )}

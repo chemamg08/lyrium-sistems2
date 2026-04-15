@@ -761,6 +761,50 @@ export async function connectMetaWithToken(
   };
 }
 
+export async function connectMetaManual(
+  accountId: string,
+  accessToken: string,
+  phoneNumberId: string,
+  wabaId?: string,
+): Promise<{ connected: boolean; phoneNumber?: string; phoneNumberId?: string }> {
+  const account = await Automation.findById(accountId);
+  if (!account) throw new Error('Cuenta no encontrada');
+
+  // Verify token works and get phone number display
+  const phoneData = await graphFetchJson<any>(`/${phoneNumberId}?fields=id,display_phone_number,verified_name`, accessToken);
+  if (!phoneData?.id) throw new Error('No se pudo verificar el número con el token proporcionado');
+
+  // Discover WABA ID if not provided
+  let resolvedWabaId = wabaId || '';
+  if (!resolvedWabaId) {
+    try {
+      const wabaData = await graphFetchJson<any>(`/${phoneNumberId}?fields=whatsapp_business_account`, accessToken);
+      resolvedWabaId = wabaData?.whatsapp_business_account?.id || '';
+    } catch {
+      // Not critical — store without WABA ID
+    }
+  }
+
+  account.whatsappSession = {
+    ...(account.whatsappSession || {}),
+    provider: 'meta',
+    instanceName: account.whatsappSession?.instanceName || `lyrium_${String(account._id)}`,
+    connected: true,
+    connectedAt: new Date().toISOString(),
+    phoneNumber: phoneData.display_phone_number || '',
+    businessAccountId: resolvedWabaId,
+    phoneNumberId: phoneData.id,
+    accessToken: encryptPassword(accessToken),
+  } as any;
+  await account.save();
+
+  return {
+    connected: true,
+    phoneNumber: phoneData.display_phone_number || '',
+    phoneNumberId: phoneData.id,
+  };
+}
+
 export async function connectMetaWithCodeByState(
   code: string,
   state: string,

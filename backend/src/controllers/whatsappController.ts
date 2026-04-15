@@ -163,6 +163,25 @@ export const connectWhatsAppWithToken: RequestHandler = async (req, res) => {
   }
 };
 
+export const connectWhatsAppManual: RequestHandler = async (req, res) => {
+  try {
+    const { accountId, accessToken, phoneNumberId, wabaId } = req.body;
+    if (!accountId || !accessToken || !phoneNumberId) {
+      res.status(400).json({ error: 'accountId, accessToken y phoneNumberId requeridos' });
+      return;
+    }
+    if (!verifyOwnership(req as AuthRequest, accountId)) {
+      res.status(403).json({ error: 'Acceso denegado' });
+      return;
+    }
+    const data = await waService.connectMetaManual(accountId, accessToken, phoneNumberId, wabaId);
+    res.json({ ok: true, ...data });
+  } catch (err: any) {
+    console.error('[WA] connectWhatsAppManual error:', err);
+    res.status(500).json({ error: err.message || 'Error conectando WhatsApp manualmente' });
+  }
+};
+
 export const whatsappMetaCallback: RequestHandler = async (req, res) => {
   try {
     const code = String(req.query.code || '');
