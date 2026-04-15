@@ -430,41 +430,44 @@ const Automations = () => {
       setShowWaConnectModal(true);
       setWaOAuthProcessing(true);
 
-      (window as any).FB.login(async (response: any) => {
+      (window as any).FB.login((response: any) => {
         const code = response?.authResponse?.code;
         if (!code) {
           setWaConnectError('No se recibió autorización de Meta. Inténtalo de nuevo.');
           setWaOAuthProcessing(false);
           return;
         }
-        try {
-          // Step 4: Exchange code on backend
-          const connectRes = await authFetch(`${WA_API}/meta/connect`, {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ accountId, code, state: oauthState }),
-          });
-          if (connectRes.ok) {
-            await loadWaData();
-            await loadWaClassifyRules();
-            setShowWaConnectModal(false);
-          } else {
-            let errorMessage = 'No fue posible finalizar la conexion con Meta.';
-            try {
-              const data = await connectRes.json();
-              if (Array.isArray(data?.missingEnv) && data.missingEnv.length > 0) {
-                errorMessage = `Faltan variables de entorno en backend: ${data.missingEnv.join(', ')}`;
-              } else if (data?.error) {
-                errorMessage = String(data.error);
-              }
-            } catch { /* ignore */ }
-            setWaConnectError(errorMessage);
+        // FB.login callback must be synchronous — run async work in IIFE
+        (async () => {
+          try {
+            // Step 4: Exchange code on backend
+            const connectRes = await authFetch(`${WA_API}/meta/connect`, {
+              method: 'POST',
+              headers: { 'Content-Type': 'application/json' },
+              body: JSON.stringify({ accountId, code, state: oauthState }),
+            });
+            if (connectRes.ok) {
+              await loadWaData();
+              await loadWaClassifyRules();
+              setShowWaConnectModal(false);
+            } else {
+              let errorMessage = 'No fue posible finalizar la conexion con Meta.';
+              try {
+                const data = await connectRes.json();
+                if (Array.isArray(data?.missingEnv) && data.missingEnv.length > 0) {
+                  errorMessage = `Faltan variables de entorno en backend: ${data.missingEnv.join(', ')}`;
+                } else if (data?.error) {
+                  errorMessage = String(data.error);
+                }
+              } catch { /* ignore */ }
+              setWaConnectError(errorMessage);
+            }
+          } catch {
+            setWaConnectError('No fue posible finalizar la conexion con Meta. Revisa tu configuracion e intentalo de nuevo.');
+          } finally {
+            setWaOAuthProcessing(false);
           }
-        } catch {
-          setWaConnectError('No fue posible finalizar la conexion con Meta. Revisa tu configuracion e intentalo de nuevo.');
-        } finally {
-          setWaOAuthProcessing(false);
-        }
+        })();
       }, {
         scope: 'whatsapp_business_management,whatsapp_business_messaging,business_management',
         response_type: 'code',
