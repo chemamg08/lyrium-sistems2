@@ -28,7 +28,7 @@ import webhookRoutes from './webhookRoutes.js';
 import publicApiRoutes from './publicApiRoutes.js';
 import taxComplianceRoutes from './taxComplianceRoutes.js';
 import whatsappRoutes from './whatsappRoutes.js';
-import { whatsappWebhook, whatsappWebhookVerify } from '../controllers/whatsappController.js';
+import { whatsappMetaCallback, whatsappWebhook, whatsappWebhookVerify } from '../controllers/whatsappController.js';
 import { getStats, incrementStat } from '../controllers/statsController.js';
 
 const router = Router();
@@ -40,6 +40,7 @@ router.use('/subscriptions', subscriptionsRoutes); // webhook needs to be public
 router.get('/calendar/callback', handleCallback); // Google OAuth callback (no JWT)
 router.use('/sign', signPublicRoutes); // Public signing page API
 router.use('/v1', publicApiRoutes); // Public API (API key auth inside)
+router.get('/whatsapp/meta/callback', whatsappMetaCallback); // WhatsApp Meta OAuth callback (no auth)
 router.get('/whatsapp/webhook', whatsappWebhookVerify); // WhatsApp webhook verify (Meta, no auth)
 router.post('/whatsapp/webhook', whatsappWebhook); // WhatsApp webhook events (Meta, no auth)
 

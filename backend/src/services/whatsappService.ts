@@ -11,10 +11,13 @@ import { decryptPassword, encryptPassword } from './emailProcessorService.js';
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
 
+function stripTrailingSlash(value: string): string {
+  return value.replace(/\/+$/, '');
+}
+
 const META_API_VERSION = process.env.WHATSAPP_META_API_VERSION || 'v22.0';
 const META_GRAPH_BASE = `https://graph.facebook.com/${META_API_VERSION}`;
-const BACKEND_URL = process.env.BACKEND_PUBLIC_URL || `http://localhost:${process.env.PORT || 3000}`;
-const FRONTEND_URL = process.env.FRONTEND_URL || 'http://localhost:8080';
+const BACKEND_URL = stripTrailingSlash(process.env.BACKEND_PUBLIC_URL || `http://localhost:${process.env.PORT || 3000}`);
 const WA_ATTACHMENTS_DIR = path.join(__dirname, '../../uploads/wa-attachments');
 
 if (!fs.existsSync(WA_ATTACHMENTS_DIR)) fs.mkdirSync(WA_ATTACHMENTS_DIR, { recursive: true });
@@ -53,7 +56,7 @@ function getMetaAppSecret(): string {
 }
 
 function getMetaRedirectUri(): string {
-  return process.env.WHATSAPP_META_REDIRECT_URI || `${FRONTEND_URL}/automatizaciones?wa_meta=1`;
+  return process.env.WHATSAPP_META_REDIRECT_URI || `${BACKEND_URL}/api/whatsapp/meta/callback`;
 }
 
 function accountIdFromInstanceName(instanceName: string): string {
@@ -576,13 +579,12 @@ export async function createInstance(accountId: string, redirectUriOverride?: st
   return { instanceName, authUrl };
 }
 
-export async function connectMetaWithCode(
-  accountId: string,
+async function connectMetaWithCodeInternal(
+  account: any,
   code: string,
   state: string,
-  redirectUri?: string,
+  redirectUri: string,
 ): Promise<{ connected: boolean; phoneNumber?: string; phoneNumberId?: string }> {
-  const account = await Automation.findById(accountId);
   if (!account) throw new Error('Cuenta no encontrada');
 
   const expectedState = account.whatsappOAuthState || '';
@@ -592,12 +594,11 @@ export async function connectMetaWithCode(
 
   const appId = getMetaAppId();
   const appSecret = getMetaAppSecret();
-  const finalRedirectUri = redirectUri || getMetaRedirectUri();
 
   const tokenUrl = new URL(`${META_GRAPH_BASE}/oauth/access_token`);
   tokenUrl.searchParams.set('client_id', appId);
   tokenUrl.searchParams.set('client_secret', appSecret);
-  tokenUrl.searchParams.set('redirect_uri', finalRedirectUri);
+  tokenUrl.searchParams.set('redirect_uri', redirectUri);
   tokenUrl.searchParams.set('code', code);
 
   const tokenRes = await fetch(tokenUrl.toString());
@@ -636,7 +637,7 @@ export async function connectMetaWithCode(
   account.whatsappSession = {
     ...(account.whatsappSession || {}),
     provider: 'meta',
-    instanceName: `lyrium_${accountId}`,
+    instanceName: account.whatsappSession?.instanceName || `lyrium_${String(account._id)}`,
     connected: true,
     connectedAt: new Date().toISOString(),
     phoneNumber: phone.display_phone_number || '',
@@ -652,6 +653,36 @@ export async function connectMetaWithCode(
     connected: true,
     phoneNumber: phone.display_phone_number || '',
     phoneNumberId: phone.id,
+  };
+}
+
+export async function connectMetaWithCode(
+  accountId: string,
+  code: string,
+  state: string,
+  redirectUri?: string,
+): Promise<{ connected: boolean; phoneNumber?: string; phoneNumberId?: string }> {
+  const account = await Automation.findById(accountId);
+  const finalRedirectUri = redirectUri || getMetaRedirectUri();
+  return connectMetaWithCodeInternal(account, code, state, finalRedirectUri);
+}
+
+export async function connectMetaWithCodeByState(
+  code: string,
+  state: string,
+  redirectUri?: string,
+): Promise<{ connected: boolean; phoneNumber?: string; phoneNumberId?: string; accountId: string }> {
+  if (!state) throw new Error('State OAuth inválido');
+
+  const account = await Automation.findOne({ whatsappOAuthState: state });
+  if (!account) throw new Error('State OAuth inválido');
+
+  const finalRedirectUri = redirectUri || getMetaRedirectUri();
+  const result = await connectMetaWithCodeInternal(account, code, state, finalRedirectUri);
+
+  return {
+    ...result,
+    accountId: String(account._id),
   };
 }
 

@@ -382,8 +382,7 @@ const Automations = () => {
     setQrLoading(true);
     setWaConnectError('');
     try {
-      const redirectUri = `${window.location.origin}${window.location.pathname}?wa_meta=1`;
-      const res = await waApi('POST', '/connect', { redirectUri });
+      const res = await waApi('POST', '/connect', {});
       if (res.ok) {
         const data = await res.json();
         if (data.authUrl) {
@@ -562,14 +561,53 @@ const Automations = () => {
 
   // Finalize WhatsApp Meta OAuth when returning from Meta
   useEffect(() => {
-    if (!accountId || waOAuthProcessing) return;
+    if (waOAuthProcessing) return;
+
     const params = new URLSearchParams(window.location.search);
-    const isMetaReturn = params.get('wa_meta') === '1';
+    if (params.get('wa_meta') !== '1') return;
+
+    const clearWaMetaParams = () => {
+      window.history.replaceState({}, '', window.location.pathname);
+    };
+
+    const status = params.get('wa_status');
+    const waMessage = params.get('wa_message') || '';
     const code = params.get('code');
     const state = params.get('state');
-    if (!isMetaReturn || !code || !state) return;
 
-    const finish = async () => {
+    if (status === 'error') {
+      setShowWaConnectModal(true);
+      setWaConnectError(waMessage || 'No fue posible finalizar la conexion con Meta.');
+      clearWaMetaParams();
+      return;
+    }
+
+    if (!accountId) return;
+
+    const finishConnected = async () => {
+      setShowWaConnectModal(true);
+      setWaOAuthProcessing(true);
+      setWaConnectError('');
+      try {
+        await loadWaData();
+        await loadWaClassifyRules();
+        setShowWaConnectModal(false);
+      } catch {
+        setWaConnectError('No fue posible sincronizar el estado de WhatsApp tras volver de Meta.');
+      } finally {
+        clearWaMetaParams();
+        setWaOAuthProcessing(false);
+      }
+    };
+
+    if (status === 'connected') {
+      finishConnected();
+      return;
+    }
+
+    if (!code || !state) return;
+
+    const finishLegacy = async () => {
       setShowWaConnectModal(true);
       setWaOAuthProcessing(true);
       setWaConnectError('');
@@ -600,12 +638,12 @@ const Automations = () => {
         setWaConnectError('No fue posible finalizar la conexion con Meta. Revisa tu configuracion e intentalo de nuevo.');
       }
       finally {
-        window.history.replaceState({}, '', window.location.pathname);
+        clearWaMetaParams();
         setWaOAuthProcessing(false);
       }
     };
 
-    finish();
+    finishLegacy();
   }, [accountId, waOAuthProcessing]);
   useEffect(() => {
     const params = new URLSearchParams(window.location.search);

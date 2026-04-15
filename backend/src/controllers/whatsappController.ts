@@ -15,6 +15,7 @@ const RECOMMENDED_META_ENV = [
   'WHATSAPP_META_REDIRECT_URI',
   'WHATSAPP_META_WEBHOOK_VERIFY_TOKEN',
   'BACKEND_PUBLIC_URL',
+  'FRONTEND_URL',
 ] as const;
 
 function getMissingEnvVars(names: readonly string[]): string[] {
@@ -30,6 +31,44 @@ function sendMetaConfigError(res: any): void {
     missingEnv: missingRequired,
     recommendedMissingEnv: missingRecommended,
   });
+}
+
+function stripTrailingSlash(value: string): string {
+  return String(value || '').replace(/\/+$/, '');
+}
+
+function getForwardedHeader(value: unknown): string {
+  return String(value || '').split(',')[0].trim();
+}
+
+function getPublicBackendBaseUrl(req: any): string {
+  const proto = getForwardedHeader(req.headers?.['x-forwarded-proto']) || req.protocol || 'https';
+  const host = getForwardedHeader(req.headers?.['x-forwarded-host']) || req.get?.('host') || '';
+  if (host) return `${proto}://${host}`;
+  return stripTrailingSlash(process.env.BACKEND_PUBLIC_URL || `http://localhost:${process.env.PORT || 3000}`);
+}
+
+function getMetaCallbackUrl(req: any): string {
+  return `${stripTrailingSlash(getPublicBackendBaseUrl(req))}/api/whatsapp/meta/callback`;
+}
+
+function getFrontendAutomationsUrl(): string {
+  const frontend = stripTrailingSlash(process.env.FRONTEND_URL || 'http://localhost:8080');
+  return `${frontend}/automatizaciones`;
+}
+
+function buildMetaResultUrl(status: 'connected' | 'error', message?: string): string {
+  const params = new URLSearchParams({
+    wa_meta: '1',
+    wa_status: status,
+  });
+
+  const cleanMessage = String(message || '').trim();
+  if (cleanMessage) {
+    params.set('wa_message', cleanMessage.slice(0, 500));
+  }
+
+  return `${getFrontendAutomationsUrl()}?${params.toString()}`;
 }
 
 // ── Multer for WhatsApp attachments ──────────────────────────────────
@@ -53,7 +92,7 @@ async function getAccount(accountId: string) {
 // ── Meta connect flow ────────────────────────────────────────────────
 export const connectWhatsApp: RequestHandler = async (req, res) => {
   try {
-    const { accountId, redirectUri } = req.body;
+    const { accountId } = req.body;
     if (!accountId) { res.status(400).json({ error: 'accountId required' }); return; }
     if (!verifyOwnership(req as AuthRequest, accountId)) { res.status(403).json({ error: 'Acceso denegado' }); return; }
 
@@ -63,6 +102,7 @@ export const connectWhatsApp: RequestHandler = async (req, res) => {
       return;
     }
 
+    const redirectUri = getMetaCallbackUrl(req);
     const result = await waService.createInstance(accountId, redirectUri);
     res.json({ ok: true, instanceName: result.instanceName, authUrl: result.authUrl });
   } catch (err: any) {
@@ -94,6 +134,40 @@ export const connectWhatsAppWithCode: RequestHandler = async (req, res) => {
   } catch (err: any) {
     console.error('[WA] connectWhatsAppWithCode error:', err);
     res.status(500).json({ error: err.message || 'Error conectando WhatsApp con Meta' });
+  }
+};
+
+export const whatsappMetaCallback: RequestHandler = async (req, res) => {
+  try {
+    const code = String(req.query.code || '');
+    const state = String(req.query.state || '');
+    const error = String(req.query.error || '');
+    const errorDescription = String(req.query.error_description || '');
+
+    if (error) {
+      const message = errorDescription || `Meta devolvió un error: ${error}`;
+      res.redirect(buildMetaResultUrl('error', message));
+      return;
+    }
+
+    if (!code || !state) {
+      res.redirect(buildMetaResultUrl('error', 'Meta no devolvió code/state válidos.'));
+      return;
+    }
+
+    const missingRequired = getMissingEnvVars(REQUIRED_META_CONNECT_ENV);
+    if (missingRequired.length > 0) {
+      res.redirect(buildMetaResultUrl('error', `Faltan variables de entorno para WhatsApp Meta: ${missingRequired.join(', ')}`));
+      return;
+    }
+
+    const redirectUri = getMetaCallbackUrl(req);
+    await waService.connectMetaWithCodeByState(code, state, redirectUri);
+
+    res.redirect(buildMetaResultUrl('connected'));
+  } catch (err: any) {
+    console.error('[WA] whatsappMetaCallback error:', err);
+    res.redirect(buildMetaResultUrl('error', String(err?.message || 'No fue posible finalizar la conexion con Meta.')));
   }
 };
 
