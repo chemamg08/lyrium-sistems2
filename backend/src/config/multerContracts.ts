@@ -33,3 +33,30 @@ export const uploadTempContract = multer({
     fileSize: 20 * 1024 * 1024 // 20MB
   }
 });
+
+const baseContractStorage = multer.diskStorage({
+  destination: async (req, file, cb) => {
+    const fs = await import('fs/promises');
+    const uploadDir = path.join(__dirname, '../../uploads/contracts');
+    await fs.mkdir(uploadDir, { recursive: true });
+    cb(null, uploadDir);
+  },
+  filename: (req, file, cb) => {
+    const uniqueSuffix = Date.now() + '_' + Math.round(Math.random() * 1E9);
+    cb(null, uniqueSuffix + '_' + sanitizeFilename(file.originalname));
+  }
+});
+
+export const uploadBaseContract = multer({
+  storage: baseContractStorage,
+  fileFilter: (req, file, cb) => {
+    if (file.mimetype === 'application/pdf') {
+      cb(null, true);
+    } else {
+      cb(new Error('Solo se permiten archivos PDF'));
+    }
+  },
+  limits: {
+    fileSize: 20 * 1024 * 1024,
+  },
+});

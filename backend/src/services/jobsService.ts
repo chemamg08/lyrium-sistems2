@@ -1,6 +1,8 @@
 import { Job } from '../models/Job.js';
+import { runWithDistributedLock } from './distributedLockService.js';
 
 const API_BASE_URL = process.env.BACKEND_INTERNAL_BASE_URL || `http://localhost:${process.env.PORT || 3000}/api`;
+const JOB_WORKER_LOCK_TTL_MS = 15 * 1000;
 
 export type JobStatus = 'queued' | 'processing' | 'done' | 'failed' | 'canceled';
 
@@ -96,69 +98,73 @@ export async function cancelJob(jobId: string): Promise<boolean> {
 
 async function processNextJob(): Promise<void> {
   if (processing) return;
-  processing = true;
 
-  try {
-    const next = await Job.findOneAndUpdate(
-      { status: 'queued' },
-      { status: 'processing', startedAt: new Date().toISOString() },
-      { returnDocument: 'after' }
-    );
-
-    if (!next) return;
+  await runWithDistributedLock('http-jobs-worker', JOB_WORKER_LOCK_TTL_MS, async () => {
+    if (processing) return;
+    processing = true;
 
     try {
-      const targetUrl = `${API_BASE_URL}${next.request.endpoint}`;
-      const jobSecret = process.env.INTERNAL_JOB_SECRET;
-      if (!jobSecret) {
-        throw new Error('INTERNAL_JOB_SECRET not configured');
-      }
-      const headers: Record<string, string> = {
-        'content-type': 'application/json',
-        'x-internal-job': jobSecret,
-        ...next.request.headers
-      };
+      const next = await Job.findOneAndUpdate(
+        { status: 'queued' },
+        { status: 'processing', startedAt: new Date().toISOString() },
+        { returnDocument: 'after' }
+      );
 
-      const response = await fetch(targetUrl, {
-        method: next.request.method,
-        headers,
-        body: next.request.method === 'GET' ? undefined : JSON.stringify(next.request.body || {})
-      });
+      if (!next) return;
 
-      const text = await response.text();
-      let parsed: any = text;
       try {
-        parsed = text ? JSON.parse(text) : {};
-      } catch {
-        parsed = { raw: text };
-      }
+        const targetUrl = `${API_BASE_URL}${next.request.endpoint}`;
+        const jobSecret = process.env.INTERNAL_JOB_SECRET;
+        if (!jobSecret) {
+          throw new Error('INTERNAL_JOB_SECRET not configured');
+        }
+        const headers: Record<string, string> = {
+          'content-type': 'application/json',
+          'x-internal-job': jobSecret,
+          ...next.request.headers
+        };
 
-      if (!response.ok) {
-        throw new Error(parsed?.error || `HTTP ${response.status}`);
-      }
+        const response = await fetch(targetUrl, {
+          method: next.request.method,
+          headers,
+          body: next.request.method === 'GET' ? undefined : JSON.stringify(next.request.body || {})
+        });
 
-      await Job.findByIdAndUpdate(next._id, {
-        status: 'done',
-        result: parsed,
-        finishedAt: new Date().toISOString(),
-        error: null
-      });
-    } catch (error: any) {
-      await Job.findByIdAndUpdate(next._id, {
-        status: 'failed',
-        error: error?.message || 'Error desconocido',
-        finishedAt: new Date().toISOString()
-      });
+        const text = await response.text();
+        let parsed: any = text;
+        try {
+          parsed = text ? JSON.parse(text) : {};
+        } catch {
+          parsed = { raw: text };
+        }
+
+        if (!response.ok) {
+          throw new Error(parsed?.error || `HTTP ${response.status}`);
+        }
+
+        await Job.findByIdAndUpdate(next._id, {
+          status: 'done',
+          result: parsed,
+          finishedAt: new Date().toISOString(),
+          error: null
+        });
+      } catch (error: any) {
+        await Job.findByIdAndUpdate(next._id, {
+          status: 'failed',
+          error: error?.message || 'Error desconocido',
+          finishedAt: new Date().toISOString()
+        });
+      }
+    } finally {
+      processing = false;
     }
-  } finally {
-    processing = false;
-  }
 
-  // Trigger subsequent queued jobs
-  const pendingCount = await Job.countDocuments({ status: 'queued' });
-  if (pendingCount > 0) {
-    void processNextJob();
-  }
+    // Trigger subsequent queued jobs
+    const pendingCount = await Job.countDocuments({ status: 'queued' });
+    if (pendingCount > 0) {
+      void processNextJob();
+    }
+  });
 }
 
 export function startJobsWorker(): void {

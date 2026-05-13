@@ -1,6 +1,6 @@
-import { Request, Response } from 'express';
+﻿import { Request, Response } from 'express';
 import { sendEmail, getEmailConfig, saveEmailConfig } from '../services/emailService.js';
-import { callFiscalAI, streamFiscalAI, getAiClient, AI_MODEL, buildContextMessages } from '../services/aiService.js';
+import { callFiscalAI, streamFiscalAI, getAiClient, AI_MODEL, buildContextMessages, stripThinkTags } from '../services/aiService.js';
 import { generateFiscalReportPDF } from '../services/pdfService.js';
 import { getAccountSpecialties } from '../services/specialtiesService.js';
 import { getLegalContextForAccount, buildCountryLegalSystemPrompt , getAccountCountry } from '../services/legalKnowledgeService.js';
@@ -641,6 +641,7 @@ export async function clearChat(req: Request, res: Response) {
     if (chat) {
       chat.messages = [];
       chat.updatedAt = new Date().toISOString();
+      chat.markModified('messages');
       await chat.save();
     }
     
@@ -1147,14 +1148,12 @@ IMPORTANTE:
       temperature: 0.1
     });
 
-    let rawContent = (response.choices[0].message.content || '').trim();
+    let rawContent = stripThinkTags(response.choices[0].message.content || '').trim();
     
     // Strip markdown code blocks if present
     if (rawContent.startsWith('```')) {
       rawContent = rawContent.replace(/^```(?:json)?\n?/, '').replace(/\n?```$/, '');
     }
-    // Strip <think> blocks if present
-    rawContent = rawContent.replace(/<think>[\s\S]*?<\/think>/g, '').trim();
 
     let reportData: any;
     try {

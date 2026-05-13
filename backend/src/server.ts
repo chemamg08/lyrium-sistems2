@@ -11,7 +11,10 @@ import { startJobsWorker } from './services/jobsService.js';
 import { resumeAllPolling } from './services/emailProcessorService.js';
 import { startCleanupWorker } from './services/cleanupService.js';
 import { startAlertScheduler } from './services/alertScheduler.js';
+import { startStripeReconciliationWorker } from './services/stripeReconciliationService.js';
 import { startTaxRateSyncWorker } from './services/taxRateSyncService.js';
+import { startCalendarSyncJob } from './jobs/calendarSyncJob.js';
+import { startWhatsAppAlertScheduler } from './services/whatsappAlertScheduler.js';
 
 dotenv.config();
 
@@ -27,10 +30,8 @@ app.use(cors({
 
 app.use(helmet());
 
-// Cookie parser
 app.use(cookieParser());
 
-// Rate limiting global: 300 requests per minute per IP
 const globalLimiter = rateLimit({
   windowMs: 60 * 1000,
   max: 300,
@@ -40,19 +41,14 @@ const globalLimiter = rateLimit({
 });
 app.use(globalLimiter);
 
-
-
-// Webhook de Stripe necesita raw body para verificar la firma
 app.use('/api/subscriptions/webhook', express.raw({ type: 'application/json' }));
+app.use('/api/whatsapp/webhook', express.raw({ type: 'application/json' }));
 
-// El resto usa JSON parseado
 app.use(express.json({ limit: '10mb' }));
 
 app.use('/api', routes);
 
-// Connect to MongoDB then start server
 connectDB().then(async () => {
-  // Drop stale unique index on stats.accountId (field removed from schema)
   try {
     await mongoose.connection.collection('stats').dropIndex('accountId_1');
     console.info('Dropped stale accountId_1 index from stats collection');
@@ -62,13 +58,15 @@ connectDB().then(async () => {
   resumeAllPolling();
   startCleanupWorker();
   startAlertScheduler();
+  startStripeReconciliationWorker();
   startTaxRateSyncWorker();
+  startCalendarSyncJob();
+  startWhatsAppAlertScheduler();
 
   const server = app.listen(PORT, () => {
     console.info(`Server running on port ${PORT}`);
   });
 
-  // Graceful shutdown
   const shutdown = async (signal: string) => {
     console.info(`${signal} received, shutting down...`);
     server.close(async () => {
@@ -77,7 +75,6 @@ connectDB().then(async () => {
       } catch (_) {}
       process.exit(0);
     });
-    // Force exit after 30s if graceful shutdown fails
     setTimeout(() => process.exit(1), 30000);
   };
 

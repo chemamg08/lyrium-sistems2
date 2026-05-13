@@ -18,6 +18,12 @@ export interface AuthPayload {
   parentAccountId?: string;
 }
 
+export interface TwoFactorSetupPayload {
+  userId: string;
+  type: 'main' | 'subaccount';
+  tokenType: '2fa-setup';
+}
+
 export interface AuthRequest extends Request {
   user?: AuthPayload;
 }
@@ -32,6 +38,10 @@ export function generateRefreshToken(payload: AuthPayload): string {
   return jwt.sign({ ...payload, tokenType: 'refresh' }, getJwtSecret(), { expiresIn: '7d' });
 }
 
+export function generate2FASetupToken(userId: string, type: 'main' | 'subaccount'): string {
+  return jwt.sign({ userId, type, tokenType: '2fa-setup' }, getJwtSecret(), { expiresIn: '15m' });
+}
+
 export function verifyToken(token: string): AuthPayload {
   return jwt.verify(token, getJwtSecret()) as AuthPayload;
 }
@@ -40,6 +50,14 @@ export function verifyRefreshToken(token: string): AuthPayload {
   const decoded = jwt.verify(token, getJwtSecret()) as AuthPayload & { tokenType?: string };
   if ((decoded as any).tokenType !== 'refresh') {
     throw new Error('Invalid refresh token');
+  }
+  return decoded;
+}
+
+export function verify2FASetupToken(token: string): TwoFactorSetupPayload {
+  const decoded = jwt.verify(token, getJwtSecret()) as TwoFactorSetupPayload;
+  if (decoded.tokenType !== '2fa-setup') {
+    throw new Error('Invalid 2FA setup token');
   }
   return decoded;
 }
@@ -123,14 +141,14 @@ export function authMiddleware(req: AuthRequest, res: Response, next: NextFuncti
       return next();
     }
 
-    // Check if account is disabled (async, non-blocking for performance)
-    checkAccountDisabled(decoded, res, next);
+    // Check if account is disabled and subscription is active
+    checkAccountAndSubscription(decoded, req, res, next);
   } catch (error) {
     return res.status(401).json({ error: 'Token inválido o expirado' });
   }
 }
 
-async function checkAccountDisabled(decoded: AuthPayload, res: Response, next: NextFunction) {
+async function checkAccountAndSubscription(decoded: AuthPayload, req: AuthRequest, res: Response, next: NextFunction) {
   try {
     const { Account } = await import('../models/Account.js');
 
@@ -148,11 +166,44 @@ async function checkAccountDisabled(decoded: AuthPayload, res: Response, next: N
       }
     }
 
+    // Check subscription status (skip for admin users, already checked above)
+    if (decoded.role !== 'admin') {
+      const { Subscription } = await import('../models/Subscription.js');
+      const subscriptionAccountId = decoded.type === 'subaccount' ? decoded.parentAccountId : decoded.userId;
+      
+      if (subscriptionAccountId) {
+        const subscription = await Subscription.findOne({ accountId: subscriptionAccountId });
+        if (subscription) {
+          if (subscription.plan === 'free' && subscription.status === 'active') {
+            return next();
+          }
+          const periodEnd = new Date(subscription.currentPeriodEnd);
+          if (periodEnd < new Date()) {
+            // Allow payment endpoints even with expired subscription
+            const allowedPaths = ['/api/subscriptions/payment-intent', '/api/subscriptions/confirm-payment'];
+            const isPaymentRoute = allowedPaths.some(path => req.originalUrl.startsWith(path));
+            
+            if (!isPaymentRoute) {
+              if (subscription.status !== 'expired') {
+                subscription.status = 'expired';
+                subscription.updatedAt = new Date().toISOString();
+                await subscription.save();
+              }
+              return res.status(403).json({
+                error: decoded.type === 'main'
+                  ? 'Tu suscripción ha caducado. Renueva tu plan para continuar.'
+                  : 'La suscripción de la cuenta principal ha caducado',
+              });
+            }
+          }
+        }
+      }
+    }
+
     next();
   } catch (err) {
-    // If check fails, allow through (fail open) — login check is still the primary guard
-    console.error('Error checking disabled status:', err);
-    next();
+    console.error('Error checking account/subscription status:', err);
+    return res.status(503).json({ error: 'No se pudo validar el estado de la cuenta. Intentalo de nuevo.' });
   }
 }
 

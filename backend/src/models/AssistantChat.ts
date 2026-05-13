@@ -1,9 +1,15 @@
 import mongoose, { Schema } from 'mongoose';
 
+export interface IFlag {
+  id: string;
+  createdAt: string;
+}
+
 export interface IAssistantMessage {
   id: string;
   role: 'user' | 'assistant';
   content: string;
+  flags?: IFlag[];
 }
 
 export interface IAssistantChat {
@@ -16,10 +22,16 @@ export interface IAssistantChat {
   summary?: string;
 }
 
+const flagSchema = new Schema({
+  id: String,
+  createdAt: String,
+}, { _id: false });
+
 const assistantMessageSchema = new Schema({
   id: String,
   role: { type: String, enum: ['user', 'assistant'] },
   content: String,
+  flags: { type: [flagSchema], default: [] },
 }, { _id: false });
 
 const assistantChatSchema = new Schema<IAssistantChat>({

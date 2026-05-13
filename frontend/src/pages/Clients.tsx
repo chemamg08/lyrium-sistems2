@@ -1,5 +1,5 @@
 import { useState, useRef, useEffect, useCallback } from "react";
-import { Plus, Pencil, Trash2, FolderOpen, X, Upload, Info, MessageSquare, Search, Send, ChevronDown, Eye, StopCircle, Calculator, StickyNote, Timer, Play, Pause, FileText, Check, Mail, CheckCircle2, Clock, AlertTriangle, PenTool } from "lucide-react";
+import { Plus, Pencil, Trash2, FolderOpen, X, Upload, Info, MessageSquare, Search, Send, ChevronDown, Eye, StopCircle, Calculator, StickyNote, Timer, Play, Pause, FileText, Check, Mail, CheckCircle2, Clock, AlertTriangle, PenTool, Briefcase, Calendar, Tag, Link, User, MessageCircle, Flag, Brain } from "lucide-react";
 import ReactMarkdown from "react-markdown";
 import { useTranslation } from "react-i18next";
 import { useToast } from "@/components/ui/use-toast";
@@ -7,6 +7,9 @@ import { useStreamingChat } from "@/hooks/useStreamingChat";
 import { authFetch } from '../lib/authFetch';
 import { getCurrencyForCountry } from '../i18n';
 import { QRCodeSVG } from 'qrcode.react';
+import NewCaseModal from '@/components/NewCaseModal';
+import ModuleGuide from "@/components/ModuleGuide";
+import { Button } from "@/components/ui/button";
 
 interface Client {
   id: string;
@@ -17,7 +20,8 @@ interface Client {
   status: "abierto" | "finalizado";
   summary?: string;
   files: ClientFile[];
-  assignedSubaccountId?: string;
+  assignedSubaccountId?: string | null;
+  assignedSubaccountIds?: string[];
   autoCreated?: boolean;
   clientType?: 'asalariado' | 'autonomo' | 'empresa';
   fiscalInfo?: FiscalInfo;
@@ -42,6 +46,8 @@ interface InvoiceLine {
 
 interface InvoiceData {
   id: string;
+  _id?: string;
+  publicId?: string;
   clientId: string;
   invoiceNumber: string;
   date: string;
@@ -63,6 +69,7 @@ interface InvoiceData {
   sentFrom?: string;
   huella?: string;
   verifactuTimestamp?: string;
+  paymentStatus?: string;
 }
 
 interface EmailAccount {
@@ -139,7 +146,7 @@ interface LyriChat {
   title: string;
   date: string;
   source: string;
-  messages: { id: string; role: "user" | "assistant"; content: string }[];
+  messages: { id: string; role: "user" | "assistant"; content: string; reasoning?: string; flags?: { id: string; createdAt?: string }[] }[];
 }
 
 interface Subaccount {
@@ -147,6 +154,28 @@ interface Subaccount {
   name: string;
   email: string;
 }
+
+const getAssignedSubaccountIds = (client?: Pick<Client, 'assignedSubaccountId' | 'assignedSubaccountIds'> | null): string[] => {
+  const assignedSubaccountIds = Array.isArray(client?.assignedSubaccountIds)
+    ? client.assignedSubaccountIds.filter((subaccountId): subaccountId is string => Boolean(subaccountId))
+    : [];
+
+  if (client?.assignedSubaccountId && !assignedSubaccountIds.includes(client.assignedSubaccountId)) {
+    assignedSubaccountIds.push(client.assignedSubaccountId);
+  }
+
+  return assignedSubaccountIds;
+};
+
+const normalizeClient = (client: Client): Client => {
+  const assignedSubaccountIds = getAssignedSubaccountIds(client);
+
+  return {
+    ...client,
+    assignedSubaccountIds,
+    assignedSubaccountId: assignedSubaccountIds[0] || null,
+  };
+};
 
 const API_URL = import.meta.env.VITE_API_URL;
 
@@ -244,6 +273,7 @@ const Clients = () => {
   const [viewInvoice, setViewInvoice] = useState<InvoiceData | null>(null);
   const [clientInvoices, setClientInvoices] = useState<InvoiceData[]>([]);
   const [showInvoicesList, setShowInvoicesList] = useState(false);
+  const [invoicesClientId, setInvoicesClientId] = useState<string | null>(null);
 
   // Send invoice state
   const [showSendInvoice, setShowSendInvoice] = useState<InvoiceData | null>(null);
@@ -281,6 +311,8 @@ const Clients = () => {
   const signFileRef = useRef<HTMLInputElement>(null);
   const [searchQuery, setSearchQuery] = useState("");
   const [statusFilter, setStatusFilter] = useState<"todos" | "abierto" | "finalizado" | "automaticos">("todos");
+  const [currentPage, setCurrentPage] = useState(1);
+  const CLIENTS_PER_PAGE = 20;
   const [openStatusDropdown, setOpenStatusDropdown] = useState<string | null>(null);
   const [openSubDropdown, setOpenSubDropdown] = useState<string | null>(null);
 
@@ -292,7 +324,10 @@ const Clients = () => {
   const [showChatSelector, setShowChatSelector] = useState(false);
   const [isSendingMessage, setIsSendingMessage] = useState(false);
   const lyriEndRef = useRef<HTMLDivElement>(null);
-  const { streamingText: lyriStreamingText, isStreaming: lyriIsStreaming, startStream: lyriStartStream, cancelStream: lyriCancelStream } = useStreamingChat();
+  const { streamingText: lyriStreamingText, streamingReasoning: lyriStreamingReasoning, isStreaming: lyriIsStreaming, startStream: lyriStartStream, cancelStream: lyriCancelStream } = useStreamingChat();
+  const pendingLyriReasoningRef = useRef('');
+  const [showLyriFlagPanel, setShowLyriFlagPanel] = useState(false);
+  const [highlightedLyriMsgId, setHighlightedLyriMsgId] = useState<string | null>(null);
 
   // Animation state
   const [isVisible, setIsVisible] = useState(false);
@@ -301,8 +336,36 @@ const Clients = () => {
   const [subaccounts, setSubaccounts] = useState<Subaccount[]>([]);
   const [userType, setUserType] = useState<string>('main');
   const [userId, setUserId] = useState<string>('');
-  const [accountId, setAccountId] = useState<string>('');
+    const [accountId, setAccountId] = useState<string>('');
 
+  // Client cases modal state
+  const [casesClientId, setCasesClientId] = useState<string | null>(null);
+  const [clientCases, setClientCases] = useState<any[]>([]);
+  const [loadingClientCases, setLoadingClientCases] = useState(false);
+  const [showNewCaseModal, setShowNewCaseModal] = useState(false);
+
+  // Case detail modal state (within client cases)
+  const [caseDetailCase, setCaseDetailCase] = useState<any>(null);
+  const [caseDetailOpen, setCaseDetailOpen] = useState(false);
+  const [caseDetailMessages, setCaseDetailMessages] = useState<any[]>([]);
+  const [caseDetailConvLoading, setCaseDetailConvLoading] = useState(false);
+  const [caseToDelete, setCaseToDelete] = useState<string | null>(null);
+  const [caseNotesOpen, setCaseNotesOpen] = useState(false);
+  const [caseNotesText, setCaseNotesText] = useState('');
+  const [isSavingCaseNotes, setIsSavingCaseNotes] = useState(false);
+
+  // Reminder states
+  const [remindersClientId, setRemindersClientId] = useState<string | null>(null);
+  const [clientReminders, setClientReminders] = useState<any[]>([]);
+  const [loadingReminders, setLoadingReminders] = useState(false);
+  const [showReminderForm, setShowReminderForm] = useState(false);
+  const [editingReminder, setEditingReminder] = useState<any>(null);
+  const [reminderForm, setReminderForm] = useState({ title: '', dateFrom: '', dateTo: '', type: '', notes: '' });
+  const [showGlobalReminders, setShowGlobalReminders] = useState(false);
+  const [globalReminders, setGlobalReminders] = useState<any[]>([]);
+  const [globalRemindersSearch, setGlobalRemindersSearch] = useState('');
+  const [globalRemindersSubFilter, setGlobalRemindersSubFilter] = useState<string>('all');
+  const [reminderToDelete, setReminderToDelete] = useState<string | null>(null);
 
   useEffect(() => {
     const country = sessionStorage.getItem('country') || 'ES';
@@ -316,6 +379,27 @@ const Clients = () => {
 
   const currencyInfo = getCurrencyForCountry(sessionStorage.getItem('country') || 'ES');
   const cSym = currencyInfo.symbol;
+
+  const formatAssignedSubaccountNames = (client: Client) => {
+    const assignedIds = getAssignedSubaccountIds(client);
+    if (assignedIds.length === 0) {
+      return t('clients.unassigned');
+    }
+
+    const assignedNames = assignedIds
+      .map((subaccountId) => subaccounts.find((subaccount) => subaccount.id === subaccountId)?.name)
+      .filter((name): name is string => Boolean(name));
+
+    if (assignedNames.length === 0) {
+      return t('clients.unassigned');
+    }
+
+    if (assignedNames.length <= 2) {
+      return assignedNames.join(', ');
+    }
+
+    return `${assignedNames.slice(0, 2).join(', ')} +${assignedNames.length - 2}`;
+  };
 
   // Close client dropdowns on click outside
   useEffect(() => {
@@ -379,7 +463,7 @@ const Clients = () => {
         if (!accId) return;
         const res = await authFetch(`${API_URL}/clients?accountId=${accId}&userType=${sessionStorage.getItem('userType')}`);
         if (res.ok) {
-          const data: Client[] = await res.json();
+          const data: Client[] = (await res.json()).map((client: Client) => normalizeClient(client));
           const updated = data.find(c => c.id === filesClientId);
           if (updated) {
             setCurrentClientFiles(updated.files);
@@ -398,7 +482,7 @@ const Clients = () => {
       
       const response = await authFetch(`${API_URL}/clients?accountId=${accId}&userType=${sessionStorage.getItem('userType')}`);
       if (response.ok) {
-        const data = await response.json();
+        const data = (await response.json()).map((client: Client) => normalizeClient(client));
         setClients(data);
       }
     } catch (error) {
@@ -439,6 +523,173 @@ const Clients = () => {
     setFormFiles([]);
     setEditingClient(client);
     setShowForm(true);
+  };
+
+  const openClientCases = async (clientId: string) => {
+    setCasesClientId(clientId);
+    setLoadingClientCases(true);
+    try {
+      const res = await authFetch(`${API_URL}/cases?accountId=${accountId}`);
+      if (res.ok) {
+        const allCases = await res.json();
+        const linked = allCases.filter((c: any) => c.linkedClientId === clientId);
+        setClientCases(linked);
+      }
+    } catch (err) {
+      console.error(err);
+    } finally {
+      setLoadingClientCases(false);
+    }
+  };
+
+  const loadClientReminders = async (clientId: string) => {
+    setLoadingReminders(true);
+    try {
+      const res = await authFetch(`${API_URL}/clients/${clientId}/reminders?accountId=${accountId}`);
+      if (res.ok) {
+        const data = await res.json();
+        setClientReminders(data || []);
+      }
+    } catch (err) { console.error(err); }
+    setLoadingReminders(false);
+  };
+
+  const openClientReminders = (clientId: string) => {
+    setRemindersClientId(clientId);
+    loadClientReminders(clientId);
+  };
+
+  const loadGlobalReminders = async () => {
+    try {
+      const res = await authFetch(`${API_URL}/reminders?accountId=${accountId}`);
+      if (res.ok) {
+        const data = await res.json();
+        setGlobalReminders(data || []);
+      }
+    } catch (err) { console.error(err); }
+  };
+
+  const handleSaveReminder = async () => {
+    if (!remindersClientId) return;
+    try {
+      const url = editingReminder
+        ? `${API_URL}/reminders/${editingReminder._id || editingReminder.id}`
+        : `${API_URL}/clients/${remindersClientId}/reminders`;
+      const method = editingReminder ? 'PUT' : 'POST';
+      const body: any = { accountId, ...reminderForm };
+      const res = await authFetch(url, { method, headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body) });
+      if (res.ok) {
+        setShowReminderForm(false);
+        setEditingReminder(null);
+        setReminderForm({ title: '', dateFrom: '', dateTo: '', type: '', notes: '' });
+        loadClientReminders(remindersClientId);
+        loadGlobalReminders();
+      }
+    } catch (err) { console.error(err); }
+  };
+
+  const handleDeleteReminder = async (reminderId: string) => {
+    try {
+      const res = await authFetch(`${API_URL}/reminders/${reminderId}?accountId=${accountId}`, { method: 'DELETE' });
+      if (res.ok) {
+        setReminderToDelete(null);
+        if (remindersClientId) loadClientReminders(remindersClientId);
+        loadGlobalReminders();
+      }
+    } catch (err) { console.error(err); }
+  };
+
+  const startEditReminder = (reminder: any) => {
+    setEditingReminder(reminder);
+    setReminderForm({
+      title: reminder.title || '',
+      dateFrom: reminder.dateFrom || '',
+      dateTo: reminder.dateTo || '',
+      type: reminder.type || '',
+      notes: reminder.notes || '',
+    });
+    setShowReminderForm(true);
+  };
+
+  const STATUS_COLORS: Record<string, string> = {
+    pending: 'bg-yellow-500/20 text-yellow-400 border-yellow-500/30',
+    assigned: 'bg-blue-500/20 text-blue-400 border-blue-500/30',
+    closed: 'bg-green-500/20 text-green-400 border-green-500/30',
+    rejected: 'bg-red-500/20 text-red-400 border-red-500/30',
+  };
+
+  const caseStatusLabels: Record<string, string> = {
+    pending: t('cases.pending') || 'Pendiente',
+    assigned: t('cases.assigned') || 'Asignado',
+    closed: t('cases.closed') || 'Cerrado',
+    rejected: t('cases.rejected') || 'Rechazado',
+  };
+
+  const openCaseDetail = async (c: any) => {
+    setCaseDetailCase(c);
+    setCaseDetailOpen(true);
+    if (c.source !== 'manual') {
+      setCaseDetailConvLoading(true);
+      try {
+        const res = await authFetch(`${API_URL}/cases/${c._id}/conversation`);
+        if (res.ok) {
+          const data = await res.json();
+          setCaseDetailMessages(data.messages || []);
+        }
+      } catch (err) {
+        console.error(err);
+      } finally {
+        setCaseDetailConvLoading(false);
+      }
+    } else {
+      setCaseDetailMessages([]);
+    }
+  };
+
+  const handleDeleteCaseFromModal = async (caseId: string) => {
+    try {
+      const res = await authFetch(`${API_URL}/cases/${caseId}`, {
+        method: 'DELETE',
+      });
+      if (res.ok) {
+        setCaseToDelete(null);
+        setClientCases(prev => prev.filter(c => c._id !== caseId));
+        if (caseDetailOpen && caseDetailCase?._id === caseId) {
+          setCaseDetailOpen(false);
+          setCaseDetailCase(null);
+        }
+      }
+    } catch (err) {
+      console.error(err);
+    }
+  };
+
+  const openCaseNotesFromModal = () => {
+    if (!caseDetailCase) return;
+    setCaseNotesText(caseDetailCase.notes || '');
+    setCaseNotesOpen(true);
+  };
+
+  const saveCaseNotesFromModal = async () => {
+    if (!caseDetailCase) return;
+    setIsSavingCaseNotes(true);
+    try {
+      const res = await authFetch(`${API_URL}/cases/${caseDetailCase._id}/notes`, {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ notes: caseNotesText }),
+      });
+      if (res.ok) {
+        const updated = await res.json();
+        setCaseDetailCase(updated);
+        setClientCases(prev => prev.map(c => c._id === updated._id ? updated : c));
+        setCaseNotesOpen(false);
+      }
+    } catch (err) {
+      console.error(err);
+    } finally {
+      setIsSavingCaseNotes(false);
+    }
   };
 
   const save = async () => {
@@ -649,22 +900,35 @@ const Clients = () => {
     }
   };
 
-  const assignClientToSubaccount = async (clientId: string, subaccountId: string) => {
+  const assignClientToSubaccount = async (clientId: string, subaccountIds: string[]) => {
     try {
       const response = await authFetch(`${API_URL}/accounts/clients/${clientId}/assign`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ subaccountId: subaccountId || null }),
+        body: JSON.stringify({ subaccountIds }),
       });
 
       if (response.ok) {
-        setClients((prev) => prev.map((c) => 
-          c.id === clientId ? { ...c, assignedSubaccountId: subaccountId || undefined } : c
+        const data = await response.json();
+        const updatedClient = data.client ? normalizeClient(data.client) : null;
+        setClients((prev) => prev.map((c) =>
+          c.id === clientId
+            ? updatedClient || { ...c, assignedSubaccountIds: subaccountIds, assignedSubaccountId: subaccountIds[0] || null }
+            : c
         ));
       }
     } catch (error) {
       console.error('Error al asignar cliente:', error);
     }
+  };
+
+  const toggleClientSubaccount = async (client: Client, subaccountId: string) => {
+    const currentIds = getAssignedSubaccountIds(client);
+    const nextIds = currentIds.includes(subaccountId)
+      ? currentIds.filter((id) => id !== subaccountId)
+      : [...currentIds, subaccountId];
+
+    await assignClientToSubaccount(client.id, nextIds);
   };
 
   const openClientFiles = async (clientId: string) => {
@@ -1009,6 +1273,7 @@ const Clients = () => {
   };
 
   const loadClientInvoices = async (clientId: string) => {
+    setInvoicesClientId(clientId);
     try {
       const res = await authFetch(`${API_URL}/clients/${clientId}/invoices`);
       if (res.ok) {
@@ -1186,6 +1451,30 @@ const Clients = () => {
     }
   };
 
+  const [updatingPaymentStatus, setUpdatingPaymentStatus] = useState(false);
+
+  const handleUpdatePaymentStatus = async (invoiceId: string, status: string) => {
+    setUpdatingPaymentStatus(true);
+    try {
+      const res = await authFetch(`${API_URL}/invoices/${invoiceId}/payment-status`, {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ accountId, paymentStatus: status }),
+      });
+      if (res.ok) {
+        const updated = await res.json();
+        if (viewInvoice && (viewInvoice._id === invoiceId || viewInvoice.id === invoiceId)) {
+          setViewInvoice(updated);
+        }
+        if (showInvoicesList && invoicesClientId) {
+          const res2 = await authFetch(`${API_URL}/clients/${invoicesClientId}/invoices?accountId=${accountId}`);
+          if (res2.ok) setClientInvoices(await res2.json());
+        }
+      }
+    } catch (err) { console.error(err); }
+    setUpdatingPaymentStatus(false);
+  };
+
   // Drag & Drop handlers para formulario
   const handleFormDragEnter = (e: React.DragEvent) => {
     e.preventDefault();
@@ -1270,12 +1559,17 @@ const Clients = () => {
           chatId: activeLyriChatId,
           content: userContent
         },
+        onDoneReasoning: (fullReasoning) => {
+          pendingLyriReasoningRef.current = fullReasoning;
+        },
         onDone: (fullText) => {
+          const assistantMsgId = `ai-${Date.now()}`;
           setLyriChats(prev => prev.map(chat =>
             chat.id === activeLyriChatId
-              ? { ...chat, messages: [...chat.messages, { id: `ai-${Date.now()}`, role: 'assistant' as const, content: fullText }] }
+              ? { ...chat, messages: [...chat.messages, { id: assistantMsgId, role: 'assistant' as const, content: fullText, reasoning: pendingLyriReasoningRef.current || undefined }] }
               : chat
           ));
+          pendingLyriReasoningRef.current = '';
           setIsSendingMessage(false);
         },
       });
@@ -1365,24 +1659,83 @@ const Clients = () => {
 
   const activeLyriChat = lyriChats.find((c) => c.id === activeLyriChatId);
 
+  const toggleLyriFlag = async (messageId: string) => {
+    if (!activeLyriChat) return;
+    const msg: any = activeLyriChat.messages.find((m: any) => m.id === messageId);
+    if (!msg) return;
+    const isFlagged = msg.flags && msg.flags.length > 0;
+    try {
+      if (isFlagged) {
+        const flagId = msg.flags[msg.flags.length - 1].id;
+        const res = await authFetch(`${API_URL}/flags/client/${activeLyriChat.id}/messages/${messageId}/flags/${flagId}`, { method: 'DELETE' });
+        if (res.ok) {
+          const data = await res.json();
+          setLyriChats(prev => prev.map((c: any) => c.id === activeLyriChat.id ? { ...c, messages: c.messages.map((m: any) => m.id === messageId ? { ...m, flags: data.flags } : m) } : c));
+        }
+      } else {
+        const res = await authFetch(`${API_URL}/flags/client/${activeLyriChat.id}/messages/${messageId}`, { method: 'POST' });
+        if (res.ok) {
+          const data = await res.json();
+          setLyriChats(prev => prev.map((c: any) => c.id === activeLyriChat.id ? { ...c, messages: c.messages.map((m: any) => m.id === messageId ? { ...m, flags: data.flags } : m) } : c));
+        }
+      }
+    } catch (err) { console.error(err); }
+  };
+
+  const scrollToLyriMessage = (messageId: string) => {
+    const el = document.getElementById(`lyri-msg-${messageId}`);
+    if (el) {
+      el.scrollIntoView({ behavior: 'smooth', block: 'center' });
+      setHighlightedLyriMsgId(messageId);
+      setTimeout(() => setHighlightedLyriMsgId(null), 2000);
+      setShowLyriFlagPanel(false);
+    }
+  };
+
   // Filtering
   const filteredClients = clients.filter((c) => {
     const matchesSearch = c.name.toLowerCase().includes(searchQuery.toLowerCase()) || c.email.toLowerCase().includes(searchQuery.toLowerCase());
     const matchesStatus = statusFilter === "automaticos" ? c.autoCreated === true : (statusFilter === "todos" || c.status === statusFilter);
-    const matchesSubaccount = userType === 'main' || c.assignedSubaccountId === userId;
+    const matchesSubaccount = userType === 'main' || getAssignedSubaccountIds(c).includes(userId);
     return matchesSearch && matchesStatus && matchesSubaccount;
   });
+  const totalPages = Math.ceil(filteredClients.length / CLIENTS_PER_PAGE);
+  const paginatedClients = filteredClients.slice((currentPage - 1) * CLIENTS_PER_PAGE, currentPage * CLIENTS_PER_PAGE);
+
+  const isFreePlan = sessionStorage.getItem('plan') === 'free';
+  const planDowngradedAt = sessionStorage.getItem('planDowngradedAt');
+  const inGracePeriod = planDowngradedAt ? (Date.now() - new Date(planDowngradedAt).getTime()) < 7 * 24 * 60 * 60 * 1000 : false;
 
   return (
     <div className="p-4 md:p-8">
+      <ModuleGuide moduleId="clients" />
+      {isFreePlan && !inGracePeriod && clients.length >= 10 && (
+        <div className="mb-4 rounded-md border border-red-500/20 bg-red-500/10 p-3 flex items-center justify-between">
+          <div>
+            <p className="text-sm font-medium text-red-700 dark:text-red-400">Límite alcanzado</p>
+            <p className="text-xs text-red-600 dark:text-red-300">Has llegado al máximo de 10 clientes del plan Sin Cargo.</p>
+          </div>
+          <Button size="sm" variant="outline" onClick={() => { /* open profile modal or navigate to pricing */ }}>
+            Suscribirse
+          </Button>
+        </div>
+      )}
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 mb-6">
         <div>
           <h1 className="text-xl md:text-2xl font-semibold text-foreground">{t('clients.title')}</h1>
           <p className="text-sm text-muted-foreground mt-1">{t('clients.count', {count: clients.length})}</p>
         </div>
-        <button onClick={openNew} className="flex items-center gap-2 bg-primary text-primary-foreground px-4 py-2 rounded-md text-sm font-medium hover:opacity-90 transition-opacity self-start sm:self-auto">
-          <Plus className="h-4 w-4" /> {t('clients.new')}
-        </button>
+        <div className="flex items-center gap-3">
+          <button onClick={() => { setShowGlobalReminders(true); loadGlobalReminders(); }} className="flex items-center gap-2 px-4 py-2 rounded-lg border border-border bg-card hover:bg-accent text-foreground text-sm font-medium transition-colors">
+            <Calendar className="h-4 w-4" />
+            {t('clients.events') || 'Eventos'}
+          </button>
+          {!(isFreePlan && !inGracePeriod && clients.length >= 10) && (
+            <button onClick={openNew} className="flex items-center gap-2 bg-primary text-primary-foreground px-4 py-2 rounded-md text-sm font-medium hover:opacity-90 transition-opacity self-start sm:self-auto">
+              <Plus className="h-4 w-4" /> {t('clients.new')}
+            </button>
+          )}
+        </div>
       </div>
 
       {/* Search & Filter Bar */}
@@ -1391,7 +1744,7 @@ const Clients = () => {
           <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
           <input
             value={searchQuery}
-            onChange={(e) => setSearchQuery(e.target.value)}
+            onChange={(e) => { setSearchQuery(e.target.value); setCurrentPage(1); }}
             placeholder={t('clients.search')}
             className="w-full bg-accent/50 border border-border rounded-md pl-9 pr-3 py-2 text-sm focus:outline-none focus:ring-1 focus:ring-ring"
           />
@@ -1405,7 +1758,7 @@ const Clients = () => {
           ]).map(({ key, label }) => (
             <button
               key={key}
-              onClick={() => setStatusFilter(key)}
+              onClick={() => { setStatusFilter(key); setCurrentPage(1); }}
               className={`px-3 py-1.5 rounded text-xs font-medium transition-colors whitespace-nowrap ${statusFilter === key ? "bg-primary text-primary-foreground" : "text-muted-foreground hover:text-foreground"}`}
             >
               {label}
@@ -1416,10 +1769,14 @@ const Clients = () => {
 
       {/* Client List */}
       <div className="space-y-3">
-        {filteredClients.map((client, index) => (
+        {paginatedClients.map((client, index) => {
+          const assignedIds = getAssignedSubaccountIds(client);
+          const assignedLabel = formatAssignedSubaccountNames(client);
+
+          return (
           <div 
             key={client.id} 
-            className={`bg-card border border-border rounded-lg p-4 md:p-5 flex flex-col md:flex-row md:items-center justify-between gap-3 ${isVisible ? 'animate-slide-up' : 'opacity-0'}`}
+            className={`bg-card border border-border rounded-lg p-4 md:p-5 flex flex-col md:flex-row md:items-center justify-between gap-3 ${isVisible ? 'animate-slide-up' : 'opacity-0'} ${openStatusDropdown === client.id || openSubDropdown === client.id ? 'relative z-40' : ''}`}
             style={{ animationDelay: `${index * 75}ms` }}
           >
             <div className="flex-1 min-w-0">
@@ -1482,23 +1839,20 @@ const Clients = () => {
                   <button
                     onClick={() => setOpenSubDropdown(openSubDropdown === client.id ? null : client.id)}
                     className={`text-xs font-medium border rounded-full px-2.5 py-1 flex items-center gap-1 transition-colors ${
-                      client.assignedSubaccountId
+                      assignedIds.length > 0
                         ? 'bg-blue-500/15 border-blue-500/30 text-blue-600 dark:text-blue-400'
                         : 'bg-muted border-border text-muted-foreground'
                     }`}
                   >
-                    <span className={`h-1.5 w-1.5 rounded-full ${client.assignedSubaccountId ? 'bg-blue-500' : 'bg-muted-foreground/40'}`} />
-                    {client.assignedSubaccountId
-                      ? subaccounts.find(s => s.id === client.assignedSubaccountId)?.name || t('clients.unassigned')
-                      : t('clients.unassigned')
-                    }
+                    <span className={`h-1.5 w-1.5 rounded-full ${assignedIds.length > 0 ? 'bg-blue-500' : 'bg-muted-foreground/40'}`} />
+                    <span className="max-w-[180px] truncate">{assignedLabel}</span>
                     <ChevronDown className="h-3 w-3 opacity-60" />
                   </button>
                   {openSubDropdown === client.id && (
                     <div className="absolute z-50 top-full mt-1 left-0 min-w-[150px] bg-card border border-border rounded-lg shadow-lg py-1 animate-in fade-in-0 zoom-in-95 duration-100 max-h-48 overflow-y-auto">
                       <button
-                        onClick={() => { assignClientToSubaccount(client.id, ''); setOpenSubDropdown(null); }}
-                        className={`w-full text-left px-3 py-1.5 text-xs flex items-center gap-2 hover:bg-accent transition-colors ${!client.assignedSubaccountId ? 'font-semibold' : ''}`}
+                        onClick={() => { assignClientToSubaccount(client.id, []); setOpenSubDropdown(null); }}
+                        className={`w-full text-left px-3 py-1.5 text-xs flex items-center gap-2 hover:bg-accent transition-colors ${assignedIds.length === 0 ? 'font-semibold' : ''}`}
                       >
                         <span className="h-2 w-2 rounded-full bg-muted-foreground/40" />
                         <span className="text-muted-foreground">{t('clients.unassigned')}</span>
@@ -1506,10 +1860,10 @@ const Clients = () => {
                       {subaccounts.map((sub) => (
                         <button
                           key={sub.id}
-                          onClick={() => { assignClientToSubaccount(client.id, sub.id); setOpenSubDropdown(null); }}
-                          className={`w-full text-left px-3 py-1.5 text-xs flex items-center gap-2 hover:bg-accent transition-colors ${client.assignedSubaccountId === sub.id ? 'font-semibold' : ''}`}
+                          onClick={() => { void toggleClientSubaccount(client, sub.id); }}
+                          className={`w-full text-left px-3 py-1.5 text-xs flex items-center gap-2 hover:bg-accent transition-colors ${assignedIds.includes(sub.id) ? 'font-semibold' : ''}`}
                         >
-                          <span className="h-2 w-2 rounded-full bg-blue-500" />
+                          <Check className={`h-3.5 w-3.5 ${assignedIds.includes(sub.id) ? 'opacity-100 text-blue-500' : 'opacity-0'}`} />
                           <span className="text-blue-600 dark:text-blue-400">{sub.name}</span>
                         </button>
                       ))}
@@ -1519,6 +1873,9 @@ const Clients = () => {
               )}
               <button onClick={() => openLyri(client.id)} className="flex items-center gap-1.5 px-3 py-1.5 rounded-md bg-accent hover:bg-accent/80 text-foreground text-xs font-medium transition-colors">
                 <MessageSquare className="h-3.5 w-3.5" /> {t('clients.actions.talkToLyra')}
+              </button>
+              <button onClick={() => openClientReminders(client.id)} className="p-2 rounded-md hover:bg-accent text-muted-foreground hover:text-foreground transition-colors" title={t('clients.reminders') || 'Recordatorios'}>
+                <Calendar className="h-4 w-4" />
               </button>
               <button onClick={() => openClientFiles(client.id)} className="p-2 rounded-md hover:bg-accent text-muted-foreground hover:text-foreground transition-colors" title={t('clients.actions.files')}>
                 <FolderOpen className="h-4 w-4" />
@@ -1535,16 +1892,63 @@ const Clients = () => {
               <button onClick={() => openEdit(client)} className="p-2 rounded-md hover:bg-accent text-muted-foreground hover:text-foreground transition-colors" title={t('clients.actions.edit')}>
                 <Pencil className="h-4 w-4" />
               </button>
+              <button onClick={() => openClientCases(client.id)} className="p-2 rounded-md hover:bg-accent text-muted-foreground hover:text-foreground transition-colors" title={t('clients.actions.cases') || 'Ver casos'}>
+                <Briefcase className="h-4 w-4" />
+              </button>
               <button onClick={() => confirmRemove(client.id)} className="p-2 rounded-md hover:bg-destructive/10 text-muted-foreground hover:text-destructive transition-colors" title={t('clients.actions.delete')}>
                 <Trash2 className="h-4 w-4" />
               </button>
             </div>
           </div>
-        ))}
-        {filteredClients.length === 0 && (
+          );
+        })}
+        {paginatedClients.length === 0 && (
           <p className="text-center text-sm text-muted-foreground py-8">{t('clients.noResults')}</p>
         )}
       </div>
+
+      {/* Pagination */}
+      {totalPages > 1 && (
+        <div className="flex items-center justify-center gap-2 mt-8">
+          <button
+            onClick={() => setCurrentPage(p => Math.max(1, p - 1))}
+            disabled={currentPage === 1}
+            className="px-3 py-2 rounded-lg border text-sm hover:bg-muted disabled:opacity-40 disabled:cursor-not-allowed transition-colors"
+          >
+            ← {t('clients.previous') || 'Anterior'}
+          </button>
+          <div className="flex items-center gap-1">
+            {Array.from({ length: Math.min(totalPages, 7) }, (_, i) => {
+              let page: number;
+              if (totalPages <= 7) {
+                page = i + 1;
+              } else if (currentPage <= 4) {
+                page = i + 1;
+              } else if (currentPage >= totalPages - 3) {
+                page = totalPages - 6 + i;
+              } else {
+                page = currentPage - 3 + i;
+              }
+              return (
+                <button
+                  key={page}
+                  onClick={() => setCurrentPage(page)}
+                  className={`w-8 h-8 rounded-lg text-sm font-medium transition-colors ${page === currentPage ? 'bg-primary text-primary-foreground' : 'hover:bg-muted'}`}
+                >
+                  {page}
+                </button>
+              );
+            })}
+          </div>
+          <button
+            onClick={() => setCurrentPage(p => Math.min(totalPages, p + 1))}
+            disabled={currentPage === totalPages}
+            className="px-3 py-2 rounded-lg border text-sm hover:bg-muted disabled:opacity-40 disabled:cursor-not-allowed transition-colors"
+          >
+            {t('clients.next') || 'Siguiente'} →
+          </button>
+        </div>
+      )}
 
       {/* New/Edit Modal */}
       {showForm && (
@@ -2299,7 +2703,7 @@ const Clients = () => {
               <textarea
                 value={notesText}
                 onChange={(e) => setNotesText(e.target.value)}
-                rows={10}
+              rows={20}
                 className="w-full bg-accent/50 border border-border rounded-md px-3 py-2 text-sm focus:outline-none focus:ring-1 focus:ring-ring resize-none"
                 placeholder={t('clients.notesModal.placeholder')}
               />
@@ -2555,6 +2959,20 @@ const Clients = () => {
                         <div className="text-right">
                           <p className="text-sm font-bold text-primary">{inv.totalAmount.toFixed(2)} {cSym}</p>
                           {inv.sentAt && <p className="text-xs text-green-600">{t('clients.invoice.sentLabel')}</p>}
+                          <select
+                            value={inv.paymentStatus || 'pending'}
+                            onChange={(e) => handleUpdatePaymentStatus(inv._id || inv.id, e.target.value)}
+                            disabled={updatingPaymentStatus}
+                            className={`text-[10px] px-2 py-0.5 rounded-full border font-medium cursor-pointer mt-1 ${
+                              (inv.paymentStatus || 'pending') === 'paid' ? 'bg-green-500/20 text-green-400 border-green-500/30' :
+                              (inv.paymentStatus || 'pending') === 'unpaid' ? 'bg-red-500/20 text-red-400 border-red-500/30' :
+                              'bg-yellow-500/20 text-yellow-400 border-yellow-500/30'
+                            }`}
+                          >
+                            <option value="pending">{t('invoices.pending') || 'Pendiente'}</option>
+                            <option value="paid">{t('invoices.paid') || 'Pagado'}</option>
+                            <option value="unpaid">{t('invoices.unpaid') || 'Impagado'}</option>
+                          </select>
                         </div>
                       </button>
                       <div className="flex gap-1 pr-3">
@@ -2677,6 +3095,24 @@ const Clients = () => {
                     <span className="text-4xl font-bold text-gray-900">{viewInvoice.totalAmount.toFixed(2)} {cSym}</span>
                   </div>
                 </div>
+              </div>
+              {/* Payment Status */}
+              <div className="flex items-center justify-between mt-4 pt-4 border-t border-gray-100">
+                <span className="text-sm font-medium text-gray-700">{t('invoices.paymentStatus') || 'Estado de pago'}</span>
+                <select
+                  value={viewInvoice.paymentStatus || 'pending'}
+                  onChange={(e) => handleUpdatePaymentStatus(viewInvoice._id || viewInvoice.id, e.target.value)}
+                  disabled={updatingPaymentStatus}
+                  className={`text-sm px-3 py-1.5 rounded-lg border font-medium cursor-pointer ${
+                    (viewInvoice.paymentStatus || 'pending') === 'paid' ? 'bg-green-500/20 text-green-400 border-green-500/30' :
+                    (viewInvoice.paymentStatus || 'pending') === 'unpaid' ? 'bg-red-500/20 text-red-400 border-red-500/30' :
+                    'bg-yellow-500/20 text-yellow-400 border-yellow-500/30'
+                  }`}
+                >
+                  <option value="pending">{t('invoices.pending') || 'Pendiente'}</option>
+                  <option value="paid">{t('invoices.paid') || 'Pagado'}</option>
+                  <option value="unpaid">{t('invoices.unpaid') || 'Impagado'}</option>
+                </select>
               </div>
               {/* QR VeriFactu — solo facturas con huella (España territorio común) */}
               {viewInvoice.huella && viewInvoice.firmNIF && (() => {
@@ -2813,8 +3249,8 @@ const Clients = () => {
               </div>
             </div>
             {/* QR VeriFactu — solo facturas con huella (España territorio común) */}
-            {showSendInvoice.huella && showSendInvoice.firmNIF && (() => {
-              const qrUrl = `https://www2.agenciatributaria.gob.es/wlpl/TIKE-CONT/ValidarQR?nif=${encodeURIComponent(showSendInvoice.firmNIF)}&numserie=${encodeURIComponent(showSendInvoice.invoiceNumber)}&fecha=${encodeURIComponent(showSendInvoice.date)}&importe=${encodeURIComponent(showSendInvoice.totalAmount.toFixed(2))}`;
+            {showSendInvoice.huella && showSendInvoice.firmNIF && showSendInvoice.publicId && (() => {
+              const qrUrl = `https://lyrium.io/invoice/${showSendInvoice.publicId}`;
               return (
                 <div style={{ marginTop: '20px', paddingTop: '16px', borderTop: '1px solid #f3f4f6', display: 'flex', alignItems: 'center', gap: '12px' }}>
                   <QRCodeSVG value={qrUrl} size={64} level="M" />
@@ -2960,8 +3396,20 @@ const Clients = () => {
               <div className="flex items-center gap-3">
                 <h2 className="text-lg font-semibold text-foreground">{t('clients.lyraModal.title')}</h2>
               </div>
-              <div className="flex items-center gap-2">
-                {/* Chat selector */}
+                <div className="flex items-center gap-2">
+                  <button
+                    onClick={() => setShowLyriFlagPanel(!showLyriFlagPanel)}
+                    className="p-2 rounded-lg hover:bg-muted text-muted-foreground transition-colors relative"
+                    title="Mensajes marcados"
+                  >
+                    <Flag size={18} />
+                    {activeLyriChat?.messages?.filter((m: any) => m.flags && m.flags.length > 0).length > 0 && (
+                      <span className="absolute -top-1 -right-1 h-4 w-4 bg-yellow-500 text-[10px] text-black rounded-full flex items-center justify-center font-bold">
+                        {activeLyriChat?.messages?.filter((m: any) => m.flags && m.flags.length > 0).length}
+                      </span>
+                    )}
+                  </button>
+                  {/* Chat selector */}
                 <div className="relative">
                   <button
                     onClick={() => setShowChatSelector(!showChatSelector)}
@@ -3012,23 +3460,55 @@ const Clients = () => {
                   <p className="text-sm text-muted-foreground">{t('clients.lyraModal.noMessages')}</p>
                 </div>
               )}
-              {activeLyriChat?.messages.map((msg) => (
+              {activeLyriChat?.messages.map((msg: any) => (
                 <div key={msg.id} className={`flex ${msg.role === "user" ? "justify-end" : "justify-start"}`}>
-                  <div className={`max-w-[70%] rounded-lg px-4 py-3 text-sm leading-relaxed prose prose-sm dark:prose-invert prose-p:my-1 prose-ul:my-1 prose-ol:my-1 ${msg.role === "user" ? "bg-primary text-primary-foreground" : "bg-accent text-accent-foreground"}`}>
+                  <div
+                    id={`lyri-msg-${msg.id}`}
+                    className={`max-w-[70%] rounded-lg px-4 py-3 text-sm leading-relaxed prose prose-sm dark:prose-invert prose-p:my-1 prose-ul:my-1 prose-ol:my-1 relative group transition-all ${highlightedLyriMsgId === msg.id ? 'ring-2 ring-yellow-500' : ''} ${msg.flags && msg.flags.length > 0 ? 'border-l-2 border-l-yellow-500' : ''} ${msg.role === "user" ? "bg-primary text-primary-foreground" : "bg-accent text-accent-foreground"}`}
+                  >
+                    {msg.role === 'assistant' && msg.reasoning && (
+                      <details className="mb-2 not-prose">
+                        <summary className="text-xs text-muted-foreground cursor-pointer select-none flex items-center gap-1.5 list-none">
+                          <Brain className="h-3 w-3" />
+                          <span>Pensando...</span>
+                        </summary>
+                        <div className="mt-1.5 text-xs text-muted-foreground/80 font-mono whitespace-pre-wrap border-t border-border/40 pt-1.5" style={{ maxHeight: '4.5em', overflowY: 'auto' }}>
+                          {msg.reasoning}
+                        </div>
+                      </details>
+                    )}
                     <ReactMarkdown>{msg.content}</ReactMarkdown>
+                    <button
+                      onClick={() => toggleLyriFlag(msg.id)}
+                      className="absolute top-1 right-1 p-1 rounded opacity-0 group-hover:opacity-100 transition-opacity hover:bg-black/10"
+                      title={msg.flags && msg.flags.length > 0 ? 'Desmarcar' : 'Marcar'}
+                    >
+                      <Flag size={14} className={msg.flags && msg.flags.length > 0 ? 'text-yellow-500 fill-yellow-500' : 'text-muted-foreground'} />
+                    </button>
                   </div>
                 </div>
               ))}
-              {isSendingMessage && (!lyriIsStreaming || !lyriStreamingText) && (
+              {isSendingMessage && lyriIsStreaming && !lyriStreamingText && (
                 <div className="flex justify-start">
                   <div className="bg-accent text-accent-foreground rounded-lg px-4 py-3 text-sm">
                     <span className="inline-block animate-pulse">{t('clients.lyraModal.typing')}</span>
                   </div>
                 </div>
               )}
-              {lyriIsStreaming && lyriStreamingText && (
+              {lyriIsStreaming && (lyriStreamingText || lyriStreamingReasoning) && (
                 <div className="flex justify-start">
                   <div className="max-w-[70%] rounded-lg px-4 py-3 text-sm leading-relaxed prose prose-sm dark:prose-invert prose-p:my-1 prose-ul:my-1 prose-ol:my-1 bg-accent text-accent-foreground">
+                    {lyriStreamingReasoning && (
+                      <details className="mb-2 not-prose" open>
+                        <summary className="text-xs text-muted-foreground cursor-pointer select-none flex items-center gap-1.5 list-none">
+                          <Brain className="h-3 w-3" />
+                          <span>Pensando...</span>
+                        </summary>
+                        <div className="mt-1.5 text-xs text-muted-foreground/80 font-mono whitespace-pre-wrap border-t border-border/40 pt-1.5" style={{ maxHeight: '4.5em', overflowY: 'auto' }}>
+                          {lyriStreamingReasoning}
+                        </div>
+                      </details>
+                    )}
                     <ReactMarkdown>{lyriStreamingText}</ReactMarkdown>
                   </div>
                 </div>
@@ -3057,6 +3537,481 @@ const Clients = () => {
               <button onClick={isSendingMessage ? cancelLyriJob : sendLyriMessage} disabled={!isSendingMessage && (!lyriInput.trim() || !activeLyriChatId)} className="p-2.5 rounded-md bg-primary text-primary-foreground hover:opacity-90 transition-opacity disabled:opacity-40">
                 {isSendingMessage ? <StopCircle className="h-4 w-4" /> : <Send className="h-4 w-4" />}
               </button>
+            </div>
+
+            {/* Flag Panel Drawer */}
+            {showLyriFlagPanel && (
+              <div className="absolute top-0 right-0 h-full w-72 bg-card border-l border-border z-20 flex flex-col shadow-xl">
+                <div className="flex items-center justify-between p-3 border-b">
+                  <h3 className="font-semibold flex items-center gap-2 text-sm">
+                    <Flag size={14} className="text-yellow-500" />
+                    Marcados ({activeLyriChat?.messages?.filter((m: any) => m.flags && m.flags.length > 0).length || 0})
+                  </h3>
+                  <button onClick={() => setShowLyriFlagPanel(false)} className="p-1 rounded hover:bg-muted">
+                    <X size={14} />
+                  </button>
+                </div>
+                <div className="flex-1 overflow-y-auto p-2 space-y-2">
+                  {activeLyriChat?.messages?.filter((m: any) => m.flags && m.flags.length > 0).length === 0 ? (
+                    <p className="text-xs text-muted-foreground text-center py-6">No hay mensajes marcados</p>
+                  ) : (
+                    activeLyriChat?.messages?.filter((m: any) => m.flags && m.flags.length > 0).map((msg: any) => (
+                      <button
+                        key={msg.id}
+                        onClick={() => scrollToLyriMessage(msg.id)}
+                        className="w-full text-left p-2 rounded-lg bg-muted/50 hover:bg-muted transition-colors"
+                      >
+                        <div className="flex items-center gap-2 mb-1">
+                          <span className={`text-[10px] px-1.5 py-0.5 rounded ${msg.role === 'user' ? 'bg-primary/20 text-primary' : 'bg-muted-foreground/20 text-muted-foreground'}`}>
+                            {msg.role === 'user' ? 'Tú' : 'Lyra'}
+                          </span>
+                        </div>
+                        <p className="text-[11px] text-muted-foreground line-clamp-2">{msg.content.substring(0, 100)}...</p>
+                      </button>
+                    ))
+                  )}
+                </div>
+              </div>
+            )}
+          </div>
+        </div>
+      )}
+
+      {/* Client Cases Modal */}
+      {casesClientId && (
+        <div className="fixed inset-0 z-[60] flex items-center justify-center bg-black/60 p-4">
+          <div className="bg-card border rounded-xl w-full max-w-lg max-h-[80vh] overflow-hidden flex flex-col">
+            <div className="flex items-center justify-between p-5 border-b">
+              <h2 className="text-lg font-bold flex items-center gap-2">
+                <Briefcase size={20} />
+                {t('clients.casesTitle') || 'Casos de'} {clients.find(c => c.id === casesClientId)?.name || ''}
+              </h2>
+              <div className="flex items-center gap-2">
+                <button
+                  onClick={() => setShowNewCaseModal(true)}
+                  className="p-1.5 rounded hover:bg-accent text-muted-foreground hover:text-foreground transition-colors"
+                  title="Nuevo caso"
+                >
+                  <Plus size={20} />
+                </button>
+                <button onClick={() => { setCasesClientId(null); setClientCases([]); }} className="p-1.5 rounded hover:bg-muted transition-colors">
+                  <X size={20} />
+                </button>
+              </div>
+            </div>
+            <div className="flex-1 overflow-y-auto p-5">
+              {loadingClientCases ? (
+                <p className="text-sm text-muted-foreground text-center py-8">{t('cases.loading') || 'Cargando...'}</p>
+              ) : clientCases.length === 0 ? (
+                <p className="text-sm text-muted-foreground text-center py-8">{t('clients.noCases') || 'Este cliente no tiene casos asociados'}</p>
+              ) : (
+                <div className="space-y-3">
+                  {clientCases.map((c: any) => (
+                    <div key={c._id} className="bg-muted/50 rounded-lg p-4">
+                      <div className="flex items-start justify-between gap-2">
+                        <div className="flex-1 min-w-0 space-y-2">
+                          <div className="flex items-center gap-2 flex-wrap">
+                            <span className={`text-xs px-2.5 py-1 rounded-full border font-medium ${STATUS_COLORS[c.status] || ''}`}>
+                              {caseStatusLabels[c.status] || c.status}
+                            </span>
+                          </div>
+                          <h3 className="font-medium text-sm">{c.contactName}</h3>
+                          {c.subject && <p className="text-xs text-muted-foreground truncate">{c.subject}</p>}
+                          <div className="flex items-center gap-3 text-xs text-muted-foreground">
+                            <span>{new Date(c.createdAt).toLocaleDateString()}</span>
+                            {c.assignedSubaccountName && (
+                              <span className="text-blue-400">👤 {c.assignedSubaccountName}</span>
+                            )}
+                          </div>
+                        </div>
+                        <button
+                          onClick={() => openCaseDetail(c)}
+                          className="p-2 rounded-lg hover:bg-accent text-muted-foreground hover:text-foreground transition-colors flex-shrink-0"
+                          title={t('cases.viewDetail') || 'Ver detalle'}
+                        >
+                          <Eye size={16} />
+                        </button>
+                        <button
+                          onClick={(e) => { e.stopPropagation(); setCaseToDelete(c._id); }}
+                          className="p-2 rounded-lg hover:bg-red-500/20 text-red-400 transition-colors flex-shrink-0"
+                          title={t('cases.delete') || 'Eliminar caso'}
+                        >
+                          <Trash2 size={16} />
+                        </button>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              )}
+            </div>
+          </div>
+        </div>
+      )}
+
+      {showNewCaseModal && casesClientId && (
+        <NewCaseModal
+          accountId={accountId}
+          preselectedClient={{ id: casesClientId, name: clients.find(c => c.id === casesClientId)?.name || '' }}
+          onClose={() => setShowNewCaseModal(false)}
+          onSuccess={() => {
+            setShowNewCaseModal(false);
+            openClientCases(casesClientId);
+          }}
+        />
+      )}
+
+      {/* Case Detail Modal (from client cases) */}
+      {caseDetailOpen && caseDetailCase && (
+        <div className="fixed inset-0 z-[70] flex items-center justify-center bg-black/60 p-4">
+          <div className="bg-card border rounded-xl w-full max-w-5xl max-h-[90vh] overflow-hidden flex flex-col">
+            {/* Header */}
+            <div className="flex items-center justify-between p-6 border-b">
+              <div>
+                <h2 className="text-xl font-bold">{t('cases.detailTitle') || 'Detalle del caso'}</h2>
+                <p className="text-sm text-muted-foreground mt-1">{caseDetailCase.contactName}</p>
+              </div>
+              <button onClick={() => { setCaseDetailOpen(false); setCaseDetailCase(null); setCaseDetailMessages([]); }} className="p-2 rounded-lg hover:bg-muted transition-colors">
+                <X size={20} />
+              </button>
+            </div>
+
+            {/* Content */}
+            <div className="flex-1 overflow-y-auto p-6">
+              <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+                {/* Left: Case info */}
+                <div className="space-y-4">
+                  <div className="bg-muted/50 rounded-xl p-5 space-y-3">
+                    <div className="flex items-center gap-2">
+                      <span className={`text-xs px-2.5 py-1 rounded-full border font-medium ${STATUS_COLORS[caseDetailCase.status] || ''}`}>
+                        {caseStatusLabels[caseDetailCase.status] || caseDetailCase.status}
+                      </span>
+                      {caseDetailCase.especialidadName && (
+                        <span className="text-xs px-2 py-1 rounded-full bg-muted text-muted-foreground flex items-center gap-1">
+                          <Tag size={10} />
+                          {caseDetailCase.especialidadName}
+                        </span>
+                      )}
+                    </div>
+
+                    <div className="grid grid-cols-2 gap-3 text-sm">
+                      <div>
+                        <p className="text-muted-foreground text-xs mb-0.5">{t('cases.contact') || 'Contacto'}</p>
+                        <p className="font-medium">{caseDetailCase.contactName}</p>
+                      </div>
+                      {caseDetailCase.contactEmail && (
+                        <div>
+                          <p className="text-muted-foreground text-xs mb-0.5">{t('cases.emailLabel') || 'Email'}</p>
+                          <p className="font-medium">{caseDetailCase.contactEmail}</p>
+                        </div>
+                      )}
+                      {caseDetailCase.contactPhone && (
+                        <div>
+                          <p className="text-muted-foreground text-xs mb-0.5">{t('cases.phone') || 'Teléfono'}</p>
+                          <p className="font-medium">{caseDetailCase.contactPhone}</p>
+                        </div>
+                      )}
+                      <div>
+                        <p className="text-muted-foreground text-xs mb-0.5">{t('cases.date') || 'Fecha'}</p>
+                        <p className="font-medium">{new Date(caseDetailCase.createdAt).toLocaleString()}</p>
+                      </div>
+                      {caseDetailCase.assignedSubaccountName && (
+                        <div>
+                          <p className="text-muted-foreground text-xs mb-0.5">{t('cases.assignedLawyer') || 'Abogado asignado'}</p>
+                          <p className="font-medium text-blue-400">{caseDetailCase.assignedSubaccountName}</p>
+                        </div>
+                      )}
+                      {caseDetailCase.linkedClientName && (
+                        <div>
+                          <p className="text-muted-foreground text-xs mb-0.5">{t('cases.linkedClient') || 'Cliente vinculado'}</p>
+                          <p className="font-medium text-green-400">{caseDetailCase.linkedClientName}</p>
+                        </div>
+                      )}
+                    </div>
+                  </div>
+
+                  {/* Original message */}
+                  <div className="bg-muted/50 rounded-xl p-5">
+                    <p className="text-sm font-medium mb-2">{t('cases.originalMessage') || 'Mensaje original'}</p>
+                    <p className="text-sm text-muted-foreground whitespace-pre-wrap">{caseDetailCase.body}</p>
+                  </div>
+
+                  {/* Actions */}
+                  <div className="flex gap-2">
+                    <button
+                      onClick={openCaseNotesFromModal}
+                      className="px-3 py-2 rounded-lg bg-yellow-500/20 text-yellow-400 text-sm font-medium hover:bg-yellow-500/30 transition-colors flex items-center gap-1.5"
+                    >
+                      <StickyNote size={14} />
+                      {t('cases.notes') || 'Notas'}
+                    </button>
+                  </div>
+                </div>
+
+                {/* Right: Conversation history */}
+                <div className="bg-muted/30 rounded-xl p-5 flex flex-col h-[500px]">
+                  <h3 className="text-sm font-semibold mb-3 flex items-center gap-2">
+                    <MessageCircle size={16} />
+                    {t('cases.conversation') || 'Historial de conversación'}
+                  </h3>
+                  <div className="flex-1 overflow-y-auto space-y-3 pr-1">
+                    {caseDetailConvLoading ? (
+                      <p className="text-sm text-muted-foreground text-center py-8">{t('cases.loadingConversation') || 'Cargando conversación...'}</p>
+                    ) : caseDetailMessages.length === 0 ? (
+                      <p className="text-sm text-muted-foreground text-center py-8">
+                        {caseDetailCase.source === 'manual'
+                          ? (t('cases.manualCaseNoConversation') || 'Los casos manuales no tienen conversación asociada')
+                          : (t('cases.noMessages') || 'No hay mensajes')}
+                      </p>
+                    ) : (
+                      caseDetailMessages.map((msg: any) => (
+                        <div
+                          key={msg.id}
+                          className={`flex ${msg.sent ? 'justify-end' : 'justify-start'}`}
+                        >
+                          <div
+                            className={`max-w-[80%] rounded-xl px-4 py-2.5 text-sm ${
+                              msg.sent
+                                ? 'bg-primary text-primary-foreground rounded-br-sm'
+                                : 'bg-card border rounded-bl-sm'
+                            }`}
+                          >
+                            <p className="text-xs opacity-70 mb-1">{msg.from}</p>
+                            <p className="whitespace-pre-wrap">{msg.text}</p>
+                            <p className={`text-[10px] mt-1 ${msg.sent ? 'text-primary-foreground/60' : 'text-muted-foreground'}`}>
+                              {new Date(msg.time).toLocaleString()}
+                            </p>
+                          </div>
+                        </div>
+                      ))
+                    )}
+                  </div>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Case Notes Modal */}
+      {caseNotesOpen && (
+        <div className="fixed inset-0 z-[80] flex items-center justify-center bg-black/60 p-4">
+          <div className="bg-card border rounded-xl w-full max-w-2xl p-6">
+            <div className="flex items-center justify-between mb-4">
+              <h2 className="text-lg font-bold flex items-center gap-2">
+                <StickyNote size={20} />
+                {t('cases.notes') || 'Notas del caso'}
+              </h2>
+              <button onClick={() => setCaseNotesOpen(false)} className="p-1.5 rounded hover:bg-muted transition-colors">
+                <X size={20} />
+              </button>
+            </div>
+            <textarea
+              value={caseNotesText}
+              onChange={(e) => setCaseNotesText(e.target.value)}
+              rows={20}
+              className="w-full px-3 py-2 bg-muted border rounded-lg text-sm resize-none focus:outline-none focus:ring-1 focus:ring-ring"
+              placeholder={t('cases.notesPlaceholder') || 'Escribe tus notas aquí...'}
+            />
+            <div className="flex justify-end gap-3 mt-4">
+              <button
+                onClick={() => setCaseNotesOpen(false)}
+                className="px-4 py-2 rounded-lg border text-sm hover:bg-muted transition-colors"
+              >
+                {t('cases.cancel') || 'Cancelar'}
+              </button>
+              <button
+                onClick={saveCaseNotesFromModal}
+                disabled={isSavingCaseNotes}
+                className="px-4 py-2 rounded-lg bg-primary text-primary-foreground text-sm font-medium hover:bg-primary/90 transition-colors disabled:opacity-50"
+              >
+                {isSavingCaseNotes ? (t('cases.saving') || 'Guardando...') : (t('cases.saveNotes') || 'Guardar notas')}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Delete Case Confirmation */}
+      {caseToDelete && (
+        <div className="fixed inset-0 z-[80] flex items-center justify-center bg-black/60 p-4">
+          <div className="bg-card border rounded-xl w-full max-w-sm p-6 text-center">
+            <div className="mx-auto w-12 h-12 rounded-full bg-red-500/20 flex items-center justify-center mb-4">
+              <Trash2 size={24} className="text-red-400" />
+            </div>
+            <h3 className="text-lg font-bold mb-2">{t('cases.deleteConfirmTitle') || 'Eliminar caso'}</h3>
+            <p className="text-sm text-muted-foreground mb-6">{t('cases.deleteConfirmMsg') || '¿Estás seguro de que quieres eliminar este caso? Esta acción no se puede deshacer.'}</p>
+            <div className="flex justify-center gap-3">
+              <button
+                onClick={() => setCaseToDelete(null)}
+                className="px-4 py-2 rounded-lg border text-sm hover:bg-muted transition-colors"
+              >
+                {t('cases.cancel') || 'Cancelar'}
+              </button>
+              <button
+                onClick={() => handleDeleteCaseFromModal(caseToDelete)}
+                className="px-4 py-2 rounded-lg bg-red-500 text-white text-sm font-medium hover:bg-red-600 transition-colors"
+              >
+                {t('cases.delete') || 'Eliminar'}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Client Reminders Modal */}
+      {remindersClientId && (
+        <div className="fixed inset-0 z-[60] flex items-center justify-center bg-black/60 p-4">
+          <div className="bg-card border rounded-xl w-full max-w-lg max-h-[80vh] overflow-hidden flex flex-col">
+            <div className="flex items-center justify-between p-5 border-b">
+              <h2 className="text-lg font-bold flex items-center gap-2">
+                <Calendar size={20} />
+                {t('clients.reminders') || 'Recordatorios'} — {clients.find(c => c.id === remindersClientId)?.name || ''}
+              </h2>
+              <div className="flex items-center gap-2">
+                <button onClick={() => { setShowReminderForm(true); setEditingReminder(null); setReminderForm({ title: '', dateFrom: '', dateTo: '', type: '', notes: '' }); }} className="p-1.5 rounded hover:bg-muted transition-colors" title="Nuevo recordatorio">
+                  <Plus size={18} />
+                </button>
+                <button onClick={() => { setRemindersClientId(null); setClientReminders([]); setShowReminderForm(false); }} className="p-1.5 rounded hover:bg-muted transition-colors">
+                  <X size={20} />
+                </button>
+              </div>
+            </div>
+            <div className="flex-1 overflow-y-auto p-5">
+              {loadingReminders ? (
+                <p className="text-sm text-muted-foreground text-center py-8">{t('cases.loading') || 'Cargando...'}</p>
+              ) : clientReminders.length === 0 ? (
+                <p className="text-sm text-muted-foreground text-center py-8">{t('clients.noReminders') || 'No hay recordatorios'}</p>
+              ) : (
+                <div className="space-y-3">
+                  {clientReminders.map((r: any) => (
+                    <div key={r._id || r.id} className="bg-muted/50 rounded-lg p-4">
+                      <div className="flex items-start justify-between gap-2">
+                        <div className="flex-1">
+                          <div className="flex items-center gap-2 mb-1">
+                            <h3 className="font-medium text-sm">{r.title}</h3>
+                            {r.type && <span className="text-[10px] px-2 py-0.5 rounded-full bg-primary/20 text-primary">{r.type}</span>}
+                          </div>
+                          <p className="text-xs text-muted-foreground">{new Date(r.dateFrom).toLocaleDateString()}{r.dateTo ? ` — ${new Date(r.dateTo).toLocaleDateString()}` : ''}</p>
+                          {r.notes && <p className="text-xs text-muted-foreground mt-1">{r.notes}</p>}
+                        </div>
+                        <div className="flex items-center gap-1 flex-shrink-0">
+                          <button onClick={() => startEditReminder(r)} className="p-1 rounded hover:bg-muted text-muted-foreground"><Pencil size={14} /></button>
+                          <button onClick={() => setReminderToDelete(r._id || r.id)} className="p-1 rounded hover:bg-red-500/20 text-red-400"><Trash2 size={14} /></button>
+                        </div>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              )}
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Reminder Form Modal */}
+      {showReminderForm && (
+        <div className="fixed inset-0 z-[70] flex items-center justify-center bg-black/60 p-4">
+          <div className="bg-card border rounded-xl w-full max-w-md p-6">
+            <h2 className="text-lg font-bold mb-4">{editingReminder ? (t('clients.editReminder') || 'Editar recordatorio') : (t('clients.newReminder') || 'Nuevo recordatorio')}</h2>
+            <div className="space-y-3">
+              <div>
+                <label className="text-sm font-medium mb-1 block">{t('clients.reminderTitle') || 'Título'}</label>
+                <input value={reminderForm.title} onChange={(e) => setReminderForm({ ...reminderForm, title: e.target.value })} className="w-full px-3 py-2 bg-muted border rounded-lg text-sm" placeholder="Ej: Plazo alegaciones" />
+              </div>
+              <div className="grid grid-cols-2 gap-3">
+                <div>
+                  <label className="text-sm font-medium mb-1 block">{t('clients.dateFrom') || 'Desde'}</label>
+                  <input type="date" value={reminderForm.dateFrom} onChange={(e) => setReminderForm({ ...reminderForm, dateFrom: e.target.value })} className="w-full px-3 py-2 bg-muted border rounded-lg text-sm" />
+                </div>
+                <div>
+                  <label className="text-sm font-medium mb-1 block">{t('clients.dateTo') || 'Hasta'}</label>
+                  <input type="date" value={reminderForm.dateTo} onChange={(e) => setReminderForm({ ...reminderForm, dateTo: e.target.value })} className="w-full px-3 py-2 bg-muted border rounded-lg text-sm" />
+                </div>
+              </div>
+              <div>
+                <label className="text-sm font-medium mb-1 block">{t('clients.reminderType') || 'Tipo'}</label>
+                <input value={reminderForm.type} onChange={(e) => setReminderForm({ ...reminderForm, type: e.target.value })} className="w-full px-3 py-2 bg-muted border rounded-lg text-sm" placeholder="Ej: Plazo legal, Audiencia, Reunión..." />
+              </div>
+              <div>
+                <label className="text-sm font-medium mb-1 block">{t('clients.notes') || 'Notas'}</label>
+                <textarea value={reminderForm.notes} onChange={(e) => setReminderForm({ ...reminderForm, notes: e.target.value })} rows={3} className="w-full px-3 py-2 bg-muted border rounded-lg text-sm resize-none" placeholder="Notas opcionales..." />
+              </div>
+            </div>
+            <div className="flex justify-end gap-3 mt-4">
+              <button onClick={() => { setShowReminderForm(false); setEditingReminder(null); }} className="px-4 py-2 rounded-lg border text-sm hover:bg-muted">{t('cases.cancel') || 'Cancelar'}</button>
+              <button onClick={handleSaveReminder} className="px-4 py-2 rounded-lg bg-primary text-primary-foreground text-sm font-medium hover:bg-primary/90">{t('cases.save') || 'Guardar'}</button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Delete Reminder Confirmation */}
+      {reminderToDelete && (
+        <div className="fixed inset-0 z-[80] flex items-center justify-center bg-black/60 p-4">
+          <div className="bg-card border rounded-xl w-full max-w-sm p-6 text-center">
+            <h3 className="text-lg font-bold mb-2">{t('clients.deleteReminder') || 'Eliminar recordatorio'}</h3>
+            <p className="text-sm text-muted-foreground mb-6">{t('clients.deleteReminderMsg') || '¿Estás seguro?'}</p>
+            <div className="flex justify-center gap-3">
+              <button onClick={() => setReminderToDelete(null)} className="px-4 py-2 rounded-lg border text-sm hover:bg-muted">{t('cases.cancel') || 'Cancelar'}</button>
+              <button onClick={() => handleDeleteReminder(reminderToDelete)} className="px-4 py-2 rounded-lg bg-red-500 text-white text-sm font-medium hover:bg-red-600">{t('cases.delete') || 'Eliminar'}</button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Global Reminders Modal */}
+      {showGlobalReminders && (
+        <div className="fixed inset-0 z-[60] flex items-center justify-center bg-black/60 p-4">
+          <div className="bg-card border rounded-xl w-full max-w-2xl max-h-[85vh] overflow-hidden flex flex-col">
+            <div className="flex items-center justify-between p-5 border-b">
+              <h2 className="text-lg font-bold flex items-center gap-2">
+                <Calendar size={20} />
+                {t('clients.allEvents') || 'Todos los eventos'}
+              </h2>
+              <button onClick={() => setShowGlobalReminders(false)} className="p-1.5 rounded hover:bg-muted transition-colors">
+                <X size={20} />
+              </button>
+            </div>
+            <div className="p-4 border-b flex items-center gap-3 flex-wrap">
+              <div className="relative flex-1 min-w-[200px]">
+                <Search size={14} className="absolute left-3 top-1/2 -translate-y-1/2 text-muted-foreground" />
+                <input value={globalRemindersSearch} onChange={(e) => setGlobalRemindersSearch(e.target.value)} placeholder={t('clients.search') || 'Buscar...'} className="w-full pl-9 pr-3 py-2 bg-muted border rounded-lg text-sm" />
+              </div>
+              <select value={globalRemindersSubFilter} onChange={(e) => setGlobalRemindersSubFilter(e.target.value)} className="text-sm bg-muted border rounded-lg px-3 py-2">
+                <option value="all">{t('cases.allLawyers') || 'Todos los abogados'}</option>
+                {subaccounts.map((s: any) => <option key={s.id || s._id} value={s.id || s._id}>{s.name || s.email}</option>)}
+              </select>
+            </div>
+            <div className="flex-1 overflow-y-auto p-4">
+              {(() => {
+                const filtered = globalReminders.filter((r: any) => {
+                  const q = globalRemindersSearch.toLowerCase();
+                  const reminderClient = clients.find((client) => client.id === r.clientId);
+                  const matchSearch = !q || r.title.toLowerCase().includes(q) || (r.clientName && r.clientName.toLowerCase().includes(q)) || (r.type && r.type.toLowerCase().includes(q));
+                  const matchSub = globalRemindersSubFilter === 'all' || getAssignedSubaccountIds(reminderClient).includes(globalRemindersSubFilter);
+                  return matchSearch && matchSub;
+                }).sort((a: any, b: any) => new Date(a.dateFrom).getTime() - new Date(b.dateFrom).getTime());
+                if (filtered.length === 0) return <p className="text-sm text-muted-foreground text-center py-8">{t('clients.noReminders') || 'No hay recordatorios'}</p>;
+                return (
+                  <div className="space-y-2">
+                    {filtered.map((r: any) => (
+                      <div key={r._id || r.id} className="bg-muted/50 rounded-lg p-3 flex items-center gap-3">
+                        <div className="h-10 w-10 rounded-lg bg-primary/10 flex items-center justify-center flex-shrink-0">
+                          <Calendar size={18} className="text-primary" />
+                        </div>
+                        <div className="flex-1 min-w-0">
+                          <div className="flex items-center gap-2">
+                            <h3 className="font-medium text-sm truncate">{r.title}</h3>
+                            {r.type && <span className="text-[10px] px-2 py-0.5 rounded-full bg-primary/20 text-primary flex-shrink-0">{r.type}</span>}
+                          </div>
+                          <p className="text-xs text-muted-foreground">{r.clientName} · {new Date(r.dateFrom).toLocaleDateString()}{r.dateTo ? ` — ${new Date(r.dateTo).toLocaleDateString()}` : ''}</p>
+                        </div>
+                        <button onClick={() => { setRemindersClientId(r.clientId); setShowGlobalReminders(false); loadClientReminders(r.clientId); }} className="text-xs text-primary hover:underline flex-shrink-0">{t('clients.view') || 'Ver'}</button>
+                      </div>
+                    ))}
+                  </div>
+                );
+              })()}
             </div>
           </div>
         </div>

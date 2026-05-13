@@ -1,0 +1,201 @@
+.landing-shell.landing-light {
+  --landing-ink: 28, 34, 43;
+  background-color: #ffffff;
+  color: rgb(var(--landing-ink));
+}
+
+.landing-shell.landing-light .landing-nav {
+  border-color: rgba(var(--landing-ink), 0.12) !important;
+}
+
+.landing-shell.landing-light .landing-nav.landing-nav-scrolled {
+  background-color: rgba(255, 255, 255, 0.94) !important;
+}
+
+.landing-shell.landing-light .landing-country-menu {
+  background-color: #ffffff !important;
+  border-color: rgba(var(--landing-ink), 0.14) !important;
+  box-shadow: 0 24px 70px rgba(15, 23, 42, 0.12) !important;
+}
+
+.landing-shell.landing-light .landing-hero-fade {
+  background: linear-gradient(to top, #ffffff, transparent) !important;
+}
+
+.landing-shell.landing-light .landing-divider {
+  background: linear-gradient(to right, transparent, rgba(var(--landing-ink), 0.18), transparent) !important;
+}
+
+.landing-shell.landing-light .landing-primary-button {
+  background-color: rgb(var(--landing-ink)) !important;
+  color: #ffffff !important;
+}
+
+.landing-shell.landing-light .landing-primary-button:hover {
+  background-color: rgba(var(--landing-ink), 0.88) !important;
+}
+
+.landing-shell.landing-light .landing-outline-button {
+  border-color: rgba(var(--landing-ink), 0.22) !important;
+  color: rgba(var(--landing-ink), 0.9) !important;
+}
+
+.landing-shell.landing-light .landing-outline-button:hover {
+  background-color: rgba(var(--landing-ink), 0.08) !important;
+  color: rgb(var(--landing-ink)) !important;
+}
+
+.landing-shell.landing-light .landing-login-link {
+  color: rgba(var(--landing-ink), 0.74) !important;
+}
+
+.landing-shell.landing-light .landing-login-link:hover {
+  color: rgb(var(--landing-ink)) !important;
+}
+
+.landing-shell.landing-light .landing-themed [class*="text-white"] {
+  color: rgb(var(--landing-ink)) !important;
+}
+
+.landing-shell.landing-light .landing-themed [class*="text-white/80"] {
+  color: rgba(var(--landing-ink), 0.9) !important;
+}
+
+.landing-shell.landing-light .landing-themed [class*="text-white/70"] {
+  color: rgba(var(--landing-ink), 0.82) !important;
+}
+
+.landing-shell.landing-light .landing-themed [class*="text-white/60"] {
+  color: rgba(var(--landing-ink), 0.74) !important;
+}
+
+.landing-shell.landing-light .landing-themed [class*="text-white/50"] {
+  color: rgba(var(--landing-ink), 0.66) !important;
+}
+
+.landing-shell.landing-light .landing-themed [class*="text-white/40"] {
+  color: rgba(var(--landing-ink), 0.58) !important;
+}
+
+.landing-shell.landing-light .landing-themed [class*="text-white/35"] {
+  color: rgba(var(--landing-ink), 0.52) !important;
+}
+
+.landing-shell.landing-light .landing-themed [class*="text-white/30"] {
+  color: rgba(var(--landing-ink), 0.46) !important;
+}
+
+.landing-shell.landing-light .landing-themed [class*="text-white/25"] {
+  color: rgba(var(--landing-ink), 0.4) !important;
+}
+
+.landing-shell.landing-light .landing-themed [class*="text-white/20"] {
+  color: rgba(var(--landing-ink), 0.34) !important;
+}
+
+.landing-shell.landing-light .landing-themed [class*="text-white/15"] {
+  color: rgba(var(--landing-ink), 0.28) !important;
+}
+
+.landing-shell.landing-light .landing-themed [class*="border-white/25"] {
+  border-color: rgba(var(--landing-ink), 0.28) !important;
+}
+
+.landing-shell.landing-light .landing-themed [class*="border-white/20"] {
+  border-color: rgba(var(--landing-ink), 0.24) !important;
+}
+
+.landing-shell.landing-light .landing-themed [class*="border-white/15"] {
+  border-color: rgba(var(--landing-ink), 0.2) !important;
+}
+
+.landing-shell.landing-light .landing-themed [class*="border-white/10"] {
+  border-color: rgba(var(--landing-ink), 0.16) !important;
+}
+
+.landing-shell.landing-light .landing-themed [class*="border-white/8"] {
+  border-color: rgba(var(--landing-ink), 0.14) !important;
+}
+
+.landing-shell.landing-light .landing-themed [class*="border-white/5"] {
+  border-color: rgba(var(--landing-ink), 0.1) !important;
+}
+
+.landing-shell.landing-light .landing-themed [class*="bg-white/[0.06]"] {
+  background-color: rgba(var(--landing-ink), 0.14) !important;
+}
+
+.landing-shell.landing-light .landing-themed [class*="bg-white/[0.05]"] {
+  background-color: rgba(var(--landing-ink), 0.12) !important;
+}
+
+.landing-shell.landing-light .landing-themed [class*="bg-white/[0.04]"] {
+  background-color: rgba(var(--landing-ink), 0.1) !important;
+}
+
+.landing-shell.landing-light .landing-themed [class*="bg-white/[0.03]"] {
+  background-color: rgba(var(--landing-ink), 0.09) !important;
+}
+
+.landing-shell.landing-light .landing-themed [class*="bg-white/[0.02]"] {
+  background-color: rgba(var(--landing-ink), 0.08) !important;
+}
+
+.landing-shell.landing-light .landing-themed [class*="bg-white/[0.015]"] {
+  background-color: rgba(var(--landing-ink), 0.07) !important;
+}
+
+.landing-shell.landing-light .landing-themed [class*="bg-white/20"] {
+  background-color: rgba(var(--landing-ink), 0.24) !important;
+}
+
+.landing-shell.landing-light .landing-themed [class*="bg-white/10"] {
+  background-color: rgba(var(--landing-ink), 0.14) !important;
+}
+
+.landing-shell.landing-light .landing-themed [class*="bg-white/8"] {
+  background-color: rgba(var(--landing-ink), 0.12) !important;
+}
+
+.landing-shell.landing-light .landing-themed [class*="bg-white/5"] {
+  background-color: rgba(var(--landing-ink), 0.09) !important;
+}
+
+.landing-shell.landing-light .landing-themed [class*="hover:text-white"]:hover {
+  color: rgb(var(--landing-ink)) !important;
+}
+
+.landing-shell.landing-light .landing-themed [class*="hover:bg-white/[0.05]"]:hover,
+.landing-shell.landing-light .landing-themed [class*="hover:bg-white/5"]:hover {
+  background-color: rgba(var(--landing-ink), 0.12) !important;
+}
+
+.landing-shell.landing-light .landing-themed [class*="hover:border-white/15"]:hover {
+  border-color: rgba(var(--landing-ink), 0.2) !important;
+}
+
+.landing-particle-dust {
+  will-change: transform, opacity;
+  animation-name: landing-particle-float;
+  animation-timing-function: ease-in-out;
+  animation-iteration-count: infinite;
+}
+
+@keyframes landing-particle-float {
+  0%,
+  100% {
+    transform: translate3d(0, 0, 0) scale(0.92);
+  }
+
+  24% {
+    transform: translate3d(-0.9px, -1.2px, 0) scale(1.02);
+  }
+
+  50% {
+    transform: translate3d(1px, -2.1px, 0) scale(1.18);
+  }
+
+  76% {
+    transform: translate3d(-0.55px, -0.7px, 0) scale(1.04);
+  }
+}

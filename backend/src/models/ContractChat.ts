@@ -1,10 +1,16 @@
 import mongoose, { Schema } from 'mongoose';
 
+export interface IFlag {
+  id: string;
+  createdAt: string;
+}
+
 export interface IContractChatMessage {
   id: string;
   role: 'user' | 'assistant';
   content: string;
   metadata?: any;
+  flags?: IFlag[];
 }
 
 export interface IContractChat {
@@ -27,11 +33,17 @@ export interface IContractChat {
   summary?: string;
 }
 
+const flagSchema = new Schema({
+  id: String,
+  createdAt: String,
+}, { _id: false });
+
 const contractChatMessageSchema = new Schema({
   id: String,
   role: { type: String, enum: ['user', 'assistant'] },
   content: String,
   metadata: Schema.Types.Mixed,
+  flags: { type: [flagSchema], default: [] },
 }, { _id: false });
 
 const contractChatSchema = new Schema<IContractChat>({

@@ -6,8 +6,16 @@ import SharedFilesModal from "@/components/SharedFilesModal";
 import ImproveAIModal from "@/components/ImproveAIModal";
 import { authFetch } from '../lib/authFetch';
 import { useNavigate } from "react-router-dom";
+import ModuleGuide from "@/components/ModuleGuide";
 
 const API_URL = import.meta.env.VITE_API_URL;
+
+type DashboardCalendarEvent = {
+  id: string;
+  title: string;
+  startDateTime: string;
+  allDay: boolean;
+};
 
 const Dashboard = () => {
   const { t } = useTranslation();
@@ -22,6 +30,8 @@ const Dashboard = () => {
   });
   const [calendarConnected, setCalendarConnected] = useState(false);
   const [todayEvents, setTodayEvents] = useState<{ id: string; summary: string; start: string; allDay: boolean }[]>([]);
+  const isFreePlan = sessionStorage.getItem('plan') === 'free';
+  const [iaUsage, setIaUsage] = useState({ count: 0, limit: 50 });
 
   useEffect(() => {
     setIsVisible(false);
@@ -30,6 +40,24 @@ const Dashboard = () => {
     loadCalendarWidget();
     return () => clearTimeout(timer);
   }, []);
+
+  useEffect(() => {
+    if (!isFreePlan) return;
+    const accountId = sessionStorage.getItem('accountId');
+    if (!accountId) return;
+    const fetchUsage = async () => {
+      try {
+        const res = await authFetch(`${import.meta.env.VITE_API_URL}/assistant/daily-usage?accountId=${accountId}`);
+        if (res.ok) {
+          const data = await res.json();
+          setIaUsage({ count: data.count || 0, limit: data.limit || 50 });
+        }
+      } catch { /* ignore */ }
+    };
+    fetchUsage();
+    const interval = setInterval(fetchUsage, 30000);
+    return () => clearInterval(interval);
+  }, [isFreePlan]);
 
   const loadStats = async () => {
     try {
@@ -59,17 +87,17 @@ const Dashboard = () => {
       if (!eventsRes.ok) return;
       const eventsData = await eventsRes.json();
       const today = new Date().toISOString().split('T')[0];
-      const filtered = (eventsData.events || [])
-        .filter((e: any) => {
-          const eDate = (e.start?.dateTime || e.start?.date || '').split('T')[0];
+      const filtered = ((eventsData.events || []) as DashboardCalendarEvent[])
+        .filter((e) => {
+          const eDate = (e.startDateTime || '').split('T')[0];
           return eDate === today;
         })
         .slice(0, 5)
-        .map((e: any) => ({
+        .map((e) => ({
           id: e.id,
-          summary: e.summary || '',
-          start: e.start?.dateTime || e.start?.date || '',
-          allDay: !e.start?.dateTime,
+          summary: e.title || '',
+          start: e.startDateTime || '',
+          allDay: !!e.allDay,
         }));
       setTodayEvents(filtered);
     } catch { /* ignore */ }
@@ -83,6 +111,20 @@ const Dashboard = () => {
 
   return (
     <div className="p-4 md:p-8">
+      <ModuleGuide moduleId="dashboard" />
+      {isFreePlan && (
+        <div className="mb-4 rounded-md border border-amber-500/20 bg-amber-500/10 p-3 flex items-center justify-between">
+          <div>
+            <p className="text-sm font-medium text-amber-700 dark:text-amber-400">Plan Sin Cargo</p>
+            <p className="text-xs text-amber-600 dark:text-amber-300">
+              {iaUsage.count} / {iaUsage.limit} mensajes con IA hoy
+            </p>
+          </div>
+          {iaUsage.count >= iaUsage.limit && (
+            <span className="text-xs font-semibold text-red-500">Límite alcanzado</span>
+          )}
+        </div>
+      )}
       <div className="flex items-start justify-between mb-6 md:mb-8">
         <div>
           <h1 className="text-2xl font-semibold text-foreground">{t('dashboard.title')}</h1>

@@ -15,7 +15,12 @@ interface SavedStrategy {
   };
 }
 
-export function generateDefensePDF(strategies: SavedStrategy[], title: string): PDFKit.PDFDocument {
+interface DefenseEvidenceItem {
+  fileName: string;
+  publicToken: string;
+}
+
+export function generateDefensePDF(strategies: SavedStrategy[], title: string, evidences?: DefenseEvidenceItem[], publicBaseUrl?: string): PDFKit.PDFDocument {
   const doc = new PDFDocument({ margin: 50 });
 
   // Header
@@ -122,6 +127,21 @@ export function generateDefensePDF(strategies: SavedStrategy[], title: string): 
       doc.moveDown(1);
     }
   });
+
+  // Evidence links
+  if (evidences && evidences.length > 0 && publicBaseUrl) {
+    doc.addPage();
+    doc.fontSize(18).fillColor('#1a1a1a').text('Evidencias Adjuntas', { underline: true });
+    doc.moveDown(1);
+    evidences.forEach((ev, idx) => {
+      doc.fontSize(11).fillColor('#333333');
+      doc.text(`${idx + 1}. ${ev.fileName}`, { indent: 20 });
+      doc.fontSize(9).fillColor('#0066cc');
+      const url = `${publicBaseUrl}/public/evidence/${ev.publicToken}`;
+      doc.text(url, { indent: 20, link: url, underline: true });
+      doc.moveDown(0.8);
+    });
+  }
 
   // Footer
   doc.moveDown(2);

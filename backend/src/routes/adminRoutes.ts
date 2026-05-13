@@ -7,7 +7,16 @@ import {
   modifySubscription,
   toggleAccountStatus,
   createAccountManually,
+  verifyJunior,
+  getJuniorVerifications,
+  getPromoCodes,
+  createPromoCode,
+  updatePromoCode,
+  deletePromoCode,
+  getRevenue,
+  getInvoicesByDateRange,
 } from '../controllers/adminController.js';
+import { getSuggestions, deleteSuggestion } from '../controllers/suggestionController.js';
 
 const router = Router();
 
@@ -21,5 +30,15 @@ router.get('/users/:id', getUserDetail as any);
 router.put('/users/:id/subscription', modifySubscription as any);
 router.put('/users/:id/status', toggleAccountStatus as any);
 router.post('/users', createAccountManually as any);
+router.post('/users/:id/verify-junior', verifyJunior as any);
+router.get('/junior-verifications', getJuniorVerifications as any);
+router.get('/suggestions', getSuggestions as any);
+router.delete('/suggestions/:id', deleteSuggestion as any);
+router.get('/promo-codes', getPromoCodes as any);
+router.post('/promo-codes', createPromoCode as any);
+router.put('/promo-codes/:id', updatePromoCode as any);
+router.delete('/promo-codes/:id', deletePromoCode as any);
+router.get('/revenue', getRevenue as any);
+router.get('/invoices', getInvoicesByDateRange as any);
 
 export default router;

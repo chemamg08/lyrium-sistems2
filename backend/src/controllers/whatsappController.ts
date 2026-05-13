@@ -1,7 +1,8 @@
-import type { RequestHandler } from 'express';
+import type { RequestHandler, Response } from 'express';
 import multer from 'multer';
 import path from 'path';
 import fs from 'fs';
+import crypto from 'crypto';
 import { Automation } from '../models/Automation.js';
 import { verifyOwnership, type AuthRequest } from '../middleware/auth.js';
 import * as waService from '../services/whatsappService.js';
@@ -9,12 +10,12 @@ import * as waService from '../services/whatsappService.js';
 const REQUIRED_META_CONNECT_ENV = [
   'WHATSAPP_META_APP_ID',
   'WHATSAPP_META_APP_SECRET',
+  'WHATSAPP_META_WEBHOOK_VERIFY_TOKEN',
+  'BACKEND_PUBLIC_URL',
 ] as const;
 
 const RECOMMENDED_META_ENV = [
   'WHATSAPP_META_REDIRECT_URI',
-  'WHATSAPP_META_WEBHOOK_VERIFY_TOKEN',
-  'BACKEND_PUBLIC_URL',
   'FRONTEND_URL',
 ] as const;
 
@@ -22,12 +23,34 @@ function getMissingEnvVars(names: readonly string[]): string[] {
   return names.filter((name) => !String(process.env[name] || '').trim());
 }
 
+function isValidAbsoluteHttpUrl(value: string): boolean {
+  try {
+    const parsed = new URL(value);
+    return parsed.protocol === 'http:' || parsed.protocol === 'https:';
+  } catch {
+    return false;
+  }
+}
+
+function getInvalidRequiredEnvVars(): string[] {
+  const invalid: string[] = [];
+  const backendPublicUrl = String(process.env.BACKEND_PUBLIC_URL || '').trim();
+  if (backendPublicUrl && !isValidAbsoluteHttpUrl(backendPublicUrl)) {
+    invalid.push('BACKEND_PUBLIC_URL');
+  }
+  return invalid;
+}
+
+function getMetaConfigIssues(): string[] {
+  return [...new Set([...getMissingEnvVars(REQUIRED_META_CONNECT_ENV), ...getInvalidRequiredEnvVars()])];
+}
+
 function sendMetaConfigError(res: any): void {
-  const missingRequired = getMissingEnvVars(REQUIRED_META_CONNECT_ENV);
+  const missingRequired = getMetaConfigIssues();
   const missingRecommended = getMissingEnvVars(RECOMMENDED_META_ENV);
 
   res.status(500).json({
-    error: `Faltan variables de entorno para WhatsApp Meta: ${missingRequired.join(', ')}`,
+    error: `Faltan o son inválidas variables de entorno para WhatsApp Meta: ${missingRequired.join(', ')}`,
     missingEnv: missingRequired,
     recommendedMissingEnv: missingRecommended,
   });
@@ -55,6 +78,37 @@ function getMetaCallbackUrl(req: any): string {
 function getFrontendAutomationsUrl(): string {
   const frontend = stripTrailingSlash(process.env.FRONTEND_URL || 'http://localhost:8080');
   return `${frontend}/automatizaciones`;
+}
+
+function cleanupUploadedFiles(files?: Express.Multer.File[]): void {
+  for (const file of files || []) {
+    try {
+      fs.unlinkSync(file.path);
+    } catch {
+      // Ignore cleanup errors for temporary uploaded files.
+    }
+  }
+}
+
+function getWebhookRawBody(body: unknown): Buffer {
+  if (Buffer.isBuffer(body)) return body;
+  return Buffer.from(JSON.stringify(body || {}), 'utf8');
+}
+
+function isValidMetaWebhookSignature(rawBody: Buffer, signatureHeader: string): boolean {
+  const appSecret = String(process.env.WHATSAPP_META_APP_SECRET || '').trim();
+  if (!appSecret || !signatureHeader) return false;
+
+  const receivedSignature = signatureHeader.startsWith('sha256=')
+    ? signatureHeader.slice('sha256='.length)
+    : signatureHeader;
+  const expectedSignature = crypto.createHmac('sha256', appSecret).update(rawBody).digest('hex');
+
+  try {
+    return crypto.timingSafeEqual(Buffer.from(expectedSignature, 'hex'), Buffer.from(receivedSignature, 'hex'));
+  } catch {
+    return false;
+  }
 }
 
 function buildMetaResultUrl(status: 'connected' | 'error', message?: string): string {
@@ -96,14 +150,15 @@ export const connectWhatsApp: RequestHandler = async (req, res) => {
     if (!accountId) { res.status(400).json({ error: 'accountId required' }); return; }
     if (!verifyOwnership(req as AuthRequest, accountId)) { res.status(403).json({ error: 'Acceso denegado' }); return; }
 
-    const missingRequired = getMissingEnvVars(REQUIRED_META_CONNECT_ENV);
+    const missingRequired = getMetaConfigIssues();
     if (missingRequired.length > 0) {
       sendMetaConfigError(res);
       return;
     }
 
     const result = await waService.initMetaEmbeddedSignup(accountId);
-    res.json({ ok: true, ...result });
+    const configId = process.env.WHATSAPP_META_CONFIG_ID || null;
+    res.json({ ok: true, ...result, configId });
   } catch (err: any) {
     console.error('[WA] connectWhatsApp error:', err);
     res.status(500).json({ error: err.message });
@@ -122,7 +177,7 @@ export const connectWhatsAppWithCode: RequestHandler = async (req, res) => {
       return;
     }
 
-    const missingRequired = getMissingEnvVars(REQUIRED_META_CONNECT_ENV);
+    const missingRequired = getMetaConfigIssues();
     if (missingRequired.length > 0) {
       sendMetaConfigError(res);
       return;
@@ -139,7 +194,7 @@ export const connectWhatsAppWithCode: RequestHandler = async (req, res) => {
 
 export const connectWhatsAppWithToken: RequestHandler = async (req, res) => {
   try {
-    const { accountId, state, accessToken } = req.body;
+    const { accountId, state, accessToken, name, alertEmail } = req.body;
     if (!accountId || !state || !accessToken) {
       res.status(400).json({ error: 'accountId, state y accessToken requeridos' });
       return;
@@ -155,7 +210,7 @@ export const connectWhatsAppWithToken: RequestHandler = async (req, res) => {
       return;
     }
 
-    const data = await waService.connectMetaWithToken(accountId, state, accessToken);
+    const data = await waService.connectMetaWithToken(accountId, state, accessToken, name, alertEmail);
     res.json({ ok: true, ...data });
   } catch (err: any) {
     console.error('[WA] connectWhatsAppWithToken error:', err);
@@ -165,7 +220,8 @@ export const connectWhatsAppWithToken: RequestHandler = async (req, res) => {
 
 export const connectWhatsAppManual: RequestHandler = async (req, res) => {
   try {
-    const { accountId, accessToken, phoneNumberId, wabaId } = req.body;
+    const { accountId, accessToken, phoneNumberId, wabaId, name, alertEmail } = req.body;
+    const missingRequired = getMetaConfigIssues();
     if (!accountId || !accessToken || !phoneNumberId) {
       res.status(400).json({ error: 'accountId, accessToken y phoneNumberId requeridos' });
       return;
@@ -174,7 +230,11 @@ export const connectWhatsAppManual: RequestHandler = async (req, res) => {
       res.status(403).json({ error: 'Acceso denegado' });
       return;
     }
-    const data = await waService.connectMetaManual(accountId, accessToken, phoneNumberId, wabaId);
+    if (missingRequired.length > 0) {
+      sendMetaConfigError(res);
+      return;
+    }
+    const data = await waService.connectMetaManual(accountId, accessToken, phoneNumberId, wabaId, name, alertEmail);
     res.json({ ok: true, ...data });
   } catch (err: any) {
     console.error('[WA] connectWhatsAppManual error:', err);
@@ -200,9 +260,9 @@ export const whatsappMetaCallback: RequestHandler = async (req, res) => {
       return;
     }
 
-    const missingRequired = getMissingEnvVars(REQUIRED_META_CONNECT_ENV);
+    const missingRequired = getMetaConfigIssues();
     if (missingRequired.length > 0) {
-      res.redirect(buildMetaResultUrl('error', `Faltan variables de entorno para WhatsApp Meta: ${missingRequired.join(', ')}`));
+      res.redirect(buildMetaResultUrl('error', `Faltan o son inválidas variables de entorno para WhatsApp Meta: ${missingRequired.join(', ')}`));
       return;
     }
 
@@ -223,13 +283,30 @@ export const getWhatsAppStatus: RequestHandler = async (req, res) => {
     if (!verifyOwnership(req as AuthRequest, accountId)) { res.status(403).json({ error: 'Acceso denegado' }); return; }
 
     const account = await getAccount(accountId);
-    const instanceName = account?.whatsappSession?.instanceName || `lyrium_${accountId}`;
+    const sessions = account?.whatsappSessions || [];
+    const legacySession = account?.whatsappSession;
 
+    const instanceName = legacySession?.instanceName || `lyrium_${accountId}`;
     const status = await waService.getInstanceStatus(instanceName);
+
     res.json({
-      connected: status.connected,
-      instanceName,
-      phoneNumber: status.phoneNumber || account?.whatsappSession?.phoneNumber || '',
+      connected: sessions.some((s: any) => s.connected) || status.connected,
+      whatsappSessions: sessions.map((s: any) => ({
+        id: s.phoneNumberId || s.instanceName,
+        phoneNumberId: s.phoneNumberId || '',
+        name: s.name || `WhatsApp ${s.phoneNumber || ''}`,
+        phoneNumber: s.phoneNumber || '',
+        connected: s.connected,
+        connectedAt: s.connectedAt,
+        provider: s.provider || 'meta',
+        tokenType: s.tokenType,
+        tokenExpiresAt: s.tokenExpiresAt,
+        alertEmail: s.alertEmail || '',
+      })),
+      legacySession: legacySession ? {
+        phoneNumber: legacySession.phoneNumber || '',
+        connected: legacySession.connected,
+      } : null,
     });
   } catch (err: any) {
     res.status(500).json({ error: err.message });
@@ -238,12 +315,26 @@ export const getWhatsAppStatus: RequestHandler = async (req, res) => {
 
 export const disconnectWhatsApp: RequestHandler = async (req, res) => {
   try {
-    const { accountId } = req.body;
+    const { accountId, phoneNumberId } = req.body;
     if (!accountId) { res.status(400).json({ error: 'accountId required' }); return; }
     if (!verifyOwnership(req as AuthRequest, accountId)) { res.status(403).json({ error: 'Acceso denegado' }); return; }
 
-    const instanceName = `lyrium_${accountId}`;
-    await waService.disconnectInstance(instanceName);
+    const account = await getAccount(accountId);
+    if (!account) { res.status(404).json({ error: 'Account not found' }); return; }
+
+    if (phoneNumberId) {
+      account.whatsappSessions = (account.whatsappSessions || []).filter((s: any) => s.phoneNumberId !== phoneNumberId);
+      const remainingConnected = (account.whatsappSessions || []).find((s: any) => s.connected);
+      if (remainingConnected) {
+        account.whatsappSession = remainingConnected;
+      } else {
+        account.whatsappSession = undefined;
+      }
+    } else {
+      account.whatsappSessions = [];
+      account.whatsappSession = undefined;
+    }
+    await account.save();
 
     res.json({ ok: true });
   } catch (err: any) {
@@ -293,12 +384,18 @@ export const updateWhatsAppSelection: RequestHandler = async (req, res) => {
 export const getWhatsAppConversations: RequestHandler = async (req, res) => {
   try {
     const accountId = req.query.accountId as string;
+    const phoneNumberId = req.query.phoneNumberId as string;
     if (!accountId) { res.status(400).json({ error: 'accountId required' }); return; }
     if (!verifyOwnership(req as AuthRequest, accountId)) { res.status(403).json({ error: 'Acceso denegado' }); return; }
 
     const account = await getAccount(accountId);
+    let conversations = account?.whatsappConversations || [];
+    if (phoneNumberId) {
+      conversations = conversations.filter((c: any) => c.phoneNumberId === phoneNumberId);
+    }
+
     res.json({
-      conversations: account?.whatsappConversations || [],
+      conversations,
       folders: account?.whatsappFolders || [],
       switchActivo: account?.whatsappSwitchActivo || false,
       connected: account?.whatsappSession?.connected || false,
@@ -320,14 +417,8 @@ export const markWhatsAppRead: RequestHandler = async (req, res) => {
     if (!accountId) { res.status(400).json({ error: 'accountId required' }); return; }
     if (!verifyOwnership(req as AuthRequest, accountId)) { res.status(403).json({ error: 'Acceso denegado' }); return; }
 
-    const account = await getAccount(accountId);
-    if (!account) { res.status(404).json({ error: 'Not found' }); return; }
-
-    const conv = account.whatsappConversations.find((c: any) => c.id === conversationId);
-    if (conv) {
-      conv.unread = 0;
-      await account.save();
-    }
+    const updated = await waService.markConversationRead(accountId, conversationId);
+    if (!updated) { res.status(404).json({ error: 'Not found' }); return; }
 
     res.json({ ok: true });
   } catch (err: any) {
@@ -342,16 +433,10 @@ export const toggleWhatsAppAutoReply: RequestHandler = async (req, res) => {
     if (!accountId) { res.status(400).json({ error: 'accountId required' }); return; }
     if (!verifyOwnership(req as AuthRequest, accountId)) { res.status(403).json({ error: 'Acceso denegado' }); return; }
 
-    const account = await getAccount(accountId);
-    if (!account) { res.status(404).json({ error: 'Not found' }); return; }
+    const autoReplyPaused = await waService.toggleConversationAutoReply(accountId, conversationId);
+    if (autoReplyPaused === null) { res.status(404).json({ error: 'Not found' }); return; }
 
-    const conv = account.whatsappConversations.find((c: any) => c.id === conversationId);
-    if (conv) {
-      conv.autoReplyPaused = !conv.autoReplyPaused;
-      await account.save();
-    }
-
-    res.json({ ok: true, autoReplyPaused: conv?.autoReplyPaused });
+    res.json({ ok: true, autoReplyPaused });
   } catch (err: any) {
     res.status(500).json({ error: err.message });
   }
@@ -376,82 +461,94 @@ export const deleteWhatsAppConversation: RequestHandler = async (req, res) => {
 
 // ── Send manual message ──────────────────────────────────────────────
 export const sendWhatsAppMessage: RequestHandler = async (req, res) => {
+  let files: Express.Multer.File[] | undefined;
   try {
     const { accountId, phone, text } = req.body;
     const conversationId = req.params.id;
+    files = req.files as Express.Multer.File[] | undefined;
     if (!accountId) { res.status(400).json({ error: 'accountId required' }); return; }
     if (!verifyOwnership(req as AuthRequest, accountId)) { res.status(403).json({ error: 'Acceso denegado' }); return; }
 
     const account = await getAccount(accountId);
-    if (!account?.whatsappSession?.instanceName || !account.whatsappSession.connected) {
-      res.status(400).json({ error: 'WhatsApp not connected' });
+    if (!account) {
+      res.status(404).json({ error: 'Account not found' });
+      return;
+    }
+    const conversation = (account.whatsappConversations || []).find((c: any) => c.id === conversationId || c.contactPhone === phone);
+    if (!conversation) {
+      res.status(404).json({ error: 'Conversation not found' });
       return;
     }
 
-    const instanceName = account.whatsappSession.instanceName;
-
-    if (text) {
-      await waService.sendTextMessage(instanceName, phone, text);
+    const conversationPhoneNumberId = conversation.phoneNumberId;
+    if (!conversationPhoneNumberId) {
+      res.status(400).json({ error: 'Esta conversación no tiene un número de WhatsApp asignado' });
+      return;
     }
 
-    const files = req.files as Express.Multer.File[] | undefined;
-    if (files && files.length > 0) {
-      for (const file of files) {
-        await waService.sendMediaMessage(instanceName, phone, file.path, '');
+    const session = (account.whatsappSessions || []).find((s: any) => s.phoneNumberId === conversationPhoneNumberId);
+    if (!session?.connected) {
+      res.status(400).json({ error: 'WhatsApp not connected for this number' });
+      return;
+    }
+
+    const instanceName = session.instanceName || `lyrium_${accountId}`;
+
+    if (waService.isWhatsAppConversationOutside24h(conversation)) {
+      res.status(409).json({ error: 'Meta bloquea mensajes libres fuera de 24 horas. El cliente debe volver a escribir para reabrir la ventana.' });
+      return;
+    }
+
+    if (!String(text || '').trim() && (!files || files.length === 0)) {
+      res.status(400).json({ error: 'Text or files required' });
+      return;
+    }
+
+    // instanceName ya definido arriba
+
+    const outgoingAttachments = (files || []).map((file) => ({
+      filename: file.filename,
+      originalName: file.originalname,
+      mimeType: file.mimetype,
+      size: file.size,
+    }));
+    let sentText = false;
+    let sentAttachmentCount = 0;
+
+    try {
+      if (text) {
+        await waService.sendTextMessage(instanceName, phone, text, conversationPhoneNumberId);
+        await waService.persistOutgoingWhatsAppMessage(accountId, conversationId, phone, text, []);
+        sentText = true;
       }
-    }
 
-    const now = new Date().toISOString();
-    let conv = account.whatsappConversations.find((c: any) => c.id === conversationId || c.contactPhone === phone);
-    if (!conv) {
-      conv = {
-        id: conversationId || `waconv_${Date.now()}`,
-        contactName: phone,
-        contactPhone: phone,
-        messages: [],
-        lastMessageTime: now,
-        unread: 0,
-        autoReplyPaused: false,
-      };
-      account.whatsappConversations.push(conv as any);
-    }
-
-    if (text) {
-      conv.messages.push({
-        id: `wa_sent_${Date.now()}`,
-        from: 'me',
-        text,
-        time: now,
-        sent: true,
+      if (files && files.length > 0) {
+        for (let index = 0; index < files.length; index += 1) {
+          const file = files[index];
+          const attachmentMeta = outgoingAttachments[index];
+          await waService.sendMediaMessage(instanceName, phone, file.path, '', conversationPhoneNumberId);
+          await waService.persistOutgoingWhatsAppMessage(accountId, conversationId, phone, '', attachmentMeta ? [attachmentMeta] : []);
+          sentAttachmentCount += 1;
+        }
+      }
+    } catch (sendErr: any) {
+      const partial = sentText || sentAttachmentCount > 0;
+      res.status(partial ? 207 : 502).json({
+        ok: partial,
+        partial,
+        sentText,
+        sentAttachments: sentAttachmentCount,
+        error: 'Error enviando mensaje por WhatsApp: ' + sendErr.message,
       });
+      return;
     }
 
-    if (files && files.length > 0) {
-      for (const file of files) {
-        conv.messages.push({
-          id: `wa_sent_file_${Date.now()}_${Math.random().toString(36).slice(2, 6)}`,
-          from: 'me',
-          text: `[${file.originalname}]`,
-          time: now,
-          sent: true,
-          attachments: [{
-            id: `wa_att_${Date.now()}_${Math.random().toString(36).slice(2, 6)}`,
-            filename: file.filename,
-            originalName: file.originalname,
-            mimeType: file.mimetype,
-            size: file.size,
-          }],
-        });
-      }
-    }
-
-    conv.lastMessageTime = now;
-    await account.save();
-
-    res.json({ ok: true });
+    res.json({ ok: true, sentText, sentAttachments: sentAttachmentCount });
   } catch (err: any) {
     console.error('[WA] sendWhatsAppMessage error:', err);
     res.status(500).json({ error: err.message });
+  } finally {
+    cleanupUploadedFiles(files);
   }
 };
 
@@ -642,16 +739,58 @@ export const deleteWhatsAppClassifyRule: RequestHandler = async (req, res) => {
   }
 };
 
+function resolveWAAttachmentPath(filename: string): string | null {
+  if (!filename || filename.includes('..') || filename.includes('/') || filename.includes('\\')) {
+    return null;
+  }
+
+  const filePath = path.join(waService.WA_ATTACHMENTS_DIR, filename);
+  return fs.existsSync(filePath) ? filePath : null;
+}
+
+export const serveWAPublicAttachment: RequestHandler = async (req, res) => {
+  try {
+    const filename = String(req.params.filename || '');
+    const expiresAt = Number(req.query.exp || 0);
+    const signature = String(req.query.sig || '');
+
+    if (!waService.isValidWAPublicAttachmentSignature(filename, expiresAt, signature)) {
+      res.status(403).json({ error: 'Invalid signature' });
+      return;
+    }
+
+    const filePath = resolveWAAttachmentPath(filename);
+    if (!filePath) { res.status(404).json({ error: 'File not found' }); return; }
+    res.sendFile(filePath);
+  } catch (err: any) {
+    res.status(500).json({ error: err.message });
+  }
+};
+
 // ── Serve WhatsApp attachment files ──────────────────────────────────
 export const serveWAAttachment: RequestHandler = async (req, res) => {
   try {
-    const filename = req.params.filename;
-    if (!filename || filename.includes('..') || filename.includes('/') || filename.includes('\\')) {
-      res.status(400).json({ error: 'Invalid filename' });
-      return;
+    const accountId = req.query.accountId as string;
+    if (!accountId) { res.status(400).json({ error: 'accountId required' }); return; }
+    if (!verifyOwnership(req as AuthRequest, accountId)) { res.status(403).json({ error: 'Acceso denegado' }); return; }
+
+    const filename = String(req.params.filename || '');
+    const account = await getAccount(accountId);
+    const conversations = account?.whatsappConversations || [];
+    let found = false;
+    for (const conv of conversations) {
+      for (const msg of conv.messages || []) {
+        for (const att of msg.attachments || []) {
+          if (att.filename === filename) { found = true; break; }
+        }
+        if (found) break;
+      }
+      if (found) break;
     }
-    const filePath = path.join(waService.WA_ATTACHMENTS_DIR, filename);
-    if (!fs.existsSync(filePath)) { res.status(404).json({ error: 'File not found' }); return; }
+    if (!found) { res.status(404).json({ error: 'File not found' }); return; }
+
+    const filePath = resolveWAAttachmentPath(filename);
+    if (!filePath) { res.status(404).json({ error: 'File not found' }); return; }
     res.sendFile(filePath);
   } catch (err: any) {
     res.status(500).json({ error: err.message });
@@ -679,7 +818,21 @@ export const whatsappWebhookVerify: RequestHandler = async (req, res) => {
 
 export const whatsappWebhook: RequestHandler = async (req, res) => {
   try {
-    const body = req.body;
+    const appSecret = String(process.env.WHATSAPP_META_APP_SECRET || '').trim();
+    if (!appSecret) {
+      res.status(500).json({ error: 'WhatsApp Meta webhook not configured' });
+      return;
+    }
+
+    const rawBody = getWebhookRawBody(req.body);
+    const signatureHeader = String(req.headers['x-hub-signature-256'] || '');
+    if (!isValidMetaWebhookSignature(rawBody, signatureHeader)) {
+      res.status(403).json({ error: 'Invalid WhatsApp webhook signature' });
+      return;
+    }
+
+    const rawText = rawBody.toString('utf8').trim();
+    const body = rawText ? JSON.parse(rawText) : {};
     const entries = Array.isArray(body?.entry) ? body.entry : [];
 
     for (const entry of entries) {
@@ -719,3 +872,59 @@ export const getWhatsAppUnreadCount: RequestHandler = async (req, res) => {
     res.status(500).json({ error: err.message });
   }
 };
+
+// ── Token management ─────────────────────────────────────────────────
+export async function refreshWhatsAppToken(req: AuthRequest, res: Response) {
+  try {
+    const { accountId, phoneNumberId } = req.body;
+
+    if (!accountId || !phoneNumberId) {
+      return res.status(400).json({ error: 'accountId y phoneNumberId son requeridos' });
+    }
+
+    if (!verifyOwnership(req, accountId)) {
+      return res.status(403).json({ error: 'Acceso denegado' });
+    }
+
+    const result = await waService.refreshWhatsAppToken(accountId, phoneNumberId);
+
+    if (!result.success) {
+      return res.status(400).json({ error: result.error });
+    }
+
+    res.json({
+      success: true,
+      newExpiresAt: result.newExpiresAt,
+      daysRemaining: result.daysRemaining,
+    });
+  } catch (err: any) {
+    console.error('[WA] Error en refresh-token:', err);
+    res.status(500).json({ error: err.message || 'Error interno' });
+  }
+}
+
+export async function getTokenStatus(req: AuthRequest, res: Response) {
+  try {
+    const { accountId } = req.query;
+    const { phoneNumberId } = req.query;
+
+    if (!accountId || !phoneNumberId) {
+      return res.status(400).json({ error: 'accountId y phoneNumberId son requeridos' });
+    }
+
+    if (!verifyOwnership(req, accountId as string)) {
+      return res.status(403).json({ error: 'Acceso denegado' });
+    }
+
+    const status = await waService.getTokenStatus(accountId as string, phoneNumberId as string);
+
+    if (!status) {
+      return res.status(404).json({ error: 'Sesión no encontrada' });
+    }
+
+    res.json(status);
+  } catch (err: any) {
+    console.error('[WA] Error en token-status:', err);
+    res.status(500).json({ error: err.message || 'Error interno' });
+  }
+}

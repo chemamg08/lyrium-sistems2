@@ -20,6 +20,8 @@ export interface ISubaccount {
   googleCalendarConnected?: boolean;
   calendarOAuthState?: string | null;
   calendarOAuthStateExpires?: string | null;
+  googleCalendarSyncToken?: string | null;
+  googleCalendarLastSyncedAt?: string | null;
 }
 
 const subaccountSchema = new Schema<ISubaccount>({
@@ -42,6 +44,8 @@ const subaccountSchema = new Schema<ISubaccount>({
   googleCalendarConnected: { type: Boolean, default: false },
   calendarOAuthState: { type: String, default: null },
   calendarOAuthStateExpires: { type: String, default: null },
+  googleCalendarSyncToken: { type: String, default: null },
+  googleCalendarLastSyncedAt: { type: String, default: null },
 }, { _id: false, versionKey: false });
 
 subaccountSchema.set('toJSON', {

@@ -5,6 +5,15 @@ import { sendTestWebhook } from '../services/webhookService.js';
 
 const router = Router();
 
+function serializeWebhook(webhook: any, includeSecret = false) {
+  const data = webhook?.toJSON ? webhook.toJSON() : webhook;
+  if (includeSecret) {
+    return data;
+  }
+  const { secret, ...safeWebhook } = data;
+  return safeWebhook;
+}
+
 // GET /api/integrations/webhooks/events — List available events (MUST be before /:id)
 router.get('/events', (_req: Request, res: Response) => {
   res.json(WEBHOOK_EVENTS);
@@ -19,7 +28,7 @@ router.get('/', async (req: Request, res: Response) => {
     }
 
     const webhooks = await Webhook.find({ accountId }).sort({ createdAt: -1 });
-    res.json(webhooks);
+    res.json(webhooks.map((webhook) => serializeWebhook(webhook)));
   } catch (error) {
     console.error('Error listing webhooks:', error);
     res.status(500).json({ error: 'Error listing webhooks' });
@@ -65,7 +74,7 @@ router.post('/', async (req: Request, res: Response) => {
       isActive: true,
     });
 
-    res.status(201).json(webhook);
+    res.status(201).json(serializeWebhook(webhook, true));
   } catch (error) {
     console.error('Error creating webhook:', error);
     res.status(500).json({ error: 'Error creating webhook' });
@@ -95,7 +104,7 @@ router.put('/:id', async (req: Request, res: Response) => {
     if (description !== undefined) webhook.description = description;
 
     await webhook.save();
-    res.json(webhook);
+    res.json(serializeWebhook(webhook));
   } catch (error) {
     console.error('Error updating webhook:', error);
     res.status(500).json({ error: 'Error updating webhook' });

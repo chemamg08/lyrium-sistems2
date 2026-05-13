@@ -55,7 +55,7 @@ const VerifyEmail = () => {
 
         <Card className="bg-zinc-900/90 border-zinc-800/50 shadow-2xl backdrop-blur-sm">
           <CardHeader className="space-y-1">
-            <CardTitle className="text-2xl font-bold text-center">Lyrium Systems</CardTitle>
+            <CardTitle className="text-2xl font-bold text-center">Lyrium</CardTitle>
           </CardHeader>
           <CardContent className="flex flex-col items-center gap-6 py-8">
             {status === 'loading' && (

@@ -14,22 +14,82 @@ const __dirname = path.dirname(__filename);
 
 const UPLOADS_DIR = path.join(__dirname, '../../uploads/shared');
 
-// POST /upload  — multipart: files + senderId + senderName + recipientIds (JSON array string)
+const cleanupUploadedFiles = async (files: Express.Multer.File[] = []) => {
+  await Promise.all(files.map(async (file) => {
+    try {
+      await fsAsync.unlink(file.path);
+    } catch {}
+  }));
+};
+
+const resolveAuthenticatedSender = async (userId: string) => {
+  const account = await Account.findById(userId).lean();
+  if (account) {
+    const subs = await Subaccount.find({ parentAccountId: userId }).lean();
+    return {
+      senderId: String((account as any)._id),
+      senderName: account.name,
+      groupMembers: subs.map((sub) => String((sub as any)._id)),
+    };
+  }
+
+  const subaccount = await Subaccount.findById(userId).lean();
+  if (!subaccount) return null;
+
+  const mainAccount = await Account.findById(subaccount.parentAccountId).lean();
+  if (!mainAccount) return null;
+
+  const subs = await Subaccount.find({ parentAccountId: subaccount.parentAccountId }).lean();
+  return {
+    senderId: String((subaccount as any)._id),
+    senderName: subaccount.name,
+    groupMembers: [
+      String((mainAccount as any)._id),
+      ...subs
+        .map((sub) => String((sub as any)._id))
+        .filter((id) => id !== String((subaccount as any)._id)),
+    ],
+  };
+};
+
+// POST /upload  — multipart: files + recipientIds (JSON array string)
 export const uploadAndShare = async (req: Request, res: Response) => {
   try {
-    const { senderId, senderName, recipientIds } = req.body;
+    const { recipientIds } = req.body;
     const files = req.files as Express.Multer.File[];
+    const authUserId = (req as any).user?.userId as string | undefined;
 
-    if (!senderId || !verifyOwnership(req, senderId)) {
+    if (!authUserId || !verifyOwnership(req, authUserId)) {
+      await cleanupUploadedFiles(files);
       return res.status(403).json({ error: 'Acceso denegado' });
     }
 
     if (!files || files.length === 0)
       return res.status(400).json({ error: 'No files uploaded' });
 
-    const parsed: string[] = Array.isArray(recipientIds)
-      ? recipientIds
-      : JSON.parse(recipientIds || '[]');
+    let parsed: string[];
+    try {
+      parsed = Array.isArray(recipientIds)
+        ? recipientIds
+        : JSON.parse(recipientIds || '[]');
+    } catch {
+      await cleanupUploadedFiles(files);
+      return res.status(400).json({ error: 'Destinatarios inválidos' });
+    }
+
+    const sender = await resolveAuthenticatedSender(authUserId);
+    if (!sender) {
+      await cleanupUploadedFiles(files);
+      return res.status(404).json({ error: 'Remitente no encontrado' });
+    }
+
+    const allowedRecipients = new Set(sender.groupMembers);
+    const uniqueRecipientIds = [...new Set(parsed.map((value) => String(value)))];
+
+    if (uniqueRecipientIds.length === 0 || uniqueRecipientIds.some((id) => !allowedRecipients.has(id))) {
+      await cleanupUploadedFiles(files);
+      return res.status(400).json({ error: 'Destinatarios inválidos' });
+    }
 
     const now = new Date().toISOString();
     const newEntries = await Promise.all(
@@ -38,9 +98,9 @@ export const uploadAndShare = async (req: Request, res: Response) => {
           _id: Date.now().toString() + '_' + Math.random().toString(36).slice(2),
           filename: file.filename,
           originalName: sanitizeFilename(file.originalname),
-          senderId,
-          senderName,
-          recipientIds: parsed,
+          senderId: sender.senderId,
+          senderName: sender.senderName,
+          recipientIds: uniqueRecipientIds,
           size: file.size,
           uploadedAt: now,
         });

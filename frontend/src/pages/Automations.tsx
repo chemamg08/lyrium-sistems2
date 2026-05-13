@@ -1,7 +1,7 @@
 ﻿import {
   Mail, MessageCircle, Calendar, ArrowLeft, Send, Paperclip, Search,
   MoreVertical, Users, HelpCircle, X, Plus, Trash2, Eye, Upload, PauseCircle, PanelLeft, Pencil,
-  FolderOpen, Copy, Check, ChevronDown, FileText, Image, Download, ChevronRight, Settings2, Phone, Sparkles, Settings
+  FolderOpen, Copy, Check, ChevronDown, FileText, Image, Download, ChevronRight, Settings2, Phone, Sparkles, Settings, AlertTriangle, RefreshCw
 } from "lucide-react";
 import { useState, useEffect, useRef, DragEvent } from "react";
 import { useTranslation } from "react-i18next";
@@ -12,12 +12,24 @@ import dayGridPlugin from '@fullcalendar/daygrid';
 import timeGridPlugin from '@fullcalendar/timegrid';
 import interactionPlugin from '@fullcalendar/interaction';
 import allLocales from '@fullcalendar/core/locales-all';
+import ModuleGuide from "@/components/ModuleGuide";
 
 const API = `${import.meta.env.VITE_API_URL}/automatizaciones`;
 const CALENDAR_API = `${import.meta.env.VITE_API_URL}/calendar`;
 
 interface Especialidad { id: string; nombre: string; descripcion: string; createdAt: string; }
-interface CuentaCorreo { id: string; plataforma: string; correo: string; password: string; createdAt: string; }
+interface CuentaCorreo {
+  id: string;
+  plataforma: string;
+  correo: string;
+  password: string;
+  hasPassword?: boolean;
+  createdAt: string;
+  customSmtpHost?: string;
+  customSmtpPort?: number;
+  customImapHost?: string;
+  customImapPort?: number;
+}
 interface Documento { id: string; nombre: string; filename: string; uploadedAt: string; }
 interface Subcuenta { id: string; name: string; email: string; }
 interface EmailAttachment { id: string; filename: string; originalName: string; mimeType: string; size: number; }
@@ -53,6 +65,44 @@ interface AutoData {
   respondConsultasGenerales?: boolean;
   respondSolicitudesServicio?: boolean;
   soloContactosConocidos?: boolean;
+  whatsappSessions?: IWhatsAppSession[];
+}
+interface IWhatsAppSession {
+  id?: string;
+  name?: string;
+  phoneNumber?: string;
+  phoneNumberId: string;
+  connected?: boolean;
+  tokenExpiresAt?: string;
+  tokenType?: string;
+  alertEmail?: string;
+  hasAccessToken?: boolean;
+}
+
+interface CalendarApiEvent {
+  id: string;
+  title: string;
+  description?: string;
+  startDateTime: string;
+  endDateTime: string;
+  allDay: boolean;
+  colorId?: string;
+  recurrence?: string[];
+  location?: string;
+  attendees?: string[];
+}
+
+interface CalendarEventDetail {
+  id: string;
+  title: string;
+  description?: string;
+  start: Date | null;
+  end: Date | null;
+  allDay: boolean;
+  location?: string;
+  colorId?: string;
+  recurrence?: string[];
+  attendees?: string[];
 }
 
 const PLATFORMS = [
@@ -124,6 +174,7 @@ function SwitchBox({ active, onChange, label }: { active: boolean; onChange: (v:
 }
 
 type View = "main" | "email" | "whatsapp" | "calendar";
+const WA_WINDOW_MS = 24 * 60 * 60 * 1000;
 
 // Format ISO or legacy time strings to local HH:MM
 function formatTime(raw: string): string {
@@ -131,6 +182,24 @@ function formatTime(raw: string): string {
   const d = new Date(raw);
   if (!isNaN(d.getTime())) return d.toLocaleTimeString(undefined, { hour: '2-digit', minute: '2-digit' });
   return raw; // fallback for old "HH:MM" strings
+}
+
+function getLastIncomingWATimestamp(conversation: WAConversation): number | null {
+  for (let index = conversation.messages.length - 1; index >= 0; index -= 1) {
+    const message = conversation.messages[index];
+    if (message.sent) continue;
+
+    const timestamp = new Date(message.time).getTime();
+    if (!isNaN(timestamp)) return timestamp;
+  }
+
+  return null;
+}
+
+function isWAConversationOutside24h(conversation: WAConversation, now = Date.now()): boolean {
+  const lastIncomingTimestamp = getLastIncomingWATimestamp(conversation);
+  if (lastIncomingTimestamp === null) return false;
+  return now - lastIncomingTimestamp > WA_WINDOW_MS;
 }
 
 const Automations = () => {
@@ -145,7 +214,7 @@ const Automations = () => {
   const [waSwitchActivo, setWaSwitchActivo] = useState(false);
   const [waConnected, setWaConnected] = useState(false);
   const [waSearch, setWaSearch] = useState('');
-  const [waFilter, setWaFilter] = useState<'all' | 'manual' | 'auto'>('all');
+  const [waFilter, setWaFilter] = useState<'all' | 'manual' | 'auto' | 'expired'>('all');
   const [waFolderFilter, setWaFolderFilter] = useState('');
   const [showWaFolderPanel, setShowWaFolderPanel] = useState(false);
   const [newWaFolderName, setNewWaFolderName] = useState('');
@@ -157,6 +226,7 @@ const Automations = () => {
   const [waManualToken, setWaManualToken] = useState('');
   const [waManualPhoneId, setWaManualPhoneId] = useState('');
   const [waManualWabaId, setWaManualWabaId] = useState('');
+  const [waManualAlertEmail, setWaManualAlertEmail] = useState('');
   const [showWaCorreosConsultas, setShowWaCorreosConsultas] = useState(false);
   const [waCorreoInput, setWaCorreoInput] = useState('');
   const [waCorreosConsultas, setWaCorreosConsultas] = useState<string[]>([]);
@@ -197,14 +267,16 @@ const Automations = () => {
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const [calendarConnected, setCalendarConnected] = useState(false);
   const [calendarEmail, setCalendarEmail] = useState('');
-  const [calendarEvents, setCalendarEvents] = useState<any[]>([]);
+  const [calendarEvents, setCalendarEvents] = useState<CalendarApiEvent[]>([]);
   const [calendarLoading, setCalendarLoading] = useState(false);
   const [showAddEventForm, setShowAddEventForm] = useState(false);
   const [editingEventId, setEditingEventId] = useState<string | null>(null);
   const [eventForm, setEventForm] = useState({ title: '', date: '', startTime: '', endTime: '', description: '', allDay: false, recurrence: '', colorId: '' });
   const [showConfirmDisconnect, setShowConfirmDisconnect] = useState(false);
   const [confirmDeleteEventId, setConfirmDeleteEventId] = useState<string | null>(null);
-  const [selectedEventDetail, setSelectedEventDetail] = useState<{ id: string; title: string; description?: string; start: Date | null; end: Date | null; allDay: boolean; colorId?: string; recurrence?: string[] } | null>(null);
+  const [selectedEventDetail, setSelectedEventDetail] = useState<CalendarEventDetail | null>(null);
+  const [calendarLastSyncedAt, setCalendarLastSyncedAt] = useState<string | null>(null);
+  const [calendarSyncing, setCalendarSyncing] = useState(false);
   const [showSeleccion, setShowSeleccion] = useState(false);
   const [emailFilter, setEmailFilter] = useState<'all' | 'manual' | 'auto'>('all');
   const [emailSearch, setEmailSearch] = useState('');
@@ -226,6 +298,11 @@ const Automations = () => {
   const [classifyRules, setClassifyRules] = useState<ClassifyRule[]>([]);
   const [classifyForm, setClassifyForm] = useState({ name: '', description: '', folderIds: [] as string[] });
   const [classifyLoading, setClassifyLoading] = useState(false);
+  const [showWhatsAppSessions, setShowWhatsAppSessions] = useState(false);
+  const [showAddWaSession, setShowAddWaSession] = useState(false);
+  const [waSessionForm, setWaSessionForm] = useState({ name: '', accessToken: '', phoneNumberId: '', wabaId: '', alertEmail: '' });
+  const [emailAccountFilter, setEmailAccountFilter] = useState<string>('all');
+  const [whatsappNumberFilter, setWhatsappNumberFilter] = useState<string>('all');
 
   useEffect(() => {
     const accId = sessionStorage.getItem("accountId") || "";
@@ -329,7 +406,8 @@ const Automations = () => {
 
   const deleteClassifyRule = async (ruleId: string) => {
     try {
-      await authFetch(`${API}/email-classify-rules/${ruleId}?accountId=${accountId}`, { method: 'DELETE' });
+      const res = await authFetch(`${API}/email-classify-rules/${ruleId}?accountId=${accountId}`, { method: 'DELETE' });
+      if (!res.ok) return;
       setClassifyRules(prev => prev.filter(r => r.id !== ruleId));
     } catch { /* offline */ }
   };
@@ -372,7 +450,6 @@ const Automations = () => {
         setWaConversations(data.conversations || []);
         setWaFolders(data.folders || []);
         setWaSwitchActivo(data.switchActivo || false);
-        setWaConnected(data.connected || false);
         setWaCorreosConsultas(data.correosConsultas || []);
         setWaSelection({
           respondConsultasGenerales: data?.selection?.respondConsultasGenerales !== false,
@@ -424,7 +501,7 @@ const Automations = () => {
         setShowWaConnectModal(true);
         return;
       }
-      const { state: oauthState, appId } = await initRes.json();
+      const { state: oauthState, appId, configId } = await initRes.json();
 
       // Step 2: Load Facebook JS SDK
       await loadFbSdk(appId);
@@ -434,24 +511,25 @@ const Automations = () => {
       setShowWaConnectModal(true);
       setWaOAuthProcessing(true);
 
-      (window as any).FB.login((response: any) => {
-        const accessToken = response?.authResponse?.accessToken;
-        if (!accessToken) {
-          setWaConnectError('No se recibió autorización de Meta. Inténtalo de nuevo.');
-          setWaOAuthProcessing(false);
-          return;
-        }
-        // FB.login callback must be synchronous — run async work in IIFE
-        (async () => {
+      if (configId) {
+        (window as any).FB.ui({
+          type: 'embedded_signup',
+          configId,
+        }, async (response: any) => {
+          const accessToken = response?.authResponse?.accessToken;
+          if (!accessToken) {
+            setWaConnectError('No se recibió autorización de Meta. Inténtalo de nuevo.');
+            setWaOAuthProcessing(false);
+            return;
+          }
           try {
-            // Step 4: Send access token to backend
             const connectRes = await authFetch(`${WA_API}/meta/connect-token`, {
               method: 'POST',
               headers: { 'Content-Type': 'application/json' },
               body: JSON.stringify({ accountId, state: oauthState, accessToken }),
             });
             if (connectRes.ok) {
-              await loadWaData();
+              await refreshWhatsAppSessionState();
               await loadWaClassifyRules();
               setShowWaConnectModal(false);
             } else {
@@ -471,10 +549,50 @@ const Automations = () => {
           } finally {
             setWaOAuthProcessing(false);
           }
-        })();
-      }, {
-        scope: 'whatsapp_business_management,whatsapp_business_messaging,business_management',
-      });
+        });
+      } else {
+        (window as any).FB.login((response: any) => {
+          const accessToken = response?.authResponse?.accessToken;
+          if (!accessToken) {
+            setWaConnectError('No se recibió autorización de Meta. Inténtalo de nuevo.');
+            setWaOAuthProcessing(false);
+            return;
+          }
+          // FB.login callback must be synchronous — run async work in IIFE
+          (async () => {
+            try {
+              // Step 4: Send access token to backend
+              const connectRes = await authFetch(`${WA_API}/meta/connect-token`, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ accountId, state: oauthState, accessToken }),
+              });
+              if (connectRes.ok) {
+                await refreshWhatsAppSessionState();
+                await loadWaClassifyRules();
+                setShowWaConnectModal(false);
+              } else {
+                let errorMessage = 'No fue posible finalizar la conexion con Meta.';
+                try {
+                  const data = await connectRes.json();
+                  if (Array.isArray(data?.missingEnv) && data.missingEnv.length > 0) {
+                    errorMessage = `Faltan variables de entorno en backend: ${data.missingEnv.join(', ')}`;
+                  } else if (data?.error) {
+                    errorMessage = String(data.error);
+                  }
+                } catch { /* ignore */ }
+                setWaConnectError(errorMessage);
+              }
+            } catch {
+              setWaConnectError('No fue posible finalizar la conexion con Meta. Revisa tu configuracion e intentalo de nuevo.');
+            } finally {
+              setWaOAuthProcessing(false);
+            }
+          })();
+        }, {
+          scope: 'whatsapp_business_management,whatsapp_business_messaging,business_management',
+        });
+      }
     } catch (err: any) {
       setWaConnectError(err?.message || 'No fue posible iniciar la conexion con Meta. Revisa tu conexion e intentalo de nuevo.');
       setQrLoading(false);
@@ -483,8 +601,12 @@ const Automations = () => {
   };
 
   const disconnectWa = async () => {
-    await waApi('POST', '/disconnect', {});
-    setWaConnected(false);
+    const res = await waApi('POST', '/disconnect', {});
+    if (res.ok) {
+      await refreshWhatsAppSessionState();
+    } else {
+      setWaConnected(false);
+    }
   };
 
   const connectWaManual = async () => {
@@ -504,15 +626,17 @@ const Automations = () => {
           accessToken: waManualToken.trim(),
           phoneNumberId: waManualPhoneId.trim(),
           wabaId: waManualWabaId.trim() || undefined,
+          alertEmail: waManualAlertEmail.trim() || undefined,
         }),
       });
       if (res.ok) {
-        await loadWaData();
+        await refreshWhatsAppSessionState();
         await loadWaClassifyRules();
         setShowWaConnectModal(false);
         setWaManualToken('');
         setWaManualPhoneId('');
         setWaManualWabaId('');
+        setWaManualAlertEmail('');
         setWaManualMode(false);
       } else {
         const data = await res.json().catch(() => ({}));
@@ -526,15 +650,24 @@ const Automations = () => {
   };
 
   const toggleWaSwitch = async () => {
+    const previous = waSwitchActivo;
     const newVal = !waSwitchActivo;
     setWaSwitchActivo(newVal);
-    await waApi('PUT', '/switch', { enabled: newVal });
+    try {
+      const res = await waApi('PUT', '/switch', { enabled: newVal });
+      if (!res.ok) throw new Error('switch rejected');
+    } catch {
+      setWaSwitchActivo(previous);
+    }
   };
 
   const sendWaMessage = async () => {
     if (!messageInput.trim() && pendingFiles.length === 0) return;
     const conv = waConversations.find(c => c.id === selectedWAContact);
     if (!conv) return;
+    if (isWAConversationOutside24h(conv)) return;
+
+    let response: Response;
 
     if (pendingFiles.length > 0) {
       const fd = new FormData();
@@ -542,19 +675,27 @@ const Automations = () => {
       fd.append('phone', conv.contactPhone);
       fd.append('text', messageInput);
       pendingFiles.forEach(f => fd.append('files', f));
-      await authFetch(`${WA_API}/conversations/${conv.id}/send`, { method: 'POST', body: fd });
+      response = await authFetch(`${WA_API}/conversations/${conv.id}/send`, { method: 'POST', body: fd });
     } else {
-      await waApi('POST', `/conversations/${conv.id}/send`, { phone: conv.contactPhone, text: messageInput });
+      response = await waApi('POST', `/conversations/${conv.id}/send`, { phone: conv.contactPhone, text: messageInput });
     }
+
+    if (!response.ok) return;
 
     setMessageInput('');
     setPendingFiles([]);
-    loadWaData();
+    await loadWaData();
   };
 
   const markWaRead = async (conversationId: string) => {
-    await waApi('PUT', '/mark-read', { conversationId });
+    const previousUnread = waConversations.find(c => c.id === conversationId)?.unread || 0;
     setWaConversations(prev => prev.map(c => c.id === conversationId ? { ...c, unread: 0 } : c));
+    try {
+      const res = await waApi('PUT', '/mark-read', { conversationId });
+      if (!res.ok) throw new Error('mark read rejected');
+    } catch {
+      setWaConversations(prev => prev.map(c => c.id === conversationId ? { ...c, unread: previousUnread } : c));
+    }
   };
 
   const toggleWaAutoReply = async (conversationId: string) => {
@@ -627,7 +768,8 @@ const Automations = () => {
 
   const deleteWaClassifyRule = async (ruleId: string) => {
     try {
-      await authFetch(`${WA_API}/classify-rules/${ruleId}?accountId=${accountId}`, { method: 'DELETE' });
+      const res = await authFetch(`${WA_API}/classify-rules/${ruleId}?accountId=${accountId}`, { method: 'DELETE' });
+      if (!res.ok) return;
       setWaClassifyRules(prev => prev.filter(r => r.id !== ruleId));
     } catch { /* offline */ }
   };
@@ -655,21 +797,116 @@ const Automations = () => {
   };
 
   const toggleWaSeleccion = async (field: 'respondConsultasGenerales' | 'respondSolicitudesServicio' | 'soloContactosConocidos') => {
+    const previous = waSelection;
     const next = {
       ...waSelection,
       [field]: !waSelection[field],
     };
     setWaSelection(next);
-    await waApi('PUT', '/selection', next);
+    try {
+      const res = await waApi('PUT', '/selection', next);
+      if (!res.ok) throw new Error('selection rejected');
+    } catch {
+      setWaSelection(previous);
+    }
   };
+
+  const saveWaSession = async () => {
+    if (!waSessionForm.accessToken.trim() || !waSessionForm.phoneNumberId.trim()) return;
+    try {
+      const res = await authFetch(`${WA_API}/meta/connect-manual`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          accountId,
+          accessToken: waSessionForm.accessToken,
+          phoneNumberId: waSessionForm.phoneNumberId,
+          wabaId: waSessionForm.wabaId || undefined,
+          name: waSessionForm.name || undefined,
+          alertEmail: waSessionForm.alertEmail || undefined,
+        }),
+      });
+      if (res.ok) {
+        setShowAddWaSession(false);
+        setWaSessionForm({ name: '', accessToken: '', phoneNumberId: '', wabaId: '', alertEmail: '' });
+        await refreshWhatsAppSessionState();
+      }
+    } catch { /* offline */ }
+  };
+
+  const deleteWaSession = async (phoneNumberId: string) => {
+    try {
+      const res = await authFetch(`${WA_API}/disconnect`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ accountId, phoneNumberId }),
+      });
+      if (res.ok) await refreshWhatsAppSessionState();
+    } catch { /* offline */ }
+  };
+
+  const refreshWaToken = async (phoneNumberId: string) => {
+    try {
+      const res = await authFetch(`${WA_API}/refresh-token`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ accountId, phoneNumberId }),
+      });
+      if (res.ok) await refreshWhatsAppSessionState();
+    } catch { /* offline */ }
+  };
+
+  const getTokenStatus = (expiresAt?: string): { color: string; label: string; days: number } => {
+    if (!expiresAt) return { color: 'text-muted-foreground', label: 'Sin info', days: 999 };
+    const expires = new Date(expiresAt).getTime();
+    const now = Date.now();
+    const days = Math.floor((expires - now) / (1000 * 60 * 60 * 24));
+    if (days < 0) return { color: 'text-red-400', label: 'Expirado', days };
+    if (days <= 7) return { color: 'text-red-400', label: `${days} días`, days };
+    if (days <= 14) return { color: 'text-yellow-400', label: `${days} días`, days };
+    return { color: 'text-green-400', label: `${days} días`, days };
+  };
+
+  async function loadAutoData() {
+    if (!accountId) return;
+    try {
+      const res = await authFetch(`${WA_API}/status?accountId=${accountId}`);
+      if (res.ok) {
+        const data = await res.json();
+        setAutoData(prev => ({ ...prev, whatsappSessions: data.whatsappSessions || [] }));
+      }
+    } catch { /* offline */ }
+  }
+
+  async function refreshWhatsAppSessionState() {
+    await Promise.all([
+      loadWaData(),
+      loadAutoData(),
+      checkWaStatus(),
+    ]);
+  }
 
   // Load WA data and auto-refresh
   useEffect(() => { if (accountId) { loadWaData(); checkWaStatus(); } }, [accountId]);
   useEffect(() => { if (accountId) loadWaClassifyRules(); }, [accountId]);
   useEffect(() => {
     if (!accountId || view !== 'whatsapp') return;
-    const interval = setInterval(() => { loadWaData(); loadWaClassifyRules(); }, 10000);
-    return () => clearInterval(interval);
+    loadWaData();
+    loadWaClassifyRules();
+    checkWaStatus();
+
+    const dataInterval = setInterval(() => {
+      loadWaData();
+      loadWaClassifyRules();
+    }, 10000);
+    const statusInterval = setInterval(() => {
+      checkWaStatus();
+    }, 30000);
+
+    return () => {
+      clearInterval(dataInterval);
+      clearInterval(statusInterval);
+    };
   }, [accountId, view]);
 
   // Finalize WhatsApp Meta OAuth when returning from Meta
@@ -783,6 +1020,7 @@ const Automations = () => {
         const data = await res.json();
         setCalendarConnected(data.connected);
         setCalendarEmail(data.email || '');
+        setCalendarLastSyncedAt(data.lastSyncedAt || null);
         if (data.connected) loadCalendarEvents(accId, true);
       }
     } catch { /* offline */ }
@@ -794,10 +1032,26 @@ const Automations = () => {
       const res = await authFetch(`${CALENDAR_API}/events?accountId=${accId}`);
       if (res.ok) {
         const data = await res.json();
-        setCalendarEvents(data.events || []);
+        setCalendarEvents(Array.isArray(data.events) ? data.events : []);
       }
     } catch { /* offline */ }
     if (showLoading) setCalendarLoading(false);
+  };
+
+  const handleSyncCalendar = async () => {
+    setCalendarSyncing(true);
+    try {
+      const res = await authFetch(`${CALENDAR_API}/sync`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ accountId: calendarUserId }),
+      });
+      if (res.ok) {
+        loadCalendarEvents(calendarUserId);
+        loadCalendarStatus(calendarUserId);
+      }
+    } catch { /* offline */ }
+    setCalendarSyncing(false);
   };
 
   const handleConnectCalendar = async () => {
@@ -815,11 +1069,12 @@ const Automations = () => {
   const handleDisconnectCalendar = async () => {
     setShowConfirmDisconnect(false);
     try {
-      await authFetch(`${CALENDAR_API}/disconnect`, {
+      const res = await authFetch(`${CALENDAR_API}/disconnect`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ accountId: calendarUserId }),
       });
+      if (!res.ok) return;
       setCalendarConnected(false);
       setCalendarEmail('');
       setCalendarEvents([]);
@@ -872,7 +1127,7 @@ const Automations = () => {
     setSavingEvent(false);
   };
 
-  const handleEditEvent = (detail: typeof selectedEventDetail) => {
+  const handleEditEvent = (detail: CalendarEventDetail | null) => {
     if (!detail) return;
     const startDate = detail.start ? new Date(detail.start) : null;
     const endDate = detail.end ? new Date(detail.end) : null;
@@ -922,7 +1177,9 @@ const Automations = () => {
 
   const saveCuenta = async () => {
     if (!cuentaForm.correo.trim()) return;
-    await api("POST", "/cuentas-correo", cuentaForm);
+    if (cuentaForm.plataforma === 'custom' && (!cuentaForm.customSmtpHost.trim() || !cuentaForm.customImapHost.trim())) return;
+    const ok = await api("POST", "/cuentas-correo", cuentaForm);
+    if (!ok) return;
     setCuentaForm({ plataforma: "gmail", correo: "", password: "", customSmtpHost: "", customSmtpPort: 587, customImapHost: "", customImapPort: 993 }); setShowAddCuenta(false); reload();
   };
   const deleteCuenta = async (id: string) => { await api("DELETE", `/cuentas-correo/${id}?accountId=${accountId}`); reload(); };
@@ -975,6 +1232,11 @@ const Automations = () => {
         method: 'POST',
         body: formData,
       });
+      if (!res.ok) {
+        setPendingFiles(filesToSend);
+        setMessageInput(text);
+        return;
+      }
       const result = await res.json();
       const sentAttachments: EmailAttachment[] = result.attachments || [];
       setAutoData(prev => ({
@@ -993,24 +1255,31 @@ const Automations = () => {
           } : c
         ),
       }));
-    } catch { /* error */ } finally {
+    } catch {
+      setPendingFiles(filesToSend);
+      setMessageInput(text);
+    } finally {
       setIsSending(false);
     }
   };
   const toggleConvAutoReply = async (convId: string, paused: boolean) => {
+    const previousConversations = autoData.emailConversations;
     try {
-      await authFetch(`${API}/conversations/${convId}/auto-reply`, {
-        method: 'PUT',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ accountId, conversationId: convId, paused }),
-      });
       setAutoData(prev => ({
         ...prev,
         emailConversations: prev.emailConversations.map(c =>
           c.id === convId ? { ...c, autoReplyPaused: paused } : c
         ),
       }));
-    } catch { /* error */ }
+      const res = await authFetch(`${API}/conversations/${convId}/auto-reply`, {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ accountId, conversationId: convId, paused }),
+      });
+      if (!res.ok) throw new Error('auto-reply rejected');
+    } catch {
+      setAutoData(prev => ({ ...prev, emailConversations: previousConversations }));
+    }
   };
   const setSubcuentaEsp = async (subcuentaId: string, especialidadId: string) => {
     await api("PUT", "/subcuenta-especialidad", { subcuentaId, especialidadId }); reload();
@@ -1034,18 +1303,20 @@ const Automations = () => {
   };
   const deleteFolder = async (folderId: string) => {
     try {
-      await authFetch(`${API}/email-folders/${folderId}?accountId=${accountId}`, { method: 'DELETE' });
+      const res = await authFetch(`${API}/email-folders/${folderId}?accountId=${accountId}`, { method: 'DELETE' });
+      if (!res.ok) return;
       setAutoData(prev => ({ ...prev, emailFolders: prev.emailFolders.filter(f => f.id !== folderId) }));
       if (folderFilter === folderId) setFolderFilter('');
     } catch { /* error */ }
   };
   const assignToFolder = async (folderId: string, conversationId: string) => {
     try {
-      await authFetch(`${API}/email-folders/assign`, {
+      const res = await authFetch(`${API}/email-folders/assign`, {
         method: 'PUT',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ accountId, folderId, conversationId }),
       });
+      if (!res.ok) return;
       setAutoData(prev => ({
         ...prev,
         emailFolders: prev.emailFolders.map(f => ({
@@ -1059,11 +1330,12 @@ const Automations = () => {
   };
   const removeFromFolder = async (folderId: string, conversationId: string) => {
     try {
-      await authFetch(`${API}/email-folders/remove`, {
+      const res = await authFetch(`${API}/email-folders/remove`, {
         method: 'PUT',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ accountId, folderId, conversationId }),
       });
+      if (!res.ok) return;
       setAutoData(prev => ({
         ...prev,
         emailFolders: prev.emailFolders.map(f =>
@@ -1185,13 +1457,33 @@ const Automations = () => {
           ) : (
             <>
               <div className="flex items-center justify-between gap-2 flex-wrap">
-                <div className="flex items-center gap-2 p-2 rounded-lg bg-green-500/10 border border-green-500/30">
-                  <div className="h-2 w-2 rounded-full bg-green-500 shrink-0" />
-                  <span className="text-xs text-foreground">{t('automations.calendarConnectedAs', { email: calendarEmail })}</span>
+                <div className="flex items-center gap-3 flex-wrap">
+                  <div className="flex items-center gap-2 p-2 rounded-lg bg-green-500/10 border border-green-500/30">
+                    <div className="h-2 w-2 rounded-full bg-green-500 shrink-0" />
+                    <span className="text-xs text-foreground">{t('automations.calendarConnectedAs', { email: calendarEmail })}</span>
+                  </div>
+                  {calendarLastSyncedAt && (
+                    <span className="text-[11px] text-muted-foreground">
+                      {t('automations.calendarLastSync') || 'Última sync'}: {(() => {
+                        const diff = Date.now() - new Date(calendarLastSyncedAt).getTime();
+                        const mins = Math.floor(diff / 60000);
+                        if (mins < 1) return 'Ahora mismo';
+                        if (mins < 60) return `Hace ${mins} min`;
+                        const hours = Math.floor(mins / 60);
+                        return `Hace ${hours}h`;
+                      })()}
+                    </span>
+                  )}
                 </div>
-                <button onClick={() => setShowAddEventForm(true)} className="flex items-center gap-2 px-3 py-2 rounded-md border border-border bg-card hover:bg-accent text-foreground text-xs font-medium transition-colors">
-                  <Plus className="h-3.5 w-3.5" />{t('automations.calendarAddEvent')}
-                </button>
+                <div className="flex items-center gap-2">
+                  <button onClick={handleSyncCalendar} disabled={calendarSyncing} className="flex items-center gap-1.5 px-3 py-2 rounded-md border border-border bg-card hover:bg-accent text-foreground text-xs font-medium transition-colors disabled:opacity-50" title={t('automations.calendarSyncNow') || 'Sincronizar ahora'}>
+                    <RefreshCw className={`h-3.5 w-3.5 ${calendarSyncing ? 'animate-spin' : ''}`} />
+                    <span className="hidden sm:inline">{t('automations.calendarSyncNow') || 'Sincronizar'}</span>
+                  </button>
+                  <button onClick={() => setShowAddEventForm(true)} className="flex items-center gap-2 px-3 py-2 rounded-md border border-border bg-card hover:bg-accent text-foreground text-xs font-medium transition-colors">
+                    <Plus className="h-3.5 w-3.5" />{t('automations.calendarAddEvent')}
+                  </button>
+                </div>
               </div>
               {calendarLoading ? (
                 <div className="text-xs text-muted-foreground text-center py-8">...</div>
@@ -1211,18 +1503,24 @@ const Automations = () => {
                         '#06b6d4', '#f97316', '#ec4899', '#84cc16', '#14b8a6',
                       ];
                       const hashCode = (s: string) => { let h = 0; for (let i = 0; i < s.length; i++) { h = ((h << 5) - h) + s.charCodeAt(i); h |= 0; } return Math.abs(h); };
-                      return calendarEvents.map((e: any) => {
+                      return calendarEvents.map((e) => {
                         const color = e.colorId ? (GOOGLE_COLOR_MAP[e.colorId] || palette[hashCode(e.id) % palette.length]) : palette[hashCode(e.id) % palette.length];
                         return {
                           id: e.id,
-                          title: e.summary,
-                          start: e.start?.dateTime || e.start?.date,
-                          end: e.end?.dateTime || e.end?.date,
-                          allDay: !e.start?.dateTime,
+                          title: e.title,
+                          start: e.startDateTime,
+                          end: e.endDateTime,
+                          allDay: e.allDay,
                           backgroundColor: color,
                           borderColor: color,
                           textColor: '#ffffff',
-                          extendedProps: { description: e.description, colorId: e.colorId, recurrence: e.recurrence },
+                          extendedProps: {
+                            description: e.description,
+                            colorId: e.colorId,
+                            recurrence: e.recurrence,
+                            location: e.location,
+                            attendees: e.attendees,
+                          },
                         };
                       });
                     })()}
@@ -1398,7 +1696,10 @@ const Automations = () => {
 
   if (view === "email") {
     const allConversations = autoData.emailConversations;
-    const conversations = allConversations.filter(c => {
+    const filteredEmailConversations = emailAccountFilter === 'all'
+      ? allConversations
+      : allConversations.filter((c: any) => c.cuentaCorreoId === emailAccountFilter);
+    const conversations = filteredEmailConversations.filter(c => {
       if (folderFilter) {
         const folder = autoData.emailFolders.find(f => f.id === folderFilter);
         if (!folder?.conversationIds.includes(c.id)) return false;
@@ -1504,6 +1805,20 @@ const Automations = () => {
                   </div>
                 )}
               </div>
+              {autoData.cuentasCorreo.length > 1 && (
+                <div className="px-4 py-2 border-b border-border">
+                  <select
+                    value={emailAccountFilter}
+                    onChange={(e) => setEmailAccountFilter(e.target.value)}
+                    className="w-full text-xs bg-muted border border-border rounded-md px-2 py-1.5 text-foreground focus:outline-none"
+                  >
+                    <option value="all">Todas las cuentas</option>
+                    {autoData.cuentasCorreo.map((c: any) => (
+                      <option key={c.id} value={c.id}>{c.correo}</option>
+                    ))}
+                  </select>
+                </div>
+              )}
               <div className="flex-1 overflow-y-auto">
                 {conversations.length === 0 && (
                   <p className="text-xs text-muted-foreground text-center py-8">{t('automations.noEmailConversations')}</p>
@@ -1630,7 +1945,7 @@ const Automations = () => {
                                 return (
                                   <a
                                     key={att.id}
-                                    href={`${API}/email-attachments/${encodeURIComponent(att.filename)}`}
+                                    href={`${API}/email-attachments/${encodeURIComponent(att.filename)}?accountId=${accountId}`}
                                     target="_blank"
                                     rel="noopener noreferrer"
                                     className={`flex items-center gap-2 px-2 py-1.5 rounded-md text-xs transition-colors ${msg.sent ? 'bg-background/10 hover:bg-background/20 text-background' : 'bg-accent/50 hover:bg-accent text-foreground'}`}
@@ -1997,7 +2312,7 @@ const Automations = () => {
           <Modal title={t('automations.emailAccountsTitle')} onClose={() => setShowCuentasCorreo(false)}>
             <div className="flex items-center justify-between mb-5">
               <span className="text-xs text-muted-foreground">{autoData.cuentasCorreo.length} {autoData.cuentasCorreo.length !== 1 ? "accounts" : "account"}</span>
-              <button onClick={() => setShowAddCuenta(true)} disabled={autoData.cuentasCorreo.length >= 1} className="flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium rounded-md bg-foreground text-background hover:opacity-90 disabled:opacity-40 disabled:cursor-not-allowed">
+              <button onClick={() => setShowAddCuenta(true)} className="flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium rounded-md bg-foreground text-background hover:opacity-90">
                 <Plus className="h-3.5 w-3.5" />{t('automations.add')}
               </button>
             </div>
@@ -2011,6 +2326,40 @@ const Automations = () => {
                   className="w-full px-3 py-2 text-sm rounded-md border border-border bg-card text-foreground placeholder:text-muted-foreground focus:outline-none focus:ring-1 focus:ring-ring" />
                 <input type="password" placeholder={t('automations.appPassword')} value={cuentaForm.password} onChange={(e) => setCuentaForm({ ...cuentaForm, password: e.target.value })}
                   className="w-full px-3 py-2 text-sm rounded-md border border-border bg-card text-foreground placeholder:text-muted-foreground focus:outline-none focus:ring-1 focus:ring-ring" />
+                {(() => {
+                  const platformGuides: Record<string, { text: string; link?: string }> = {
+                    gmail: { text: "Para Gmail, usa una contraseña de aplicación.", link: "https://support.google.com/accounts/answer/185833" },
+                    outlook: { text: "Para Outlook/Hotmail, usa una contraseña de aplicación.", link: "https://support.microsoft.com/account-billing/usar-contrase%C3%B1as-de-aplicaci%C3%B3n-con-el-correo-de-Outlook-como-autenticaci%C3%B3n-de-dos-factores-b8c22536-7b10-4e06-8f9b-3d8c5c8d8a0e" },
+                    yahoo: { text: "Para Yahoo, usa una contraseña de aplicación.", link: "https://help.yahoo.com/kb/SLN15241.html" },
+                    icloud: { text: "Para iCloud, usa una contraseña de aplicación.", link: "https://support.apple.com/es-es/102654" },
+                    "office365": { text: "Para Office 365, usa una contraseña de aplicación.", link: "https://support.microsoft.com/account-billing/usar-contrase%C3%B1as-de-aplicaci%C3%B3n-con-el-correo-de-Outlook-como-autenticaci%C3%B3n-de-dos-factores-b8c22536-7b10-4e06-8f9b-3d8c5c8d8a0e" },
+                    hostinger: { text: "Para Hostinger, usa la contraseña normal de tu panel de hosting." },
+                    ionos: { text: "Para IONOS, usa la contraseña normal de tu panel de hosting." },
+                    ovh: { text: "Para OVH, usa la contraseña normal de tu panel de hosting." },
+                    godaddy: { text: "Para GoDaddy, usa la contraseña normal de tu panel de hosting." },
+                    custom: { text: "Para servidores personalizados, usa la contraseña de tu panel de hosting." },
+                    zoho: { text: "Para Zoho, se recomienda usar una contraseña de aplicación.", link: "https://help.zoho.com/portal/en/kb/bigin/settings/security/articles/generate-an-app-specific-password" },
+                  };
+                  const guide = platformGuides[cuentaForm.plataforma];
+                  if (!guide) return null;
+                  return (
+                    <div className="rounded-md border border-amber-500/20 bg-amber-500/10 p-2.5">
+                      <p className="text-xs text-amber-600 dark:text-amber-400 font-medium">
+                        {guide.text}
+                        {guide.link && (
+                          <a
+                            href={guide.link}
+                            target="_blank"
+                            rel="noopener noreferrer"
+                            className="ml-1 underline hover:text-amber-700 dark:hover:text-amber-300"
+                          >
+                            ¿Cómo obtenerla?
+                          </a>
+                        )}
+                      </p>
+                    </div>
+                  );
+                })()}
                 {cuentaForm.plataforma === 'custom' && (
                   <div className="grid grid-cols-2 gap-3">
                     <input placeholder="SMTP Host" value={cuentaForm.customSmtpHost} onChange={(e) => setCuentaForm({ ...cuentaForm, customSmtpHost: e.target.value })}
@@ -2124,13 +2473,18 @@ const Automations = () => {
   }
 
   if (view === "whatsapp") {
-    const filteredConvs = waConversations.filter(c => {
+    const now = Date.now();
+    const filteredWaConversations = whatsappNumberFilter === 'all'
+      ? waConversations
+      : waConversations.filter((c: any) => c.phoneNumberId === whatsappNumberFilter);
+    const filteredConvs = filteredWaConversations.filter(c => {
       if (waFolderFilter) {
         const folder = waFolders.find(f => f.id === waFolderFilter);
         if (!folder?.conversationIds.includes(c.id)) return false;
       }
       if (waFilter === 'manual' && !c.autoReplyPaused) return false;
       if (waFilter === 'auto' && c.autoReplyPaused) return false;
+      if (waFilter === 'expired' && !isWAConversationOutside24h(c, now)) return false;
       if (waSearch) {
         const q = waSearch.toLowerCase();
         if (!c.contactName.toLowerCase().includes(q) && !c.contactPhone.includes(q)) return false;
@@ -2139,6 +2493,7 @@ const Automations = () => {
     });
     const currentConv = waConversations.find(c => c.id === selectedWAContact);
     const currentMessages = currentConv?.messages || [];
+    const waManualSendBlocked = currentConv ? isWAConversationOutside24h(currentConv, now) : false;
 
     return (
       <>
@@ -2237,6 +2592,16 @@ const Automations = () => {
                       className="w-full px-3 py-1.5 text-xs rounded-md border border-border bg-background text-foreground placeholder:text-muted-foreground focus:outline-none focus:ring-1 focus:ring-ring"
                     />
                     <p className="text-[10px] text-muted-foreground mt-0.5">ID de la cuenta de WhatsApp Business. Se detecta automáticamente si se deja vacío.</p>
+                  </div>
+                  <div>
+                    <label className="block text-xs font-medium text-foreground mb-1">Email de alerta (opcional)</label>
+                    <input
+                      type="email"
+                      value={waManualAlertEmail}
+                      onChange={e => setWaManualAlertEmail(e.target.value)}
+                      placeholder="Email de alerta (opcional)"
+                      className="w-full px-3 py-1.5 text-xs rounded-md border border-border bg-background text-foreground placeholder:text-muted-foreground focus:outline-none focus:ring-1 focus:ring-ring"
+                    />
                   </div>
                 </div>
 
@@ -2449,6 +2814,13 @@ const Automations = () => {
             <button onClick={() => setShowWaCorreosConsultas(true)} className="flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium rounded-md border border-border bg-card hover:bg-accent text-foreground transition-colors">
               <Phone className="h-3.5 w-3.5" />Correos consulta
             </button>
+            <button
+              onClick={() => { setShowWhatsAppSessions(true); void refreshWhatsAppSessionState(); }}
+              className="flex items-center gap-2 px-3 py-2 text-xs font-medium rounded-lg border border-border hover:bg-accent transition-colors"
+            >
+              <Phone className="h-3.5 w-3.5" />
+              {t('automations.whatsappNumbers') || 'Números'}
+            </button>
             <button onClick={() => setShowWaClassifyModal(true)} className="flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium rounded-md border border-border bg-card hover:bg-accent text-foreground transition-colors">
               <Sparkles className="h-3.5 w-3.5" />Reglas WA
             </button>
@@ -2485,13 +2857,21 @@ const Automations = () => {
                 <input className="w-full pl-9 pr-3 py-2 text-sm bg-muted/50 border-none rounded-md text-foreground placeholder:text-muted-foreground focus:outline-none focus:ring-1 focus:ring-ring"
                   placeholder={t('automations.searchConversation')} value={waSearch} onChange={e => setWaSearch(e.target.value)} />
               </div>
-              <div className="flex gap-1">
+              <div className="grid grid-cols-4 gap-1">
                 {(['all', 'auto', 'manual'] as const).map(f => (
                   <button key={f} onClick={() => setWaFilter(f)}
-                    className={`flex-1 px-2 py-1 text-[10px] font-medium rounded-md transition-colors ${waFilter === f ? 'bg-foreground text-background' : 'bg-muted text-muted-foreground hover:bg-accent'}`}>
+                    className={`px-2 py-1 text-[10px] font-medium rounded-md transition-colors ${waFilter === f ? 'bg-foreground text-background' : 'bg-muted text-muted-foreground hover:bg-accent'}`}>
                     {f === 'all' ? t('automations.all') : f === 'auto' ? t('automations.autoReply') : t('automations.manual')}
                   </button>
                 ))}
+                <button
+                  onClick={() => setWaFilter('expired')}
+                  title={t('automations.waExpired24hFilter')}
+                  aria-label={t('automations.waExpired24hFilter')}
+                  className={`flex items-center justify-center px-2 py-1 rounded-md transition-colors ${waFilter === 'expired' ? 'bg-foreground text-background' : 'bg-muted text-muted-foreground hover:bg-accent'}`}
+                >
+                  <AlertTriangle className="h-3.5 w-3.5" />
+                </button>
               </div>
               {waFolders.length > 0 && (
                 <select value={waFolderFilter} onChange={e => setWaFolderFilter(e.target.value)}
@@ -2500,6 +2880,20 @@ const Automations = () => {
                   {waFolders.map(f => <option key={f.id} value={f.id}>{f.name}</option>)}
                 </select>
               )}
+              {(autoData.whatsappSessions || []).length > 1 && (
+                <div className="px-4 py-2 border-b border-border">
+                  <select
+                    value={whatsappNumberFilter}
+                    onChange={(e) => setWhatsappNumberFilter(e.target.value)}
+                    className="w-full text-xs bg-muted border border-border rounded-md px-2 py-1.5 text-foreground focus:outline-none"
+                  >
+                    <option value="all">Todos los números</option>
+                    {(autoData.whatsappSessions || []).filter((s: any) => s.connected).map((s: any) => (
+                      <option key={s.phoneNumberId} value={s.phoneNumberId}>{s.name || `WhatsApp ${s.phoneNumber || s.phoneNumberId}`}</option>
+                    ))}
+                  </select>
+                </div>
+              )}
             </div>
 
             <div className="flex-1 overflow-y-auto">
@@ -2507,29 +2901,34 @@ const Automations = () => {
                 <div className="p-4 text-center">
                   <p className="text-sm text-muted-foreground">{waConnected ? t('automations.waNoConversations') : t('automations.waNotConnectedHint')}</p>
                 </div>
-              ) : filteredConvs.map((conv) => (
-                <button key={conv.id} onClick={() => { setSelectedWAContact(conv.id); markWaRead(conv.id); if (isMobile) setShowConvPanel(false); }}
-                  className={`w-full text-left p-3 border-b border-border/50 hover:bg-accent/50 transition-colors ${selectedWAContact === conv.id ? "bg-accent" : ""}`}>
-                  <div className="flex items-start justify-between gap-2">
-                    <div className="flex items-center gap-3 min-w-0">
-                      <div className="h-9 w-9 rounded-full bg-muted flex items-center justify-center shrink-0">
-                        <span className="text-xs font-semibold text-foreground">{conv.contactName.split(" ").map((n: string) => n[0]).join("").slice(0, 2)}</span>
+              ) : filteredConvs.map((conv) => {
+                const isOutside24h = isWAConversationOutside24h(conv, now);
+
+                return (
+                  <button key={conv.id} onClick={() => { setSelectedWAContact(conv.id); markWaRead(conv.id); if (isMobile) setShowConvPanel(false); }}
+                    className={`w-full text-left p-3 border-b border-border/50 hover:bg-accent/50 transition-colors ${selectedWAContact === conv.id ? "bg-accent" : ""}`}>
+                    <div className="flex items-start justify-between gap-2">
+                      <div className="flex items-center gap-3 min-w-0">
+                        <div className="h-9 w-9 rounded-full bg-muted flex items-center justify-center shrink-0">
+                          <span className="text-xs font-semibold text-foreground">{conv.contactName.split(" ").map((n: string) => n[0]).join("").slice(0, 2)}</span>
+                        </div>
+                        <div className="min-w-0">
+                          <p className="text-sm font-medium text-foreground truncate">{conv.contactName}</p>
+                          <p className="text-xs text-muted-foreground truncate">{conv.messages.length > 0 ? conv.messages[conv.messages.length - 1].text : ''}</p>
+                        </div>
                       </div>
-                      <div className="min-w-0">
-                        <p className="text-sm font-medium text-foreground truncate">{conv.contactName}</p>
-                        <p className="text-xs text-muted-foreground truncate">{conv.messages.length > 0 ? conv.messages[conv.messages.length - 1].text : ''}</p>
+                      <div className="flex flex-col items-end gap-1 shrink-0">
+                        <span className="text-[10px] text-muted-foreground">{conv.lastMessageTime ? formatTime(conv.lastMessageTime) : ''}</span>
+                        {conv.unread > 0 && (
+                          <span className="h-4 min-w-4 px-1 rounded-full bg-foreground text-background text-[10px] font-bold flex items-center justify-center">{conv.unread}</span>
+                        )}
+                        {isOutside24h && <AlertTriangle className="h-3 w-3 text-amber-500" title={t('automations.waExpired24hFilter')} />}
+                        {conv.autoReplyPaused && <PauseCircle className="h-3 w-3 text-yellow-500" />}
                       </div>
                     </div>
-                    <div className="flex flex-col items-end gap-1 shrink-0">
-                      <span className="text-[10px] text-muted-foreground">{conv.lastMessageTime ? formatTime(conv.lastMessageTime) : ''}</span>
-                      {conv.unread > 0 && (
-                        <span className="h-4 min-w-4 px-1 rounded-full bg-foreground text-background text-[10px] font-bold flex items-center justify-center">{conv.unread}</span>
-                      )}
-                      {conv.autoReplyPaused && <PauseCircle className="h-3 w-3 text-yellow-500" />}
-                    </div>
-                  </div>
-                </button>
-              ))}
+                  </button>
+                );
+              })}
             </div>
           </div>
 
@@ -2577,7 +2976,7 @@ const Automations = () => {
                             {msg.attachments.map((att) => {
                               const isAudio = att.mimeType?.startsWith('audio/');
                               const isImage = att.mimeType?.startsWith('image/');
-                              const fileUrl = `${WA_API}/wa-attachments/${encodeURIComponent(att.filename)}`;
+                              const fileUrl = `${WA_API}/wa-attachments/${encodeURIComponent(att.filename)}?accountId=${accountId}`;
                               if (isAudio) {
                                 return (
                                   <div key={att.id}>
@@ -2620,6 +3019,11 @@ const Automations = () => {
 
                 {/* Input area */}
                 <div className="p-3 border-t border-border bg-card">
+                  {waManualSendBlocked && (
+                    <div className="mb-2 rounded-md border border-amber-300 bg-amber-50 px-3 py-2 text-xs text-amber-700">
+                      Meta bloquea los mensajes manuales libres cuando han pasado más de 24 horas desde el último mensaje del cliente. El cliente debe volver a escribir para reabrir la ventana.
+                    </div>
+                  )}
                   {pendingFiles.length > 0 && (
                     <div className="flex flex-wrap gap-2 mb-2">
                       {pendingFiles.map((f, i) => (
@@ -2632,12 +3036,13 @@ const Automations = () => {
                   )}
                   <div className="flex items-center gap-2">
                     <button onClick={() => { const input = document.createElement('input'); input.type = 'file'; input.multiple = true; input.onchange = (e) => { const files = (e.target as HTMLInputElement).files; if (files) setPendingFiles(prev => [...prev, ...Array.from(files)]); }; input.click(); }}
-                      className="p-2 rounded-md hover:bg-accent text-muted-foreground"><Paperclip className="h-4 w-4" /></button>
+                      disabled={!waConnected || waManualSendBlocked}
+                      className="p-2 rounded-md hover:bg-accent text-muted-foreground disabled:opacity-50 disabled:cursor-not-allowed"><Paperclip className="h-4 w-4" /></button>
                     <input className="flex-1 px-3 py-2 text-sm bg-muted/50 border-none rounded-md text-foreground placeholder:text-muted-foreground focus:outline-none focus:ring-1 focus:ring-ring"
-                      placeholder={t('automations.writeMessage')} value={messageInput} onChange={(e) => setMessageInput(e.target.value)}
+                      placeholder={waManualSendBlocked ? 'Bloqueado por Meta hasta que el cliente vuelva a escribir' : t('automations.writeMessage')} value={messageInput} onChange={(e) => setMessageInput(e.target.value)}
                       onKeyDown={(e) => { if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); sendWaMessage(); } }}
-                      disabled={!waConnected} />
-                    <button onClick={sendWaMessage} disabled={!waConnected || (!messageInput.trim() && pendingFiles.length === 0)}
+                      disabled={!waConnected || waManualSendBlocked} />
+                    <button onClick={sendWaMessage} disabled={!waConnected || waManualSendBlocked || (!messageInput.trim() && pendingFiles.length === 0)}
                       className="p-2 rounded-md bg-foreground text-background hover:opacity-90 transition-opacity disabled:opacity-50"><Send className="h-4 w-4" /></button>
                   </div>
                 </div>
@@ -2844,12 +3249,104 @@ const Automations = () => {
           </Modal>
         )}
 
+        {showWhatsAppSessions && (
+          <Modal title={t('automations.whatsappNumbersTitle') || 'Números de WhatsApp'} onClose={() => setShowWhatsAppSessions(false)}>
+            <div className="flex items-center justify-between mb-5">
+              <span className="text-xs text-muted-foreground">
+                {(autoData.whatsappSessions || []).length} {(autoData.whatsappSessions || []).length !== 1 ? "números" : "número"}
+              </span>
+              <button
+                onClick={() => setShowAddWaSession(true)}
+                className="flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium rounded-md bg-foreground text-background hover:opacity-90"
+              >
+                <Plus className="h-3.5 w-3.5" />{t('automations.add') || 'Añadir'}
+              </button>
+            </div>
+            {showAddWaSession && (
+              <div className="mb-5 p-4 border border-border rounded-lg bg-muted/20 space-y-3">
+                <input
+                  placeholder="Nombre (ej: WhatsApp Penal)"
+                  value={waSessionForm.name}
+                  onChange={(e) => setWaSessionForm({ ...waSessionForm, name: e.target.value })}
+                  className="w-full px-3 py-2 text-sm rounded-md border border-border bg-card text-foreground placeholder:text-muted-foreground focus:outline-none focus:ring-1 focus:ring-ring"
+                />
+                <input
+                  placeholder="Access Token de Meta"
+                  value={waSessionForm.accessToken}
+                  onChange={(e) => setWaSessionForm({ ...waSessionForm, accessToken: e.target.value })}
+                  className="w-full px-3 py-2 text-sm rounded-md border border-border bg-card text-foreground placeholder:text-muted-foreground focus:outline-none focus:ring-1 focus:ring-ring"
+                />
+                <input
+                  placeholder="Phone Number ID"
+                  value={waSessionForm.phoneNumberId}
+                  onChange={(e) => setWaSessionForm({ ...waSessionForm, phoneNumberId: e.target.value })}
+                  className="w-full px-3 py-2 text-sm rounded-md border border-border bg-card text-foreground placeholder:text-muted-foreground focus:outline-none focus:ring-1 focus:ring-ring"
+                />
+                <input
+                  placeholder="WABA ID (opcional)"
+                  value={waSessionForm.wabaId}
+                  onChange={(e) => setWaSessionForm({ ...waSessionForm, wabaId: e.target.value })}
+                  className="w-full px-3 py-2 text-sm rounded-md border border-border bg-card text-foreground placeholder:text-muted-foreground focus:outline-none focus:ring-1 focus:ring-ring"
+                />
+                <input
+                  placeholder="Email de alerta (opcional)"
+                  type="email"
+                  value={waSessionForm.alertEmail}
+                  onChange={(e) => setWaSessionForm({ ...waSessionForm, alertEmail: e.target.value })}
+                  className="w-full px-3 py-2 text-sm rounded-md border border-border bg-card text-foreground placeholder:text-muted-foreground focus:outline-none focus:ring-1 focus:ring-ring"
+                />
+                <div className="flex gap-2 justify-end">
+                  <button onClick={() => setShowAddWaSession(false)} className="px-3 py-1.5 text-xs rounded-md border border-border hover:bg-accent text-muted-foreground">{t('automations.cancel') || 'Cancelar'}</button>
+                  <button onClick={saveWaSession} className="px-3 py-1.5 text-xs rounded-md bg-foreground text-background hover:opacity-90">{t('automations.save') || 'Guardar'}</button>
+                </div>
+              </div>
+            )}
+            {(autoData.whatsappSessions || []).length === 0
+              ? <p className="text-sm text-muted-foreground text-center py-6">{t('automations.noWhatsAppNumbers') || 'No hay números configurados'}</p>
+              : <div className="space-y-3">
+                  {(autoData.whatsappSessions || []).map((s: any) => {
+                    const status = getTokenStatus(s.tokenExpiresAt);
+                    return (
+                      <div key={s.phoneNumberId || s.id} className="flex items-center justify-between p-4 border border-border rounded-lg bg-muted/20">
+                        <div className="flex-1">
+                          <div className="flex items-center gap-2">
+                            <p className="text-sm font-medium text-foreground">{s.name || `WhatsApp ${s.phoneNumber || ''}`}</p>
+                            <span className={`text-xs font-medium ${status.color}`}>● {status.label}</span>
+                          </div>
+                          <p className="text-xs text-muted-foreground">{s.phoneNumber || s.phoneNumberId}</p>
+                          <div className="flex items-center gap-3 mt-1">
+                            <p className="text-xs text-muted-foreground">
+                              {s.connected ? <span className="text-green-400">Conectado</span> : <span className="text-red-400">Desconectado</span>}
+                            </p>
+                            {s.alertEmail && <p className="text-xs text-muted-foreground">Alerta: {s.alertEmail}</p>}
+                          </div>
+                        </div>
+                        <div className="flex items-center gap-2">
+                          {s.connected && s.phoneNumberId && (
+                            <button
+                              onClick={() => refreshWaToken(s.phoneNumberId)}
+                              className="px-2 py-1 text-xs rounded-md border border-border hover:bg-accent text-muted-foreground"
+                              title="Renovar token"
+                            >
+                              Renovar
+                            </button>
+                          )}
+                          <button onClick={() => deleteWaSession(s.phoneNumberId)} className="p-1.5 rounded-md hover:bg-destructive/10 text-muted-foreground hover:text-destructive"><Trash2 className="h-3.5 w-3.5" /></button>
+                        </div>
+                      </div>
+                    );
+                  })}
+                </div>}
+          </Modal>
+        )}
+
       </>
     );
   }
 
   return (
     <div className="p-4 md:p-8 max-w-5xl mx-auto">
+      <ModuleGuide moduleId="automations" />
       <div className="mb-6 md:mb-8">
         <h1 className="text-2xl font-semibold tracking-tight text-foreground">{t('nav.automations')}</h1>
         <p className="text-sm text-muted-foreground mt-1">{t('automations.manageChannels')}</p>
@@ -2877,6 +3374,9 @@ const Automations = () => {
               </div>
             </div>
             <p className="text-xs text-muted-foreground mb-3">{t('automations.customAutomationInfo')}</p>
+            <div className="mb-3 rounded-md border border-amber-200 bg-amber-50 px-3 py-2 text-xs text-amber-800">
+              {t('automations.customAutomationExtraNotice')}
+            </div>
             <div className="flex items-center justify-between mb-3">
               <span className="inline-flex items-center gap-1 px-2 py-1 rounded-md bg-muted text-xs font-semibold text-foreground">{t('automations.customAutomationPrice')}</span>
             </div>

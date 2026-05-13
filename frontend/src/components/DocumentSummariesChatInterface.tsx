@@ -1,5 +1,5 @@
 import { useState, useRef, useEffect } from "react";
-import { Send, Paperclip, Loader2, X, FileText, Trash2, StopCircle, Brain, FolderOpen } from "lucide-react";
+import { Send, Paperclip, Loader2, X, FileText, Trash2, StopCircle, Brain, FolderOpen, Flag } from "lucide-react";
 import ReactMarkdown from "react-markdown";
 import { useTranslation } from "react-i18next";
 import { useToast } from "@/components/ui/use-toast";
@@ -21,10 +21,12 @@ interface Message {
   id: string;
   role: "user" | "assistant";
   content: string;
+  reasoning?: string;
   metadata?: {
     type?: "text" | "files_uploaded";
     uploadedFiles?: UploadedFile[];
   };
+  flags?: Array<{ id: string }>;
 }
 
 interface DocumentSummariesChatInterfaceProps {
@@ -66,7 +68,10 @@ const DocumentSummariesChatInterface = ({
   const fileRef = useRef<HTMLInputElement>(null);
   const chatIdRef = useRef<string | null>(null);
   const streamPollingRef = useRef<ReturnType<typeof setInterval> | null>(null);
-  const { streamingText, isStreaming, startStream, cancelStream } = useStreamingChat();
+  const { streamingText, streamingReasoning, isStreaming, startStream, cancelStream } = useStreamingChat();
+  const pendingReasoningRef = useRef('');
+  const [showFlagPanel, setShowFlagPanel] = useState(false);
+  const [highlightedMsgId, setHighlightedMsgId] = useState<string | null>(null);
 
   // Mantener ref sincronizado
   useEffect(() => { chatIdRef.current = chatId; }, [chatId]);
@@ -304,6 +309,39 @@ const DocumentSummariesChatInterface = ({
     setIsLoading(false);
   };
 
+  const toggleFlag = async (messageId: string) => {
+    const msg = messages.find(m => m.id === messageId);
+    if (!msg) return;
+    const isFlagged = msg.flags && msg.flags.length > 0;
+    const currentChatId = chatId || '';
+    try {
+      if (isFlagged) {
+        const flagId = msg.flags[msg.flags.length - 1].id;
+        const res = await authFetch(`${import.meta.env.VITE_API_URL}/flags/summaries/${currentChatId}/messages/${messageId}/flags/${flagId}`, { method: 'DELETE' });
+        if (res.ok) {
+          const data = await res.json();
+          setMessages(prev => prev.map(m => m.id === messageId ? { ...m, flags: data.flags } : m));
+        }
+      } else {
+        const res = await authFetch(`${import.meta.env.VITE_API_URL}/flags/summaries/${currentChatId}/messages/${messageId}`, { method: 'POST' });
+        if (res.ok) {
+          const data = await res.json();
+          setMessages(prev => prev.map(m => m.id === messageId ? { ...m, flags: data.flags } : m));
+        }
+      }
+    } catch (err) { console.error(err); }
+  };
+
+  const scrollToMessage = (messageId: string) => {
+    const el = document.getElementById(`msg-${messageId}`);
+    if (el) {
+      el.scrollIntoView({ behavior: 'smooth', block: 'center' });
+      setHighlightedMsgId(messageId);
+      setTimeout(() => setHighlightedMsgId(null), 2000);
+      setShowFlagPanel(false);
+    }
+  };
+
   const send = async () => {
     // Validar que haya algo que enviar
     if ((!input.trim() && pendingFiles.length === 0) || isLoading) return;
@@ -441,9 +479,11 @@ const DocumentSummariesChatInterface = ({
         const currentMsgCount = messages.length + (userMessage ? 1 : 0);
         sessionStorage.setItem(`streaming_summaries_${currentChatId}`, String(currentMsgCount));
 
+        pendingReasoningRef.current = '';
         await startStream({
           endpoint: `/summaries/chat/${currentChatId}/message/stream`,
           body: { content: userMessage, ...(ragEnabled ? { ragEnabled: true } : {}) },
+          onDoneReasoning: (fullReasoning) => { pendingReasoningRef.current = fullReasoning; },
           onDone: (fullText) => {
             // Limpiar flag de streaming
             const doneChatId = chatIdRef.current;
@@ -452,8 +492,9 @@ const DocumentSummariesChatInterface = ({
             const content = ragEnabled ? `${fullText}\n<!-- rag-enhanced -->` : fullText;
             setMessages((prev) => [
               ...prev,
-              { id: `ai-${Date.now()}`, role: "assistant", content },
+              { id: `ai-${Date.now()}`, role: "assistant", content, reasoning: pendingReasoningRef.current || undefined },
             ]);
+            pendingReasoningRef.current = '';
             setIsLoading(false);
             if (isNewChat && onChatCreated) onChatCreated(currentChatId!);
             if (onMessagesChanged) onMessagesChanged();
@@ -546,17 +587,33 @@ const DocumentSummariesChatInterface = ({
       )}
 
       {/* Header */}
-      <div className="border-b border-border p-4 md:p-6">
-        <h2 className="text-lg md:text-xl font-semibold text-foreground">
-          {t('docChat.headerTitle')}
-        </h2>
-        <p className="text-sm text-muted-foreground mt-1">
-          {uploadedFiles.length > 0 
-            ? `${t('docChat.subtitleLoaded', { count: uploadedFiles.length })}${pendingFiles.length > 0 ? ` + ${pendingFiles.length} pendiente(s)` : ''}`
-            : pendingFiles.length > 0
-              ? t('docChat.subtitlePending', { count: pendingFiles.length })
-              : t('docChat.subtitleDefault')}
-        </p>
+      <div className="border-b border-border p-4 md:p-6 relative">
+        <div className="flex items-center justify-between">
+          <div>
+            <h2 className="text-lg md:text-xl font-semibold text-foreground">
+              {t('docChat.headerTitle')}
+            </h2>
+            <p className="text-sm text-muted-foreground mt-1">
+              {uploadedFiles.length > 0 
+                ? `${t('docChat.subtitleLoaded', { count: uploadedFiles.length })}${pendingFiles.length > 0 ? ` + ${pendingFiles.length} pendiente(s)` : ''}`
+                : pendingFiles.length > 0
+                  ? t('docChat.subtitlePending', { count: pendingFiles.length })
+                  : t('docChat.subtitleDefault')}
+            </p>
+          </div>
+          <button
+            onClick={() => setShowFlagPanel(!showFlagPanel)}
+            className="p-2 rounded-lg hover:bg-muted text-muted-foreground transition-colors relative"
+            title="Mensajes marcados"
+          >
+            <Flag size={18} />
+            {messages.filter(m => m.flags && m.flags.length > 0).length > 0 && (
+              <span className="absolute -top-1 -right-1 h-4 w-4 bg-yellow-500 text-[10px] text-black rounded-full flex items-center justify-center font-bold">
+                {messages.filter(m => m.flags && m.flags.length > 0).length}
+              </span>
+            )}
+          </button>
+        </div>
       </div>
 
       {/* Messages */}
@@ -584,12 +641,24 @@ const DocumentSummariesChatInterface = ({
           >
             <div className="max-w-[85%] md:max-w-[70%]">
               <div
-                className={`rounded-lg px-4 py-3 text-sm leading-relaxed ${
+                id={`msg-${msg.id}`}
+                className={`rounded-lg px-4 py-3 text-sm relative group transition-all ${highlightedMsgId === msg.id ? 'ring-2 ring-yellow-500' : ''} ${msg.flags && msg.flags.length > 0 ? 'border-l-2 border-l-yellow-500' : ''} ${
                   msg.role === "user"
                     ? "bg-chat-user text-chat-user-foreground"
                     : "bg-chat-ai text-chat-ai-foreground prose prose-sm dark:prose-invert prose-p:my-1 prose-ul:my-1 prose-ol:my-1"
                 }`}
               >
+                {msg.role === 'assistant' && msg.reasoning && (
+                  <details className="mb-2 not-prose">
+                    <summary className="text-xs text-muted-foreground cursor-pointer select-none flex items-center gap-1.5 list-none">
+                      <Brain className="h-3 w-3" />
+                      <span>Pensando...</span>
+                    </summary>
+                    <div className="mt-1.5 text-xs text-muted-foreground/80 font-mono whitespace-pre-wrap border-t border-border/40 pt-1.5" style={{ maxHeight: '4.5em', overflowY: 'auto' }}>
+                      {msg.reasoning}
+                    </div>
+                  </details>
+                )}
                 {msg.role === "assistant" ? (
                   <ReactMarkdown>{displayContent}</ReactMarkdown>
                 ) : (
@@ -601,6 +670,13 @@ const DocumentSummariesChatInterface = ({
                     <span className="text-[10px] text-muted-foreground">{t('improveAI.ragUsed')}</span>
                   </div>
                 )}
+                <button
+                  onClick={() => toggleFlag(msg.id)}
+                  className="absolute top-1 right-1 p-1 rounded opacity-0 group-hover:opacity-100 transition-opacity hover:bg-black/10"
+                  title={msg.flags && msg.flags.length > 0 ? 'Desmarcar' : 'Marcar'}
+                >
+                  <Flag size={14} className={msg.flags && msg.flags.length > 0 ? 'text-yellow-500 fill-yellow-500' : 'text-muted-foreground'} />
+                </button>
               </div>
 
               {/* Mostrar archivos subidos en el mensaje */}
@@ -652,9 +728,20 @@ const DocumentSummariesChatInterface = ({
             </div>
           </div>
         )}
-        {isStreaming && streamingText && (
+        {isStreaming && (streamingText || streamingReasoning) && (
           <div className="flex justify-start">
             <div className="max-w-[85%] md:max-w-[70%] rounded-lg px-4 py-3 text-sm leading-relaxed prose prose-sm dark:prose-invert prose-p:my-1 prose-ul:my-1 prose-ol:my-1 bg-chat-ai text-chat-ai-foreground">
+              {streamingReasoning && (
+                <details className="mb-2 not-prose" open>
+                  <summary className="text-xs text-muted-foreground cursor-pointer select-none flex items-center gap-1.5 list-none">
+                    <Brain className="h-3 w-3" />
+                    <span>Pensando...</span>
+                  </summary>
+                  <div className="mt-1.5 text-xs text-muted-foreground/80 font-mono whitespace-pre-wrap border-t border-border/40 pt-1.5" style={{ maxHeight: '4.5em', overflowY: 'auto' }}>
+                    {streamingReasoning}
+                  </div>
+                </details>
+              )}
               <ReactMarkdown>{streamingText}</ReactMarkdown>
             </div>
           </div>
@@ -748,6 +835,40 @@ const DocumentSummariesChatInterface = ({
           </button>
         </div>
       </div>
+      {/* Flag Panel Drawer */}
+      {showFlagPanel && (
+        <div className="absolute top-0 right-0 h-full w-80 bg-card border-l border-border z-30 flex flex-col shadow-xl">
+          <div className="flex items-center justify-between p-4 border-b">
+            <h3 className="font-semibold flex items-center gap-2">
+              <Flag size={16} className="text-yellow-500" />
+              Mensajes marcados ({messages.filter(m => m.flags && m.flags.length > 0).length})
+            </h3>
+            <button onClick={() => setShowFlagPanel(false)} className="p-1 rounded hover:bg-muted">
+              <X size={16} />
+            </button>
+          </div>
+          <div className="flex-1 overflow-y-auto p-3 space-y-2">
+            {messages.filter(m => m.flags && m.flags.length > 0).length === 0 ? (
+              <p className="text-sm text-muted-foreground text-center py-8">No hay mensajes marcados</p>
+            ) : (
+              messages.filter(m => m.flags && m.flags.length > 0).map((msg) => (
+                <button
+                  key={msg.id}
+                  onClick={() => scrollToMessage(msg.id)}
+                  className="w-full text-left p-3 rounded-lg bg-muted/50 hover:bg-muted transition-colors"
+                >
+                  <div className="flex items-center gap-2 mb-1">
+                    <span className={`text-[10px] px-1.5 py-0.5 rounded ${msg.role === 'user' ? 'bg-primary/20 text-primary' : 'bg-muted-foreground/20 text-muted-foreground'}`}>
+                      {msg.role === 'user' ? 'Tú' : 'Lyra'}
+                    </span>
+                  </div>
+                  <p className="text-xs text-muted-foreground line-clamp-2">{msg.content.substring(0, 120)}...</p>
+                </button>
+              ))
+            )}
+          </div>
+        </div>
+      )}
     </div>
   );
 };

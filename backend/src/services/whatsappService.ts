@@ -3,10 +3,20 @@ import crypto from 'crypto';
 import fs from 'fs';
 import path from 'path';
 import { fileURLToPath } from 'url';
-import { AI_MODEL } from '../config/aiModel.js';
+import { AI_AUTOMATION_MODEL } from '../config/aiModel.js';
+import { stripThinkTags } from './aiService.js';
 import { Automation } from '../models/Automation.js';
-import { sendEmailViaCuenta, type CuentaCorreoConfig } from './emailService.js';
-import { decryptPassword, encryptPassword } from './emailProcessorService.js';
+import { sendEmail, sendEmailViaCuenta, type CuentaCorreoConfig } from './emailService.js';
+import { getAutomationMessage, resolveAutomationLanguage } from './automationMessages.js';
+import {
+  assignWhatsAppCase,
+  decryptPassword,
+  detectExplicitAssignmentRequest,
+  encryptPassword,
+  hasMatchingSpecialist,
+  interpretClientConfirmation,
+} from './emailProcessorService.js';
+import { createCaseFromWhatsApp } from './casesService.js';
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
@@ -15,10 +25,19 @@ function stripTrailingSlash(value: string): string {
   return value.replace(/\/+$/, '');
 }
 
+function getBackendPublicUrl(): string {
+  const value = stripTrailingSlash(String(process.env.BACKEND_PUBLIC_URL || '').trim());
+  if (!/^https?:\/\//i.test(value)) {
+    throw new Error('BACKEND_PUBLIC_URL no configurado o inválido');
+  }
+  return value;
+}
+
 const META_API_VERSION = process.env.WHATSAPP_META_API_VERSION || 'v22.0';
 const META_GRAPH_BASE = `https://graph.facebook.com/${META_API_VERSION}`;
-const BACKEND_URL = stripTrailingSlash(process.env.BACKEND_PUBLIC_URL || `http://localhost:${process.env.PORT || 3000}`);
 const WA_ATTACHMENTS_DIR = path.join(__dirname, '../../uploads/wa-attachments');
+const WA_PUBLIC_ATTACHMENT_TTL_MS = 15 * 60 * 1000;
+const WA_CUSTOMER_CARE_WINDOW_MS = 24 * 60 * 60 * 1000;
 
 if (!fs.existsSync(WA_ATTACHMENTS_DIR)) fs.mkdirSync(WA_ATTACHMENTS_DIR, { recursive: true });
 
@@ -56,11 +75,61 @@ function getMetaAppSecret(): string {
 }
 
 function getMetaRedirectUri(): string {
-  return process.env.WHATSAPP_META_REDIRECT_URI || `${BACKEND_URL}/api/whatsapp/meta/callback`;
+  return process.env.WHATSAPP_META_REDIRECT_URI || `${getBackendPublicUrl()}/api/whatsapp/meta/callback`;
 }
 
 function accountIdFromInstanceName(instanceName: string): string {
   return instanceName.startsWith('lyrium_') ? instanceName.slice('lyrium_'.length) : instanceName;
+}
+
+function normalizePhone(phone: string): string {
+  return phone.replace(/\D/g, '');
+}
+
+function createAutomationClientId(): string {
+  return `client_${crypto.randomUUID()}`;
+}
+
+interface FindOrCreateClientResult {
+  client: any;
+  created: boolean;
+}
+
+async function findOrCreateClient(
+  accountId: string,
+  email: undefined,
+  phone: string,
+  name: string,
+  preferredId?: string,
+): Promise<FindOrCreateClientResult> {
+  const Client = (await import('../models/Client.js')).Client;
+
+  const normalizedPhone = normalizePhone(phone);
+
+  let existingClient = await Client.findOne({
+    accountId,
+    phone: { $regex: new RegExp(`^${normalizedPhone}$`, 'i') },
+  });
+
+  if (existingClient) {
+    await Client.findByIdAndUpdate(existingClient._id, {
+      $inc: { cases: 1 },
+    });
+    return { client: existingClient, created: false };
+  }
+
+  const newClient = await Client.create({
+    _id: preferredId || createAutomationClientId(),
+    accountId,
+    name: name || phone,
+    email: '',
+    phone: phone,
+    status: 'abierto',
+    cases: 1,
+    autoCreated: true,
+  });
+
+  return { client: newClient, created: true };
 }
 
 function sanitizePhone(phone: string): string {
@@ -101,6 +170,91 @@ async function graphFetchBuffer(url: string, token: string): Promise<Buffer> {
   return Buffer.from(arr);
 }
 
+async function fetchAccessibleWhatsAppBusinesses(accessToken: string): Promise<any[]> {
+  const wabas: any[] = [];
+  const seen = new Set<string>();
+
+  try {
+    const directResp = await graphFetchJson<any>('/me/whatsapp_business_accounts', accessToken);
+    for (const entry of Array.isArray(directResp?.data) ? directResp.data : []) {
+      if (entry?.id && !seen.has(entry.id)) {
+        seen.add(entry.id);
+        wabas.push(entry);
+      }
+    }
+  } catch {
+    // User tokens from FB.login often fail here; fallback below.
+  }
+
+  if (wabas.length > 0) return wabas;
+
+  const bizResp = await graphFetchJson<any>('/me/businesses', accessToken);
+  const businesses: any[] = Array.isArray(bizResp?.data) ? bizResp.data : [];
+  for (const biz of businesses) {
+    try {
+      const bwabaResp = await graphFetchJson<any>(`/${biz.id}/whatsapp_business_accounts`, accessToken);
+      for (const entry of Array.isArray(bwabaResp?.data) ? bwabaResp.data : []) {
+        if (entry?.id && !seen.has(entry.id)) {
+          seen.add(entry.id);
+          wabas.push(entry);
+        }
+      }
+    } catch {
+      // Try next business.
+    }
+  }
+
+  return wabas;
+}
+
+async function resolveSingleMetaWaba(accessToken: string): Promise<any> {
+  const wabas = await fetchAccessibleWhatsAppBusinesses(accessToken);
+  if (wabas.length === 0) {
+    throw new Error('No se encontró ninguna cuenta de WhatsApp Business en Meta. Asegúrate de que tu cuenta de Meta tiene una cuenta de WhatsApp Business vinculada.');
+  }
+  if (wabas.length > 1) {
+    throw new Error('Meta devolvió varias cuentas de WhatsApp Business. Usa la conexión manual indicando WABA ID y Phone Number ID para evitar enlazar el número equivocado.');
+  }
+  return wabas[0];
+}
+
+async function resolveSingleMetaPhone(accessToken: string, wabaId: string): Promise<any> {
+  const phoneResp = await graphFetchJson<any>(`/${wabaId}/phone_numbers?fields=id,display_phone_number,verified_name`, accessToken);
+  const phones = Array.isArray(phoneResp?.data) ? phoneResp.data : [];
+  if (phones.length === 0) {
+    throw new Error('No se encontró ningún número en la cuenta de WhatsApp Business');
+  }
+  if (phones.length > 1) {
+    throw new Error('Meta devolvió varios números de WhatsApp para esta cuenta. Usa la conexión manual indicando Phone Number ID para evitar enlazar el número equivocado.');
+  }
+  return phones[0];
+}
+
+async function inspectMetaToken(accessToken: string): Promise<{ tokenExpiresAt?: string; tokenType?: 'short' | 'long' }> {
+  try {
+    const appAccessToken = `${getMetaAppId()}|${getMetaAppSecret()}`;
+    const debugUrl = new URL(`${META_GRAPH_BASE}/debug_token`);
+    debugUrl.searchParams.set('input_token', accessToken);
+    debugUrl.searchParams.set('access_token', appAccessToken);
+
+    const res = await fetch(debugUrl.toString());
+    if (!res.ok) return {};
+
+    const data = await res.json().catch(() => ({}));
+    const expiresAtUnix = Number(data?.data?.expires_at || 0);
+    if (!Number.isFinite(expiresAtUnix) || expiresAtUnix <= 0) return {};
+
+    const tokenExpiresAt = new Date(expiresAtUnix * 1000).toISOString();
+    const remainingMs = expiresAtUnix * 1000 - Date.now();
+    return {
+      tokenExpiresAt,
+      tokenType: remainingMs > 24 * 60 * 60 * 1000 ? 'long' : 'short',
+    };
+  } catch {
+    return {};
+  }
+}
+
 function getMediaTypeLabelByType(type: string): string {
   if (type === 'audio') return '🔊 Audio';
   if (type === 'image') return '📷 Imagen';
@@ -130,12 +284,115 @@ function isMediaMessage(msg: any): boolean {
 
 async function findAccountByPhoneNumberId(phoneNumberId: string): Promise<any | null> {
   if (!phoneNumberId) return null;
-  return Automation.findOne({ 'whatsappSession.phoneNumberId': phoneNumberId });
+  return Automation.findOne({ 'whatsappSessions.phoneNumberId': phoneNumberId });
 }
 
-function getSessionToken(account: any): string {
-  const encrypted = account?.whatsappSession?.accessToken || '';
+function resolveWhatsAppSession(account: any, phoneNumberId?: string, instanceName?: string): any | null {
+  if (phoneNumberId) {
+    const exactSession = (account?.whatsappSessions || []).find((session: any) => session.phoneNumberId === phoneNumberId);
+    if (exactSession) return exactSession;
+    if (account?.whatsappSession?.phoneNumberId === phoneNumberId) return account.whatsappSession;
+    return null;
+  }
+
+  if (instanceName) {
+    const matchingInstance = (account?.whatsappSessions || []).find((session: any) => session.instanceName === instanceName);
+    if (matchingInstance) return matchingInstance;
+    if (account?.whatsappSession?.instanceName === instanceName) return account.whatsappSession;
+  }
+
+  return account?.whatsappSessions?.find((session: any) => session.connected) || account?.whatsappSession || null;
+}
+
+function getSessionToken(account: any, session?: any): string {
+  const resolvedSession = session || resolveWhatsAppSession(account);
+  const encrypted = resolvedSession?.accessToken || '';
   return decryptPassword(encrypted);
+}
+
+function toCuentaConfig(cuentaCorreo: any): CuentaCorreoConfig {
+  return {
+    plataforma: cuentaCorreo.plataforma,
+    correo: cuentaCorreo.correo,
+    password: decryptPassword(cuentaCorreo.password),
+    customSmtpHost: cuentaCorreo.customSmtpHost,
+    customSmtpPort: cuentaCorreo.customSmtpPort,
+    customImapHost: cuentaCorreo.customImapHost,
+    customImapPort: cuentaCorreo.customImapPort,
+  };
+}
+
+function getWAAttachmentSigningSecret(): string {
+  return process.env.WHATSAPP_ATTACHMENT_SECRET || process.env.JWT_SECRET || 'lyrium-wa-attachments';
+}
+
+function createWAId(prefix: string): string {
+  return `${prefix}_${crypto.randomUUID()}`;
+}
+
+function signWAPublicAttachment(filename: string, expiresAt: number): string {
+  return crypto
+    .createHmac('sha256', getWAAttachmentSigningSecret())
+    .update(`${filename}:${expiresAt}`)
+    .digest('hex');
+}
+
+function safeHexEqual(expected: string, received: string): boolean {
+  if (!expected || !received || expected.length !== received.length) return false;
+
+  try {
+    return crypto.timingSafeEqual(Buffer.from(expected, 'hex'), Buffer.from(received, 'hex'));
+  } catch {
+    return false;
+  }
+}
+
+function isTransientMetaStatusError(err: unknown): boolean {
+  const message = String((err as any)?.message || err || '');
+  return /failed \(429\)|failed \(5\d\d\)|fetch failed|network|ECONNRESET|ETIMEDOUT|ENOTFOUND|EAI_AGAIN/i.test(message);
+}
+
+export interface WAOutgoingAttachment {
+  filename: string;
+  originalName: string;
+  mimeType: string;
+  size: number;
+}
+
+export function buildWAPublicAttachmentUrl(
+  filename: string,
+  expiresAt = Date.now() + WA_PUBLIC_ATTACHMENT_TTL_MS,
+): string {
+  const signature = signWAPublicAttachment(filename, expiresAt);
+  return `${getBackendPublicUrl()}/api/whatsapp/public-attachments/${encodeURIComponent(filename)}?exp=${expiresAt}&sig=${signature}`;
+}
+
+export function isValidWAPublicAttachmentSignature(
+  filename: string,
+  expiresAt: number,
+  signature: string,
+): boolean {
+  if (!filename || !signature || !Number.isFinite(expiresAt) || expiresAt < Date.now()) return false;
+  const expected = signWAPublicAttachment(filename, expiresAt);
+  return safeHexEqual(expected, signature);
+}
+
+function getLastIncomingConversationTimestamp(conversation: any): number | null {
+  const messages = Array.isArray(conversation?.messages) ? conversation.messages : [];
+  for (let index = messages.length - 1; index >= 0; index -= 1) {
+    const message = messages[index];
+    if (message?.sent) continue;
+
+    const timestamp = new Date(message?.time || '').getTime();
+    if (!Number.isNaN(timestamp)) return timestamp;
+  }
+  return null;
+}
+
+export function isWhatsAppConversationOutside24h(conversation: any, now = Date.now()): boolean {
+  const lastIncomingTimestamp = getLastIncomingConversationTimestamp(conversation);
+  if (lastIncomingTimestamp === null) return false;
+  return now - lastIncomingTimestamp > WA_CUSTOMER_CARE_WINDOW_MS;
 }
 
 function getKBContext(account: any): string {
@@ -150,13 +407,15 @@ function getKBContext(account: any): string {
 
 async function classifyWhatsAppMessage(
   body: string,
+  especialidades: Array<{ id: string; nombre: string; descripcion: string }> = [],
   historyContext = '',
-): Promise<{ type: 'consulta_general' | 'solicitud_servicio' | 'otro' }> {
+): Promise<{ type: 'consulta_general' | 'solicitud_servicio' | 'otro'; especialidadId?: string }> {
   try {
-    const prompt = `Clasifica este mensaje de WhatsApp del cliente en una de estas 3 categorias:\n\n1. "consulta_general" — pregunta general, solicitud de informacion, dudas sobre servicios/precios/horarios/disponibilidad, o cualquier mensaje humano con pregunta\n2. "solicitud_servicio" — quiere contratar/encargar un servicio legal concreto\n3. "otro" — spam o mensaje automatico sin contenido humano util\n\nIMPORTANTE: Si tienes duda, responde "consulta_general".\n\nResponde SOLO con JSON: {"type":"consulta_general"|"solicitud_servicio"|"otro"}${historyContext ? `\n\n${historyContext}` : ''}\n/no_think`;
+    const espList = especialidades.map((e) => `- ID: ${e.id} | Nombre: "${e.nombre}" | Descripción: "${e.descripcion}"`).join('\n');
+    const prompt = `Clasifica este mensaje de WhatsApp del cliente en una de estas 3 categorias:\n\n1. "consulta_general" — pregunta general, solicitud de informacion, dudas sobre servicios/precios/horarios/disponibilidad, o cualquier mensaje humano con pregunta\n2. "solicitud_servicio" — quiere contratar/encargar un servicio legal concreto\n3. "otro" — spam o mensaje automatico sin contenido humano util\n\nIMPORTANTE: Si tienes duda, responde "consulta_general".\n\n${especialidades.length > 0 ? `Si es "solicitud_servicio", indica qué especialidad encaja mejor de las siguientes. Si ninguna encaja, devuelve "especialidadId": null.\n${espList}\n\n` : ''}Responde SOLO con JSON: {"type":"consulta_general"|"solicitud_servicio"|"otro"${especialidades.length > 0 ? ',"especialidadId":"id o null"' : ''}}${historyContext ? `\n\n${historyContext}` : ''}\n/no_think`;
 
     const response = await getAI().chat.completions.create({
-      model: AI_MODEL,
+      model: AI_AUTOMATION_MODEL,
       messages: [
         { role: 'system', content: prompt },
         { role: 'user', content: body.substring(0, 2000) },
@@ -165,13 +424,17 @@ async function classifyWhatsAppMessage(
       temperature: 0.1,
     });
 
-    const content = (response.choices?.[0]?.message?.content || '').replace(/<think>[\s\S]*?<\/think>/gi, '').trim();
+      const content = stripThinkTags(response.choices?.[0]?.message?.content || '').trim();
     const match = content.match(/\{[\s\S]*\}/);
     if (match) {
       const parsed = JSON.parse(match[0]);
       const type = parsed?.type;
       if (type === 'consulta_general' || type === 'solicitud_servicio' || type === 'otro') {
-        return { type };
+        const especialidadId = parsed?.especialidadId;
+        return {
+          type,
+          especialidadId: especialidadId && especialidadId !== 'null' ? String(especialidadId) : undefined,
+        };
       }
     }
   } catch (err) {
@@ -179,6 +442,45 @@ async function classifyWhatsAppMessage(
   }
 
   return { type: 'consulta_general' };
+}
+
+function findPendingWhatsAppConfirmation(account: any, conversationId: string, contactPhone: string): any | null {
+  return (account.pendingConsultas || []).find((pending: any) =>
+    pending.channel === 'whatsapp'
+    && pending.type === 'confirmacion_asignacion'
+    && (
+      (pending.waConversationId && pending.waConversationId === conversationId)
+      || (pending.waContactPhone && sanitizePhone(pending.waContactPhone) === sanitizePhone(contactPhone))
+    )
+  ) || null;
+}
+
+function appendAssistantMessage(conversation: any, text: string): void {
+  conversation.messages.push({
+    id: createWAId('wa_reply'),
+    from: 'lyra',
+    text,
+    time: new Date().toISOString(),
+    sent: true,
+  });
+  conversation.lastMessageTime = new Date().toISOString();
+}
+
+async function sendAssistantText(
+  instanceName: string,
+  contactPhone: string,
+  conversation: any,
+  text: string,
+  phoneNumberId?: string,
+): Promise<boolean> {
+  try {
+    await sendTextMessage(instanceName, contactPhone, text, phoneNumberId);
+    appendAssistantMessage(conversation, text);
+    return true;
+  } catch (err) {
+    console.error('[WA] Error enviando mensaje automático:', err);
+    return false;
+  }
 }
 
 async function findAnswerInKB(
@@ -192,7 +494,7 @@ async function findAnswerInKB(
 
   try {
     const response = await getAI().chat.completions.create({
-      model: AI_MODEL,
+      model: AI_AUTOMATION_MODEL,
       messages: [
         {
           role: 'system',
@@ -207,7 +509,7 @@ async function findAnswerInKB(
       temperature: 0.3,
     });
 
-    const answer = (response.choices?.[0]?.message?.content || '').replace(/<think>[\s\S]*?<\/think>/gi, '').trim();
+    const answer = stripThinkTags(response.choices?.[0]?.message?.content || '').trim();
     if (!answer || answer.toUpperCase().includes('NO_TENGO_INFO')) {
       return { found: false, answer: null };
     }
@@ -240,13 +542,13 @@ async function applyWhatsAppClassifyRules(
 
     try {
       const response = await getAI().chat.completions.create({
-        model: AI_MODEL,
+        model: AI_AUTOMATION_MODEL,
         messages: [{ role: 'user', content: prompt }],
         max_tokens: 80,
         temperature: 0.1,
       });
 
-      const content = (response.choices?.[0]?.message?.content || '').replace(/<think>[\s\S]*?<\/think>/gi, '').trim();
+    const content = stripThinkTags(response.choices?.[0]?.message?.content || '').trim();
       const json = content.match(/\{[\s\S]*\}/);
       if (!json) continue;
 
@@ -283,16 +585,7 @@ async function forwardWhatsAppToConsultas(
   if (consultaEmails.length === 0) return false;
 
   const cuentaCorreo = (account.cuentasCorreo || [])[0];
-  if (!cuentaCorreo) {
-    console.warn('[WA] No hay cuenta de correo para reenviar consulta WhatsApp');
-    return false;
-  }
-
-  const cuentaConfig: CuentaCorreoConfig = {
-    plataforma: cuentaCorreo.plataforma,
-    correo: cuentaCorreo.correo,
-    password: decryptPassword(cuentaCorreo.password),
-  };
+  const cuentaConfig = cuentaCorreo ? toCuentaConfig(cuentaCorreo) : null;
 
   const consultaId = Date.now().toString();
   const subject = `[Consulta pendiente] [CP-${consultaId}] WhatsApp: ${contactName} (+${contactPhone})`;
@@ -302,8 +595,11 @@ async function forwardWhatsAppToConsultas(
   body += `MENSAJE:\n${messageText}\n\n`;
 
   if (mediaAttachment?.filename) {
-    const mediaUrl = `${BACKEND_URL}/api/whatsapp/wa-attachments/${encodeURIComponent(mediaAttachment.filename)}`;
-    body += `ADJUNTO ENLACE: ${mediaUrl}\n\n`;
+    try {
+      body += `ADJUNTO ENLACE: ${buildWAPublicAttachmentUrl(mediaAttachment.filename)}\n\n`;
+    } catch (err) {
+      console.warn('[WA] No se pudo generar enlace público firmado para adjunto de consulta:', err);
+    }
   }
 
   body += `Responde a este email con las instrucciones para responder al cliente por WhatsApp.\n`;
@@ -324,7 +620,18 @@ async function forwardWhatsAppToConsultas(
   let sentAtLeastOne = false;
   for (const consultaEmail of consultaEmails) {
     try {
-      await sendEmailViaCuenta(cuentaConfig, consultaEmail, subject, body, attachments.length > 0 ? attachments : undefined);
+      if (cuentaConfig) {
+        await sendEmailViaCuenta(cuentaConfig, consultaEmail, subject, body, attachments.length > 0 ? attachments : undefined);
+      } else {
+        const fallbackOk = await sendEmail(String(account._id), {
+          to: consultaEmail,
+          subject,
+          text: body,
+        });
+        if (!fallbackOk) {
+          throw new Error('No se pudo enviar el correo de consulta con la configuración legacy');
+        }
+      }
       sentAtLeastOne = true;
     } catch (err) {
       console.error('[WA] Error reenviando consulta a', consultaEmail, err);
@@ -340,7 +647,7 @@ async function forwardWhatsAppToConsultas(
     originalFromName: contactName,
     originalSubject: `WhatsApp ${contactName}`,
     originalBody: messageText,
-    cuentaCorreoId: cuentaCorreo.id,
+    cuentaCorreoId: cuentaCorreo?.id || '',
     conversationId,
     forwardedAt: new Date().toISOString(),
     type,
@@ -360,8 +667,9 @@ async function downloadMetaMedia(
   const account = await findAccountByPhoneNumberId(phoneNumberId);
   if (!account) return null;
 
-  const token = getSessionToken(account);
-  if (!token) return null;
+  const session = resolveWhatsAppSession(account, phoneNumberId);
+  const token = getSessionToken(account, session);
+  if (!token || !session?.phoneNumberId) return null;
 
   try {
     const meta = await graphFetchJson<any>(`/${mediaId}`, token);
@@ -401,18 +709,21 @@ async function processOneIncomingMetaMessage(
     const hasMedia = isMediaMessage(msg);
     if (!text && !hasMedia) return;
 
-    let conv = account.whatsappConversations.find((c: any) => c.contactPhone === contactPhone);
+    let conv = account.whatsappConversations.find(
+      (c: any) => c.contactPhone === contactPhone && (!c.phoneNumberId || c.phoneNumberId === phoneNumberId)
+    );
     const isKnownContact = !!conv;
 
     if (!conv) {
       conv = {
-        id: `waconv_${Date.now()}`,
+        id: createWAId('waconv'),
         contactName,
         contactPhone,
         messages: [],
         lastMessageTime: new Date().toISOString(),
         unread: 0,
         autoReplyPaused: false,
+        phoneNumberId,
       } as any;
       account.whatsappConversations.push(conv as any);
     }
@@ -466,6 +777,94 @@ async function processOneIncomingMetaMessage(
       return;
     }
 
+    const historyMessages = (conversation.messages || []).slice(0, -1).map((m: any) => `${m.sent ? 'Asistente' : contactName}: ${m.text}`).join('\n');
+    const historyContext = historyMessages ? `CONTEXTO PREVIO:\n${historyMessages.substring(0, 6000)}` : '';
+    const session = resolveWhatsAppSession(account, phoneNumberId);
+    if (!session?.connected || !session.phoneNumberId) {
+      console.warn('[WA] No hay una sesión conectada para la conversación entrante:', phoneNumberId);
+      return;
+    }
+    const instanceName = session.instanceName || `lyrium_${accountId}`;
+
+    const pendingConfirmation = text.trim()
+      ? findPendingWhatsAppConfirmation(account, conversation.id, contactPhone)
+      : null;
+
+    if (pendingConfirmation) {
+      const pendingIndex = (account.pendingConsultas || []).findIndex((p: any) => p.id === pendingConfirmation.id);
+      if (pendingIndex !== -1) {
+        account.pendingConsultas.splice(pendingIndex, 1);
+      }
+
+      const isAffirmative = await interpretClientConfirmation(text);
+      const clientLanguage = await resolveAutomationLanguage(
+        accountId,
+        pendingConfirmation.originalSubject,
+        pendingConfirmation.originalBody,
+        text,
+      );
+      if (isAffirmative) {
+        const assigned = await assignWhatsAppCase(accountId, account, {
+          contactName,
+          contactPhone,
+          conversationId: conversation.id,
+          originalText: pendingConfirmation.originalBody || text,
+          especialidadId: pendingConfirmation.especialidadId,
+        });
+
+        if (assigned) {
+          try {
+            const CaseModel = (await import('../models/Case.js')).default;
+            await CaseModel.findOneAndUpdate(
+              { accountId, sourceId: conversation.id, status: 'pending' },
+              {
+                status: 'assigned',
+                assignedSubaccountId: assigned.subaccountId,
+                assignedSubaccountName: assigned.subaccountName || '',
+                assignedAt: new Date().toISOString(),
+              }
+            );
+          } catch (err) {
+            console.error('[WhatsApp] error updating case after assignment:', err);
+          }
+
+          await sendAssistantText(
+            instanceName,
+            contactPhone,
+            conversation,
+            getAutomationMessage(clientLanguage, 'assignedSpecializedLawyer'),
+            session.phoneNumberId,
+          );
+          await account.save();
+          return;
+        }
+
+        const fallbackMsg = getAutomationMessage(clientLanguage, 'requestUnderReview');
+        if (await sendAssistantText(instanceName, contactPhone, conversation, fallbackMsg, session.phoneNumberId)) {
+          await account.save();
+        }
+        await forwardWhatsAppToConsultas(
+          account,
+          conversation.id,
+          contactPhone,
+          contactName,
+          pendingConfirmation.originalBody || text,
+          'solicitud_sin_especialista',
+        );
+        return;
+      }
+
+      await sendAssistantText(
+        instanceName,
+        contactPhone,
+        conversation,
+        getAutomationMessage(clientLanguage, 'futureNeedServices'),
+        session.phoneNumberId,
+      );
+      await account.save();
+      return;
+    }
+
     if (hasMedia) {
       await applyWhatsAppClassifyRules(account, conversation.id, incomingText);
       await forwardWhatsAppToConsultas(
@@ -480,10 +879,7 @@ async function processOneIncomingMetaMessage(
       return;
     }
 
-    const historyMessages = (conversation.messages || []).slice(0, -1).map((m: any) => `${m.sent ? 'Asistente' : contactName}: ${m.text}`).join('\n');
-    const historyContext = historyMessages ? `CONTEXTO PREVIO:\n${historyMessages.substring(0, 6000)}` : '';
-
-    const classification = await classifyWhatsAppMessage(text, historyContext);
+    const classification = await classifyWhatsAppMessage(text, account.especialidades || [], historyContext);
     const respondConsultas = account.whatsappRespondConsultasGenerales !== false;
     const respondSolicitudes = account.whatsappRespondSolicitudesServicio !== false;
     const soloConocidos = account.whatsappSoloContactosConocidos === true;
@@ -495,26 +891,13 @@ async function processOneIncomingMetaMessage(
     if (classification.type === 'solicitud_servicio' && !respondSolicitudes) return;
     if (classification.type === 'otro') return;
 
-    const instanceName = account.whatsappSession?.instanceName || `lyrium_${accountId}`;
-
     if (classification.type === 'consulta_general') {
       const kbContext = getKBContext(account);
       const kbResult = await findAnswerInKB(text, kbContext, historyContext);
 
       if (kbResult.found && kbResult.answer) {
-        try {
-          await sendTextMessage(instanceName, contactPhone, kbResult.answer);
-          conversation.messages.push({
-            id: `wa_reply_${Date.now()}`,
-            from: 'lyra',
-            text: kbResult.answer,
-            time: new Date().toISOString(),
-            sent: true,
-          });
-          conversation.lastMessageTime = new Date().toISOString();
+        if (await sendAssistantText(instanceName, contactPhone, conversation, kbResult.answer, session.phoneNumberId)) {
           await account.save();
-        } catch (err) {
-          console.error('[WA] Error enviando respuesta automática KB:', err);
         }
       } else {
         await forwardWhatsAppToConsultas(account, conversation.id, contactPhone, contactName, text, 'consulta_general');
@@ -523,23 +906,107 @@ async function processOneIncomingMetaMessage(
     }
 
     if (classification.type === 'solicitud_servicio') {
-      const neutral = 'Hemos recibido su solicitud. La estamos revisando y le responderemos en breve.';
-      try {
-        await sendTextMessage(instanceName, contactPhone, neutral);
-        conversation.messages.push({
-          id: `wa_reply_${Date.now()}`,
-          from: 'lyra',
-          text: neutral,
-          time: new Date().toISOString(),
-          sent: true,
-        });
-        conversation.lastMessageTime = new Date().toISOString();
+      if (!account.autoAssignEnabled) {
+        // Create pending case and stop
+        const { client } = await findOrCreateClient(accountId, undefined, contactPhone, contactName);
+        await createCaseFromWhatsApp(accountId, account, contactName, contactPhone, conversation.id, text, classification.especialidadId, 'solicitud_servicio', 'pending', undefined, undefined, client._id);
+        await applyWhatsAppClassifyRules(account, conversation.id, text);
         await account.save();
-      } catch (err) {
-        console.error('[WA] Error enviando acuse de solicitud:', err);
+        return;
       }
 
-      await forwardWhatsAppToConsultas(account, conversation.id, contactPhone, contactName, text, 'solicitud_sin_especialista');
+      const clientLanguage = await resolveAutomationLanguage(accountId, `WhatsApp ${contactName}`, text);
+
+      const canAssign = await hasMatchingSpecialist(accountId, account, classification.especialidadId);
+      if (canAssign) {
+        const explicitRequest = await detectExplicitAssignmentRequest(text, `WhatsApp ${contactName}`);
+
+        if (explicitRequest) {
+          const assigned = await assignWhatsAppCase(accountId, account, {
+            contactName,
+            contactPhone,
+            conversationId: conversation.id,
+            originalText: text,
+            especialidadId: classification.especialidadId,
+          });
+
+          if (assigned) {
+            // Update case to assigned
+            try {
+              const CaseModel = (await import('../models/Case.js')).default;
+              await CaseModel.findOneAndUpdate(
+                { accountId, sourceId: conversation.id, status: 'pending' },
+                {
+                  status: 'assigned',
+                  assignedSubaccountId: assigned.subaccountId,
+                  assignedSubaccountName: assigned.subaccountName || '',
+                  assignedAt: new Date().toISOString(),
+                }
+              );
+            } catch (err) {
+              console.error('[WhatsApp] error updating case after assignment:', err);
+            }
+
+            await sendAssistantText(
+              instanceName,
+              contactPhone,
+              conversation,
+              getAutomationMessage(clientLanguage, 'assignedSpecializedLawyer'),
+              session.phoneNumberId,
+            );
+            await account.save();
+            return;
+          }
+
+          const fallbackMsg = getAutomationMessage(clientLanguage, 'requestUnderReview');
+          if (await sendAssistantText(instanceName, contactPhone, conversation, fallbackMsg, session.phoneNumberId)) {
+            await account.save();
+          }
+          await forwardWhatsAppToConsultas(
+            account,
+            conversation.id,
+            contactPhone,
+            contactName,
+            text,
+            'solicitud_sin_especialista',
+          );
+          return;
+        }
+
+        // Ask client before assigning — create pending case
+        const { client } = await findOrCreateClient(accountId, undefined, contactPhone, contactName);
+        await createCaseFromWhatsApp(accountId, account, contactName, contactPhone, conversation.id, text, classification.especialidadId, 'solicitud_servicio', 'pending', undefined, undefined, client._id);
+        const askMsg = getAutomationMessage(clientLanguage, 'assignmentAskWhatsApp', {
+          espName: account.especialidades.find((e: any) => e.id === classification.especialidadId)?.nombre || 'su caso',
+        });
+        if (await sendAssistantText(instanceName, contactPhone, conversation, askMsg, session.phoneNumberId)) {
+          await account.save();
+        }
+        // Save pending confirmation
+        account.pendingConsultas.push({
+          id: Date.now().toString(),
+          originalFrom: contactPhone,
+          originalFromName: contactName,
+          originalSubject: `WhatsApp ${contactName}`,
+          originalBody: text,
+          cuentaCorreoId: '',
+          conversationId: conversation.id,
+          forwardedAt: new Date().toISOString(),
+          type: 'confirmacion_asignacion',
+          especialidadId: classification.especialidadId,
+          channel: 'whatsapp',
+          waContactPhone: contactPhone,
+          waConversationId: conversation.id,
+        });
+        await account.save();
+        return;
+      } else {
+        // No specialist — create pending case and forward
+        const { client } = await findOrCreateClient(accountId, undefined, contactPhone, contactName);
+        await createCaseFromWhatsApp(accountId, account, contactName, contactPhone, conversation.id, text, classification.especialidadId, 'solicitud_servicio', 'pending', undefined, undefined, client._id);
+        await forwardWhatsAppToConsultas(account, conversation.id, contactPhone, contactName, text, 'solicitud_sin_especialista');
+        return;
+      }
     }
   });
 }
@@ -581,9 +1048,11 @@ export async function createInstance(accountId: string, redirectUriOverride?: st
 
 async function connectMetaWithCodeInternal(
   account: any,
+  accountId: string,
   code: string,
   state: string,
   redirectUri?: string,
+  alertEmail?: string,
 ): Promise<{ connected: boolean; phoneNumber?: string; phoneNumberId?: string }> {
   if (!account) throw new Error('Cuenta no encontrada');
 
@@ -613,6 +1082,8 @@ async function connectMetaWithCodeInternal(
   let accessToken = tokenData?.access_token as string;
   if (!accessToken) throw new Error('Meta no devolvió access_token');
 
+  let tokenExchanged = false;
+
   // Try to exchange for long-lived token
   try {
     const llUrl = new URL(`${META_GRAPH_BASE}/oauth/access_token`);
@@ -623,31 +1094,65 @@ async function connectMetaWithCodeInternal(
     const llRes = await fetch(llUrl.toString());
     if (llRes.ok) {
       const llData = await llRes.json();
-      if (llData?.access_token) accessToken = llData.access_token;
+      if (llData?.access_token) {
+        accessToken = llData.access_token;
+        tokenExchanged = true;
+      }
     }
   } catch {
     // Keep short-lived token if long-lived exchange fails.
   }
 
-  const wabaResp = await graphFetchJson<any>('/me/whatsapp_business_accounts', accessToken);
-  const waba = Array.isArray(wabaResp?.data) ? wabaResp.data[0] : null;
-  if (!waba?.id) throw new Error('No se encontró ninguna cuenta de WhatsApp Business en Meta');
+  const waba = await resolveSingleMetaWaba(accessToken);
+  const phone = await resolveSingleMetaPhone(accessToken, waba.id);
 
-  const phoneResp = await graphFetchJson<any>(`/${waba.id}/phone_numbers?fields=id,display_phone_number,verified_name`, accessToken);
-  const phone = Array.isArray(phoneResp?.data) ? phoneResp.data[0] : null;
-  if (!phone?.id) throw new Error('No se encontró ningún número en la cuenta de WhatsApp Business');
+  // Inicializar array si no existe
+  if (!account.whatsappSessions) account.whatsappSessions = [];
 
-  account.whatsappSession = {
-    ...(account.whatsappSession || {}),
-    provider: 'meta',
-    instanceName: account.whatsappSession?.instanceName || `lyrium_${String(account._id)}`,
-    connected: true,
-    connectedAt: new Date().toISOString(),
-    phoneNumber: phone.display_phone_number || '',
-    businessAccountId: waba.id,
-    phoneNumberId: phone.id,
-    accessToken: encryptPassword(accessToken),
-  } as any;
+  // Buscar si ya existe una sesión con este phoneNumberId
+  const existingSession = account.whatsappSessions.find(
+    (s: any) => s.phoneNumberId === phone.id
+  );
+
+  if (existingSession) {
+    // Actualizar sesión existente
+    Object.assign(existingSession, {
+      connected: true,
+      phoneNumber: phone.display_phone_number || '',
+      businessAccountId: waba.id,
+      phoneNumberId: phone.id,
+      accessToken: encryptPassword(accessToken),
+      connectedAt: new Date().toISOString(),
+      instanceName: `lyrium_${accountId}`,
+      tokenExpiresAt: tokenExchanged
+        ? new Date(Date.now() + 60 * 24 * 60 * 60 * 1000).toISOString()
+        : new Date(Date.now() + 60 * 60 * 1000).toISOString(),
+      tokenType: tokenExchanged ? 'long' : 'short',
+      name: existingSession.name || `WhatsApp ${phone.display_phone_number || ''}`,
+      alertEmail: alertEmail || existingSession.alertEmail || '',
+    });
+  } else {
+    // Añadir nueva sesión
+    account.whatsappSessions.push({
+      provider: 'meta',
+      connected: true,
+      phoneNumber: phone.display_phone_number || '',
+      businessAccountId: waba.id,
+      phoneNumberId: phone.id,
+      accessToken: encryptPassword(accessToken),
+      connectedAt: new Date().toISOString(),
+      instanceName: `lyrium_${accountId}`,
+      tokenExpiresAt: tokenExchanged
+        ? new Date(Date.now() + 60 * 24 * 60 * 60 * 1000).toISOString()
+        : new Date(Date.now() + 60 * 60 * 1000).toISOString(),
+      tokenType: tokenExchanged ? 'long' : 'short',
+      name: `WhatsApp ${phone.display_phone_number || ''}`,
+      alertEmail: alertEmail || '',
+    });
+  }
+
+  // Mantener compatibilidad: actualizar también whatsappSession con la última sesión conectada
+  account.whatsappSession = account.whatsappSessions[account.whatsappSessions.length - 1];
   account.whatsappOAuthState = '';
   account.whatsappOAuthStateExpires = '';
   await account.save();
@@ -667,13 +1172,15 @@ export async function connectMetaWithCode(
 ): Promise<{ connected: boolean; phoneNumber?: string; phoneNumberId?: string }> {
   const account = await Automation.findById(accountId);
   // redirectUri undefined → embedded signup flow (no redirect_uri in token exchange)
-  return connectMetaWithCodeInternal(account, code, state, redirectUri);
+  return connectMetaWithCodeInternal(account, accountId, code, state, redirectUri);
 }
 
 export async function connectMetaWithToken(
   accountId: string,
   state: string,
   shortLivedToken: string,
+  name?: string,
+  alertEmail?: string,
 ): Promise<{ connected: boolean; phoneNumber?: string; phoneNumberId?: string }> {
   const account = await Automation.findById(accountId);
   if (!account) throw new Error('Cuenta no encontrada');
@@ -688,6 +1195,8 @@ export async function connectMetaWithToken(
 
   let accessToken = shortLivedToken;
 
+  let tokenExchanged = false;
+
   // Exchange short-lived token for long-lived token
   try {
     const llUrl = new URL(`${META_GRAPH_BASE}/oauth/access_token`);
@@ -698,58 +1207,65 @@ export async function connectMetaWithToken(
     const llRes = await fetch(llUrl.toString());
     if (llRes.ok) {
       const llData = await llRes.json();
-      if (llData?.access_token) accessToken = llData.access_token;
+      if (llData?.access_token) {
+        accessToken = llData.access_token;
+        tokenExchanged = true;
+      }
     }
   } catch {
     // Keep short-lived token if exchange fails
   }
 
-  // graphFetchJson throws on non-2xx, so wrap the first attempt to enable fallback.
-  // User tokens from FB.login do NOT support /me/whatsapp_business_accounts — must go via /me/businesses.
-  let waba: any = null;
+  const waba = await resolveSingleMetaWaba(accessToken);
+  const phone = await resolveSingleMetaPhone(accessToken, waba.id);
 
-  try {
-    const wabaResp = await graphFetchJson<any>('/me/whatsapp_business_accounts', accessToken);
-    if (Array.isArray(wabaResp?.data) && wabaResp.data.length > 0) {
-      waba = wabaResp.data[0];
-    }
-  } catch {
-    // expected for user tokens from FB.login — fall through to /me/businesses
+  // Inicializar array si no existe
+  if (!account.whatsappSessions) account.whatsappSessions = [];
+
+  // Buscar si ya existe una sesión con este phoneNumberId
+  const existingSession = account.whatsappSessions.find(
+    (s: any) => s.phoneNumberId === phone.id
+  );
+
+  if (existingSession) {
+    // Actualizar sesión existente
+    Object.assign(existingSession, {
+      connected: true,
+      phoneNumber: phone.display_phone_number || '',
+      businessAccountId: waba.id,
+      phoneNumberId: phone.id,
+      accessToken: encryptPassword(accessToken),
+      connectedAt: new Date().toISOString(),
+      instanceName: `lyrium_${accountId}`,
+      tokenExpiresAt: tokenExchanged
+        ? new Date(Date.now() + 60 * 24 * 60 * 60 * 1000).toISOString()
+        : new Date(Date.now() + 60 * 60 * 1000).toISOString(),
+      tokenType: tokenExchanged ? 'long' : 'short',
+      name: name || (existingSession as any).name || `WhatsApp ${phone.display_phone_number || ''}`,
+      alertEmail: alertEmail || (existingSession as any).alertEmail || '',
+    });
+  } else {
+    // Añadir nueva sesión
+    account.whatsappSessions.push({
+      provider: 'meta',
+      connected: true,
+      phoneNumber: phone.display_phone_number || '',
+      businessAccountId: waba.id,
+      phoneNumberId: phone.id,
+      accessToken: encryptPassword(accessToken),
+      connectedAt: new Date().toISOString(),
+      instanceName: `lyrium_${accountId}`,
+      tokenExpiresAt: tokenExchanged
+        ? new Date(Date.now() + 60 * 24 * 60 * 60 * 1000).toISOString()
+        : new Date(Date.now() + 60 * 60 * 1000).toISOString(),
+      tokenType: tokenExchanged ? 'long' : 'short',
+      name: name || `WhatsApp ${phone.display_phone_number || ''}`,
+      alertEmail: alertEmail || '',
+    });
   }
 
-  if (!waba?.id) {
-    const bizResp = await graphFetchJson<any>('/me/businesses', accessToken);
-    const businesses: any[] = Array.isArray(bizResp?.data) ? bizResp.data : [];
-    for (const biz of businesses) {
-      try {
-        const bwabaResp = await graphFetchJson<any>(`/${biz.id}/whatsapp_business_accounts`, accessToken);
-        if (Array.isArray(bwabaResp?.data) && bwabaResp.data.length > 0) {
-          waba = bwabaResp.data[0];
-          break;
-        }
-      } catch {
-        // try next business
-      }
-    }
-  }
-
-  if (!waba?.id) throw new Error('No se encontró ninguna cuenta de WhatsApp Business en Meta. Asegúrate de que tu cuenta de Meta tiene una cuenta de WhatsApp Business vinculada.');
-
-  const phoneResp = await graphFetchJson<any>(`/${waba.id}/phone_numbers?fields=id,display_phone_number,verified_name`, accessToken);
-  const phone = Array.isArray(phoneResp?.data) ? phoneResp.data[0] : null;
-  if (!phone?.id) throw new Error('No se encontró ningún número en la cuenta de WhatsApp Business');
-
-  account.whatsappSession = {
-    ...(account.whatsappSession || {}),
-    provider: 'meta',
-    instanceName: account.whatsappSession?.instanceName || `lyrium_${String(account._id)}`,
-    connected: true,
-    connectedAt: new Date().toISOString(),
-    phoneNumber: phone.display_phone_number || '',
-    businessAccountId: waba.id,
-    phoneNumberId: phone.id,
-    accessToken: encryptPassword(accessToken),
-  } as any;
+  // Mantener compatibilidad: actualizar también whatsappSession con la última sesión conectada
+  account.whatsappSession = account.whatsappSessions[account.whatsappSessions.length - 1];
   account.whatsappOAuthState = '';
   account.whatsappOAuthStateExpires = '';
   await account.save();
@@ -766,6 +1282,8 @@ export async function connectMetaManual(
   accessToken: string,
   phoneNumberId: string,
   wabaId?: string,
+  name?: string,
+  alertEmail?: string,
 ): Promise<{ connected: boolean; phoneNumber?: string; phoneNumberId?: string }> {
   const account = await Automation.findById(accountId);
   if (!account) throw new Error('Cuenta no encontrada');
@@ -773,6 +1291,7 @@ export async function connectMetaManual(
   // Verify token works and get phone number display
   const phoneData = await graphFetchJson<any>(`/${phoneNumberId}?fields=id,display_phone_number,verified_name`, accessToken);
   if (!phoneData?.id) throw new Error('No se pudo verificar el número con el token proporcionado');
+  const tokenMetadata = await inspectMetaToken(accessToken);
 
   // Discover WABA ID if not provided
   let resolvedWabaId = wabaId || '';
@@ -785,17 +1304,49 @@ export async function connectMetaManual(
     }
   }
 
-  account.whatsappSession = {
-    ...(account.whatsappSession || {}),
-    provider: 'meta',
-    instanceName: account.whatsappSession?.instanceName || `lyrium_${String(account._id)}`,
-    connected: true,
-    connectedAt: new Date().toISOString(),
-    phoneNumber: phoneData.display_phone_number || '',
-    businessAccountId: resolvedWabaId,
-    phoneNumberId: phoneData.id,
-    accessToken: encryptPassword(accessToken),
-  } as any;
+  // Inicializar array si no existe
+  if (!account.whatsappSessions) account.whatsappSessions = [];
+
+  // Buscar si ya existe una sesión con este phoneNumberId
+  const existingSession = account.whatsappSessions.find(
+    (s: any) => s.phoneNumberId === phoneData.id
+  );
+
+  if (existingSession) {
+    // Actualizar sesión existente
+    Object.assign(existingSession, {
+      instanceName: `lyrium_${accountId}`,
+      connected: true,
+      phoneNumber: phoneData.display_phone_number || '',
+      businessAccountId: resolvedWabaId,
+      phoneNumberId: phoneData.id,
+      accessToken: encryptPassword(accessToken),
+      connectedAt: new Date().toISOString(),
+      tokenExpiresAt: tokenMetadata.tokenExpiresAt,
+      tokenType: tokenMetadata.tokenType,
+      name: name || existingSession.name || `WhatsApp ${phoneData.display_phone_number || ''}`,
+      alertEmail: alertEmail || existingSession.alertEmail || '',
+    });
+  } else {
+    // Añadir nueva sesión
+    account.whatsappSessions.push({
+      instanceName: `lyrium_${accountId}`,
+      provider: 'meta',
+      connected: true,
+      phoneNumber: phoneData.display_phone_number || '',
+      businessAccountId: resolvedWabaId,
+      phoneNumberId: phoneData.id,
+      accessToken: encryptPassword(accessToken),
+      connectedAt: new Date().toISOString(),
+      tokenExpiresAt: tokenMetadata.tokenExpiresAt,
+      tokenType: tokenMetadata.tokenType,
+      name: name || `WhatsApp ${phoneData.display_phone_number || ''}`,
+      alertEmail: alertEmail || '',
+    });
+  }
+
+  // Mantener compatibilidad: actualizar también whatsappSession con la última sesión conectada
+  account.whatsappSession = account.whatsappSessions[account.whatsappSessions.length - 1];
   await account.save();
 
   return {
@@ -809,13 +1360,14 @@ export async function connectMetaWithCodeByState(
   code: string,
   state: string,
   redirectUri?: string,
+  alertEmail?: string,
 ): Promise<{ connected: boolean; phoneNumber?: string; phoneNumberId?: string; accountId: string }> {
   if (!state) throw new Error('State OAuth inválido');
 
   const account = await Automation.findOne({ whatsappOAuthState: state });
   if (!account) throw new Error('State OAuth inválido');
 
-  const result = await connectMetaWithCodeInternal(account, code, state, redirectUri);
+  const result = await connectMetaWithCodeInternal(account, String(account._id), code, state, redirectUri, alertEmail);
 
   return {
     ...result,
@@ -850,7 +1402,9 @@ export async function initMetaEmbeddedSignup(accountId: string): Promise<{ insta
 export async function getInstanceStatus(instanceName: string): Promise<{ connected: boolean; phoneNumber?: string }> {
   const accountId = accountIdFromInstanceName(instanceName);
   const account = await Automation.findById(accountId);
-  if (!account?.whatsappSession?.phoneNumberId) {
+  if (!account) return { connected: false };
+  const session = account.whatsappSessions?.find((s: any) => s.connected) || account.whatsappSession;
+  if (!session?.phoneNumberId) {
     return { connected: false };
   }
 
@@ -858,23 +1412,30 @@ export async function getInstanceStatus(instanceName: string): Promise<{ connect
   if (!token) return { connected: false };
 
   try {
-    const data = await graphFetchJson<any>(`/${account.whatsappSession.phoneNumberId}?fields=display_phone_number`, token);
-    const phoneNumber = data?.display_phone_number || account.whatsappSession.phoneNumber || '';
+    const data = await graphFetchJson<any>(`/${session.phoneNumberId}?fields=display_phone_number`, token);
+    const phoneNumber = data?.display_phone_number || session.phoneNumber || '';
 
-    if (!account.whatsappSession.connected || account.whatsappSession.phoneNumber !== phoneNumber) {
-      account.whatsappSession.connected = true;
-      account.whatsappSession.phoneNumber = phoneNumber;
+    if (!session.connected || session.phoneNumber !== phoneNumber) {
+      session.connected = true;
+      session.phoneNumber = phoneNumber;
       await account.save();
     }
 
     return { connected: true, phoneNumber };
   } catch (err) {
     console.error('[WA] getInstanceStatus error:', err);
-    if (account.whatsappSession.connected) {
-      account.whatsappSession.connected = false;
+    if (isTransientMetaStatusError(err)) {
+      return {
+        connected: !!session.connected,
+        phoneNumber: session.phoneNumber || undefined,
+      };
+    }
+
+    if (session.connected) {
+      session.connected = false;
       await account.save();
     }
-    return { connected: false, phoneNumber: account.whatsappSession.phoneNumber || undefined };
+    return { connected: false, phoneNumber: session.phoneNumber || undefined };
   }
 }
 
@@ -887,16 +1448,27 @@ export async function disconnectInstance(instanceName: string): Promise<void> {
   const account = await Automation.findById(accountId);
   if (!account) return;
 
-  account.whatsappSession = {
-    provider: 'meta',
-    instanceName,
-    connected: false,
-    phoneNumber: '',
-    connectedAt: '',
-    businessAccountId: '',
-    phoneNumberId: '',
-    accessToken: '',
-  } as any;
+  account.whatsappSessions = [];
+  account.whatsappSession = undefined;
+  await account.save();
+}
+
+export async function disconnectWhatsApp(accountId: string, phoneNumberId?: string): Promise<void> {
+  const account = await Automation.findById(accountId);
+  if (!account) return;
+
+  if (phoneNumberId) {
+    account.whatsappSessions = (account.whatsappSessions || []).filter((s: any) => s.phoneNumberId !== phoneNumberId);
+    const remainingConnected = (account.whatsappSessions || []).find((s: any) => s.connected);
+    if (remainingConnected) {
+      account.whatsappSession = remainingConnected;
+    } else {
+      account.whatsappSession = undefined;
+    }
+  } else {
+    account.whatsappSessions = [];
+    account.whatsappSession = undefined;
+  }
   await account.save();
 }
 
@@ -905,18 +1477,19 @@ export async function deleteInstance(instanceName: string): Promise<void> {
 }
 
 // ── Send messages ─────────────────────────────────────────────────────
-export async function sendTextMessage(instanceName: string, phone: string, text: string): Promise<any> {
+export async function sendTextMessage(instanceName: string, phone: string, text: string, phoneNumberId?: string): Promise<any> {
   const accountId = accountIdFromInstanceName(instanceName);
   const account = await Automation.findById(accountId);
-  if (!account?.whatsappSession?.phoneNumberId) throw new Error('WhatsApp Meta no conectado');
+  const session = resolveWhatsAppSession(account, phoneNumberId, instanceName);
+  if (!session?.phoneNumberId) throw new Error('WhatsApp Meta no conectado');
 
-  const token = getSessionToken(account);
+  const token = getSessionToken(account, session);
   if (!token) throw new Error('Token Meta inválido');
 
   const to = sanitizePhone(phone);
   if (!to) throw new Error('Número de destino inválido');
 
-  return graphFetchJson<any>(`/${account.whatsappSession.phoneNumberId}/messages`, token, {
+  return graphFetchJson<any>(`/${session.phoneNumberId}/messages`, token, {
     method: 'POST',
     body: JSON.stringify({
       messaging_product: 'whatsapp',
@@ -927,12 +1500,13 @@ export async function sendTextMessage(instanceName: string, phone: string, text:
   });
 }
 
-export async function sendMediaMessage(instanceName: string, phone: string, filePath: string, caption?: string): Promise<any> {
+export async function sendMediaMessage(instanceName: string, phone: string, filePath: string, caption?: string, phoneNumberId?: string): Promise<any> {
   const accountId = accountIdFromInstanceName(instanceName);
   const account = await Automation.findById(accountId);
-  if (!account?.whatsappSession?.phoneNumberId) throw new Error('WhatsApp Meta no conectado');
+  const session = resolveWhatsAppSession(account, phoneNumberId, instanceName);
+  if (!session?.phoneNumberId) throw new Error('WhatsApp Meta no conectado');
 
-  const token = getSessionToken(account);
+  const token = getSessionToken(account, session);
   if (!token) throw new Error('Token Meta inválido');
 
   const to = sanitizePhone(phone);
@@ -949,7 +1523,7 @@ export async function sendMediaMessage(instanceName: string, phone: string, file
   else if (isAudio) type = 'audio';
 
   const filename = path.basename(filePath);
-  const mediaUrl = `${BACKEND_URL}/api/whatsapp/wa-attachments/${encodeURIComponent(filename)}`;
+  const mediaUrl = buildWAPublicAttachmentUrl(filename);
 
   const payload: any = {
     messaging_product: 'whatsapp',
@@ -962,10 +1536,221 @@ export async function sendMediaMessage(instanceName: string, phone: string, file
   else if (type === 'audio') payload.audio = { link: mediaUrl };
   else payload.document = { link: mediaUrl, caption: caption || '', filename };
 
-  return graphFetchJson<any>(`/${account.whatsappSession.phoneNumberId}/messages`, token, {
+  return graphFetchJson<any>(`/${session.phoneNumberId}/messages`, token, {
     method: 'POST',
     body: JSON.stringify(payload),
   });
+}
+
+export async function persistOutgoingWhatsAppMessage(
+  accountId: string,
+  conversationId: string | undefined,
+  phone: string,
+  text: string,
+  attachments: WAOutgoingAttachment[] = [],
+): Promise<void> {
+  await withAccountLock(accountId, async () => {
+    const account = await Automation.findById(accountId);
+    if (!account) throw new Error('Cuenta no encontrada');
+
+    const now = new Date().toISOString();
+    let conv = account.whatsappConversations.find((c: any) => c.id === conversationId || c.contactPhone === phone);
+    if (!conv) {
+      conv = {
+        id: conversationId || createWAId('waconv'),
+        contactName: phone,
+        contactPhone: phone,
+        messages: [],
+        lastMessageTime: now,
+        unread: 0,
+        autoReplyPaused: false,
+      };
+      account.whatsappConversations.push(conv as any);
+    }
+
+    if (text) {
+      conv.messages.push({
+        id: createWAId('wa_sent'),
+        from: 'me',
+        text,
+        time: now,
+        sent: true,
+      });
+    }
+
+    for (const attachment of attachments) {
+      conv.messages.push({
+        id: createWAId('wa_sent_file'),
+        from: 'me',
+        text: `[${attachment.originalName}]`,
+        time: now,
+        sent: true,
+        attachments: [{
+          id: createWAId('wa_att'),
+          filename: attachment.filename,
+          originalName: attachment.originalName,
+          mimeType: attachment.mimeType,
+          size: attachment.size,
+        }],
+      });
+    }
+
+    conv.lastMessageTime = now;
+    await account.save();
+  });
+}
+
+export async function rollbackOutgoingWhatsAppMessage(
+  accountId: string,
+  conversationId: string | undefined,
+  phone: string,
+  text: string,
+  attachments: WAOutgoingAttachment[] = [],
+): Promise<void> {
+  await withAccountLock(accountId, async () => {
+    const account = await Automation.findById(accountId);
+    if (!account) return;
+    const conv = account.whatsappConversations.find((c: any) => c.id === conversationId || c.contactPhone === phone);
+    if (!conv) return;
+
+    // Remove the last messages that match this exact outgoing batch
+    const removeCount = (text ? 1 : 0) + attachments.length;
+    if (removeCount > 0 && conv.messages.length >= removeCount) {
+      conv.messages.splice(conv.messages.length - removeCount, removeCount);
+    }
+    await account.save();
+  });
+}
+
+export async function markConversationRead(accountId: string, conversationId: string): Promise<boolean> {
+  return withAccountLock(accountId, async () => {
+    const account = await Automation.findById(accountId);
+    if (!account) return false;
+
+    const conv = account.whatsappConversations.find((c: any) => c.id === conversationId);
+    if (!conv) return false;
+
+    conv.unread = 0;
+    await account.save();
+    return true;
+  });
+}
+
+export async function toggleConversationAutoReply(accountId: string, conversationId: string): Promise<boolean | null> {
+  return withAccountLock(accountId, async () => {
+    const account = await Automation.findById(accountId);
+    if (!account) return null;
+
+    const conv = account.whatsappConversations.find((c: any) => c.id === conversationId);
+    if (!conv) return null;
+
+    conv.autoReplyPaused = !conv.autoReplyPaused;
+    await account.save();
+    return !!conv.autoReplyPaused;
+  });
+}
+
+// ── Token management ─────────────────────────────────────────────────
+export async function refreshWhatsAppToken(
+  accountId: string,
+  phoneNumberId: string,
+): Promise<{ success: boolean; newExpiresAt?: string; daysRemaining?: number; error?: string }> {
+  try {
+    const account = await Automation.findById(accountId);
+    if (!account) return { success: false, error: 'Cuenta no encontrada' };
+
+    const session = (account.whatsappSessions || []).find(
+      (s: any) => s.phoneNumberId === phoneNumberId
+    );
+
+    if (!session) return { success: false, error: 'Sesión no encontrada' };
+    if (!session.accessToken) return { success: false, error: 'No hay token de acceso' };
+
+    const appId = getMetaAppId();
+    const appSecret = getMetaAppSecret();
+
+    if (!appId || !appSecret) {
+      return { success: false, error: 'Meta App ID o Secret no configurados' };
+    }
+
+    const exchangeUrl = `https://graph.facebook.com/v18.0/oauth/access_token`;
+    const params = new URLSearchParams({
+      grant_type: 'fb_exchange_token',
+      client_id: appId,
+      client_secret: appSecret,
+      fb_exchange_token: decryptPassword(session.accessToken),
+    });
+
+    const response = await fetch(`${exchangeUrl}?${params.toString()}`);
+    const data = await response.json();
+
+    if (!response.ok || data.error) {
+      return { success: false, error: data.error?.message || 'No se pudo renovar el token' };
+    }
+
+    const newToken = data.access_token;
+    const expiresIn = data.expires_in || 5184000;
+    const newExpiresAt = new Date(Date.now() + expiresIn * 1000).toISOString();
+
+    session.accessToken = encryptPassword(newToken);
+    session.tokenExpiresAt = newExpiresAt;
+    session.tokenType = 'long';
+
+    await account.save();
+
+    const daysRemaining = Math.floor((new Date(newExpiresAt).getTime() - Date.now()) / (1000 * 60 * 60 * 24));
+
+    return { success: true, newExpiresAt, daysRemaining };
+  } catch (err: any) {
+    console.error('[WA] Error renovando token:', err);
+    return { success: false, error: err.message || 'Error desconocido' };
+  }
+}
+
+export async function getTokenStatus(
+  accountId: string,
+  phoneNumberId: string,
+): Promise<{
+  phoneNumberId: string;
+  connected: boolean;
+  tokenType: string;
+  expiresAt: string;
+  daysRemaining: number;
+  status: 'ok' | 'warning' | 'critical' | 'expired';
+  alertEmail?: string;
+} | null> {
+  const account = await Automation.findById(accountId);
+  if (!account) return null;
+
+  const session = (account.whatsappSessions || []).find(
+    (s: any) => s.phoneNumberId === phoneNumberId
+  );
+
+  if (!session) return null;
+
+  let daysRemaining = 999;
+  let status: 'ok' | 'warning' | 'critical' | 'expired' = 'ok';
+
+  if (session.tokenExpiresAt) {
+    const expiresAt = new Date(session.tokenExpiresAt).getTime();
+    const now = Date.now();
+    daysRemaining = Math.floor((expiresAt - now) / (1000 * 60 * 60 * 24));
+
+    if (daysRemaining < 0) status = 'expired';
+    else if (daysRemaining <= 7) status = 'critical';
+    else if (daysRemaining <= 14) status = 'warning';
+    else status = 'ok';
+  }
+
+  return {
+    phoneNumberId: session.phoneNumberId || '',
+    connected: session.connected,
+    tokenType: session.tokenType || 'unknown',
+    expiresAt: session.tokenExpiresAt || '',
+    daysRemaining,
+    status,
+    alertEmail: session.alertEmail,
+  };
 }
 
 // ── Process incoming webhook payload (Meta) ──────────────────────────

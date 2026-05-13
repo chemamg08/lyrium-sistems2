@@ -1,11 +1,17 @@
 import { Response } from 'express';
 import bcrypt from 'bcrypt';
+import crypto from 'crypto';
+import fs from 'fs';
+import path from 'path';
 import Stripe from 'stripe';
 import dotenv from 'dotenv';
 import { Account } from '../models/Account.js';
 import { Subaccount } from '../models/Subaccount.js';
 import { Subscription } from '../models/Subscription.js';
+import { PromoCode } from '../models/PromoCode.js';
+import { Invoice } from '../models/Invoice.js';
 import { AuthRequest } from '../middleware/auth.js';
+import { createAccountWithInitialSubscription } from '../services/accountProvisioningService.js';
 
 dotenv.config();
 
@@ -17,6 +23,31 @@ if (!process.env.STRIPE_SECRET_KEY) {
 const stripe = new Stripe(process.env.STRIPE_SECRET_KEY, {
   apiVersion: '2026-02-25.clover',
 });
+
+async function getStripeMonthlyRevenue(startTimestamp: number): Promise<number> {
+  let monthlyRevenue = 0;
+  let startingAfter: string | undefined;
+
+  while (true) {
+    const charges = await stripe.charges.list({
+      created: { gte: startTimestamp },
+      limit: 100,
+      ...(startingAfter ? { starting_after: startingAfter } : {}),
+    });
+
+    for (const charge of charges.data) {
+      if (charge.status === 'succeeded') {
+        monthlyRevenue += charge.amount / 100;
+      }
+    }
+
+    if (!charges.has_more || charges.data.length === 0) {
+      return monthlyRevenue;
+    }
+
+    startingAfter = charges.data[charges.data.length - 1].id;
+  }
+}
 
 // ============= DASHBOARD STATS =============
 
@@ -61,15 +92,7 @@ export const getStats = async (_req: AuthRequest, res: Response) => {
     let monthlyRevenue = 0;
     try {
       const startOfMonth = new Date(now.getFullYear(), now.getMonth(), 1);
-      const charges = await stripe.charges.list({
-        created: { gte: Math.floor(startOfMonth.getTime() / 1000) },
-        limit: 100,
-      });
-      for (const charge of charges.data) {
-        if (charge.status === 'succeeded') {
-          monthlyRevenue += charge.amount / 100; // cents to euros
-        }
-      }
+      monthlyRevenue = await getStripeMonthlyRevenue(Math.floor(startOfMonth.getTime() / 1000));
     } catch (stripeErr) {
       console.error('Error fetching Stripe revenue:', stripeErr);
     }
@@ -148,6 +171,7 @@ export const searchUsers = async (req: AuthRequest, res: Response) => {
         autoRenew: subMap[u._id].autoRenew,
         stripeCustomerId: subMap[u._id].stripeCustomerId,
         stripeSubscriptionId: subMap[u._id].stripeSubscriptionId,
+        juniorDiscount: subMap[u._id].juniorDiscount || null,
       } : null,
     }));
 
@@ -176,6 +200,7 @@ export const getUserDetail = async (req: AuthRequest, res: Response) => {
     const subaccounts = await Subaccount.find({ parentAccountId: id })
       .select('-password -twoFactorSecret -recoveryCodes -resetPasswordToken -resetPasswordExpires')
       .lean();
+    const invoices = await Invoice.find({ accountId: id }).sort({ date: -1 }).lean();
 
     res.json({
       user: {
@@ -189,13 +214,26 @@ export const getUserDetail = async (req: AuthRequest, res: Response) => {
         googleCalendarConnected: user.googleCalendarConnected,
         disabled: (user as any).disabled || false,
       },
-      subscription: subscription ? subscription : null,
+      subscription: subscription
+        ? {
+            ...(subscription as any),
+            juniorDiscount: (subscription as any).juniorDiscount || null,
+          }
+        : null,
       subaccounts: subaccounts.map((s: any) => ({
         id: s._id,
         name: s.name,
         email: s.email,
         createdAt: s.createdAt,
         twoFactorEnabled: s.twoFactorEnabled,
+      })),
+      invoices: invoices.map((inv: any) => ({
+        id: inv._id,
+        invoiceNumber: inv.invoiceNumber,
+        publicId: inv.publicId,
+        date: inv.date,
+        concept: inv.lines?.[0]?.concept || '',
+        totalAmount: inv.totalAmount,
       })),
     });
   } catch (error) {
@@ -370,10 +408,13 @@ export const createAccountManually = async (req: AuthRequest, res: Response) => 
     }
 
     const hashedPassword = await bcrypt.hash(password, SALT_ROUNDS);
-    const id = Date.now().toString();
+    const id = crypto.randomUUID();
     const now = new Date().toISOString();
 
-    await Account.create({
+    const trialEnd = new Date();
+    trialEnd.setDate(trialEnd.getDate() + 14);
+
+    await createAccountWithInitialSubscription({
       _id: id,
       name,
       email,
@@ -383,14 +424,8 @@ export const createAccountManually = async (req: AuthRequest, res: Response) => 
       role: 'user',
       emailVerified: true, // Skip email verification for admin-created accounts
       createdAt: now,
-    });
-
-    // Create trial subscription
-    const trialEnd = new Date();
-    trialEnd.setDate(trialEnd.getDate() + 14);
-
-    await Subscription.create({
-      _id: (Date.now() + 1).toString(),
+    }, {
+      _id: crypto.randomUUID(),
       accountId: id,
       plan: plan || 'starter',
       interval: interval || 'monthly',
@@ -411,5 +446,245 @@ export const createAccountManually = async (req: AuthRequest, res: Response) => 
   } catch (error) {
     console.error('Error creating account manually:', error);
     res.status(500).json({ error: 'Error al crear cuenta' });
+  }
+};
+
+// ============= JUNIOR VERIFICATION =============
+
+export const verifyJunior = async (req: AuthRequest, res: Response) => {
+  try {
+    const { id } = req.params;
+    const { status } = req.body;
+
+    if (!status || !['verified', 'rejected'].includes(status)) {
+      return res.status(400).json({ error: 'Status debe ser verified o rejected' });
+    }
+
+    const subscription = await Subscription.findOne({ accountId: id });
+    if (!subscription) {
+      return res.status(404).json({ error: 'Suscripción no encontrada' });
+    }
+
+    if (!subscription.juniorDiscount) {
+      return res.status(400).json({ error: 'No hay descuento junior activo para esta suscripción' });
+    }
+
+    const now = new Date().toISOString();
+
+    // Eliminar archivo físico si existe
+    if (subscription.juniorDiscount.proofUrl) {
+      try {
+        const filePath = path.join(process.cwd(), subscription.juniorDiscount.proofUrl);
+        if (fs.existsSync(filePath)) {
+          fs.unlinkSync(filePath);
+        }
+      } catch (fileErr) {
+        console.error('Error eliminando archivo de prueba junior:', fileErr);
+      }
+      subscription.juniorDiscount.proofUrl = null;
+    }
+
+    if (status === 'verified') {
+      subscription.juniorDiscount.status = 'verified';
+      subscription.juniorDiscount.appliedAt = now;
+      subscription.juniorDiscount.verifiedAt = now;
+      subscription.juniorDiscount.verifiedBy = req.user?.userId || null;
+    } else {
+      subscription.juniorDiscount.status = 'rejected';
+      subscription.juniorDiscount.enabled = false;
+
+      // Si hay suscripción Stripe activa, cambiar al Price ID base del mismo intervalo
+      if (subscription.stripeSubscriptionId && subscription.interval) {
+        try {
+          const stripeSub = await stripe.subscriptions.retrieve(subscription.stripeSubscriptionId);
+          const itemId = stripeSub.items?.data?.[0]?.id;
+          if (itemId) {
+            const basePriceId = subscription.interval === 'monthly'
+              ? (process.env.STRIPE_PRICE_INDIVIDUAL_MONTHLY || 'price_individual_monthly')
+              : (process.env.STRIPE_PRICE_INDIVIDUAL_ANNUAL || 'price_individual_annual');
+            await stripe.subscriptions.update(subscription.stripeSubscriptionId, {
+              items: [{ id: itemId, price: basePriceId }],
+              proration_behavior: 'none',
+            });
+          }
+        } catch (stripeErr: any) {
+          console.error('Error updating Stripe subscription on junior rejection:', stripeErr?.message);
+        }
+      }
+    }
+
+    subscription.updatedAt = now;
+    await subscription.save();
+
+    res.json({ success: true, subscription: subscription.toJSON() });
+  } catch (error) {
+    console.error('Error verifying junior discount:', error);
+    res.status(500).json({ error: 'Error al verificar descuento junior' });
+  }
+};
+
+export const getJuniorVerifications = async (_req: AuthRequest, res: Response) => {
+  try {
+    const subscriptions = await Subscription.find({
+      'juniorDiscount.enabled': true,
+    }).lean();
+
+    const accountIds = subscriptions.map((s) => s.accountId);
+    const accounts = await Account.find({ _id: { $in: accountIds } })
+      .select('name email country')
+      .lean();
+
+    const accountMap: Record<string, any> = {};
+    for (const acc of accounts) {
+      accountMap[(acc as any)._id] = acc;
+    }
+
+    const results = subscriptions.map((sub) => {
+      const acc = accountMap[sub.accountId];
+      return {
+        accountId: sub.accountId,
+        name: acc?.name || '',
+        email: acc?.email || '',
+        country: acc?.country || '',
+        plan: sub.plan,
+        interval: sub.interval,
+        status: sub.juniorDiscount?.status || 'pending',
+        proofUrl: sub.juniorDiscount?.proofUrl || null,
+        requestedAt: (sub as any).createdAt,
+        juniorDiscount: sub.juniorDiscount,
+      };
+    });
+
+    res.json({ verifications: results });
+  } catch (error) {
+    console.error('Error getting junior verifications:', error);
+    res.status(500).json({ error: 'Error al obtener verificaciones junior' });
+  }
+};
+
+export const getPromoCodes = async (_req: AuthRequest, res: Response) => {
+  try {
+    const codes = await PromoCode.find({}).sort({ createdAt: -1 });
+    res.json(codes);
+  } catch (error) {
+    console.error('Error getting promo codes:', error);
+    res.status(500).json({ error: 'Error al obtener códigos promocionales' });
+  }
+};
+
+export const createPromoCode = async (req: AuthRequest, res: Response) => {
+  try {
+    const { code, type, value, durationMonths, maxUses, expiresAt } = req.body;
+    if (!code || !type || value == null || !durationMonths) {
+      return res.status(400).json({ error: 'Faltan campos requeridos' });
+    }
+    const existing = await PromoCode.findOne({ code: code.toUpperCase() });
+    if (existing) {
+      return res.status(400).json({ error: 'El código ya existe' });
+    }
+    const newCode = new PromoCode({
+      _id: crypto.randomUUID(),
+      code: code.toUpperCase(),
+      type,
+      value,
+      durationMonths,
+      maxUses: maxUses || null,
+      expiresAt: expiresAt || null,
+    });
+    await newCode.save();
+    res.json({ success: true, promoCode: newCode });
+  } catch (error) {
+    console.error('Error creating promo code:', error);
+    res.status(500).json({ error: 'Error al crear código promocional' });
+  }
+};
+
+export const updatePromoCode = async (req: AuthRequest, res: Response) => {
+  try {
+    const { id } = req.params;
+    const { type, value, durationMonths, maxUses, active, expiresAt } = req.body;
+    const code = await PromoCode.findById(id);
+    if (!code) {
+      return res.status(404).json({ error: 'Código no encontrado' });
+    }
+    if (type != null) code.type = type;
+    if (value != null) code.value = value;
+    if (durationMonths != null) code.durationMonths = durationMonths;
+    if (maxUses !== undefined) code.maxUses = maxUses || null;
+    if (active !== undefined) code.active = active;
+    if (expiresAt !== undefined) code.expiresAt = expiresAt || null;
+    code.updatedAt = new Date().toISOString();
+    await code.save();
+    res.json({ success: true, promoCode: code });
+  } catch (error) {
+    console.error('Error updating promo code:', error);
+    res.status(500).json({ error: 'Error al actualizar código promocional' });
+  }
+};
+
+export const deletePromoCode = async (req: AuthRequest, res: Response) => {
+  try {
+    const { id } = req.params;
+    const code = await PromoCode.findById(id);
+    if (!code) {
+      return res.status(404).json({ error: 'Código no encontrado' });
+    }
+    await PromoCode.deleteOne({ _id: id });
+    res.json({ success: true });
+  } catch (error) {
+    console.error('Error deleting promo code:', error);
+    res.status(500).json({ error: 'Error al eliminar código promocional' });
+  }
+};
+
+// ============= REVENUE & INVOICES =============
+
+export const getRevenue = async (req: AuthRequest, res: Response) => {
+  try {
+    const { start, end } = req.query;
+    const filter: any = {};
+    if (start || end) {
+      filter.date = {};
+      if (start) filter.date.$gte = start as string;
+      if (end) filter.date.$lte = end as string;
+    }
+
+    const invoices = await Invoice.find(filter).lean();
+    const totalRevenue = invoices.reduce((sum: number, inv: any) => sum + (inv.totalAmount || 0), 0);
+
+    res.json({ totalRevenue });
+  } catch (error) {
+    console.error('Error calculating revenue:', error);
+    res.status(500).json({ error: 'Error al calcular ingresos' });
+  }
+};
+
+export const getInvoicesByDateRange = async (req: AuthRequest, res: Response) => {
+  try {
+    const { start, end } = req.query;
+    const filter: any = {};
+    if (start || end) {
+      filter.date = {};
+      if (start) filter.date.$gte = start as string;
+      if (end) filter.date.$lte = end as string;
+    }
+
+    const invoices = await Invoice.find(filter).sort({ date: -1 }).lean();
+    const results = invoices.map((inv: any) => ({
+      id: inv._id,
+      invoiceNumber: inv.invoiceNumber,
+      publicId: inv.publicId,
+      date: inv.date,
+      clientName: inv.clientName,
+      clientEmail: inv.clientEmail,
+      totalAmount: inv.totalAmount,
+      concept: inv.lines?.[0]?.concept || '',
+      accountId: inv.accountId,
+    }));
+
+    res.json({ invoices: results });
+  } catch (error) {
+    console.error('Error getting invoices by date range:', error);
+    res.status(500).json({ error: 'Error al obtener facturas' });
   }
 };

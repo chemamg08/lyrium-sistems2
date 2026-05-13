@@ -63,7 +63,7 @@ export async function createSignatureRequest(params: {
   });
 
   // Add file to client's files array
-  const client = await Client.findById(params.clientId);
+  const client = await Client.findOne({ _id: params.clientId, accountId: params.accountId });
   if (client) {
     const signatureFileEntry = {
       id: `sigfile_${sigReq._id}`,
@@ -130,7 +130,7 @@ export async function createSignatureRequestFromUpload(params: {
   });
 
   // Add file to client's files array
-  const client = await Client.findById(params.clientId);
+  const client = await Client.findOne({ _id: params.clientId, accountId: params.accountId });
   if (client) {
     const signatureFileEntry = {
       id: `sigfile_${sigReq._id}`,

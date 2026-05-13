@@ -1,0 +1,31 @@
+﻿--- holafinal.md
++++ holafinal.md
+@@ -289,6 +289,28 @@
+ Solucion: convertir Pruebas en un repositorio real de evidencias dentro de Defensa. Cada cuenta principal y cada subcuenta deberian disponer de su propia cuota independiente de 10 GB para pruebas; al crear una prueba se deberia exigir al menos nombre de la prueba y archivo; deberia existir un boton de Biblioteca de pruebas donde ver todas las pruebas subidas por ese usuario, abrirlas en un visor online segun su tipo, eliminarlas de forma logica a una papelera y, desde la ventana de papelera, borrarlas definitivamente. Al exportar la estrategia a PDF, las pruebas deberian aparecer con enlaces publicos largos y no adivinables que abran un visor de Lyrium para video, imagen, audio, PDF o descarga controlada.
+ Explicacion tecnica: si Defensa va a manejar pruebas de verdad, la app debe actuar como custodio documental y no como simple ficha descriptiva. Eso implica almacenamiento persistente por usuario, contabilidad real del espacio consumido, soft delete con papelera, invalidacion del enlace publico cuando la prueba pase a papelera o se elimine, y URLs publicas por posesion del enlace pero no descubribles ni indexables. Sin esa capa, el modulo sigue siendo insuficiente para un flujo serio de gestion y presentacion de evidencias.
+ 
++**Plan tecnico detallado (punto 64):**
++- Extender `DefenseEvidence` con campos: `filePath`, `fileSize`, `mimeType`, `publicToken` (UUID aleatorio), `isDeleted`, `deletedAt`, `createdBy`.
++- Crear middleware `multerDefense.ts` con `fileFilter` para PDF, im├ígenes, video, audio; sin l├¡mite de tama├▒o por archivo individual.
++- Almacenar archivos en `uploads/evidence/<createdBy>/<randomName>`.
++- Control de cuota: 10 GB acumulados por `createdBy`. Se calcula sumando `fileSize` de todos los `DefenseEvidence` activos (`isDeleted: false`) de ese usuario. Si la subida supera la cuota, rechazar con 413.
++- Nuevos endpoints (autenticados):
++  - `POST /defense-chat/:chatId/evidence/upload` ÔÇö subir archivo, generar `publicToken`, validar cuota.
++  - `GET /defense-chat/evidence/library?accountId=` ÔÇö listar pruebas del usuario (`createdBy`, `isDeleted: false`).
++  - `GET /defense-chat/evidence/trash?accountId=` ÔÇö listar papelera (`isDeleted: true`).
++  - `POST /defense-chat/evidence/:evidenceId/trash` ÔÇö soft delete (`isDeleted: true`, `deletedAt`).
++  - `POST /defense-chat/evidence/:evidenceId/restore` ÔÇö restaurar desde papelera.
++  - `DELETE /defense-chat/evidence/:evidenceId/permanent` ÔÇö borrar archivo de disco y registro de BD.
++- Nuevo endpoint p├║blico (sin auth, solo token):
++  - `GET /public/evidence/:token` ÔÇö buscar por `publicToken`, si `isDeleted` o no existe devolver 404; si existe, servir archivo seg├║n `mimeType`: video/mp4 ÔåÆ inline video, image/* ÔåÆ inline image, audio/* ÔåÆ inline audio, application/pdf ÔåÆ inline PDF, resto ÔåÆ descarga con `Content-Disposition: attachment`. Token = UUID largo no adivinable.
++- Al soft-deletear o eliminar permanentemente, el token queda invalidado autom├íticamente porque la query filtra `isDeleted: false`.
++- Integrar en `generateDefensePDF` (pdfService.ts): a├▒adir secci├│n "Evidencias adjuntas" al final de cada estrategia, listando nombre de prueba + enlace p├║blico completo (`https://<domain>/public/evidence/<token>`).
++- Frontend (`DefensePrep.tsx`):
++  - A├▒adir bot├│n "Biblioteca de pruebas" junto a la pesta├▒a Pruebas.
++  - Modal de biblioteca con listado, drag-and-drop de subida, visor inline seg├║n tipo, bot├│n de papelera.
++  - Modal de papelera con opci├│n de restaurar o borrar permanentemente.
++  - Indicador de espacio usado / 10 GB.
++
+ ### Redaccion
+ 
+ 71. Fallo: la revisi├│n puede resaltar o sustituir el fragmento equivocado cuando el mismo texto aparece varias veces en el escrito.

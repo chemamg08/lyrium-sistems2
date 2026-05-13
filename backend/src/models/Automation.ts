@@ -41,6 +41,9 @@ export interface IEmailMessage {
   text: string;
   time: string;
   sent: boolean;
+  messageId?: string;
+  references?: string;
+  inReplyTo?: string;
   attachments?: IEmailAttachment[];
 }
 
@@ -52,6 +55,8 @@ export interface IEmailConversation {
   messages: IEmailMessage[];
   lastMessageTime: string;
   unread: number;
+  cuentaCorreoId?: string;
+  cuentaCorreoEmail?: string;
   autoClientId?: string;
   autoReplyPaused?: boolean;
 }
@@ -67,6 +72,9 @@ export interface IPendingConsulta {
   forwardedAt: string;
   type: string;
   especialidadId?: string;
+  channel?: 'email' | 'whatsapp';
+  waContactPhone?: string;
+  waConversationId?: string;
 }
 
 export interface IPendingReply {
@@ -79,6 +87,7 @@ export interface IPendingReply {
   scheduledAt: number;
   accountId: string;
   conversationId?: string;
+  cuentaCorreoId?: string;
   retryCount: number;
 }
 
@@ -130,11 +139,13 @@ export interface IWhatsAppConversation {
   lastMessageTime: string;
   unread: number;
   autoReplyPaused?: boolean;
+  phoneNumberId?: string;
 }
 
 export interface IWhatsAppFolder {
   id: string;
   name: string;
+  color?: string;
   conversationIds: string[];
 }
 
@@ -147,6 +158,10 @@ export interface IWhatsAppSession {
   businessAccountId?: string;
   phoneNumberId?: string;
   accessToken?: string;
+  name?: string;
+  tokenExpiresAt?: string;
+  tokenType?: string;
+  alertEmail?: string;
 }
 
 export interface IAutomation {
@@ -169,6 +184,8 @@ export interface IAutomation {
   respondSolicitudesServicio: boolean;
   soloContactosConocidos: boolean;
   // WhatsApp
+  whatsappSessions?: IWhatsAppSession[];
+  /** @deprecated Use whatsappSessions instead */
   whatsappSession?: IWhatsAppSession;
   whatsappSwitchActivo: boolean;
   whatsappConversations: IWhatsAppConversation[];
@@ -223,6 +240,9 @@ const emailMessageSchema = new Schema({
   text: String,
   time: String,
   sent: Boolean,
+  messageId: String,
+  references: String,
+  inReplyTo: String,
   attachments: { type: [emailAttachmentSchema], default: [] },
 }, { _id: false });
 
@@ -234,6 +254,8 @@ const emailConversationSchema = new Schema({
   messages: { type: [emailMessageSchema], default: [] },
   lastMessageTime: String,
   unread: { type: Number, default: 0 },
+  cuentaCorreoId: String,
+  cuentaCorreoEmail: String,
   autoClientId: String,
   autoReplyPaused: { type: Boolean, default: false },
 }, { _id: false });
@@ -286,15 +308,17 @@ const waConversationSchema = new Schema({
   lastMessageTime: String,
   unread: { type: Number, default: 0 },
   autoReplyPaused: { type: Boolean, default: false },
+  phoneNumberId: String,
 }, { _id: false });
 
 const waFolderSchema = new Schema({
   id: String,
   name: String,
+  color: String,
   conversationIds: { type: [String], default: [] },
 }, { _id: false });
 
-const waSessionSchema = new Schema({
+const whatsappSessionSchema = new Schema({
   provider: { type: String, default: 'meta' },
   instanceName: String,
   connected: { type: Boolean, default: false },
@@ -303,7 +327,14 @@ const waSessionSchema = new Schema({
   businessAccountId: String,
   phoneNumberId: String,
   accessToken: String,
+  tokenExpiresAt: String,
+  tokenType: { type: String, enum: ['short', 'long'] },
+  name: String,
+  alertEmail: String,
 }, { _id: false });
+
+// @deprecated Kept for backward compatibility, use whatsappSessionSchema
+const waSessionSchema = whatsappSessionSchema;
 
 const pendingConsultaSchema = new Schema({
   id: String,
@@ -331,6 +362,7 @@ const pendingReplySchema = new Schema({
   scheduledAt: Number,
   accountId: String,
   conversationId: String,
+  cuentaCorreoId: String,
   retryCount: { type: Number, default: 0 },
 }, { _id: false });
 
@@ -354,6 +386,8 @@ const automationSchema = new Schema<IAutomation>({
   respondSolicitudesServicio: { type: Boolean, default: true },
   soloContactosConocidos: { type: Boolean, default: false },
   // WhatsApp
+  whatsappSessions: { type: [whatsappSessionSchema], default: [] },
+  /** @deprecated Use whatsappSessions instead */
   whatsappSession: { type: waSessionSchema, default: null },
   whatsappSwitchActivo: { type: Boolean, default: false },
   whatsappConversations: { type: [waConversationSchema], default: [] },

@@ -1,10 +1,16 @@
 import mongoose, { Schema } from 'mongoose';
 
+export interface IFlag {
+  id: string;
+  createdAt: string;
+}
+
 export interface IMessage {
   id: string;
   role: 'user' | 'assistant';
   content: string;
   timestamp?: string;
+  flags?: IFlag[];
 }
 
 export interface IChat {
@@ -18,11 +24,17 @@ export interface IChat {
   summary?: string;
 }
 
+const flagSchema = new Schema({
+  id: String,
+  createdAt: String,
+}, { _id: false });
+
 const messageSchema = new Schema({
   id: String,
   role: { type: String, enum: ['user', 'assistant'] },
   content: String,
   timestamp: String,
+  flags: { type: [flagSchema], default: [] },
 }, { _id: false });
 
 const chatSchema = new Schema<IChat>({

@@ -4,9 +4,11 @@ import path from 'path';
 import crypto from 'crypto';
 import { fileURLToPath } from 'url';
 import OpenAI from 'openai';
-import { AI_MODEL } from '../config/aiModel.js';
+import { AI_AUTOMATION_MODEL } from '../config/aiModel.js';
+import { stripThinkTags } from './aiService.js';
 import {
   fetchUnreadEmails,
+  markEmailsAsSeen,
   sendEmailViaCuenta,
   replyToEmail,
   type CuentaCorreoConfig,
@@ -17,9 +19,86 @@ import { Automation } from '../models/Automation.js';
 import { Client } from '../models/Client.js';
 import { Subaccount } from '../models/Subaccount.js';
 import { sanitizeFilename } from '../utils/sanitizeFilename.js';
+import { buildAssignedSubaccountFields, hasAssignedSubaccount, readAssignedSubaccountIds } from '../utils/clientAssignments.js';
+import { getAutomationMessage, resolveAutomationLanguage } from './automationMessages.js';
+import { createCaseFromEmail } from './casesService.js';
+import { runWithDistributedLock } from './distributedLockService.js';
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
+
+function normalizePhone(phone: string): string {
+  return phone.replace(/\D/g, '');
+}
+
+function normalizeEmailAddress(email: string): string {
+  return (email || '').trim().toLowerCase();
+}
+
+function createAutomationClientId(): string {
+  return `client_${crypto.randomUUID()}`;
+}
+
+interface FindOrCreateClientResult {
+  client: any;
+  created: boolean;
+}
+
+async function findOrCreateClient(
+  accountId: string,
+  email?: string,
+  phone?: string,
+  name?: string,
+  preferredId?: string,
+): Promise<FindOrCreateClientResult> {
+  const normalizedPhone = phone ? normalizePhone(phone) : null;
+
+  let existingClient = null;
+
+  if (email) {
+    existingClient = await Client.findOne({
+      accountId,
+      email: { $regex: new RegExp(`^${email}$`, 'i') },
+    });
+  }
+
+  if (!existingClient && normalizedPhone) {
+    existingClient = await Client.findOne({
+      accountId,
+      phone: { $regex: new RegExp(`^${normalizedPhone}$`, 'i') },
+    });
+  }
+
+  if (existingClient) {
+    await Client.findByIdAndUpdate(existingClient._id, {
+      $inc: { cases: 1 },
+    });
+    return { client: existingClient, created: false };
+  }
+
+  const newClient = await Client.create({
+    _id: preferredId || createAutomationClientId(),
+    accountId,
+    name: name || email || phone || 'Desconocido',
+    email: email || '',
+    phone: phone || '',
+    status: 'abierto',
+    cases: 1,
+    autoCreated: true,
+  });
+
+  return { client: newClient, created: true };
+}
+
+async function addSubaccountToClient(clientId: string, subaccountId: string): Promise<void> {
+  const client = await Client.findById(clientId);
+  if (!client) {
+    return;
+  }
+
+  const fields = buildAssignedSubaccountFields(readAssignedSubaccountIds(client), subaccountId);
+  await Client.findByIdAndUpdate(clientId, fields);
+}
 
 const UPLOADS_DIR = path.join(__dirname, '../../uploads/automatizaciones');
 const EMAIL_ATTACHMENTS_DIR = path.join(__dirname, '../../uploads/email-attachments');
@@ -78,7 +157,17 @@ function getQwen(): OpenAI {
 
 // ── Interfaces ───────────────────────────────────────────────────────
 interface Especialidad { id: string; nombre: string; descripcion: string; createdAt: string; }
-interface CuentaCorreo { id: string; plataforma: string; correo: string; password: string; createdAt: string; }
+interface CuentaCorreo {
+  id: string;
+  plataforma: string;
+  correo: string;
+  password: string;
+  createdAt: string;
+  customSmtpHost?: string;
+  customSmtpPort?: number;
+  customImapHost?: string;
+  customImapPort?: number;
+}
 interface Documento { id: string; nombre: string; filename: string; extractedText?: string; uploadedAt: string; }
 
 interface EmailConversation {
@@ -92,9 +181,14 @@ interface EmailConversation {
     text: string;
     time: string;
     sent: boolean;
+    messageId?: string;
+    references?: string;
+    inReplyTo?: string;
   }>;
   lastMessageTime: string;
   unread: number;
+  cuentaCorreoId?: string;
+  cuentaCorreoEmail?: string;
   autoClientId?: string;
   autoReplyPaused?: boolean;
 }
@@ -125,6 +219,128 @@ interface AccountData {
   sortByCarga: boolean;
   emailConversations: EmailConversation[];
   pendingConsultas: PendingConsulta[];
+}
+
+function toCuentaConfig(cuentaCorreo: CuentaCorreo): CuentaCorreoConfig {
+  return {
+    plataforma: cuentaCorreo.plataforma,
+    correo: cuentaCorreo.correo,
+    password: decryptPassword(cuentaCorreo.password),
+    customSmtpHost: cuentaCorreo.customSmtpHost,
+    customSmtpPort: cuentaCorreo.customSmtpPort,
+    customImapHost: cuentaCorreo.customImapHost,
+    customImapPort: cuentaCorreo.customImapPort,
+  };
+}
+
+function findCuentaCorreoExact(account: any, cuentaCorreoId?: string): CuentaCorreo | null {
+  if (!cuentaCorreoId) return null;
+  return (account?.cuentasCorreo || []).find((c: any) => c.id === cuentaCorreoId) || null;
+}
+
+function getDefaultCuentaCorreo(account: any): CuentaCorreo | null {
+  return (account?.cuentasCorreo || [])[0] || null;
+}
+
+function findCuentaCorreo(account: any, cuentaCorreoId?: string): CuentaCorreo | null {
+  return findCuentaCorreoExact(account, cuentaCorreoId) || getDefaultCuentaCorreo(account);
+}
+
+function getConversationCuentaCorreo(account: any, conversationId?: string): CuentaCorreo | null {
+  if (conversationId) {
+    const conv = (account?.emailConversations || []).find((c: any) => c.id === conversationId);
+    const conversationCuenta = findCuentaCorreoExact(account, conv?.cuentaCorreoId);
+    if (conversationCuenta) return conversationCuenta;
+  }
+  return null;
+}
+
+function rememberConversationCuentaCorreo(conversation: any, cuentaCorreo: CuentaCorreo): void {
+  conversation.cuentaCorreoId = cuentaCorreo.id;
+  conversation.cuentaCorreoEmail = cuentaCorreo.correo;
+}
+
+function findEmailConversation(account: any, contactEmail: string, cuentaCorreoId?: string): any | null {
+  const matches = (account?.emailConversations || []).filter(
+    (conversation: any) => normalizeEmailAddress(conversation.contactEmail) === normalizeEmailAddress(contactEmail)
+  );
+
+  if (!cuentaCorreoId) {
+    return matches[0] || null;
+  }
+
+  return matches.find((conversation: any) => conversation.cuentaCorreoId === cuentaCorreoId)
+    || (matches.length === 1 && !matches[0]?.cuentaCorreoId ? matches[0] : null);
+}
+
+function extractConsultaPendingId(subject: string): string | null {
+  return subject.match(/\[CP-(\d+)\]/)?.[1] || null;
+}
+
+function normalizeConsultaSubject(subject: string): string {
+  return (subject || '')
+    .replace(/^\s*(re|rv|fw|fwd)\s*:\s*/gi, '')
+    .replace(/\[Consulta pendiente\]\s*/gi, '')
+    .replace(/\[CP-\d+\]\s*/gi, '')
+    .trim()
+    .toLowerCase();
+}
+
+function isConsultaMailbox(account: any, sender: string): boolean {
+  const normalizedSender = normalizeEmailAddress(sender);
+  return (account.correosConsultas || []).some((email: string) => normalizeEmailAddress(email) === normalizedSender)
+    || (account.whatsappCorreosConsultas || []).some((email: string) => normalizeEmailAddress(email) === normalizedSender);
+}
+
+function findPendingConsultaIndex(account: any, reply: IncomingEmail, incomingCuentaCorreo?: CuentaCorreo): number {
+  const pendingId = extractConsultaPendingId(reply.subject);
+  if (pendingId) {
+    return (account.pendingConsultas || []).findIndex((pending: any) => pending.id === pendingId);
+  }
+
+  const fromLower = normalizeEmailAddress(reply.from);
+  if (!isConsultaMailbox(account, reply.from) && incomingCuentaCorreo?.id) {
+    const conversation = findEmailConversation(account, reply.from, incomingCuentaCorreo.id);
+    if (conversation) {
+      const confirmationIdx = (account.pendingConsultas || []).findIndex((pending: any) =>
+        pending.type === 'confirmacion_asignacion'
+        && pending.channel !== 'whatsapp'
+        && pending.cuentaCorreoId === incomingCuentaCorreo.id
+        && pending.conversationId === conversation.id
+        && normalizeEmailAddress(pending.originalFrom) === fromLower
+      );
+      if (confirmationIdx !== -1) return confirmationIdx;
+    }
+  }
+
+  const normalizedSubject = normalizeConsultaSubject(reply.subject);
+  if (!normalizedSubject) return -1;
+
+  const candidates = (account.pendingConsultas || [])
+    .map((pending: any, index: number) => ({ pending, index }))
+    .filter(({ pending }: any) => {
+      if (pending.channel === 'whatsapp' && pending.type === 'confirmacion_asignacion') return false;
+      if (incomingCuentaCorreo?.id && pending.channel !== 'whatsapp' && pending.cuentaCorreoId !== incomingCuentaCorreo.id) return false;
+      return normalizeConsultaSubject(pending.originalSubject) === normalizedSubject;
+    });
+
+  return candidates.length === 1 ? candidates[0].index : -1;
+}
+
+function resolvePendingWhatsAppSession(account: any, waConversationId?: string, waContactPhone?: string): any | null {
+  const matchingConversation = (account?.whatsappConversations || []).find((conversation: any) =>
+    (waConversationId && conversation.id === waConversationId)
+    || (waContactPhone && sanitizePhoneForWA(conversation.contactPhone) === sanitizePhoneForWA(waContactPhone))
+  );
+
+  const phoneNumberId = matchingConversation?.phoneNumberId || '';
+  if (phoneNumberId) {
+    const exactSession = (account?.whatsappSessions || []).find((session: any) => session.phoneNumberId === phoneNumberId);
+    if (exactSession) return exactSession;
+    if (account?.whatsappSession?.phoneNumberId === phoneNumberId) return account.whatsappSession;
+  }
+
+  return account?.whatsappSessions?.find((session: any) => session.connected) || account?.whatsappSession || null;
 }
 
 // ── Data helpers (Mongoose) ──────────────────────────────────────────
@@ -248,7 +464,7 @@ async function buildEmailHistoryText(
   let summary = '';
   try {
     const res = await getQwen().chat.completions.create({
-      model: AI_MODEL,
+      model: AI_AUTOMATION_MODEL,
       messages: [
         { role: 'system', content: 'Resume brevemente esta conversación de email de un despacho legal. Máximo 5 frases. Sin introducciones. /no_think' },
         { role: 'user', content: olderTranscript.substring(0, 40_000) },
@@ -256,7 +472,7 @@ async function buildEmailHistoryText(
       max_tokens: 400,
       temperature: 0.3,
     });
-    summary = res.choices?.[0]?.message?.content?.replace(/<think>[\s\S]*?<\/think>/gi, '').trim() || '';
+    summary = stripThinkTags(res.choices?.[0]?.message?.content || '').trim();
   } catch (err) {
     console.error('[Email] Error summarizing history:', err);
   }
@@ -292,13 +508,13 @@ ${emailBody.substring(0, 3000)}`;
 
   try {
     const response = await getQwen().chat.completions.create({
-      model: AI_MODEL,
+      model: AI_AUTOMATION_MODEL,
       messages: [{ role: 'user', content: prompt + '\n/no_think' }],
       max_tokens: 200,
       temperature: 0.1,
     });
 
-    const text = (response.choices[0].message.content || '').replace(/<think>[\s\S]*?<\/think>/gi, '').trim();
+    const text = stripThinkTags(response.choices[0].message.content || '').trim();
     const jsonMatch = text.match(/\{[^}]+\}/);
     if (jsonMatch) {
       const parsed = JSON.parse(jsonMatch[0]);
@@ -329,7 +545,7 @@ async function findAnswerInKB(
 
   try {
     const response = await getQwen().chat.completions.create({
-      model: AI_MODEL,
+      model: AI_AUTOMATION_MODEL,
       messages: [
         {
           role: 'system',
@@ -347,7 +563,7 @@ ${kbContext.substring(0, 8000)}`,
       temperature: 0.3,
     });
 
-    const answer = response.choices[0].message.content || '';
+    const answer = stripThinkTags(response.choices[0].message.content || '');
     if (answer.includes('NO_TENGO_INFO')) return { found: false };
     return { found: true, answer };
   } catch (err) {
@@ -365,7 +581,7 @@ async function composeClientReply(
 ): Promise<string> {
   try {
     const response = await getQwen().chat.completions.create({
-      model: AI_MODEL,
+      model: AI_AUTOMATION_MODEL,
       messages: [
         {
           role: 'system',
@@ -393,7 +609,7 @@ Reglas ESTRICTAS:
       temperature: 0.3,
     });
 
-    const text = (response.choices[0].message.content || '').replace(/<think>[\s\S]*?<\/think>/gi, '').trim();
+    const text = stripThinkTags(response.choices[0].message.content || '').trim();
     return text || rawInstruction;
   } catch (err) {
     console.error('[composeClientReply] Error:', err);
@@ -428,7 +644,7 @@ async function forwardToConsultas(
       }).join('\n');
 
       const res = await getQwen().chat.completions.create({
-        model: AI_MODEL,
+        model: AI_AUTOMATION_MODEL,
         messages: [
           { role: 'system', content: 'Eres un asistente que resume conversaciones de email de un despacho de abogados. Genera un resumen breve y claro en español de la conversación, destacando: el tema principal, lo que pide el cliente, y las respuestas que se le han dado. Máximo 5 frases. No uses saludos ni introducciones, ve directo al resumen.' },
           { role: 'user', content: transcript },
@@ -566,8 +782,13 @@ function sanitizePhoneForWA(phone: string): string {
   return (phone || '').replace(/[^0-9]/g, '');
 }
 
-async function sendWhatsAppReplyFromPending(account: any, toPhone: string, text: string): Promise<void> {
-  const session = account?.whatsappSession;
+async function sendWhatsAppReplyFromPending(
+  account: any,
+  toPhone: string,
+  text: string,
+  options?: { waConversationId?: string; waContactPhone?: string },
+): Promise<void> {
+  const session = resolvePendingWhatsAppSession(account, options?.waConversationId, options?.waContactPhone);
   const phoneNumberId = session?.phoneNumberId || '';
   const encryptedToken = session?.accessToken || '';
   const accessToken = decryptPassword(encryptedToken);
@@ -617,34 +838,59 @@ function appendOutgoingWhatsAppMessage(account: any, waConversationId: string | 
 }
 
 // ── 3b. Interpret consulta action (AI) ───────────────────────────────
-async function interpretConsultaAction(
+type ConsultaInstructionAction = 'reject' | 'assign' | 'reply' | 'pause' | 'unclear';
+
+interface ConsultaInstructionInterpretation {
+  action: ConsultaInstructionAction;
+  message?: string;
+  assignToName?: string;
+  confidence?: 'high' | 'medium' | 'low';
+}
+
+function shouldHoldConsultaInstruction(interpretation: ConsultaInstructionInterpretation): boolean {
+  if (interpretation.action === 'unclear') return true;
+  if (interpretation.confidence === 'low') return true;
+  if (interpretation.action === 'assign') return !interpretation.assignToName?.trim();
+  if (interpretation.action === 'reply' || interpretation.action === 'reject') return !interpretation.message?.trim();
+  return false;
+}
+
+export async function interpretConsultaAction(
   replyText: string,
   originalSubject: string,
   originalBody: string,
   subaccountNames: string[],
-): Promise<{ action: 'reject' | 'assign' | 'reply' | 'pause'; message?: string; assignToName?: string }> {
+): Promise<ConsultaInstructionInterpretation> {
   const subNamesStr = subaccountNames.length > 0 ? subaccountNames.join(', ') : 'Ninguno disponible';
 
   try {
     const response = await getQwen().chat.completions.create({
-      model: AI_MODEL,
+      model: AI_AUTOMATION_MODEL,
       messages: [
         {
           role: 'system',
-          content: `Eres un asistente que interpreta instrucciones de un responsable de despacho sobre cómo actuar con la solicitud de un cliente.
+          content: `Eres un asistente que interpreta instrucciones internas de un responsable de despacho sobre cómo actuar con un cliente.
 
-El responsable ha recibido un aviso de que un cliente pide un servicio para el que no hay abogado asignado. El responsable responde con instrucciones.
+La instrucción del responsable puede estar en cualquier idioma, mezclar idiomas, contener faltas, abreviaturas o ser indirecta.
 
-Analiza la respuesta y clasifícala:
-- "reject": Indica que NO se ofrece ese servicio. Genera un mensaje educado de rechazo para el cliente.
-- "assign": Indica asignar el caso a un abogado concreto. Extrae el nombre.
-- "reply": Da instrucciones libres o un mensaje directo para el cliente. Genera el mensaje.
-- "pause": Indica que se pause/desactive la respuesta automtica para este cliente (el responsable quiere atenderlo manualmente).
+Debes clasificarla en UNA sola acción:
+- "reject": Indica que NO se ofrece el servicio o que hay que rechazar la petición. Genera el mensaje final para el cliente.
+- "assign": Indica asignar el caso a un abogado concreto. Extrae el nombre del abogado.
+- "reply": Da información o instrucciones para responder al cliente. Genera el mensaje final para el cliente.
+- "pause": Indica que se pause o desactive la respuesta automática para este cliente o conversación. No redactes mensaje para el cliente.
+- "unclear": La instrucción es ambigua, incompleta, contradictoria, demasiado interna o no estás seguro de interpretarla con seguridad.
+
+Reglas estrictas:
+- Prioriza la seguridad. Si dudas entre varias acciones, usa "unclear".
+- Si la acción es "reply" o "reject", el campo "message" debe ser el texto FINAL listo para enviar al cliente.
+- Ese mensaje debe ser breve, profesional, sin firmas ni placeholders, y en el mismo idioma que el cliente según la consulta original.
+- Usa SOLO la información dada por el responsable y el contexto original del cliente. No inventes datos.
+- Si la acción es "assign", usa "assignToName" con el nombre más claro posible.
 
 Abogados disponibles: ${subNamesStr}
 
 Responde SOLO con JSON válido:
-{"action": "reject"|"assign"|"reply"|"pause", "message": "texto para el cliente (para reject, reply y pause)", "assignToName": "nombre (solo para assign)"}
+{"action": "reject"|"assign"|"reply"|"pause"|"unclear", "message": "texto final para el cliente si aplica", "assignToName": "nombre solo para assign", "confidence": "high"|"medium"|"low"}
 /no_think`,
         },
         {
@@ -657,28 +903,35 @@ Responde SOLO con JSON válido:
     });
 
     const content = response.choices[0]?.message?.content || '';
-
-    // Remove <think>...</think> blocks if present
-    const cleaned = content.replace(/<think>[\s\S]*?<\/think>/gi, '').trim();
+    const cleaned = stripThinkTags(content).trim();
     const jsonMatch = cleaned.match(/\{[\s\S]*\}/);
     if (jsonMatch) {
       const parsed = JSON.parse(jsonMatch[0]);
-      return parsed;
+      const action = parsed?.action;
+      if (action === 'reject' || action === 'assign' || action === 'reply' || action === 'pause' || action === 'unclear') {
+        return {
+          action,
+          message: typeof parsed?.message === 'string' ? parsed.message.trim() : undefined,
+          assignToName: typeof parsed?.assignToName === 'string' ? parsed.assignToName.trim() : undefined,
+          confidence: parsed?.confidence === 'high' || parsed?.confidence === 'medium' || parsed?.confidence === 'low'
+            ? parsed.confidence
+            : 'low',
+        };
+      }
     }
     console.warn('[interpretConsultaAction] No valid JSON found in AI response');
   } catch (err) {
     console.error('Error interpretando respuesta de consulta:', err);
   }
 
-  // Fallback: reply with safe generic message (never auto-reject on AI failure)
-  return { action: 'reply', message: 'Hemos recibido su mensaje. Nuestro equipo lo revisará y le responderá a la mayor brevedad posible.' };
+  return { action: 'unclear', confidence: 'low' };
 }
 
 // ── 3c. Interpret client confirmation (affirmative/negative) ──────────
-async function interpretClientConfirmation(replyText: string): Promise<boolean> {
+export async function interpretClientConfirmation(replyText: string): Promise<boolean> {
   try {
     const response = await getQwen().chat.completions.create({
-      model: AI_MODEL,
+      model: AI_AUTOMATION_MODEL,
       messages: [
         {
           role: 'system',
@@ -693,7 +946,7 @@ Reply ONLY with JSON: {"affirmative": true} or {"affirmative": false}
     });
 
     const content = response.choices[0]?.message?.content || '';
-    const cleaned = content.replace(/<think>[\s\S]*?<\/think>/gi, '').trim();
+    const cleaned = stripThinkTags(content).trim();
     const jsonMatch = cleaned.match(/\{[\s\S]*?\}/);
     if (jsonMatch) {
       const parsed = JSON.parse(jsonMatch[0]);
@@ -702,15 +955,14 @@ Reply ONLY with JSON: {"affirmative": true} or {"affirmative": false}
   } catch (err) {
     console.error('[interpretClientConfirmation] Error:', err);
   }
-  // Default: assume affirmative to not lose potential clients
   return true;
 }
 
 // ── 3d. Detect if client explicitly requests assignment ───────────────
-async function detectExplicitAssignmentRequest(emailBody: string, emailSubject: string): Promise<boolean> {
+export async function detectExplicitAssignmentRequest(emailBody: string, emailSubject: string): Promise<boolean> {
   try {
     const response = await getQwen().chat.completions.create({
-      model: AI_MODEL,
+      model: AI_AUTOMATION_MODEL,
       messages: [
         {
           role: 'system',
@@ -726,7 +978,7 @@ Responde SOLO con JSON: {"explicit": true} o {"explicit": false}
       max_tokens: 50,
     });
 
-    const content = (response.choices[0]?.message?.content || '').replace(/<think>[\s\S]*?<\/think>/gi, '').trim();
+    const content = stripThinkTags(response.choices[0]?.message?.content || '').trim();
     const jsonMatch = content.match(/\{[\s\S]*?\}/);
     if (jsonMatch) {
       const parsed = JSON.parse(jsonMatch[0]);
@@ -738,50 +990,175 @@ Responde SOLO con JSON: {"explicit": true} o {"explicit": false}
   return false;
 }
 
+export async function detectPauseAutoReplyRequest(replyText: string): Promise<boolean> {
+  try {
+    const response = await getQwen().chat.completions.create({
+      model: AI_AUTOMATION_MODEL,
+      messages: [
+        {
+          role: 'system',
+          content: `You analyze an instruction written by a law firm's staff member.
+
+Return true ONLY if the instruction means that automatic replies for this contact or conversation should be paused, stopped, disabled, or turned off.
+The instruction can be written in any language.
+
+Reply ONLY with JSON: {"pause": true} or {"pause": false}
+/no_think`,
+        },
+        { role: 'user', content: replyText.substring(0, 1500) },
+      ],
+      temperature: 0.1,
+      max_tokens: 60,
+    });
+
+    const content = stripThinkTags(response.choices[0]?.message?.content || '').trim();
+    const jsonMatch = content.match(/\{[\s\S]*?\}/);
+    if (jsonMatch) {
+      const parsed = JSON.parse(jsonMatch[0]);
+      return parsed.pause === true;
+    }
+  } catch (err) {
+    console.error('[detectPauseAutoReplyRequest] Error:', err);
+  }
+
+  return false;
+}
+
 // ── 4. Process consulta reply ────────────────────────────────────────
 async function processConsultaReply(
   reply: IncomingEmail,
   accountId: string,
+  incomingCuentaCorreo?: CuentaCorreo,
 ): Promise<boolean> {
   const account = await getAccount(accountId);
 
-  const pendingIdx = account.pendingConsultas.findIndex(
-    (p: any) => {
-      // Match by unique consulta ID in subject (e.g. [CP-1234567890])
-      const idMatch = reply.subject.match(/\[CP-(\d+)\]/);
-      if (idMatch && p.id === idMatch[1]) return true;
-      // Fallback: match by original subject content
-      if (reply.subject.includes(p.originalSubject)) return true;
-      return false;
-    }
-  );
+  const pendingIdx = findPendingConsultaIndex(account, reply, incomingCuentaCorreo);
 
   if (pendingIdx === -1) return false;
 
   const pending = account.pendingConsultas[pendingIdx];
   const cleanReply = stripQuotedText(reply.body);
 
-  const cuentaCorreo = account.cuentasCorreo.find((c: any) => c.id === pending.cuentaCorreoId);
-  if (!cuentaCorreo) {
+  const cuentaCorreo = findCuentaCorreo(account, pending.cuentaCorreoId);
+  if (!cuentaCorreo && pending.channel !== 'whatsapp') {
     account.pendingConsultas.splice(pendingIdx, 1);
     await saveAccount(account);
     return true;
   }
 
-  const cuentaConfig: CuentaCorreoConfig = {
-    plataforma: cuentaCorreo.plataforma,
-    correo: cuentaCorreo.correo,
-    password: decryptPassword(cuentaCorreo.password),
-  };
+  const cuentaConfig: CuentaCorreoConfig | null = cuentaCorreo ? toCuentaConfig(cuentaCorreo) : null;
 
-  // ── WhatsApp pending consulta flow (email -> WhatsApp) ──
   if (pending.channel === 'whatsapp') {
-    const pauseKeywords = /\b(pausa|pausar|desactiva|desactivar|detener|para)\b.*(automatic|automátic|respuesta)/i;
-    if (pauseKeywords.test(cleanReply)) {
-      const waConv = (account.whatsappConversations || []).find((c: any) =>
-        (pending.waConversationId && c.id === pending.waConversationId)
-        || (pending.waContactPhone && sanitizePhoneForWA(c.contactPhone) === sanitizePhoneForWA(pending.waContactPhone))
+    const waTargetPhone = pending.waContactPhone || pending.originalFrom;
+    const waConv = (account.whatsappConversations || []).find((c: any) =>
+      (pending.waConversationId && c.id === pending.waConversationId)
+      || (waTargetPhone && sanitizePhoneForWA(c.contactPhone) === sanitizePhoneForWA(waTargetPhone))
+    );
+
+    if (pending.type === 'solicitud_sin_especialista') {
+      const subaccounts = await Subaccount.find({ parentAccountId: accountId });
+      const subNames = subaccounts.map((s: any) => s.name || s.email);
+      const interpretation = await interpretConsultaAction(
+        cleanReply,
+        pending.originalSubject,
+        pending.originalBody,
+        subNames,
       );
+
+      if (shouldHoldConsultaInstruction(interpretation)) {
+        console.warn(`[processConsultaReply] Instrucción ambigua de consultas para WhatsApp, se mantiene pendiente: ${pending.id}`);
+        await saveAccount(account);
+        return true;
+      }
+
+      if (interpretation.action === 'assign' && interpretation.assignToName) {
+        const targetName = interpretation.assignToName.toLowerCase();
+        const targetSub = subaccounts.find((s: any) =>
+          (s.name || '').toLowerCase().includes(targetName)
+          || (s.email || '').toLowerCase().includes(targetName)
+        );
+
+        if (!targetSub) {
+          console.warn(`[processConsultaReply] No se encontró subcuenta para la instrucción de asignación WhatsApp, se mantiene pendiente: ${pending.id}`);
+          await saveAccount(account);
+          return true;
+        }
+
+        const assigned = await assignWhatsAppCaseToSubaccount(accountId, account, targetSub, {
+          contactName: pending.originalFromName,
+          contactPhone: waTargetPhone,
+          conversationId: pending.waConversationId || pending.conversationId,
+          originalText: pending.originalBody,
+          especialidadId: pending.especialidadId,
+        });
+        const clientLanguage = await resolveAutomationLanguage(
+          accountId,
+          pending.originalSubject,
+          pending.originalBody,
+          cleanReply,
+        );
+        const ackMsg = assigned
+          ? getAutomationMessage(clientLanguage, 'assignedSpecializedProfessional')
+          : getAutomationMessage(clientLanguage, 'couldNotAssignRightNow');
+        try {
+          await sendWhatsAppReplyFromPending(account, waTargetPhone, ackMsg, {
+            waConversationId: pending.waConversationId || pending.conversationId,
+            waContactPhone: waTargetPhone,
+          });
+          appendOutgoingWhatsAppMessage(account, pending.waConversationId || pending.conversationId, waTargetPhone, ackMsg);
+        } catch (err) {
+          console.error('[processConsultaReply] Error enviando respuesta WhatsApp de asignación:', err);
+          await saveAccount(account);
+          return true;
+        }
+      } else if (interpretation.action === 'pause') {
+        if (waConv) {
+          waConv.autoReplyPaused = true;
+          waConv.lastMessageTime = new Date().toISOString();
+        }
+      } else {
+        const clientLanguage = await resolveAutomationLanguage(
+          accountId,
+          pending.originalSubject,
+          pending.originalBody,
+          cleanReply,
+        );
+        const defaultMsg = interpretation.action === 'reject'
+          ? getAutomationMessage(clientLanguage, 'serviceNotOffered')
+          : getAutomationMessage(clientLanguage, 'consultaReviewedMoreInfo');
+        const msg = interpretation.message || defaultMsg;
+        try {
+          await sendWhatsAppReplyFromPending(account, waTargetPhone, msg, {
+            waConversationId: pending.waConversationId || pending.conversationId,
+            waContactPhone: waTargetPhone,
+          });
+          appendOutgoingWhatsAppMessage(account, pending.waConversationId || pending.conversationId, waTargetPhone, msg);
+        } catch (err) {
+          console.error('[processConsultaReply] Error enviando respuesta WhatsApp manual:', err);
+          await saveAccount(account);
+          return true;
+        }
+      }
+
+      account.pendingConsultas.splice(pendingIdx, 1);
+      await saveAccount(account);
+      return true;
+    }
+
+    const interpretation = await interpretConsultaAction(
+      cleanReply,
+      pending.originalSubject,
+      pending.originalBody,
+      [],
+    );
+
+    if (shouldHoldConsultaInstruction(interpretation)) {
+      console.warn(`[processConsultaReply] Instrucción ambigua de consultas para WhatsApp, se mantiene pendiente: ${pending.id}`);
+      await saveAccount(account);
+      return true;
+    }
+
+    if (interpretation.action === 'pause') {
       if (waConv) {
         waConv.autoReplyPaused = true;
         waConv.lastMessageTime = new Date().toISOString();
@@ -792,7 +1169,12 @@ async function processConsultaReply(
       return true;
     }
 
-    // Save manager instruction as new KB snippet (shared docs between Email and WhatsApp)
+    if (interpretation.action !== 'reply' && interpretation.action !== 'reject') {
+      console.warn(`[processConsultaReply] Acción no enviable al cliente para WhatsApp, se mantiene pendiente: ${pending.id}`);
+      await saveAccount(account);
+      return true;
+    }
+
     const docId = Date.now().toString();
     const docFilename = `consulta_wa_${docId}.txt`;
     const docPath = path.join(UPLOADS_DIR, docFilename);
@@ -810,32 +1192,27 @@ async function processConsultaReply(
       uploadedAt: new Date().toISOString(),
     });
 
-    const waConv = (account.whatsappConversations || []).find((c: any) =>
-      (pending.waConversationId && c.id === pending.waConversationId)
-      || (pending.waContactPhone && sanitizePhoneForWA(c.contactPhone) === sanitizePhoneForWA(pending.waContactPhone))
-    );
     const waHistCtx = (waConv?.messages?.length ?? 0) > 0
       ? `CONTEXTO — CONVERSACION PREVIA DE WHATSAPP:\n${waConv!.messages.slice(-20).map((m: any) => `${m.sent ? 'Asistente' : (waConv?.contactName || pending.originalFromName)}: ${m.text}`).join('\n')}`
       : '';
 
-    const composedReply = await composeClientReply(
+    const composedReply = interpretation.message || await composeClientReply(
       pending.originalSubject,
       pending.originalBody,
       cleanReply,
       waHistCtx,
     );
 
-    const waTargetPhone = pending.waContactPhone || pending.originalFrom;
     try {
-      await sendWhatsAppReplyFromPending(account, waTargetPhone, composedReply);
-      appendOutgoingWhatsAppMessage(
-        account,
-        pending.waConversationId || pending.conversationId,
-        waTargetPhone,
-        composedReply,
-      );
+      await sendWhatsAppReplyFromPending(account, waTargetPhone, composedReply, {
+        waConversationId: pending.waConversationId || pending.conversationId,
+        waContactPhone: waTargetPhone,
+      });
+      appendOutgoingWhatsAppMessage(account, pending.waConversationId || pending.conversationId, waTargetPhone, composedReply);
     } catch (err) {
       console.error('[processConsultaReply] Error enviando respuesta a WhatsApp:', err);
+      await saveAccount(account);
+      return true;
     }
 
     account.pendingConsultas.splice(pendingIdx, 1);
@@ -855,10 +1232,15 @@ async function processConsultaReply(
       conv.lastMessageTime = new Date().toISOString();
     }
 
-    // Use AI to determine if the reply is affirmative or negative
     const isAffirmative = await interpretClientConfirmation(cleanReply);
+    const clientLanguage = await resolveAutomationLanguage(
+      accountId,
+      pending.originalSubject,
+      pending.originalBody,
+      cleanReply,
+    );
 
-    if (isAffirmative) {
+    if (isAffirmative && cuentaConfig && cuentaCorreo) {
       const origEmail: IncomingEmail = {
         from: pending.originalFrom,
         fromName: pending.originalFromName,
@@ -871,14 +1253,14 @@ async function processConsultaReply(
       };
       await assignCase(origEmail, accountId, account, pending.especialidadId, cuentaCorreo, pending.conversationId);
 
-      const confirmMsg = 'Perfecto, le hemos asignado un abogado especializado. Se pondrá en contacto con usted en breve.';
+      const confirmMsg = getAutomationMessage(clientLanguage, 'assignedSpecializedLawyer');
       await replyToEmail(cuentaConfig, pending.originalFrom, pending.originalSubject, confirmMsg);
       if (conv) {
         conv.messages.push({ id: Date.now().toString(), from: 'Asistente', text: confirmMsg, time: timeStr, sent: true });
         conv.lastMessageTime = new Date().toISOString();
       }
-    } else {
-      const declineMsg = 'Entendido. Si en el futuro necesita nuestros servicios, no dude en contactarnos.';
+    } else if (cuentaConfig) {
+      const declineMsg = getAutomationMessage(clientLanguage, 'futureNeedServices');
       await replyToEmail(cuentaConfig, pending.originalFrom, pending.originalSubject, declineMsg);
       if (conv) {
         conv.messages.push({ id: Date.now().toString(), from: 'Asistente', text: declineMsg, time: timeStr, sent: true });
@@ -892,13 +1274,21 @@ async function processConsultaReply(
   }
 
   if (pending.type === 'solicitud_sin_especialista') {
-    // ── Use AI to interpret the consultas reply ──
     const subaccounts = await Subaccount.find({ parentAccountId: accountId });
     const subNames = subaccounts.map((s: any) => s.name || s.email);
 
     const interpretation = await interpretConsultaAction(
-      cleanReply, pending.originalSubject, pending.originalBody, subNames,
+      cleanReply,
+      pending.originalSubject,
+      pending.originalBody,
+      subNames,
     );
+
+    if (shouldHoldConsultaInstruction(interpretation)) {
+      console.warn(`[processConsultaReply] Instrucción ambigua de consultas por email, se mantiene pendiente: ${pending.id}`);
+      await saveAccount(account);
+      return true;
+    }
 
     const conv = account.emailConversations.find((c: any) => c.id === pending.conversationId);
     const timeStr = new Date().toISOString();
@@ -910,7 +1300,7 @@ async function processConsultaReply(
         || (s.email || '').toLowerCase().includes(targetName)
       );
 
-      if (targetSub) {
+      if (targetSub && cuentaConfig && cuentaCorreo) {
         const origEmail: IncomingEmail = {
           from: pending.originalFrom,
           fromName: pending.originalFromName,
@@ -923,32 +1313,38 @@ async function processConsultaReply(
         };
         await assignCaseToSubaccount(origEmail, accountId, account, targetSub, cuentaCorreo, pending.conversationId, pending.especialidadId);
 
-        const ackMsg = 'Hemos asignado su caso a un profesional especializado. Le contactará en breve.';
+        const clientLanguage = await resolveAutomationLanguage(
+          accountId,
+          pending.originalSubject,
+          pending.originalBody,
+          cleanReply,
+        );
+        const ackMsg = getAutomationMessage(clientLanguage, 'assignedSpecializedProfessional');
         await replyToEmail(cuentaConfig, pending.originalFrom, pending.originalSubject, ackMsg);
         if (conv) {
           conv.messages.push({ id: Date.now().toString(), from: 'Asistente', text: ackMsg, time: timeStr, sent: true });
           conv.lastMessageTime = new Date().toISOString();
         }
       } else {
-        // Could not find subcuenta, send a safe message
-        const msg = interpretation.message || 'No hemos podido asignar su caso en este momento. Nos pondremos en contacto con usted lo antes posible.';
-        await replyToEmail(cuentaConfig, pending.originalFrom, pending.originalSubject, msg);
-        if (conv) {
-          conv.messages.push({ id: Date.now().toString(), from: 'Asistente', text: msg, time: timeStr, sent: true });
-          conv.lastMessageTime = new Date().toISOString();
-        }
+        console.warn(`[processConsultaReply] No se encontró subcuenta para la instrucción de asignación por email, se mantiene pendiente: ${pending.id}`);
+        await saveAccount(account);
+        return true;
       }
     } else if (interpretation.action === 'pause') {
-      // pause auto-reply for this conversation
       if (conv) {
         conv.autoReplyPaused = true;
         conv.lastMessageTime = new Date().toISOString();
       }
-    } else {
-      // reject or reply — send the AI-generated message to the client
+    } else if (cuentaConfig) {
+      const clientLanguage = await resolveAutomationLanguage(
+        accountId,
+        pending.originalSubject,
+        pending.originalBody,
+        cleanReply,
+      );
       const defaultMsg = interpretation.action === 'reject'
-        ? 'Lamentamos informarle de que actualmente no ofrecemos el servicio solicitado. Le pedimos disculpas por las molestias.'
-        : 'Hemos revisado su consulta y le responderemos en breve con más información.';
+        ? getAutomationMessage(clientLanguage, 'serviceNotOffered')
+        : getAutomationMessage(clientLanguage, 'consultaReviewedMoreInfo');
       const msg = interpretation.message || defaultMsg;
       await replyToEmail(cuentaConfig, pending.originalFrom, pending.originalSubject, msg);
       if (conv) {
@@ -956,11 +1352,21 @@ async function processConsultaReply(
         conv.lastMessageTime = new Date().toISOString();
       }
     }
-  } else {
-    // ── consulta_general ──
-    // Check if the reply is asking to pause auto-reply
-    const pauseKeywords = /\b(pausa|pausar|desactiva|desactivar|detener|para)\b.*(automátic|respuesta)/i;
-    if (pauseKeywords.test(cleanReply)) {
+  } else if (cuentaConfig) {
+    const interpretation = await interpretConsultaAction(
+      cleanReply,
+      pending.originalSubject,
+      pending.originalBody,
+      [],
+    );
+
+    if (shouldHoldConsultaInstruction(interpretation)) {
+      console.warn(`[processConsultaReply] Instrucción ambigua de consultas por email, se mantiene pendiente: ${pending.id}`);
+      await saveAccount(account);
+      return true;
+    }
+
+    if (interpretation.action === 'pause') {
       const convPause = account.emailConversations.find((c: any) => c.id === pending.conversationId);
       if (convPause) {
         convPause.autoReplyPaused = true;
@@ -972,7 +1378,12 @@ async function processConsultaReply(
       return true;
     }
 
-    // Normal flow: save KB doc + reply
+    if (interpretation.action !== 'reply' && interpretation.action !== 'reject') {
+      console.warn(`[processConsultaReply] Acción no enviable al cliente por email, se mantiene pendiente: ${pending.id}`);
+      await saveAccount(account);
+      return true;
+    }
+
     const docId = Date.now().toString();
     const docFilename = `consulta_${docId}.txt`;
     const docPath = path.join(UPLOADS_DIR, docFilename);
@@ -990,12 +1401,16 @@ async function processConsultaReply(
       uploadedAt: new Date().toISOString(),
     });
 
-    // Compose professional reply from raw instruction
     const conv = account.emailConversations.find((c: any) => c.id === pending.conversationId);
     const histCtx = (conv?.messages?.length ?? 0) > 0
       ? await buildEmailHistoryText(conv!.messages, conv!.contactName || pending.originalFromName)
       : '';
-    const composedReply = await composeClientReply(pending.originalSubject, pending.originalBody, cleanReply, histCtx);
+    const composedReply = interpretation.message || await composeClientReply(
+      pending.originalSubject,
+      pending.originalBody,
+      cleanReply,
+      histCtx,
+    );
     await replyToEmail(cuentaConfig, pending.originalFrom, pending.originalSubject, composedReply);
     if (conv) {
       conv.messages.push({
@@ -1015,11 +1430,10 @@ async function processConsultaReply(
 }
 
 // ── 4b. Check if a matching specialist exists ───────────────────────
-async function hasMatchingSpecialist(accountId: string, account: any, especialidadId?: string): Promise<boolean> {
+export async function hasMatchingSpecialist(accountId: string, account: any, especialidadId?: string): Promise<boolean> {
   const subaccounts = await Subaccount.find({ parentAccountId: accountId });
   const subs = account.subcuentaEspecialidades || {};
-  const match = subaccounts.some((s: any) => subs[s._id] === especialidadId);
-  return match;
+  return subaccounts.some((s: any) => subs[s._id] === especialidadId);
 }
 
 // ── 4c. Generate AI summary for client + lawyer ─────────────────────
@@ -1041,7 +1455,7 @@ async function generateCaseSummary(
 
   try {
     const response = await getQwen().chat.completions.create({
-      model: AI_MODEL,
+      model: AI_AUTOMATION_MODEL,
       messages: [
         {
           role: 'system',
@@ -1058,7 +1472,7 @@ Máximo 2-3 frases. No uses formato de lista ni encabezados. Escribe de forma na
       max_tokens: 300,
     });
 
-    const content = (response.choices[0]?.message?.content || '').replace(/<think>[\s\S]*?<\/think>/gi, '').trim();
+    const content = stripThinkTags(response.choices[0]?.message?.content || '').trim();
     if (content && content.length > 10) return content;
   } catch (err) {
     console.error('[generateCaseSummary] Error:', err);
@@ -1066,6 +1480,197 @@ Máximo 2-3 frases. No uses formato de lista ni encabezados. Escribe de forma na
 
   // Fallback
   return `Caso de ${espName}: solicitud recibida por email. Asignado a ${lawyerName}.`;
+}
+
+async function generateWhatsAppCaseSummary(
+  account: any,
+  conversationId: string,
+  contactName: string,
+  contactPhone: string,
+  originalText: string,
+  espName: string,
+  lawyerName: string,
+): Promise<string> {
+  const conv = account.whatsappConversations?.find((c: any) => c.id === conversationId);
+  let conversationText = '';
+
+  if (conv && Array.isArray(conv.messages) && conv.messages.length > 0) {
+    conversationText = conv.messages
+      .map((m: any) => `${m.sent ? 'Asistente' : (conv.contactName || contactName || contactPhone)}: ${m.text}`)
+      .join('\n\n');
+  } else {
+    conversationText = `${contactName || contactPhone}: ${originalText.substring(0, 2000)}`;
+  }
+
+  try {
+    const response = await getQwen().chat.completions.create({
+      model: AI_AUTOMATION_MODEL,
+      messages: [
+        {
+          role: 'system',
+          content: `Genera un resumen breve y natural de un caso legal basándote en una conversación de WhatsApp con el cliente. El resumen debe ser profesional, en tercera persona, y mencionar el tipo de caso y las características principales. Incluye a qué abogado ha sido asignado.
+Máximo 2-3 frases. No uses formato de lista ni encabezados. Escribe de forma natural.
+/no_think`,
+        },
+        {
+          role: 'user',
+          content: `Especialidad: ${espName}\nAbogado asignado: ${lawyerName}\n\nConversación:\n${conversationText.substring(0, 12000)}`,
+        },
+      ],
+      temperature: 0.3,
+      max_tokens: 300,
+    });
+
+    const content = stripThinkTags(response.choices[0]?.message?.content || '').trim();
+    if (content && content.length > 10) return content;
+  } catch (err) {
+    console.error('[generateWhatsAppCaseSummary] Error:', err);
+  }
+
+  return `Caso de ${espName}: solicitud recibida por WhatsApp. Asignado a ${lawyerName}.`;
+}
+
+async function notifySubaccountAssignment(
+  account: any,
+  toEmail: string,
+  subject: string,
+  body: string,
+): Promise<void> {
+  const cuentaCorreo = account.cuentasCorreo?.[0];
+  if (!cuentaCorreo?.correo) return;
+
+  const cuentaConfig = toCuentaConfig(cuentaCorreo);
+
+  try {
+    await sendEmailViaCuenta(cuentaConfig, toEmail, subject, body);
+  } catch (err) {
+    console.error('[notifySubaccountAssignment] Error enviando notificación:', err);
+  }
+}
+
+export async function assignWhatsAppCaseToSubaccount(
+  accountId: string,
+  account: any,
+  subaccount: any,
+  options: {
+    contactName: string;
+    contactPhone: string;
+    conversationId: string;
+    originalText: string;
+    especialidadId?: string;
+  },
+): Promise<{ subaccountId: string; subaccountName: string; email: string } | null> {
+  if (!subaccount?._id) return null;
+
+  const clientId = Date.now().toString();
+  const espName = account.especialidades.find((e: any) => e.id === options.especialidadId)?.nombre || 'General';
+  const lawyerName = subaccount.name || subaccount.email;
+  const aiSummary = await generateWhatsAppCaseSummary(
+    account,
+    options.conversationId,
+    options.contactName,
+    options.contactPhone,
+    options.originalText,
+    espName,
+    lawyerName,
+  );
+
+  const { client } = await findOrCreateClient(
+    accountId,
+    undefined,
+    options.contactPhone,
+    options.contactName || options.contactPhone,
+  );
+  await addSubaccountToClient(client._id, subaccount._id);
+
+  // Actualizar caso con linkedClientId
+  try {
+    const CaseModel = (await import('../models/Case.js')).default;
+    await CaseModel.findOneAndUpdate(
+      { accountId, sourceId: options.conversationId, status: 'pending' },
+      { linkedClientId: client._id }
+    );
+  } catch (err) {
+    console.error('[WhatsApp] error updating case linkedClientId:', err);
+  }
+
+  const lawyerNotification = `Nuevo cliente asignado automáticamente desde WhatsApp.
+
+DATOS DEL CLIENTE:
+- Nombre: ${options.contactName || options.contactPhone}
+- Teléfono: ${options.contactPhone}
+- Especialidad: ${espName}
+
+RESUMEN DEL CASO:
+${aiSummary}
+
+---
+Este cliente ha sido asignado a tu cuenta automáticamente.`;
+
+  await notifySubaccountAssignment(
+    account,
+    subaccount.email,
+    `[Nuevo cliente] ${options.contactName || options.contactPhone} — ${espName}`,
+    lawyerNotification,
+  );
+
+  return {
+    subaccountId: String(subaccount._id),
+    subaccountName: subaccount.name || subaccount.email || '',
+    email: subaccount.email || '',
+  };
+}
+
+export async function assignWhatsAppCase(
+  accountId: string,
+  account: any,
+  options: {
+    contactName: string;
+    contactPhone: string;
+    conversationId: string;
+    originalText: string;
+    especialidadId?: string;
+  },
+): Promise<{ subaccountId: string; subaccountName: string; email: string } | null> {
+  const subaccounts = await Subaccount.find({ parentAccountId: accountId });
+  if (subaccounts.length === 0) {
+    console.warn(`[assignWhatsAppCase] No subaccounts available for account ${accountId} — case for ${options.contactPhone} not assigned`);
+    return null;
+  }
+
+  let bestSubaccount: any = null;
+
+  if (account.sortByCarga) {
+    const clients = await Client.find({ accountId, status: 'abierto' });
+    let minLoad = Infinity;
+    for (const sub of subaccounts) {
+      const load = clients.filter((c: any) => hasAssignedSubaccount(c, sub._id)).length;
+      if (load < minLoad) {
+        minLoad = load;
+        bestSubaccount = sub;
+      }
+    }
+  } else {
+    const subs = account.subcuentaEspecialidades || {};
+    const candidates = options.especialidadId
+      ? subaccounts.filter((s: any) => subs[s._id] === options.especialidadId)
+      : subaccounts;
+
+    const pool = candidates.length > 0 ? candidates : subaccounts;
+    const clients = await Client.find({ accountId, status: 'abierto' });
+    let minLoad = Infinity;
+    for (const sub of pool) {
+      const load = clients.filter((c: any) => hasAssignedSubaccount(c, sub._id)).length;
+      if (load < minLoad) {
+        minLoad = load;
+        bestSubaccount = sub;
+      }
+    }
+  }
+
+  if (!bestSubaccount) return null;
+
+  return assignWhatsAppCaseToSubaccount(accountId, account, bestSubaccount, options);
 }
 
 // ── 4d. Assign case to a specific subaccount ─────────────────────────
@@ -1078,39 +1683,36 @@ async function assignCaseToSubaccount(
   conversationId: string,
   especialidadId?: string,
 ): Promise<void> {
-  const clientId = Date.now().toString();
   const espName = account.especialidades.find((e: any) => e.id === especialidadId)?.nombre || 'General';
   const lawyerName = subaccount.name || subaccount.email;
 
   // Generate AI summary
   const aiSummary = await generateCaseSummary(email, account, conversationId, espName, lawyerName);
 
-  // Save account first (set autoClientId), then create client
   const conv = account.emailConversations.find((c: any) => c.id === conversationId);
-  if (conv) conv.autoClientId = clientId;
-  await saveAccount(account);
-
-  await Client.create({
-    _id: clientId,
-    name: email.fromName || email.from,
-    email: email.from,
-    phone: '',
-    cases: 1,
-    status: 'abierto',
-    summary: aiSummary,
-    files: [],
+  const { client, created } = await findOrCreateClient(
     accountId,
-    assignedSubaccountId: subaccount._id,
-    clientType: 'particular',
-    autoCreated: true,
-    fiscalInfo: {},
-  });
+    email.from,
+    '',
+    email.fromName || email.from,
+    createAutomationClientId(),
+  );
+  if (conv) {
+    conv.autoClientId = created ? client._id : undefined;
+  }
+  try {
+    await saveAccount(account);
+  } catch (err) {
+    if (created) {
+      await Client.deleteOne({ _id: client._id }).catch(() => {});
+    }
+    throw err;
+  }
+  await addSubaccountToClient(client._id, subaccount._id);
 
-  const cuentaConfig: CuentaCorreoConfig = {
-    plataforma: cuentaCorreo.plataforma,
-    correo: cuentaCorreo.correo,
-    password: decryptPassword(cuentaCorreo.password),
-  };
+  await createCaseFromEmail(accountId, account, email, conversationId, especialidadId, 'solicitud_servicio', 'assigned', subaccount._id, subaccount.name || subaccount.email, client._id);
+
+  const cuentaConfig = toCuentaConfig(cuentaCorreo);
 
   const lawyerNotification = `Nuevo cliente asignado.\n\nDATOS DEL CLIENTE:\n- Nombre: ${email.fromName || email.from}\n- Email: ${email.from}\n- Especialidad: ${espName}\n\nRESUMEN DEL CASO:\n${aiSummary}\n\n---\nEste cliente ha sido asignado a tu cuenta.`;
 
@@ -1148,7 +1750,7 @@ async function assignCase(
     const clients = await Client.find({ accountId, status: 'abierto' });
     let minLoad = Infinity;
     for (const sub of subaccounts) {
-      const load = clients.filter((c: any) => c.assignedSubaccountId === sub._id).length;
+      const load = clients.filter((c: any) => hasAssignedSubaccount(c, sub._id)).length;
       if (load < minLoad) { minLoad = load; bestSubaccount = sub; }
     }
   } else {
@@ -1162,48 +1764,66 @@ async function assignCase(
     const clients = await Client.find({ accountId, status: 'abierto' });
     let minLoad = Infinity;
     for (const sub of pool) {
-      const load = clients.filter((c: any) => c.assignedSubaccountId === sub._id).length;
+      const load = clients.filter((c: any) => hasAssignedSubaccount(c, sub._id)).length;
       if (load < minLoad) { minLoad = load; bestSubaccount = sub; }
     }
   }
 
   if (!bestSubaccount) return;
 
-  // Update conversation with clientId FIRST, save, THEN create client
-  const clientId = Date.now().toString();
   const conv = account.emailConversations.find((c: any) => c.id === conversationId);
-  if (conv) conv.autoClientId = clientId;
-  await saveAccount(account);
-
-  // Now create the client (after account save succeeded)
   const espName = account.especialidades.find((e: any) => e.id === especialidadId)?.nombre || 'General';
   const lawyerName = bestSubaccount.name || bestSubaccount.email;
 
   // Generate AI summary
   const aiSummary = await generateCaseSummary(email, account, conversationId, espName, lawyerName);
 
-  await Client.create({
-    _id: clientId,
-    name: email.fromName || email.from,
-    email: email.from,
-    phone: '',
-    cases: 1,
-    status: 'abierto',
-    summary: aiSummary,
-    files: [],
+  const { client, created } = await findOrCreateClient(
     accountId,
-    assignedSubaccountId: bestSubaccount._id,
-    clientType: 'particular',
-    autoCreated: true,
-    fiscalInfo: {},
-  });
+    email.from,
+    '',
+    email.fromName || email.from.split('@')[0],
+    createAutomationClientId(),
+  );
+  if (conv) {
+    conv.autoClientId = created ? client._id : undefined;
+  }
+  try {
+    await saveAccount(account);
+  } catch (err) {
+    if (created) {
+      await Client.deleteOne({ _id: client._id }).catch(() => {});
+    }
+    throw err;
+  }
+  await addSubaccountToClient(client._id, bestSubaccount._id);
+
+  // Update the pending case to assigned status (or create if none exists)
+  let updatedExisting = false;
+  try {
+    const CaseModel = (await import('../models/Case.js')).default;
+    const updateResult = await CaseModel.findOneAndUpdate(
+      { accountId, sourceId: conversationId, status: 'pending' },
+      {
+        status: 'assigned',
+        assignedSubaccountId: bestSubaccount._id,
+        assignedSubaccountName: bestSubaccount.name || bestSubaccount.email,
+        assignedAt: new Date().toISOString(),
+        linkedClientId: client._id,
+        linkedClientName: email.fromName || email.from,
+      }
+    );
+    if (updateResult) updatedExisting = true;
+  } catch (err) {
+    console.error('[assignCase] error updating case:', err);
+  }
+
+  if (!updatedExisting) {
+    await createCaseFromEmail(accountId, account, email, conversationId, especialidadId, 'solicitud_servicio', 'assigned', bestSubaccount._id, bestSubaccount.name || bestSubaccount.email, client._id);
+  }
 
   // Send email to the assigned lawyer
-  const cuentaConfig: CuentaCorreoConfig = {
-    plataforma: cuentaCorreo.plataforma,
-    correo: cuentaCorreo.correo,
-    password: decryptPassword(cuentaCorreo.password),
-  };
+  const cuentaConfig = toCuentaConfig(cuentaCorreo);
 
   const lawyerNotification = `Nuevo cliente asignado automáticamente.
 
@@ -1232,7 +1852,6 @@ Este cliente ha sido asignado a tu cuenta automáticamente.`;
 
 // ── Delayed reply queue (persisted in MongoDB) ──────────────────────
 interface PendingReply {
-  cuentaConfig: CuentaCorreoConfig;
   to: string;
   subject: string;
   text: string;
@@ -1241,6 +1860,8 @@ interface PendingReply {
   scheduledAt: number; // timestamp
   accountId: string;
   conversationId?: string;
+  cuentaCorreoId?: string;
+  retryCount?: number;
 }
 
 async function scheduleReply(
@@ -1251,13 +1872,14 @@ async function scheduleReply(
   references?: string,
   accountId?: string,
   conversationId?: string,
+  cuentaCorreoId?: string,
 ): Promise<void> {
   const delayMs = 1 * 60 * 1000; // 1 minuto
   const scheduledAt = Date.now() + delayMs;
   const replyDoc = {
     id: Date.now().toString() + '_' + Math.random().toString(36).substring(2, 8),
     to, subject, text, messageId, references,
-    scheduledAt, accountId: accountId || '', conversationId,
+    scheduledAt, accountId: accountId || '', conversationId, cuentaCorreoId,
     retryCount: 0,
   };
   await Automation.findByIdAndUpdate(accountId, { $push: { pendingReplies: replyDoc } });
@@ -1281,23 +1903,21 @@ async function processPendingReplies(): Promise<void> {
       try {
         // Drop replies that exceeded max retries
         if ((reply.retryCount || 0) >= MAX_RETRIES) {
-          console.error(`[scheduleReply] Reply to ${reply.to} exceeded ${MAX_RETRIES} retries, discarding`);
-          sentIds.push(reply.id);
+          console.error(`[scheduleReply] Reply to ${reply.to} exceeded ${MAX_RETRIES} retries, keeping queued for manual review`);
           continue;
         }
 
-        // Resolve email credentials from account's cuentasCorreo (no plaintext passwords stored)
-        const cuentaCorreo = account.cuentasCorreo?.[0];
+        // Resolve only the original sender account; never fall back to another mailbox.
+        const cuentaCorreo = findCuentaCorreoExact(account, reply.cuentaCorreoId)
+          || (!reply.cuentaCorreoId ? getConversationCuentaCorreo(account, reply.conversationId) : null);
         if (!cuentaCorreo) {
-          console.error(`[scheduleReply] No email account found for ${account._id}, skipping reply to ${reply.to}`);
-          sentIds.push(reply.id); // Remove orphaned reply
+          console.error(`[scheduleReply] Original email account not found for ${account._id}, keeping queued reply to ${reply.to}`);
+          await Automation.findByIdAndUpdate(account._id, {
+            $inc: { 'pendingReplies.$[elem].retryCount': 1 }
+          }, { arrayFilters: [{ 'elem.id': reply.id }] });
           continue;
         }
-        const cuentaConfig: CuentaCorreoConfig = {
-          plataforma: cuentaCorreo.plataforma,
-          correo: cuentaCorreo.correo,
-          password: decryptPassword(cuentaCorreo.password),
-        };
+        const cuentaConfig = toCuentaConfig(cuentaCorreo);
         await replyToEmail(cuentaConfig, reply.to, reply.subject, reply.text, reply.messageId, reply.references);
         sentIds.push(reply.id);
 
@@ -1363,11 +1983,12 @@ function saveIncomingAttachments(attachments?: IncomingEmailAttachment[]): Array
 function addToConversation(
   account: any,
   email: IncomingEmail,
+  cuentaCorreo: CuentaCorreo,
   isReply: boolean,
   replyText?: string,
 ): string {
   // Find existing conversation with this contact
-  let conv = account.emailConversations.find((c: any) => c.contactEmail === email.from);
+  let conv = findEmailConversation(account, email.from, cuentaCorreo.id);
 
   const now = new Date();
   const timeStr = now.toISOString();
@@ -1384,6 +2005,9 @@ function addToConversation(
       text: cleanBody.substring(0, 5000),
       time: timeStr,
       sent: false,
+      messageId: email.messageId,
+      references: email.references,
+      inReplyTo: email.inReplyTo,
       attachments: savedAttachments,
     };
     const msgs: any[] = [incomingMsg];
@@ -1407,10 +2031,14 @@ function addToConversation(
       messages: msgs,
       lastMessageTime: now.toISOString(),
       unread: 1,
+      cuentaCorreoId: cuentaCorreo.id,
+      cuentaCorreoEmail: cuentaCorreo.correo,
     };
     account.emailConversations.push(newConv);
     return newConv.id;
   }
+
+  rememberConversationCuentaCorreo(conv, cuentaCorreo);
 
   // Add incoming message to existing conversation
   conv.messages.push({
@@ -1419,6 +2047,9 @@ function addToConversation(
     text: cleanBody.substring(0, 5000),
     time: timeStr,
     sent: false,
+    messageId: email.messageId,
+    references: email.references,
+    inReplyTo: email.inReplyTo,
     attachments: savedAttachments,
   });
   conv.unread++;
@@ -1459,12 +2090,12 @@ async function applyClassifyRules(
     const prompt = `Tienes una regla de clasificación de emails:\nNombre: "${rule.name}"\nDescripción: "${rule.description}"\nCarpetas destino: "${folderNames}"\n\nAnaliza este email y determina si debe clasificarse según esa regla:\nASUNTO: ${emailSubject}\nCONTENIDO:\n${emailBody.substring(0, 2000)}\n\nResponde SOLO con JSON: {"match": true} o {"match": false}\n/no_think`;
     try {
       const response = await getQwen().chat.completions.create({
-        model: AI_MODEL,
+        model: AI_AUTOMATION_MODEL,
         messages: [{ role: 'user', content: prompt }],
         max_tokens: 50,
         temperature: 0.1,
       });
-      const text = (response.choices[0]?.message?.content || '').replace(/<think>[\s\S]*?<\/think>/gi, '').trim();
+      const text = stripThinkTags(response.choices[0]?.message?.content || '').trim();
       const jsonMatch = text.match(/\{[^}]+\}/);
       if (!jsonMatch) continue;
       const parsed = JSON.parse(jsonMatch[0]);
@@ -1491,11 +2122,7 @@ async function processOneEmail(
   cuentaCorreo: CuentaCorreo,
 ): Promise<void> {
   const account = await getAccount(accountId);
-  const cuentaConfig: CuentaCorreoConfig = {
-    plataforma: cuentaCorreo.plataforma,
-    correo: cuentaCorreo.correo,
-    password: decryptPassword(cuentaCorreo.password),
-  };
+  const cuentaConfig = toCuentaConfig(cuentaCorreo);
 
   // Check if this is a reply to a pending consulta (from consultas emails)
   const fromLower = email.from.toLowerCase();
@@ -1503,25 +2130,31 @@ async function processOneEmail(
     || (account.whatsappCorreosConsultas || []).some((c: any) => c.toLowerCase() === fromLower)
     || email.subject.includes('[Consulta pendiente]');
   if (isConsulta) {
-    const handled = await processConsultaReply(email, accountId);
+    const handled = await processConsultaReply(email, accountId, cuentaCorreo);
     if (handled) return;
   }
 
+  const existingConv = findEmailConversation(account, email.from, cuentaCorreo.id);
+
   // Check if this is a client reply to a pending confirmation
-  const pendingConfirmation = account.pendingConsultas.find(
-    (p: any) => p.type === 'confirmacion_asignacion'
-      && p.originalFrom.toLowerCase() === fromLower
+  const pendingConfirmationCandidates = (account.pendingConsultas || []).filter(
+    (pending: any) => pending.type === 'confirmacion_asignacion'
+      && pending.channel !== 'whatsapp'
+      && pending.cuentaCorreoId === cuentaCorreo.id
+      && normalizeEmailAddress(pending.originalFrom) === fromLower
   );
+  const pendingConfirmation = existingConv
+    ? pendingConfirmationCandidates.find((pending: any) => pending.conversationId === existingConv.id)
+    : (pendingConfirmationCandidates.length === 1 ? pendingConfirmationCandidates[0] : null);
   if (pendingConfirmation) {
-    const handled = await processConsultaReply(email, accountId);
+    const handled = await processConsultaReply(email, accountId, cuentaCorreo);
     if (handled) return;
   }
 
   // Check if auto-reply is paused for this contact's conversation
-  const existingConv = account.emailConversations.find((c: any) => c.contactEmail === email.from);
   if (existingConv?.autoReplyPaused) {
     // Auto-reply paused — just store the message, no AI processing
-    const convIdPaused = addToConversation(account, email, false);
+    const convIdPaused = addToConversation(account, email, cuentaCorreo, false);
     await saveAccount(account);
     await applyClassifyRules(account, convIdPaused, email.subject, email.body);
     return;
@@ -1529,7 +2162,7 @@ async function processOneEmail(
 
   // ── Emails with attachments: skip AI, forward directly to consultas ──
   if (email.attachments && email.attachments.length > 0 && account.switchActivo) {
-    const convId = addToConversation(account, email, false);
+    const convId = addToConversation(account, email, cuentaCorreo, false);
     await saveAccount(account);
     await applyClassifyRules(account, convId, email.subject, email.body);
     if (account.correosConsultas.length > 0) {
@@ -1558,7 +2191,7 @@ async function processOneEmail(
 
   if (soloConocidos && !existingConv && classification.type !== 'otro') {
     // Only respond to known contacts — this is a new contact, just store
-    const convIdSolo = addToConversation(account, email, false);
+    const convIdSolo = addToConversation(account, email, cuentaCorreo, false);
     await saveAccount(account);
     await applyClassifyRules(account, convIdSolo, email.subject, email.body);
     return;
@@ -1566,7 +2199,7 @@ async function processOneEmail(
 
   if (classification.type === 'consulta_general' && !respondConsultas) {
     // General queries disabled — store but don't auto-respond
-    const convIdCg = addToConversation(account, email, false);
+    const convIdCg = addToConversation(account, email, cuentaCorreo, false);
     await saveAccount(account);
     await applyClassifyRules(account, convIdCg, email.subject, email.body);
     return;
@@ -1574,7 +2207,7 @@ async function processOneEmail(
 
   if (classification.type === 'solicitud_servicio' && !respondSolicitudes) {
     // Service requests disabled — store but don't auto-manage
-    const convIdSs = addToConversation(account, email, false);
+    const convIdSs = addToConversation(account, email, cuentaCorreo, false);
     await saveAccount(account);
     await applyClassifyRules(account, convIdSs, email.subject, email.body);
     return;
@@ -1582,7 +2215,7 @@ async function processOneEmail(
 
   if (classification.type === 'otro') {
     // Just store the conversation, no action
-    const convIdOtro = addToConversation(account, email, false);
+    const convIdOtro = addToConversation(account, email, cuentaCorreo, false);
     await saveAccount(account);
     await applyClassifyRules(account, convIdOtro, email.subject, email.body);
     return;
@@ -1595,13 +2228,13 @@ async function processOneEmail(
 
     if (kbResult.found && kbResult.answer) {
       // Schedule delayed reply
-      const convId = addToConversation(account, email, false);
+      const convId = addToConversation(account, email, cuentaCorreo, false);
       await saveAccount(account);
       await applyClassifyRules(account, convId, email.subject, email.body);
-      await scheduleReply(email.from, email.subject, kbResult.answer, email.messageId, email.references, accountId, convId);
+      await scheduleReply(email.from, email.subject, kbResult.answer, email.messageId, email.references, accountId, convId, cuentaCorreo.id);
     } else {
       // Forward to consultas
-      const convId = addToConversation(account, email, false);
+      const convId = addToConversation(account, email, cuentaCorreo, false);
       await saveAccount(account);
       await applyClassifyRules(account, convId, email.subject, email.body);
       await forwardToConsultas(cuentaConfig, account.correosConsultas, email, account, cuentaCorreo.id, convId);
@@ -1610,12 +2243,16 @@ async function processOneEmail(
   }
 
   if (classification.type === 'solicitud_servicio') {
+    const clientLanguage = await resolveAutomationLanguage(accountId, email.subject, email.body);
+
     // Check if auto-assign is enabled
     if (!account.autoAssignEnabled) {
-      // Auto-assign disabled — just store conversation, no forwarding
-      const convIdNoAssign = addToConversation(account, email, false);
+      // Auto-assign disabled — create pending case
+      const convIdNoAssign = addToConversation(account, email, cuentaCorreo, false);
       await saveAccount(account);
       await applyClassifyRules(account, convIdNoAssign, email.subject, email.body);
+      const { client } = await findOrCreateClient(accountId, email.from, '', email.fromName || email.from);
+      await createCaseFromEmail(accountId, account, email, convIdNoAssign, classification.especialidadId, 'solicitud_servicio', 'pending', undefined, undefined, client._id);
       return;
     }
 
@@ -1627,21 +2264,24 @@ async function processOneEmail(
 
       if (explicitRequest) {
         // Client explicitly asked for assignment — assign directly
-        const convId = addToConversation(account, email, false);
+        const convId = addToConversation(account, email, cuentaCorreo, false);
         await saveAccount(account);
         await applyClassifyRules(account, convId, email.subject, email.body);
         await assignCase(email, accountId, account, classification.especialidadId, cuentaCorreo, convId);
 
-        const confirmMsg = 'Perfecto, le hemos asignado un abogado especializado. Se pondrá en contacto con usted en breve.';
-        await scheduleReply(email.from, email.subject, confirmMsg, email.messageId, email.references, accountId, convId);
+        const confirmMsg = getAutomationMessage(clientLanguage, 'assignedSpecializedLawyer');
+        await scheduleReply(email.from, email.subject, confirmMsg, email.messageId, email.references, accountId, convId, cuentaCorreo.id);
         await saveAccount(account);
       } else {
-        // Ask client before assigning
+        // Ask client before assigning — create pending case
         const espName = account.especialidades.find((e: any) => e.id === classification.especialidadId)?.nombre || 'su caso';
-        const askMsg = `Hemos recibido su solicitud. Contamos con abogados especializados en ${espName}. ¿Le gustaría que le asignemos un abogado para su caso? Responda a este email para confirmar.`;
-        await scheduleReply(email.from, email.subject, askMsg, email.messageId, email.references, accountId);
-        const convId = addToConversation(account, email, true, askMsg);
+        const askMsg = getAutomationMessage(clientLanguage, 'assignmentAskEmail', { espName });
+        const convId = addToConversation(account, email, cuentaCorreo, false);
+        await saveAccount(account);
         await applyClassifyRules(account, convId, email.subject, email.body);
+        await scheduleReply(email.from, email.subject, askMsg, email.messageId, email.references, accountId, convId, cuentaCorreo.id);
+        const { client } = await findOrCreateClient(accountId, email.from, '', email.fromName || email.from);
+        await createCaseFromEmail(accountId, account, email, convId, classification.especialidadId, 'solicitud_servicio', 'pending', undefined, undefined, client._id);
         // Save pending confirmation on same account object (avoid race condition)
         account.pendingConsultas.push({
           id: Date.now().toString(),
@@ -1659,33 +2299,31 @@ async function processOneEmail(
         await saveAccount(account);
       }
     } else {
-      // No specialist — neutral reply + forward to consultas for decision
-      const neutralMsg = 'Hemos recibido su solicitud. La estamos revisando y le responderemos en breve.';
-      const convId = addToConversation(account, email, false);
+      // Cannot assign (no specialist) — create pending case and forward
+      const convId = addToConversation(account, email, cuentaCorreo, false);
       await saveAccount(account);
       await applyClassifyRules(account, convId, email.subject, email.body);
-      await scheduleReply(email.from, email.subject, neutralMsg, email.messageId, email.references, accountId, convId);
-      const espName = account.especialidades.find((e: any) => e.id === classification.especialidadId)?.nombre || 'desconocida';
-      await forwardToConsultas(cuentaConfig, account.correosConsultas, email, account, cuentaCorreo.id, convId, 'solicitud_sin_especialista', espName, classification.especialidadId);
+      const { client } = await findOrCreateClient(accountId, email.from, '', email.fromName || email.from);
+      await createCaseFromEmail(accountId, account, email, convId, classification.especialidadId, 'solicitud_servicio', 'pending', undefined, undefined, client._id);
+      await forwardToConsultas(cuentaConfig, account.correosConsultas, email, account, cuentaCorreo.id, convId, 'solicitud_sin_especialista', classification.especialidadId);
     }
+    return;
   }
 }
 
 // ── Polling management ───────────────────────────────────────────────
 const pollingIntervals = new Map<string, ReturnType<typeof setInterval>>();
+const EMAIL_POLL_LOCK_TTL_MS = 5 * 60 * 1000;
 
 export async function processIncomingEmails(accountId: string): Promise<number> {
-  return withAccountLock(accountId, async () => {
-    const account = await getAccount(accountId);
+  const processed = await runWithDistributedLock(`email-poll:${accountId}`, EMAIL_POLL_LOCK_TTL_MS, async () =>
+    withAccountLock(accountId, async () => {
+      const account = await getAccount(accountId);
 
-    let totalProcessed = 0;
+      let totalProcessed = 0;
 
     for (const cuentaCorreo of account.cuentasCorreo) {
-      const cuentaConfig: CuentaCorreoConfig = {
-        plataforma: cuentaCorreo.plataforma,
-        correo: cuentaCorreo.correo,
-        password: decryptPassword(cuentaCorreo.password),
-      };
+      const cuentaConfig = toCuentaConfig(cuentaCorreo);
 
       try {
         const emails = await fetchUnreadEmails(cuentaConfig);
@@ -1707,8 +2345,11 @@ export async function processIncomingEmails(accountId: string): Promise<number> 
             if (!account.switchActivo) {
               // Just store all messages
               for (const email of senderEmails) {
-                addToConversation(account, email, false);
+                addToConversation(account, email, cuentaCorreo, false);
                 await saveAccount(account);
+                if (email.uid) {
+                  await markEmailsAsSeen(cuentaConfig, [email.uid]);
+                }
               }
               totalProcessed += senderEmails.length;
               continue;
@@ -1717,13 +2358,23 @@ export async function processIncomingEmails(accountId: string): Promise<number> 
             if (senderEmails.length === 1) {
               // Single email — process normally
               await processOneEmail(senderEmails[0], accountId, cuentaCorreo);
+              if (senderEmails[0].uid) {
+                await markEmailsAsSeen(cuentaConfig, [senderEmails[0].uid]);
+              }
             } else {
               // Multiple emails from same sender — store all, but only AI-process the merged version
               // Store all individual messages in the conversation first
               for (let i = 0; i < senderEmails.length - 1; i++) {
-                addToConversation(account, senderEmails[i], false);
+                addToConversation(account, senderEmails[i], cuentaCorreo, false);
               }
               await saveAccount(account);
+              const persistedUids = senderEmails
+                .slice(0, -1)
+                .map((email) => email.uid)
+                .filter((uid): uid is number => Number.isInteger(uid));
+              if (persistedUids.length > 0) {
+                await markEmailsAsSeen(cuentaConfig, persistedUids);
+              }
 
               // Merge bodies into the last email for AI processing
               const lastEmail = senderEmails[senderEmails.length - 1];
@@ -1735,6 +2386,9 @@ export async function processIncomingEmails(accountId: string): Promise<number> 
                 attachments: senderEmails.flatMap(e => e.attachments || []),
               };
               await processOneEmail(mergedEmail, accountId, cuentaCorreo);
+              if (lastEmail.uid) {
+                await markEmailsAsSeen(cuentaConfig, [lastEmail.uid]);
+              }
             }
             totalProcessed += senderEmails.length;
           } catch (err) {
@@ -1746,8 +2400,11 @@ export async function processIncomingEmails(accountId: string): Promise<number> 
       }
     }
 
-    return totalProcessed;
-  });
+      return totalProcessed;
+    })
+  );
+
+  return processed ?? 0;
 }
 
 export function startPolling(accountId: string): void {
@@ -1821,7 +2478,7 @@ export async function deleteConversation(accountId: string, conversationId: stri
   // Remove auto-created client if exists
   if (conv?.autoClientId) {
     try {
-      const result = await Client.deleteOne({ _id: conv.autoClientId });
+      const result = await Client.deleteOne({ _id: conv.autoClientId, accountId, autoCreated: true });
       if (result.deletedCount > 0) {
       }
     } catch (err) {
@@ -1846,20 +2503,16 @@ export async function sendManualEmail(
   conversationId: string,
   text: string,
   attachmentFiles?: Array<{ id: string; filename: string; originalName: string; mimeType: string; size: number; path: string }>,
-): Promise<boolean> {
+): Promise<{ ok: boolean; error?: string; notFound?: boolean }> {
   const account = await getAccount(accountId);
   const conv = account.emailConversations.find((c: any) => c.id === conversationId);
-  if (!conv) return false;
+  if (!conv) return { ok: false, error: 'Conversación no encontrada', notFound: true };
 
   // Find the email account to send from
-  const cuentaCorreo = account.cuentasCorreo[0];
-  if (!cuentaCorreo) return false;
+  const cuentaCorreo = getConversationCuentaCorreo(account, conversationId) || getDefaultCuentaCorreo(account);
+  if (!cuentaCorreo) return { ok: false, error: 'Cuenta de correo no encontrada', notFound: true };
 
-  const cuentaConfig: CuentaCorreoConfig = {
-    plataforma: cuentaCorreo.plataforma,
-    correo: cuentaCorreo.correo,
-    password: decryptPassword(cuentaCorreo.password),
-  };
+  const cuentaConfig = toCuentaConfig(cuentaCorreo);
 
   // Save message BEFORE sending so it's not lost if SMTP succeeds but save fails
   const timeStr = new Date().toISOString();
@@ -1870,7 +2523,7 @@ export async function sendManualEmail(
     mimeType: a.mimeType,
     size: a.size,
   }));
-  const newMsg = {
+  const newMsg: any = {
     id: Date.now().toString(),
     from: 'Asistente',
     text,
@@ -1883,10 +2536,17 @@ export async function sendManualEmail(
   await saveAccount(account);
 
   try {
+    const replySource = [...(conv.messages || [])].reverse().find((message: any) => !message.sent && (message.messageId || message.references));
+    const inReplyTo = replySource?.messageId;
+    const references = [replySource?.references, replySource?.messageId].filter(Boolean).join(' ') || undefined;
     const smtpAttachments = attachmentFiles?.map(a => ({ filename: a.originalName, path: a.path }));
-    await replyToEmail(cuentaConfig, conv.contactEmail, conv.subject, text, undefined, undefined, smtpAttachments);
+    const sentMessageId = await replyToEmail(cuentaConfig, conv.contactEmail, conv.subject, text, inReplyTo, references, smtpAttachments);
+    newMsg.messageId = sentMessageId;
+    newMsg.references = references;
+    newMsg.inReplyTo = inReplyTo;
+    await saveAccount(account);
 
-    return true;
+    return { ok: true };
   } catch (err) {
     console.error('[Email] Error sending manual email, rolling back message:', err);
     // Rollback: remove message from conversation
@@ -1899,7 +2559,7 @@ export async function sendManualEmail(
         try { const fs = await import('fs'); fs.unlinkSync(af.path); } catch { /* already gone */ }
       }
     }
-    return false;
+    return { ok: false, error: 'Error al enviar el email por SMTP' };
   }
 }
 

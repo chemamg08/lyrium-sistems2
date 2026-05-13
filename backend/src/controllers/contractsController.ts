@@ -4,11 +4,14 @@ import path from 'path';
 import { fileURLToPath } from 'url';
 import { analyzeContractPdf } from '../services/contractPdfService.js';
 import { Contract } from '../models/Contract.js';
+import { ContractChat } from '../models/ContractChat.js';
+import { GeneratedContract } from '../models/GeneratedContract.js';
 import { sanitizeFilename } from '../utils/sanitizeFilename.js';
 import { verifyOwnership } from '../middleware/auth.js';
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
+const TEMPLATES_DIR = path.join(__dirname, '../../templates');
 
 // GET /api/contracts - Obtener todos los contratos
 export const getContracts = async (req: Request, res: Response) => {
@@ -56,7 +59,7 @@ export const createContract = async (req: Request, res: Response) => {
       name,
       summary: summary || '',
       fileName: sanitizeFilename(file.originalname),
-      filePath: `uploads/${file.filename}`,
+      filePath: `uploads/contracts/${file.filename}`,
       accountId
     });
 
@@ -113,6 +116,35 @@ export const deleteContract = async (req: Request, res: Response) => {
       await fs.unlink(filePath);
     } catch (error) {
       console.error('Error al eliminar archivo:', error);
+    }
+
+    const contractChats = await ContractChat.find({ contractBaseId: id }).select('_id');
+    const chatIds = contractChats.map((chat) => chat._id);
+
+    if (chatIds.length > 0) {
+      const generatedContracts = await GeneratedContract.find({ chatId: { $in: chatIds } });
+
+      await Promise.all(
+        generatedContracts.flatMap((generatedContract) => {
+          const artifactPaths = [generatedContract.filePath, generatedContract.docxFilePath].filter(Boolean) as string[];
+          return artifactPaths.map(async (artifactPath) => {
+            try {
+              await fs.unlink(artifactPath);
+            } catch {
+              // Ignorar si el artefacto ya no existe en disco.
+            }
+          });
+        })
+      );
+
+      await GeneratedContract.deleteMany({ chatId: { $in: chatIds } });
+      await ContractChat.deleteMany({ contractBaseId: id });
+    }
+
+    try {
+      await fs.rm(path.join(TEMPLATES_DIR, id), { recursive: true, force: true });
+    } catch (error) {
+      console.error('Error al eliminar plantilla analizada:', error);
     }
 
     // Eliminar de la base de datos

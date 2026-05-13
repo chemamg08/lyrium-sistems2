@@ -7,11 +7,19 @@ import { Account } from '../models/Account.js';
 import { Subaccount } from '../models/Subaccount.js';
 import { Client } from '../models/Client.js';
 import { Subscription } from '../models/Subscription.js';
-import { generateToken, generateRefreshToken, setAuthCookies, clearAuthCookies, verifyRefreshToken, AuthPayload, verifyOwnership } from '../middleware/auth.js';
+import { PromoCode } from '../models/PromoCode.js';
+import { generateToken, generateRefreshToken, generate2FASetupToken, setAuthCookies, clearAuthCookies, verifyRefreshToken, verify2FASetupToken, AuthPayload, AuthRequest, verifyOwnership } from '../middleware/auth.js';
+import { createAccountWithInitialSubscription } from '../services/accountProvisioningService.js';
+import { buildAssignedSubaccountFields, normalizeAssignedSubaccountIds, readAssignedSubaccountIds } from '../utils/clientAssignments.js';
 
 const SALT_ROUNDS = 10;
 const MAX_FAILED_ATTEMPTS = 5;
 const LOCK_TIME_MS = 15 * 60 * 1000; // 15 minutes
+const CURRENT_LEGAL_VERSION = '2026-05-01';
+const PLAN_SUBACCOUNT_LIMITS: Record<'starter' | 'advanced', number> = {
+  starter: 4,
+  advanced: 10,
+};
 
 // Password validation: min 8 chars, 1 uppercase, 1 lowercase, 1 number, 1 special
 function validatePassword(password: string): { valid: boolean; error?: string } {
@@ -72,7 +80,11 @@ async function resetFailedAttempts(user: any) {
 // Cuentas principales
 export const createAccount = async (req: Request, res: Response) => {
   try {
-    const { name, email, password, country } = req.body;
+    const { name, email, password, country, acceptedTerms, promoCode: promoCodeInput } = req.body;
+
+    if (!acceptedTerms) {
+      return res.status(400).json({ error: 'Debes aceptar los terminos y la politica de privacidad' });
+    }
 
     // Validate password strength
     const pwCheck = validatePassword(password);
@@ -89,50 +101,71 @@ export const createAccount = async (req: Request, res: Response) => {
     }
 
     const hashedPassword = await bcrypt.hash(password, SALT_ROUNDS);
-    const id = Date.now().toString();
+    const id = crypto.randomUUID();
+    const acceptedLegalAt = new Date().toISOString();
 
     // Generate email verification token (expires in 24 hours)
     const emailVerificationToken = crypto.randomBytes(32).toString('hex');
     const emailVerificationExpires = new Date(Date.now() + 24 * 60 * 60 * 1000).toISOString();
+    const createdAt = new Date().toISOString();
+    const trialEndDate = new Date();
+    trialEndDate.setDate(trialEndDate.getDate() + 14);
 
-    const newAccount = await Account.create({
+    let promoCode: string | null = null;
+    let promoCodeAppliedAt: string | null = null;
+    let trialMonths = 0;
+
+    if (promoCodeInput) {
+      const promo = await PromoCode.findOne({ code: promoCodeInput.toUpperCase() });
+      if (promo && promo.active) {
+        const expired = promo.expiresAt ? new Date(promo.expiresAt) < new Date() : false;
+        const exhausted = promo.maxUses != null && promo.usedCount >= promo.maxUses;
+        if (!expired && !exhausted) {
+          promoCode = promo.code;
+          promoCodeAppliedAt = new Date().toISOString();
+          promo.usedCount += 1;
+          await promo.save();
+          if (promo.type === 'free_months') {
+            trialMonths = promo.value;
+          }
+        }
+      }
+    }
+
+    const newAccount = await createAccountWithInitialSubscription({
       _id: id,
       name,
       email,
       password: hashedPassword,
       country: (country || 'ES').toUpperCase(),
       type: 'main',
-      createdAt: new Date().toISOString(),
+      createdAt,
       emailVerified: false,
       emailVerificationToken,
       emailVerificationExpires,
+      acceptedLegalAt,
+      acceptedLegalVersion: CURRENT_LEGAL_VERSION,
+    }, {
+      _id: crypto.randomUUID(),
+      accountId: id,
+      plan: 'starter',
+      interval: 'monthly',
+      status: trialMonths > 0 ? 'active' : 'trial',
+      trialEndDate: trialMonths > 0 ? null : trialEndDate.toISOString(),
+      currentPeriodStart: createdAt,
+      currentPeriodEnd: trialMonths > 0
+        ? new Date(Date.now() + trialMonths * 30 * 24 * 60 * 60 * 1000).toISOString()
+        : trialEndDate.toISOString(),
+      promoCode,
+      promoCodeAppliedAt,
+      autoRenew: false,
+      stripeCustomerId: null,
+      stripeSubscriptionId: null,
+      stripePaymentMethodId: null,
+      paymentMethod: null,
+      createdAt,
+      updatedAt: createdAt,
     });
-
-    // Crear suscripción de prueba automáticamente
-    try {
-      const trialEndDate = new Date();
-      trialEndDate.setDate(trialEndDate.getDate() + 14);
-
-      await Subscription.create({
-        _id: Date.now().toString(),
-        accountId: id,
-        plan: 'starter',
-        interval: 'monthly',
-        status: 'trial',
-        trialEndDate: trialEndDate.toISOString(),
-        currentPeriodStart: new Date().toISOString(),
-        currentPeriodEnd: trialEndDate.toISOString(),
-        autoRenew: false,
-        stripeCustomerId: null,
-        stripeSubscriptionId: null,
-        stripePaymentMethodId: null,
-        paymentMethod: null,
-        createdAt: new Date().toISOString(),
-        updatedAt: new Date().toISOString(),
-      });
-    } catch (error) {
-      console.error('Error al crear suscripción de prueba:', error);
-    }
 
     // Send verification email
     try {
@@ -162,8 +195,18 @@ export const createAccount = async (req: Request, res: Response) => {
       console.error('Error sending verification email:', emailErr);
     }
 
-    const accountObj = newAccount.toJSON();
-    res.json({ success: true, account: { ...accountObj, password: undefined }, needsSetup2FA: true });
+    const setupToken = generate2FASetupToken(newAccount._id, 'main');
+    res.json({
+      success: true,
+      account: {
+        id: newAccount._id,
+        name: newAccount.name,
+        email: newAccount.email,
+        country: newAccount.country,
+      },
+      needsSetup2FA: true,
+      setupToken,
+    });
   } catch (error) {
     console.error('Error al crear cuenta:', error);
     res.status(500).json({ error: 'Error al crear cuenta' });
@@ -173,7 +216,14 @@ export const createAccount = async (req: Request, res: Response) => {
 // Setup 2FA - generate secret and QR URL
 export const setup2FA = async (req: Request, res: Response) => {
   try {
-    const { userId, userType } = req.body;
+    const { setupToken } = req.body;
+    if (!setupToken) {
+      return res.status(400).json({ error: '2FA setup token required' });
+    }
+
+    const decoded = verify2FASetupToken(setupToken);
+    const userId = decoded.userId;
+    const userType = decoded.type;
 
     const Model: any = userType === 'subaccount' ? Subaccount : Account;
     const user = await Model.findById(userId);
@@ -202,7 +252,14 @@ export const setup2FA = async (req: Request, res: Response) => {
 // Verify 2FA setup - user enters code to confirm
 export const verify2FASetup = async (req: Request, res: Response) => {
   try {
-    const { userId, userType, token: totpToken } = req.body;
+    const { setupToken, token: totpToken } = req.body;
+    if (!setupToken) {
+      return res.status(400).json({ error: '2FA setup token required' });
+    }
+
+    const decoded = verify2FASetupToken(setupToken);
+    const userId = decoded.userId;
+    const userType = decoded.type;
 
     const Model: any = userType === 'subaccount' ? Subaccount : Account;
     const user = await Model.findById(userId);
@@ -355,8 +412,7 @@ export const login = async (req: Request, res: Response) => {
       return res.json({
         success: false,
         needs2FASetup: true,
-        userId: user._id,
-        userType,
+        setupToken: generate2FASetupToken(user._id, userType),
       });
     }
 
@@ -377,12 +433,29 @@ export const login = async (req: Request, res: Response) => {
     const now = new Date();
     const periodEnd = new Date(subscription.currentPeriodEnd);
     if (periodEnd < now) {
+      // Set auth cookies even for expired subscriptions so the user can pay
+      const tokenPayload: any = {
+        userId: user._id,
+        email: user.email,
+        type: userType,
+      };
+      if (userType === 'subaccount') {
+        tokenPayload.parentAccountId = user.parentAccountId;
+      }
+      const token = generateToken(tokenPayload);
+      const refreshToken = generateRefreshToken(tokenPayload);
+      setAuthCookies(res, token, refreshToken);
+
+      // Check if user can switch to free plan
+      const canAccessFree = userType === 'main';
+
       return res.status(403).json({
         error: userType === 'main'
           ? 'Tu suscripción ha caducado. Renueva tu plan para continuar.'
           : 'La suscripción de la cuenta principal ha caducado',
         type: userType,
         needsPayment: userType === 'main',
+        canAccessFree,
         accountId: userType === 'main' ? user._id : undefined,
         email: user.email,
         country: user.country || 'ES',
@@ -443,6 +516,32 @@ export const refreshAccessToken = async (req: Request, res: Response) => {
     }
 
     const decoded = verifyRefreshToken(token);
+
+    if (decoded.role !== 'admin') {
+      const subscriptionAccountId = decoded.type === 'subaccount' ? decoded.parentAccountId : decoded.userId;
+      if (!subscriptionAccountId) {
+        clearAuthCookies(res);
+        return res.status(403).json({ error: 'No se pudo validar la suscripción' });
+      }
+
+      const subscription = await Subscription.findOne({ accountId: subscriptionAccountId });
+      if (!subscription) {
+        clearAuthCookies(res);
+        return res.status(403).json({ error: 'No se encontró suscripción' });
+      }
+
+      const periodEnd = new Date(subscription.currentPeriodEnd);
+      if (periodEnd < new Date()) {
+        if (subscription.status !== 'expired') {
+          subscription.status = 'expired';
+          subscription.updatedAt = new Date().toISOString();
+          await subscription.save();
+        }
+        // Allow refresh even with expired subscription so user can pay
+        // The authMiddleware will block non-payment routes
+      }
+    }
+
     const payload: AuthPayload = {
       userId: decoded.userId,
       email: decoded.email,
@@ -457,7 +556,7 @@ export const refreshAccessToken = async (req: Request, res: Response) => {
     res.cookie('authToken', newAccessToken, {
       httpOnly: true,
       secure: isProduction,
-      sameSite: isProduction ? 'strict' : 'lax',
+      sameSite: isProduction ? 'none' : 'lax',
       maxAge: 30 * 60 * 1000,
       path: '/',
     });
@@ -465,6 +564,77 @@ export const refreshAccessToken = async (req: Request, res: Response) => {
     res.json({ success: true });
   } catch (error) {
     return res.status(401).json({ error: 'Invalid refresh token' });
+  }
+};
+
+export const getCurrentSession = async (req: AuthRequest, res: Response) => {
+  try {
+    if (!req.user) {
+      return res.status(401).json({ error: 'Not authenticated' });
+    }
+
+    if (req.user.role === 'admin') {
+      const admin = await Account.findById(req.user.userId).select('name email country role').lean();
+      if (!admin) {
+        return res.status(401).json({ error: 'Account not found' });
+      }
+
+      return res.json({
+        success: true,
+        user: {
+          id: req.user.userId,
+          name: (admin as any).name,
+          email: (admin as any).email,
+          country: (admin as any).country || 'ES',
+          type: 'main',
+          role: (admin as any).role,
+        },
+      });
+    }
+
+    if (req.user.type === 'subaccount') {
+      const subaccount = await Subaccount.findById(req.user.userId).select('name email parentAccountId').lean();
+      if (!subaccount) {
+        return res.status(401).json({ error: 'Account not found' });
+      }
+
+      const parentAccount = await Account.findById((subaccount as any).parentAccountId).select('country').lean();
+
+      return res.json({
+        success: true,
+        user: {
+          id: req.user.userId,
+          name: (subaccount as any).name,
+          email: (subaccount as any).email,
+          country: (parentAccount as any)?.country || 'ES',
+          type: 'subaccount',
+          parentAccountId: (subaccount as any).parentAccountId,
+        },
+      });
+    }
+
+    const account = await Account.findById(req.user.userId).select('name email country role planDowngradedAt').lean();
+    if (!account) {
+      return res.status(401).json({ error: 'Account not found' });
+    }
+
+    const subscription = await Subscription.findOne({ accountId: req.user.userId });
+    return res.json({
+      success: true,
+      user: {
+        id: req.user.userId,
+        name: (account as any).name,
+        email: (account as any).email,
+        country: (account as any).country || 'ES',
+        type: 'main',
+        role: (account as any).role,
+        plan: subscription?.plan || 'starter',
+        planDowngradedAt: (account as any).planDowngradedAt || null,
+      },
+    });
+  } catch (error) {
+    console.error('Error getting current session:', error);
+    return res.status(500).json({ error: 'Error getting current session' });
   }
 };
 
@@ -643,6 +813,56 @@ export const resetPassword = async (req: Request, res: Response) => {
   }
 };
 
+export const activateFreePlan = async (req: Request, res: Response) => {
+  try {
+    const authUser = (req as AuthRequest).user;
+    if (!authUser) {
+      return res.status(401).json({ error: 'No autorizado' });
+    }
+    if (authUser.type !== 'main') {
+      return res.status(403).json({ error: 'Solo la cuenta principal puede activar el plan sin cargo' });
+    }
+
+    const accountId = authUser.userId;
+    const account = await Account.findById(accountId);
+    if (!account) return res.status(404).json({ error: 'Cuenta no encontrada' });
+
+    const now = new Date().toISOString();
+    const farFuture = new Date('2099-12-31').toISOString();
+
+    let subscription = await Subscription.findOne({ accountId });
+    if (subscription) {
+      subscription.plan = 'free';
+      subscription.status = 'active';
+      subscription.interval = 'monthly';
+      subscription.currentPeriodStart = now;
+      subscription.currentPeriodEnd = farFuture;
+      subscription.updatedAt = now;
+      await subscription.save();
+    } else {
+      await Subscription.create({
+        _id: crypto.randomUUID(),
+        accountId,
+        plan: 'free',
+        interval: 'monthly',
+        status: 'active',
+        currentPeriodStart: now,
+        currentPeriodEnd: farFuture,
+        autoRenew: false,
+        createdAt: now,
+        updatedAt: now,
+      });
+    }
+
+    await account.updateOne({ $set: { planDowngradedAt: now } });
+
+    res.json({ success: true, plan: 'free' });
+  } catch (error) {
+    console.error('Error activating free plan:', error);
+    res.status(500).json({ error: 'Error al activar plan sin cargo' });
+  }
+};
+
 // Subcuentas
 export const createSubaccount = async (req: Request, res: Response) => {
   try {
@@ -652,8 +872,36 @@ export const createSubaccount = async (req: Request, res: Response) => {
       return res.status(400).json({ error: 'parentAccountId es requerido' });
     }
 
+    const authUser = (req as AuthRequest).user;
+    if (!authUser) {
+      return res.status(401).json({ error: 'Token de autenticación requerido' });
+    }
+
     if (!verifyOwnership(req, parentAccountId)) {
       return res.status(403).json({ error: 'Acceso denegado' });
+    }
+
+    if (authUser.role !== 'admin' && (authUser.type !== 'main' || authUser.userId !== parentAccountId)) {
+      return res.status(403).json({ error: 'Solo la cuenta principal puede crear subcuentas' });
+    }
+
+    const subscription = await Subscription.findOne({ accountId: parentAccountId });
+    if (!subscription) {
+      return res.status(403).json({ error: 'Se requiere una suscripción activa para crear subcuentas' });
+    }
+
+    if (subscription.plan === 'free') {
+      return res.status(403).json({ error: 'El plan Sin Cargo no permite subcuentas' });
+    }
+
+    if (new Date(subscription.currentPeriodEnd) < new Date()) {
+      return res.status(403).json({ error: 'La suscripción ha caducado y no permite crear subcuentas' });
+    }
+
+    const maxSubaccounts = PLAN_SUBACCOUNT_LIMITS[subscription.plan as 'starter' | 'advanced'] ?? PLAN_SUBACCOUNT_LIMITS.starter;
+    const currentSubaccounts = await Subaccount.countDocuments({ parentAccountId });
+    if (currentSubaccounts >= maxSubaccounts) {
+      return res.status(409).json({ error: `Has alcanzado el límite de ${maxSubaccounts} subcuentas para tu plan actual` });
     }
 
     // Validate password strength
@@ -672,7 +920,7 @@ export const createSubaccount = async (req: Request, res: Response) => {
 
     const hashedPassword = await bcrypt.hash(password, SALT_ROUNDS);
     const newSubaccount = await Subaccount.create({
-      _id: Date.now().toString(),
+      _id: crypto.randomUUID(),
       name,
       email,
       password: hashedPassword,
@@ -731,10 +979,19 @@ export const deleteSubaccount = async (req: Request, res: Response) => {
 
     await Subaccount.findByIdAndDelete(id);
 
-    // Remover la asignación de clientes
-    await Client.updateMany(
-      { assignedSubaccountId: id },
-      { $unset: { assignedSubaccountId: '' } }
+    const assignedClients = await Client.find({
+      accountId: sub.parentAccountId,
+      $or: [{ assignedSubaccountId: id }, { assignedSubaccountIds: id }],
+    });
+
+    await Promise.all(
+      assignedClients.map(async (client) => {
+        const remainingIds = readAssignedSubaccountIds(client).filter((subaccountId) => subaccountId !== id);
+        const fields = buildAssignedSubaccountFields(remainingIds);
+        client.assignedSubaccountIds = fields.assignedSubaccountIds;
+        client.assignedSubaccountId = fields.assignedSubaccountId;
+        await client.save();
+      })
     );
 
     res.json({ success: true });
@@ -747,7 +1004,7 @@ export const deleteSubaccount = async (req: Request, res: Response) => {
 export const assignClientToSubaccount = async (req: Request, res: Response) => {
   try {
     const { clientId } = req.params;
-    const { subaccountId } = req.body;
+    const { subaccountId, subaccountIds } = req.body;
 
     const client = await Client.findById(clientId);
 
@@ -759,11 +1016,22 @@ export const assignClientToSubaccount = async (req: Request, res: Response) => {
       return res.status(403).json({ error: 'Acceso denegado' });
     }
 
-    if (subaccountId) {
-      client.assignedSubaccountId = subaccountId;
-    } else {
-      client.assignedSubaccountId = undefined as any;
+    const requestedIds = normalizeAssignedSubaccountIds(subaccountIds, subaccountId);
+
+    if (requestedIds.length > 0) {
+      const subaccounts = await Subaccount.find({ _id: { $in: requestedIds } });
+      if (subaccounts.length !== requestedIds.length) {
+        return res.status(400).json({ error: 'Una o varias subcuentas no existen' });
+      }
+
+      if (subaccounts.some((subaccount) => subaccount.parentAccountId !== client.accountId)) {
+        return res.status(400).json({ error: 'Una o varias subcuentas no pertenecen a esta cuenta' });
+      }
     }
+
+    const fields = buildAssignedSubaccountFields(requestedIds);
+    client.assignedSubaccountIds = fields.assignedSubaccountIds;
+    client.assignedSubaccountId = fields.assignedSubaccountId;
 
     await client.save();
 
@@ -779,11 +1047,18 @@ export const getClientsBySubaccount = async (req: Request, res: Response) => {
     const { subaccountId } = req.params;
 
     const sub = await Subaccount.findById(subaccountId);
-    if (sub && !verifyOwnership(req, sub.parentAccountId)) {
+    if (!sub) {
+      return res.status(404).json({ error: 'Subcuenta no encontrada' });
+    }
+
+    if (!verifyOwnership(req, sub.parentAccountId)) {
       return res.status(403).json({ error: 'Acceso denegado' });
     }
 
-    const clients = await Client.find({ assignedSubaccountId: subaccountId });
+    const clients = await Client.find({
+      accountId: sub.parentAccountId,
+      $or: [{ assignedSubaccountId: subaccountId }, { assignedSubaccountIds: subaccountId }],
+    });
 
     res.json(clients.map(c => c.toJSON()));
   } catch (error) {

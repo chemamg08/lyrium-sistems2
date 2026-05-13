@@ -14,6 +14,18 @@ export interface ISubscription {
   stripeSubscriptionId: string | null;
   stripePaymentMethodId: string | null;
   paymentMethod: { brand: string; last4: string } | null;
+  juniorDiscount: {
+    enabled: boolean;
+    proofUrl: string | null;
+    status: 'pending' | 'verified' | 'rejected' | 'expired';
+    appliedAt: string | null;
+    verifiedAt: string | null;
+    verifiedBy: string | null;
+    originalPrice: number;
+    finalPrice: number;
+  } | null;
+  promoCode: string | null;
+  promoCodeAppliedAt: string | null;
   createdAt: string;
   updatedAt: string;
 }
@@ -32,6 +44,21 @@ const subscriptionSchema = new Schema<ISubscription>({
   stripeSubscriptionId: { type: String, default: null },
   stripePaymentMethodId: { type: String, default: null },
   paymentMethod: { type: Schema.Types.Mixed, default: null },
+  juniorDiscount: {
+    type: {
+      enabled: { type: Boolean, default: false },
+      proofUrl: { type: String, default: null },
+      status: { type: String, enum: ['pending', 'verified', 'rejected', 'expired'], default: 'pending' },
+      appliedAt: { type: String, default: null },
+      verifiedAt: { type: String, default: null },
+      verifiedBy: { type: String, default: null },
+      originalPrice: { type: Number, default: 0 },
+      finalPrice: { type: Number, default: 0 },
+    },
+    default: null,
+  },
+  promoCode: { type: String, default: null },
+  promoCodeAppliedAt: { type: String, default: null },
   createdAt: { type: String, default: () => new Date().toISOString() },
   updatedAt: { type: String, default: () => new Date().toISOString() },
 }, { _id: false, versionKey: false });

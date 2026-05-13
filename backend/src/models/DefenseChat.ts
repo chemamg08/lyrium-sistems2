@@ -1,10 +1,16 @@
 import mongoose, { Schema } from 'mongoose';
 
+export interface IFlag {
+  id: string;
+  createdAt: string;
+}
+
 export interface IDefenseMessage {
   id: string;
   role: 'user' | 'assistant';
   content: string;
   timestamp?: string;
+  flags?: IFlag[];
 }
 
 export interface ISavedStrategy {
@@ -21,6 +27,11 @@ export interface ISavedStrategy {
     contraArgumentos: string[];
     recomendaciones: string[];
   };
+  counterReplica?: {
+    opponentArguments: string[];
+    rebuttals: string[];
+    strengthScore: number;
+  };
 }
 
 export interface IDefenseChat {
@@ -36,11 +47,17 @@ export interface IDefenseChat {
   summary?: string;
 }
 
+const flagSchema = new Schema({
+  id: String,
+  createdAt: String,
+}, { _id: false });
+
 const defenseMessageSchema = new Schema({
   id: String,
   role: { type: String, enum: ['user', 'assistant'] },
   content: String,
   timestamp: String,
+  flags: { type: [flagSchema], default: [] },
 }, { _id: false });
 
 const savedStrategySchema = new Schema({
@@ -50,6 +67,11 @@ const savedStrategySchema = new Schema({
   date: String,
   createdAt: String,
   sections: { type: Schema.Types.Mixed, default: {} },
+  counterReplica: {
+    opponentArguments: { type: [String], default: [] },
+    rebuttals: { type: [String], default: [] },
+    strengthScore: { type: Number, default: 0 },
+  },
 }, { _id: false });
 
 const defenseChatSchema = new Schema<IDefenseChat>({

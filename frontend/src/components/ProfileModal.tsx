@@ -2,6 +2,7 @@ import { useState, useEffect } from "react";
 import { X, Plus, Trash2, CreditCard, Check, Calendar, Eye, EyeOff, Copy, Key, Webhook } from "lucide-react";
 import { Button } from "./ui/button";
 import { Input } from "./ui/input";
+import { Switch } from "@/components/ui/switch";
 import { loadStripe } from "@stripe/stripe-js";
 import { Elements, CardElement, useStripe, useElements } from "@stripe/react-stripe-js";
 import { useTranslation } from "react-i18next";
@@ -22,7 +23,7 @@ interface Subaccount {
 interface Subscription {
   id: string;
   accountId: string;
-  plan: 'starter' | 'advanced';
+  plan: 'starter' | 'individual' | 'advanced';
   interval: 'monthly' | 'annual';
   status: 'trial' | 'active' | 'expired' | 'canceled';
   trialEndDate: string | null;
@@ -36,12 +37,16 @@ interface Subscription {
     brand: string;
     last4: string;
   } | null;
+  juniorDiscountStatus?: 'pending' | 'verified' | 'rejected';
+  juniorProofUrl?: string | null;
+  promoCode?: string | null;
+  promoCodeAppliedAt?: string | null;
   createdAt: string;
   updatedAt: string;
 }
 
 interface PlanConfig {
-  id: 'starter' | 'advanced';
+  id: 'starter' | 'individual' | 'advanced';
   name: string;
   monthlyPrice: number;
   annualPrice: number;
@@ -60,8 +65,10 @@ interface ProfileModalProps {
 interface PaymentFormProps {
   clientSecret: string;
   accountId: string;
-  plan: 'starter' | 'advanced';
+  plan: 'starter' | 'individual' | 'advanced';
   interval: 'monthly' | 'annual';
+  isJunior?: boolean;
+  proofUrl?: string | null;
   paymentIntentId?: string;
   setupIntentId?: string;
   subscriptionId?: string;
@@ -69,7 +76,7 @@ interface PaymentFormProps {
   onCancel: () => void;
 }
 
-const PaymentForm = ({ clientSecret, accountId, plan, interval, paymentIntentId, setupIntentId, subscriptionId, onSuccess, onCancel }: PaymentFormProps) => {
+const PaymentForm = ({ clientSecret, accountId, plan, interval, isJunior, proofUrl, paymentIntentId, setupIntentId, subscriptionId, onSuccess, onCancel }: PaymentFormProps) => {
   const { t } = useTranslation();
   const { toast } = useToast();
   const stripe = useStripe();
@@ -115,6 +122,8 @@ const PaymentForm = ({ clientSecret, accountId, plan, interval, paymentIntentId,
               interval,
               setupIntentId,
               subscriptionId,
+              isJunior: plan === 'individual' && isJunior ? true : undefined,
+              proofUrl,
             }),
           });
 
@@ -145,6 +154,8 @@ const PaymentForm = ({ clientSecret, accountId, plan, interval, paymentIntentId,
               interval,
               paymentIntentId,
               subscriptionId,
+              isJunior: plan === 'individual' && isJunior ? true : undefined,
+              proofUrl,
             }),
           });
 
@@ -208,7 +219,9 @@ const PaymentForm = ({ clientSecret, accountId, plan, interval, paymentIntentId,
 const ProfileModal = ({ isOpen, onClose }: ProfileModalProps) => {
   const { t } = useTranslation();
   const { toast } = useToast();
-  const [activeTab, setActiveTab] = useState<"billing" | "subaccounts" | "information" | "integrations">("subaccounts");
+  const [activeTab, setActiveTab] = useState<"billing" | "subaccounts" | "information" | "integrations" | "suggestions">("subaccounts");
+  const isMainAccount = sessionStorage.getItem('userType') === 'main' || sessionStorage.getItem('userRole') === 'admin';
+  const isFreePlan = sessionStorage.getItem('plan') === 'free';
   const [subaccounts, setSubaccounts] = useState<Subaccount[]>([]);
   const [showCreateForm, setShowCreateForm] = useState(false);
   const [formData, setFormData] = useState({ name: "", email: "", password: "" });
@@ -219,6 +232,7 @@ const ProfileModal = ({ isOpen, onClose }: ProfileModalProps) => {
   const [webhooks, setWebhooks] = useState<any[]>([]);
   const [newKeyName, setNewKeyName] = useState("");
   const [showNewKey, setShowNewKey] = useState<string | null>(null);
+  const [showNewWebhookSecret, setShowNewWebhookSecret] = useState<string | null>(null);
   const [newWebhookUrl, setNewWebhookUrl] = useState("");
   const [newWebhookEvents, setNewWebhookEvents] = useState<string[]>([]);
   const [newWebhookDesc, setNewWebhookDesc] = useState("");
@@ -235,6 +249,10 @@ const ProfileModal = ({ isOpen, onClose }: ProfileModalProps) => {
   const [isChangingEmail, setIsChangingEmail] = useState(false);
   const [isChangingPassword, setIsChangingPassword] = useState(false);
 
+  // Suggestions tab states
+  const [suggestionText, setSuggestionText] = useState("");
+  const [sendingSuggestion, setSendingSuggestion] = useState(false);
+
   // Billing profile states
   const [billingProfile, setBillingProfile] = useState({
     companyName: '', companyAddress: '', companyPhone: '',
@@ -244,16 +262,23 @@ const ProfileModal = ({ isOpen, onClose }: ProfileModalProps) => {
   
   // Billing states
   const [subscription, setSubscription] = useState<Subscription | null>(null);
-  const [selectedPlan, setSelectedPlan] = useState<'starter' | 'advanced'>('starter');
+  const [selectedPlan, setSelectedPlan] = useState<'starter' | 'individual' | 'advanced' | 'free'>('starter');
   const [selectedInterval, setSelectedInterval] = useState<'monthly' | 'annual'>('monthly');
   const [autoRenew, setAutoRenew] = useState(false);
   const currency = getCurrencyForCountry(sessionStorage.getItem('country') || 'ES');
   const [showCardModal, setShowCardModal] = useState(false);
   const [showPaymentModal, setShowPaymentModal] = useState(false);
+  const [promoCode, setPromoCode] = useState('');
+  const [appliedPromo, setAppliedPromo] = useState<any>(null);
+  const [promoCodeValidating, setPromoCodeValidating] = useState(false);
   const [clientSecret, setClientSecret] = useState<string | null>(null);
   const [paymentIntentId, setPaymentIntentId] = useState<string | null>(null);
   const [setupIntentId, setSetupIntentId] = useState<string | null>(null);
   const [subscriptionId, setSubscriptionId] = useState<string | null>(null);
+  const [isJunior, setIsJunior] = useState(false);
+  const [juniorProofFile, setJuniorProofFile] = useState<File | null>(null);
+  const [proofUrl, setProofUrl] = useState<string | null>(null);
+  const [uploadStatus, setUploadStatus] = useState<'idle' | 'uploading' | 'success' | 'error'>('idle');
 
   const PLANS: PlanConfig[] = [
     {
@@ -265,6 +290,14 @@ const ProfileModal = ({ isOpen, onClose }: ProfileModalProps) => {
       features: [t('profile.featureUpTo4'), t('profile.featureAllFeatures'), t('profile.featurePrioritySupport')]
     },
     {
+      id: 'individual',
+      name: 'Plan Individual',
+      monthlyPrice: 60,
+      annualPrice: 600,
+      maxSubaccounts: 0,
+      features: ['Acceso completo a la app para el titular', t('profile.featureAllFeatures'), t('profile.featurePrioritySupport')]
+    },
+    {
       id: 'advanced',
       name: t('profile.planAdvanced'),
       monthlyPrice: 350,
@@ -274,8 +307,27 @@ const ProfileModal = ({ isOpen, onClose }: ProfileModalProps) => {
     }
   ];
 
+  const getDisplayedPrice = (planId: string, interval: 'monthly' | 'annual', junior: boolean) => {
+    let price = 0;
+    if (planId !== 'individual' || !junior) {
+      const plan = PLANS.find(p => p.id === planId);
+      price = interval === 'monthly' ? (plan?.monthlyPrice ?? 0) : (plan?.annualPrice ?? 0);
+    } else {
+      price = interval === 'monthly' ? 45 : 480;
+    }
+    if (appliedPromo && appliedPromo.type === 'percentage_discount') {
+      price = Math.round(price * (1 - appliedPromo.value / 100));
+    }
+    return price;
+  };
+
   useEffect(() => {
     if (isOpen) {
+      if (!isMainAccount && (activeTab === "subaccounts" || activeTab === "billing")) {
+        setActiveTab("information");
+        return;
+      }
+
       if (activeTab === "subaccounts") {
         loadSubaccounts();
       } else if (activeTab === "billing") {
@@ -285,9 +337,11 @@ const ProfileModal = ({ isOpen, onClose }: ProfileModalProps) => {
         loadWebhooks();
       } else if (activeTab === "information") {
         loadBillingProfile();
+      } else if (activeTab === "suggestions") {
+        // No data to load for suggestions
       }
     }
-  }, [isOpen, activeTab]);
+  }, [isOpen, activeTab, isMainAccount]);
 
   const loadSubaccounts = async () => {
     try {
@@ -402,6 +456,8 @@ const ProfileModal = ({ isOpen, onClose }: ProfileModalProps) => {
         body: JSON.stringify({ accountId, url: newWebhookUrl.trim(), events: newWebhookEvents, description: newWebhookDesc }),
       });
       if (res.ok) {
+        const data = await res.json();
+        setShowNewWebhookSecret(data.secret || '');
         setNewWebhookUrl('');
         setNewWebhookEvents([]);
         setNewWebhookDesc('');
@@ -462,6 +518,32 @@ const ProfileModal = ({ isOpen, onClose }: ProfileModalProps) => {
     }
   };
 
+  const handleValidatePromoCode = async () => {
+    if (!promoCode.trim()) return;
+    setPromoCodeValidating(true);
+    try {
+      const res = await authFetch(`${API_URL}/subscriptions/validate-promo-code`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ code: promoCode.trim() }),
+      });
+      if (res.ok) {
+        const data = await res.json();
+        setAppliedPromo(data);
+        toast({ title: 'Código aplicado correctamente' });
+      } else {
+        const err = await res.json();
+        setAppliedPromo(null);
+        toast({ title: err.error || 'Código no válido', variant: 'destructive' });
+      }
+    } catch {
+      setAppliedPromo(null);
+      toast({ title: 'Error al validar código', variant: 'destructive' });
+    } finally {
+      setPromoCodeValidating(false);
+    }
+  };
+
   const handleSubscribe = async () => {
     const accountId = sessionStorage.getItem('accountId');
     if (!accountId) {
@@ -474,12 +556,14 @@ const ProfileModal = ({ isOpen, onClose }: ProfileModalProps) => {
       const response = await authFetch(`${API_URL}/subscriptions/payment-intent`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          accountId,
-          plan: selectedPlan,
-          interval: selectedInterval,
-          autoRenew,
-        }),
+          body: JSON.stringify({
+            accountId,
+            plan: selectedPlan,
+            interval: selectedInterval,
+            autoRenew,
+            isJunior: selectedPlan === 'individual' && isJunior ? true : undefined,
+            promoCode: appliedPromo ? appliedPromo.code : promoCode.trim() || undefined,
+          }),
       });
 
       if (response.ok) {
@@ -518,6 +602,31 @@ const ProfileModal = ({ isOpen, onClose }: ProfileModalProps) => {
     setSubscriptionId(null);
   };
 
+  const handleUploadJuniorProof = async () => {
+    if (!juniorProofFile) return;
+    setUploadStatus('uploading');
+    try {
+      const formData = new FormData();
+      formData.append('proof', juniorProofFile);
+      const res = await authFetch(`${API_URL}/subscriptions/junior-proof`, {
+        method: 'POST',
+        body: formData,
+      });
+      if (res.ok) {
+        const data = await res.json();
+        setProofUrl(data.proofUrl || null);
+        setUploadStatus('success');
+        toast({ title: 'Documento subido correctamente' });
+      } else {
+        setUploadStatus('error');
+        toast({ title: 'Error al subir el documento', variant: 'destructive' });
+      }
+    } catch {
+      setUploadStatus('error');
+      toast({ title: 'Error al subir el documento', variant: 'destructive' });
+    }
+  };
+
   const handleChangePlan = async () => {
     if (!subscription) return;
     
@@ -542,6 +651,7 @@ const ProfileModal = ({ isOpen, onClose }: ProfileModalProps) => {
             accountId,
             newPlan: selectedPlan,
             newInterval: selectedInterval,
+            promoCode: appliedPromo ? appliedPromo.code : promoCode.trim() || undefined,
           }),
         });
 
@@ -755,6 +865,32 @@ const ProfileModal = ({ isOpen, onClose }: ProfileModalProps) => {
     }
   };
 
+  const handleSendSuggestion = async () => {
+    if (!suggestionText.trim()) {
+      toast({ title: t('profile.suggestionEmpty'), variant: 'destructive' });
+      return;
+    }
+    setSendingSuggestion(true);
+    try {
+      const res = await authFetch(`${API_URL}/suggestions`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ text: suggestionText.trim() }),
+      });
+      if (res.ok) {
+        toast({ title: t('profile.suggestionSent') });
+        setSuggestionText("");
+      } else {
+        const data = await res.json();
+        toast({ title: data.error || t('profile.suggestionError'), variant: 'destructive' });
+      }
+    } catch {
+      toast({ title: t('profile.suggestionError'), variant: 'destructive' });
+    } finally {
+      setSendingSuggestion(false);
+    }
+  };
+
   if (!isOpen) return null;
 
   return (
@@ -774,26 +910,30 @@ const ProfileModal = ({ isOpen, onClose }: ProfileModalProps) => {
         <div className="flex flex-col md:flex-row flex-1 overflow-hidden">
           {/* Sidebar → horizontal tabs on mobile */}
           <div className="flex md:flex-col md:w-48 md:flex-none border-b md:border-b-0 md:border-r bg-muted/30 p-2 md:p-4 gap-1">
-            <button
-              onClick={() => setActiveTab("billing")}
-              className={`flex-1 md:flex-none md:w-full text-center md:text-left px-4 py-2 rounded-md text-sm font-medium transition-colors ${
-                activeTab === "billing"
-                  ? "bg-primary text-primary-foreground"
-                  : "text-muted-foreground hover:bg-accent hover:text-accent-foreground"
-              }`}
-            >
-              {t('profile.billing')}
-            </button>
-            <button
-              onClick={() => setActiveTab("subaccounts")}
-              className={`flex-1 md:flex-none md:w-full text-center md:text-left px-4 py-2 rounded-md text-sm font-medium transition-colors ${
-                activeTab === "subaccounts"
-                  ? "bg-primary text-primary-foreground"
-                  : "text-muted-foreground hover:bg-accent hover:text-accent-foreground"
-              }`}
-            >
-              {t('profile.subaccounts')}
-            </button>
+            {isMainAccount && (
+              <button
+                onClick={() => setActiveTab("billing")}
+                className={`flex-1 md:flex-none md:w-full text-center md:text-left px-4 py-2 rounded-md text-sm font-medium transition-colors ${
+                  activeTab === "billing"
+                    ? "bg-primary text-primary-foreground"
+                    : "text-muted-foreground hover:bg-accent hover:text-accent-foreground"
+                }`}
+              >
+                {t('profile.billing')}
+              </button>
+            )}
+            {isMainAccount && (
+              <button
+                onClick={() => setActiveTab("subaccounts")}
+                className={`flex-1 md:flex-none md:w-full text-center md:text-left px-4 py-2 rounded-md text-sm font-medium transition-colors ${
+                  activeTab === "subaccounts"
+                    ? "bg-primary text-primary-foreground"
+                    : "text-muted-foreground hover:bg-accent hover:text-accent-foreground"
+                }`}
+              >
+                {t('profile.subaccounts')}
+              </button>
+            )}
             <button
               onClick={() => setActiveTab("information")}
               className={`flex-1 md:flex-none md:w-full text-center md:text-left px-4 py-2 rounded-md text-sm font-medium transition-colors ${
@@ -813,6 +953,16 @@ const ProfileModal = ({ isOpen, onClose }: ProfileModalProps) => {
               }`}
             >
               {t('profile.integrations')}
+            </button>
+            <button
+              onClick={() => setActiveTab("suggestions")}
+              className={`flex-1 md:flex-none md:w-full text-center md:text-left px-4 py-2 rounded-md text-sm font-medium transition-colors ${
+                activeTab === "suggestions"
+                  ? "bg-primary text-primary-foreground"
+                  : "text-muted-foreground hover:bg-accent hover:text-accent-foreground"
+              }`}
+            >
+              {t('profile.suggestions')}
             </button>
           </div>
 
@@ -842,10 +992,10 @@ const ProfileModal = ({ isOpen, onClose }: ProfileModalProps) => {
                     <Calendar className="h-5 w-5 text-primary" />
                     <div>
                       <p className="text-sm font-medium">
-                        {subscription.status === 'trial' 
-                          ? t('profile.trialUntil') 
-                          : subscription.autoRenew 
-                            ? t('profile.nextRenewal') 
+                        {subscription.status === 'trial'
+                          ? t('profile.trialUntil')
+                          : subscription.autoRenew
+                            ? t('profile.nextRenewal')
                             : t('profile.expiresOn')}
                       </p>
                       <p className="text-lg font-semibold text-primary">
@@ -855,17 +1005,99 @@ const ProfileModal = ({ isOpen, onClose }: ProfileModalProps) => {
                   </div>
                 )}
 
+                {/* Código promocional */}
+                {subscription?.status !== 'active' && (
+                  <div className="bg-muted/30 border border-border rounded-lg p-4 mb-6 space-y-3">
+                    <label className="text-sm font-medium block">Código promocional</label>
+                    <div className="flex gap-2">
+                      <input
+                        type="text"
+                        value={promoCode}
+                        onChange={(e) => setPromoCode(e.target.value)}
+                        placeholder="Ej: VERANO25"
+                        className="flex-1 px-3 py-2 bg-background border rounded-lg text-sm"
+                      />
+                      <Button
+                        type="button"
+                        onClick={handleValidatePromoCode}
+                        disabled={promoCodeValidating || !promoCode.trim()}
+                        variant="outline"
+                        size="sm"
+                      >
+                        {promoCodeValidating ? 'Validando...' : 'Aplicar'}
+                      </Button>
+                    </div>
+                    {appliedPromo && (
+                      <p className="text-xs text-green-600 dark:text-green-400">
+                        {appliedPromo.type === 'percentage_discount'
+                          ? `✓ ${appliedPromo.value}% de descuento durante ${appliedPromo.durationMonths} meses`
+                          : `✓ ${appliedPromo.value} meses gratuitos`}
+                      </p>
+                    )}
+                  </div>
+                )}
+                {subscription?.promoCode && (
+                  <div className="bg-green-50 dark:bg-green-950 border border-green-200 dark:border-green-800 rounded-lg p-4 mb-6">
+                    <p className="text-sm font-medium text-green-800 dark:text-green-200">
+                      Código promocional aplicado: {subscription.promoCode}
+                    </p>
+                  </div>
+                )}
+
                 {/* Mostrar plan actual si existe */}
                 {subscription && subscription.status !== 'trial' && (
                   <div className="bg-green-50 dark:bg-green-950 border border-green-200 dark:border-green-800 rounded-lg p-4 mb-6">
                     <p className="text-sm font-medium text-green-800 dark:text-green-200">
-                      {t('profile.currentPlan')} {subscription.plan === 'starter' ? t('profile.planStarter') : t('profile.planAdvanced')} ({subscription.interval === 'monthly' ? t('profile.monthly') : t('profile.annual')})
+                      {t('profile.currentPlan')} {subscription.plan === 'starter' ? t('profile.planStarter') : subscription.plan === 'individual' ? 'Plan Individual' : t('profile.planAdvanced')} ({subscription.interval === 'monthly' ? t('profile.monthly') : t('profile.annual')})
+                    </p>
+                  </div>
+                )}
+
+                {/* Junior discount status */}
+                {subscription?.juniorDiscountStatus && (
+                  <div className={`rounded-lg p-4 mb-6 ${subscription.juniorDiscountStatus === 'pending' ? 'bg-yellow-50 dark:bg-yellow-950 border border-yellow-200 dark:border-yellow-800' : subscription.juniorDiscountStatus === 'verified' ? 'bg-green-50 dark:bg-green-950 border border-green-200 dark:border-green-800' : 'bg-red-50 dark:bg-red-950 border border-red-200 dark:border-red-800'}`}>
+                    <p className={`text-sm font-medium ${subscription.juniorDiscountStatus === 'pending' ? 'text-yellow-800 dark:text-yellow-200' : subscription.juniorDiscountStatus === 'verified' ? 'text-green-800 dark:text-green-200' : 'text-red-800 dark:text-red-200'}`}>
+                      {subscription.juniorDiscountStatus === 'pending' && 'Tu descuento junior está pendiente de verificación.'}
+                      {subscription.juniorDiscountStatus === 'verified' && 'Descuento junior activo (45€/mes o 480€/año).'}
+                      {subscription.juniorDiscountStatus === 'rejected' && 'Tu descuento junior ha sido rechazado. El siguiente cobro será del precio base.'}
                     </p>
                   </div>
                 )}
 
                 {/* Tarjetas de precios */}
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mb-6">
+                <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-6">
+                  {/* Free plan card */}
+                  <div>
+                    <div
+                      onClick={() => {
+                        setSelectedPlan('free');
+                        setSelectedInterval('monthly');
+                      }}
+                      className={`border-2 rounded-lg p-4 cursor-pointer transition-all hover:shadow-md ${
+                        selectedPlan === 'free' && selectedInterval === 'monthly'
+                          ? 'border-primary bg-primary/5'
+                          : 'border-border'
+                      }`}
+                    >
+                      <div className="flex items-start justify-between mb-2">
+                        <div>
+                          <h4 className="font-semibold">Sin Cargo</h4>
+                          <p className="text-xs text-muted-foreground">Gratuito</p>
+                        </div>
+                        {selectedPlan === 'free' && selectedInterval === 'monthly' && (
+                          <Check className="h-5 w-5 text-primary" />
+                        )}
+                      </div>
+                      <p className="text-2xl font-bold mb-3">0€<span className="text-sm font-normal text-muted-foreground">/mes</span></p>
+                      <ul className="space-y-1 text-xs text-muted-foreground">
+                        <li>• Hasta 10 clientes</li>
+                        <li>• Hasta 5 casos activos</li>
+                        <li>• 50 mensajes IA/día</li>
+                        <li>• Sin automatizaciones</li>
+                        <li>• Sin subcuentas</li>
+                      </ul>
+                    </div>
+                  </div>
                   {PLANS.map((plan) => (
                     <div key={plan.id}>
                       {/* Mensual */}
@@ -889,7 +1121,7 @@ const ProfileModal = ({ isOpen, onClose }: ProfileModalProps) => {
                             <Check className="h-5 w-5 text-primary" />
                           )}
                         </div>
-                        <p className="text-2xl font-bold mb-3">{formatPrice(plan.monthlyPrice, currency)}<span className="text-sm font-normal text-muted-foreground">{t('profile.perMonth')}</span></p>
+                        <p className="text-2xl font-bold mb-3">{formatPrice(getDisplayedPrice(plan.id, 'monthly', isJunior), currency)}<span className="text-sm font-normal text-muted-foreground">{t('profile.perMonth')}</span></p>
                         <ul className="space-y-1 text-xs text-muted-foreground">
                           {plan.features.map((feature, idx) => (
                             <li key={idx}>• {feature}</li>
@@ -918,7 +1150,7 @@ const ProfileModal = ({ isOpen, onClose }: ProfileModalProps) => {
                             <Check className="h-5 w-5 text-primary" />
                           )}
                         </div>
-                        <p className="text-2xl font-bold mb-1">{formatPrice(plan.annualPrice, currency)}<span className="text-sm font-normal text-muted-foreground">{t('profile.perYear')}</span></p>
+                        <p className="text-2xl font-bold mb-1">{formatPrice(getDisplayedPrice(plan.id, 'annual', isJunior), currency)}<span className="text-sm font-normal text-muted-foreground">{t('profile.perYear')}</span></p>
                         <p className="text-xs text-green-600 dark:text-green-400 mb-3">
                           {t('profile.savePerYear', { amount: formatPrice(plan.monthlyPrice * 12 - plan.annualPrice, currency) })}
                         </p>
@@ -930,9 +1162,50 @@ const ProfileModal = ({ isOpen, onClose }: ProfileModalProps) => {
                       </div>
                     </div>
                   ))}
-                </div>
+            </div>
 
-                {/* Switch de renovación automática */}
+            {/* Junior discount toggle */}
+            {selectedPlan === 'individual' && (
+              <div className="bg-muted/50 border border-border rounded-lg p-4 mb-4 space-y-4">
+                <div className="flex items-center justify-between">
+                  <div>
+                    <p className="font-medium">Descuento junior</p>
+                    <p className="text-xs text-muted-foreground">Soy abogado junior (licenciado hace menos de 2 años)</p>
+                  </div>
+                  <Switch
+                    checked={isJunior}
+                    onCheckedChange={setIsJunior}
+                  />
+                </div>
+                {isJunior && (
+                  <div className="space-y-3">
+                    <div>
+                      <label className="text-sm font-medium block mb-1">Subir prueba</label>
+                      <input
+                        type="file"
+                        onChange={(e) => setJuniorProofFile(e.target.files?.[0] || null)}
+                        className="block w-full text-sm text-muted-foreground file:mr-4 file:py-2 file:px-4 file:rounded-full file:border-0 file:text-sm file:font-semibold file:bg-primary file:text-primary-foreground hover:file:bg-primary/90"
+                      />
+                    </div>
+                    <Button
+                      onClick={handleUploadJuniorProof}
+                      disabled={!juniorProofFile || uploadStatus === 'uploading'}
+                      size="sm"
+                    >
+                      {uploadStatus === 'uploading' ? 'Subiendo...' : 'Subir documento'}
+                    </Button>
+                    {uploadStatus === 'success' && (
+                      <p className="text-xs text-green-600 dark:text-green-400">Documento subido correctamente.</p>
+                    )}
+                    {uploadStatus === 'error' && (
+                      <p className="text-xs text-destructive">Error al subir el documento. Inténtalo de nuevo.</p>
+                    )}
+                  </div>
+                )}
+              </div>
+            )}
+
+            {/* Switch de renovación automática */}
                 <div className="bg-muted/50 border border-border rounded-lg p-4 mb-4">
                   <label className="flex items-center justify-between cursor-pointer">
                     <div>
@@ -955,34 +1228,45 @@ const ProfileModal = ({ isOpen, onClose }: ProfileModalProps) => {
                       {t('profile.changePlan')}
                     </Button>
                   ) : (
-                    <Button onClick={handleSubscribe} disabled={isLoading} className="flex-1">
+                    <Button onClick={handleSubscribe} disabled={isLoading || (selectedPlan === 'individual' && isJunior && !proofUrl)} className="flex-1">
                       {t('profile.subscribe')}
                     </Button>
                   )}
                 </div>
+                {selectedPlan === 'individual' && isJunior && !proofUrl && (
+                  <p className="text-xs text-destructive mt-2">Debes subir la prueba de abogado junior antes de suscribirte.</p>
+                )}
               </div>
             )}
 
             {activeTab === "subaccounts" && (
               <div>
+                {isFreePlan && (
+                  <div className="mb-4 rounded-md border border-amber-500/20 bg-amber-500/10 p-3">
+                    <p className="text-sm font-medium text-amber-700 dark:text-amber-400">Plan Sin Cargo</p>
+                    <p className="text-xs text-amber-600 dark:text-amber-300">El plan Sin Cargo no permite crear subcuentas.</p>
+                  </div>
+                )}
                 <div className="flex items-center justify-between mb-6">
                   <h3 className="text-lg font-semibold">{t('profile.subaccounts')}</h3>
                   <div className="flex items-center gap-3">
                     <span className="text-sm text-muted-foreground">
                       {subaccounts.length} / {PLANS.find(p => p.id === (subscription?.plan || 'starter'))?.maxSubaccounts ?? 4}
                     </span>
-                    <Button
-                      onClick={() => setShowCreateForm(!showCreateForm)}
-                      size="sm"
-                      disabled={subaccounts.length >= (PLANS.find(p => p.id === (subscription?.plan || 'starter'))?.maxSubaccounts ?? 4)}
-                    >
-                      <Plus className="h-4 w-4 mr-2" />
-                      {t('profile.createSubaccount')}
-                    </Button>
+                    {!isFreePlan && (
+                      <Button
+                        onClick={() => setShowCreateForm(!showCreateForm)}
+                        size="sm"
+                        disabled={subaccounts.length >= (PLANS.find(p => p.id === (subscription?.plan || 'starter'))?.maxSubaccounts ?? 4)}
+                      >
+                        <Plus className="h-4 w-4 mr-2" />
+                        {t('profile.createSubaccount')}
+                      </Button>
+                    )}
                   </div>
                 </div>
 
-                {showCreateForm && (
+                {showCreateForm && !isFreePlan && (
                   <div className="bg-muted/50 p-4 rounded-lg mb-6">
                     <h4 className="font-medium mb-4">{t('profile.newSubaccountTitle')}</h4>
                     <div className="space-y-3">
@@ -1268,6 +1552,26 @@ const ProfileModal = ({ isOpen, onClose }: ProfileModalProps) => {
                   </div>
                   <p className="text-xs text-muted-foreground">{t('profile.intWebhooksDesc')}</p>
 
+                  {showNewWebhookSecret && (
+                    <div className="bg-green-500/10 border border-green-500/30 rounded p-3 space-y-2">
+                      <p className="text-xs font-medium text-green-400">Guarda este secret ahora. Solo se muestra una vez.</p>
+                      <div className="flex items-center gap-2">
+                        <code className="text-xs bg-background px-2 py-1 rounded flex-1 break-all">{showNewWebhookSecret}</code>
+                        <Button
+                          size="sm"
+                          variant="ghost"
+                          onClick={() => {
+                            navigator.clipboard.writeText(showNewWebhookSecret);
+                            toast({ title: 'Secret copiado' });
+                          }}
+                        >
+                          <Copy className="h-3 w-3" />
+                        </Button>
+                      </div>
+                      <Button size="sm" variant="outline" onClick={() => setShowNewWebhookSecret('')}>{t('common.close')}</Button>
+                    </div>
+                  )}
+
                   <div className="space-y-2">
                     <Input placeholder="https://hooks.zapier.com/..." value={newWebhookUrl} onChange={(e) => setNewWebhookUrl(e.target.value)} />
                     <Input placeholder={t('profile.intWebhookDescPlaceholder')} value={newWebhookDesc} onChange={(e) => setNewWebhookDesc(e.target.value)} />
@@ -1316,6 +1620,28 @@ const ProfileModal = ({ isOpen, onClose }: ProfileModalProps) => {
                       ))}
                     </div>
                   )}
+                </div>
+              </div>
+            )}
+
+            {activeTab === "suggestions" && (
+              <div className="space-y-4">
+                <h3 className="text-lg font-semibold">{t('profile.suggestions')}</h3>
+                <p className="text-sm text-muted-foreground">{t('profile.suggestionsDesc')}</p>
+                <textarea
+                  value={suggestionText}
+                  onChange={(e) => {
+                    if (e.target.value.length <= 1000) setSuggestionText(e.target.value);
+                  }}
+                  placeholder={t('profile.suggestionsPlaceholder')}
+                  rows={5}
+                  className="w-full px-3 py-2 rounded-md border border-input bg-background text-sm focus:outline-none focus:ring-2 focus:ring-ring resize-none"
+                />
+                <div className="flex justify-between items-center">
+                  <span className="text-xs text-muted-foreground">{suggestionText.length}/1000</span>
+                  <Button onClick={handleSendSuggestion} disabled={sendingSuggestion || !suggestionText.trim()}>
+                    {sendingSuggestion ? t('common.loading') : t('profile.suggestionsSend')}
+                  </Button>
                 </div>
               </div>
             )}
@@ -1379,6 +1705,8 @@ const ProfileModal = ({ isOpen, onClose }: ProfileModalProps) => {
                   accountId={sessionStorage.getItem('accountId') || ''}
                   plan={selectedPlan}
                   interval={selectedInterval}
+                  isJunior={isJunior}
+                  proofUrl={proofUrl}
                   paymentIntentId={paymentIntentId || undefined}
                   setupIntentId={setupIntentId || undefined}
                   subscriptionId={subscriptionId || undefined}

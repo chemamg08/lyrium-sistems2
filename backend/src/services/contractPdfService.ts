@@ -2,13 +2,13 @@ import fs from 'fs/promises';
 import path from 'path';
 import { fileURLToPath } from 'url';
 import { PDFDocument, rgb, StandardFonts, PDFImage } from 'pdf-lib';
+import { getAccountLogoPath } from '../utils/accountLogo.js';
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
 
 const TEMPLATES_DIR = path.join(__dirname, '../../templates');
 const GENERATED_DIR = path.join(__dirname, '../../generated_contracts');
-const LOGO_PATH = path.join(__dirname, '../../uploads/logo.png');
 
 export interface EmptyField {
   placeholder: string;  // ej: "___", "[NOMBRE]", "........"
@@ -205,12 +205,17 @@ export async function loadContractStructure(
 /**
  * Verifica si existe un logo guardado
  */
-async function hasLogo(): Promise<boolean> {
+async function getLogoPath(accountId?: string): Promise<string | null> {
+  if (!accountId) {
+    return null;
+  }
+
   try {
-    await fs.access(LOGO_PATH);
-    return true;
+    const logoPath = getAccountLogoPath(accountId);
+    await fs.access(logoPath);
+    return logoPath;
   } catch {
-    return false;
+    return null;
   }
 }
 
@@ -255,7 +260,8 @@ function sanitizeForWinAnsi(text: string): string {
  */
 export async function generateContractFromText(
   modifiedText: string,
-  outputFileName: string
+  outputFileName: string,
+  accountId?: string
 ): Promise<string> {
   await ensureDirectories();
   // Sanitize the entire text for WinAnsi encoding before processing
@@ -268,9 +274,10 @@ export async function generateContractFromText(
 
     // Cargar logo si existe
     let logo: PDFImage | null = null;
-    if (await hasLogo()) {
+    const logoPath = await getLogoPath(accountId);
+    if (logoPath) {
       try {
-        const logoBytes = await fs.readFile(LOGO_PATH);
+        const logoBytes = await fs.readFile(logoPath);
         logo = await pdfDoc.embedPng(logoBytes);
       } catch {
         // Logo optional — continue without it
@@ -509,4 +516,117 @@ export async function generateContractFromTemplate(
 export async function isContractAnalyzed(contractBaseId: string): Promise<boolean> {
   const structure = await loadContractStructure(contractBaseId);
   return structure !== null;
+}
+
+import { Document, Packer, Paragraph, TextRun, HeadingLevel, AlignmentType, PageBreak, type FileChild } from 'docx';
+
+/**
+ * Generate a DOCX document from contract text (markdown-like format).
+ * Supports: # H1, ## H2, ### H3, **bold**, blank lines as paragraph breaks.
+ */
+export async function generateContractDOCX(text: string, outputFileName: string): Promise<string> {
+  const GENERATED_CONTRACTS_DIR = path.join(__dirname, '../../generated_contracts');
+  await fs.mkdir(GENERATED_CONTRACTS_DIR, { recursive: true });
+
+  const lines = text.split('\n');
+  const children: (Paragraph | PageBreak)[] = [];
+
+  for (let i = 0; i < lines.length; i++) {
+    const line = lines[i].trim();
+
+    if (line === '') {
+      children.push(new Paragraph({ children: [], spacing: { after: 120 } }));
+      continue;
+    }
+
+    if (line.startsWith('# ') && !line.startsWith('## ')) {
+      const title = line.replace(/^#\s*/, '').replace(/\*\*/g, '');
+      children.push(new Paragraph({
+        children: [new TextRun({ text: title, bold: true, size: 52, font: 'Calibri' })],
+        heading: HeadingLevel.HEADING_1,
+        spacing: { before: 240, after: 120 },
+        alignment: AlignmentType.CENTER,
+      }));
+      continue;
+    }
+
+    if (line.startsWith('## ') && !line.startsWith('### ')) {
+      const section = line.replace(/^##\s*/, '').replace(/\*\*/g, '');
+      children.push(new Paragraph({
+        children: [new TextRun({ text: section, bold: true, size: 36, font: 'Calibri' })],
+        heading: HeadingLevel.HEADING_2,
+        spacing: { before: 200, after: 80 },
+      }));
+      continue;
+    }
+
+    if (line.startsWith('### ')) {
+      const subsection = line.replace(/^###\s*/, '').replace(/\*\*/g, '');
+      children.push(new Paragraph({
+        children: [new TextRun({ text: subsection, bold: true, size: 30, font: 'Calibri' })],
+        heading: HeadingLevel.HEADING_3,
+        spacing: { before: 160, after: 60 },
+      }));
+      continue;
+    }
+
+    const runs = parseInlineMarkdown(line);
+    children.push(new Paragraph({
+      children: runs,
+      spacing: { after: 120 },
+      alignment: AlignmentType.JUSTIFIED,
+    }));
+  }
+
+  const doc = new Document({
+    sections: [{
+      properties: {},
+      children: children as unknown as readonly FileChild[],
+    }],
+    styles: {
+      paragraphStyles: [
+        {
+          id: 'Normal',
+          name: 'Normal',
+          run: { size: 24, font: 'Calibri' },
+        },
+      ],
+    },
+  });
+
+  const docxBuffer = await Packer.toBuffer(doc);
+  const outputPath = path.join(GENERATED_CONTRACTS_DIR, outputFileName.replace('.pdf', '.docx'));
+  await fs.writeFile(outputPath, docxBuffer);
+
+  return outputPath;
+}
+
+/**
+ * Parse inline markdown: **bold** text becomes TextRun objects.
+ */
+function parseInlineMarkdown(text: string): TextRun[] {
+  const runs: TextRun[] = [];
+  const regex = /\*\*(.+?)\*\*/g;
+  let lastIndex = 0;
+  let match;
+
+  while ((match = regex.exec(text)) !== null) {
+    if (match.index > lastIndex) {
+      const before = text.substring(lastIndex, match.index);
+      if (before) runs.push(new TextRun({ text: before, size: 24, font: 'Calibri' }));
+    }
+    runs.push(new TextRun({ text: match[1], bold: true, size: 24, font: 'Calibri' }));
+    lastIndex = regex.lastIndex;
+  }
+
+  if (lastIndex < text.length) {
+    const remaining = text.substring(lastIndex);
+    if (remaining) runs.push(new TextRun({ text: remaining, size: 24, font: 'Calibri' }));
+  }
+
+  if (runs.length === 0) {
+    runs.push(new TextRun({ text, size: 24, font: 'Calibri' }));
+  }
+
+  return runs;
 }

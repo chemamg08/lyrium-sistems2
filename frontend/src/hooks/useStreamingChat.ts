@@ -12,6 +12,8 @@ interface StreamOptions {
   headers?: Record<string, string>;
   /** Called once with the final accumulated text when stream finishes */
   onDone?: (fullText: string) => void;
+  /** Called once with the final accumulated reasoning when stream finishes */
+  onDoneReasoning?: (fullReasoning: string) => void;
 }
 
 /**
@@ -25,6 +27,7 @@ interface StreamOptions {
  */
 export function useStreamingChat() {
   const [streamingText, setStreamingText] = useState('');
+  const [streamingReasoning, setStreamingReasoning] = useState('');
   const [isStreaming, setIsStreaming] = useState(false);
   const [isSaving, setIsSaving] = useState(false);
   const [isContractGeneration, setIsContractGeneration] = useState(false);
@@ -40,6 +43,7 @@ export function useStreamingChat() {
     abortRef.current?.abort();
     abortRef.current = null;
     setIsStreaming(false);
+    setStreamingReasoning('');
     setIsContractGeneration(false);
     contractDetectedRef.current = false;
   }, []);
@@ -52,12 +56,14 @@ export function useStreamingChat() {
     abortRef.current = controller;
 
     setStreamingText('');
+    setStreamingReasoning('');
     setIsStreaming(true);
     setIsSaving(false);
     setIsContractGeneration(false);
     contractDetectedRef.current = false;
 
     let accumulated = '';
+    let accumulatedReasoning = '';
     let ragEnhanced = false;
 
     try {
@@ -101,6 +107,7 @@ export function useStreamingChat() {
               if (ragEnhanced) accumulated += '\n<!-- rag-enhanced -->';
               setIsStreaming(false);
               setIsSaving(false);
+              opts.onDoneReasoning?.(accumulatedReasoning);
               opts.onDone?.(accumulated);
               return accumulated;
             }
@@ -127,6 +134,10 @@ export function useStreamingChat() {
                 setStreamingText(displayText);
               }
             }
+            if (parsed.thinking) {
+              accumulatedReasoning += parsed.thinking;
+              setStreamingReasoning(accumulatedReasoning);
+            }
             if (parsed.error) {
               console.error('Stream error from server:', parsed.error);
             }
@@ -150,10 +161,9 @@ export function useStreamingChat() {
       }
       setIsStreaming(false);
       setIsSaving(false);
-      if (accumulated) opts.onDone?.(accumulated);
       return accumulated;
     }
   }, []);
 
-  return { streamingText, isStreaming, isSaving, isContractGeneration, startStream, cancelStream, resetContractGeneration };
+  return { streamingText, streamingReasoning, isStreaming, isSaving, isContractGeneration, startStream, cancelStream, resetContractGeneration };
 }

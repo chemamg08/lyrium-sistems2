@@ -14,6 +14,8 @@ export interface IAccount {
   googleCalendarConnected?: boolean;
   calendarOAuthState?: string | null;
   calendarOAuthStateExpires?: string | null;
+  googleCalendarSyncToken?: string | null;
+  googleCalendarLastSyncedAt?: string | null;
   twoFactorSecret?: string | null;
   twoFactorEnabled?: boolean;
   recoveryCodes?: string[];
@@ -25,6 +27,9 @@ export interface IAccount {
   failedLoginAttempts?: number;
   lockUntil?: string | null;
   disabled?: boolean;
+  acceptedLegalAt?: string | null;
+  acceptedLegalVersion?: string | null;
+  planDowngradedAt?: string | null;
   // Billing / invoice fields
   companyName?: string;
   companyAddress?: string;
@@ -49,6 +54,8 @@ const accountSchema = new Schema<IAccount>({
   googleCalendarConnected: { type: Boolean, default: false },
   calendarOAuthState: { type: String, default: null },
   calendarOAuthStateExpires: { type: String, default: null },
+  googleCalendarSyncToken: { type: String, default: null },
+  googleCalendarLastSyncedAt: { type: String, default: null },
   twoFactorSecret: { type: String, default: null },
   twoFactorEnabled: { type: Boolean, default: false },
   recoveryCodes: { type: [String], default: [] },
@@ -60,6 +67,9 @@ const accountSchema = new Schema<IAccount>({
   failedLoginAttempts: { type: Number, default: 0 },
   lockUntil: { type: String, default: null },
   disabled: { type: Boolean, default: false },
+  acceptedLegalAt: { type: String, default: null },
+  acceptedLegalVersion: { type: String, default: null },
+  planDowngradedAt: { type: String, default: null },
   companyName: { type: String, default: '' },
   companyAddress: { type: String, default: '' },
   companyPhone: { type: String, default: '' },
@@ -73,6 +83,20 @@ accountSchema.set('toJSON', {
   transform: (_doc: any, ret: any) => {
     ret.id = ret._id;
     delete ret._id;
+    delete ret.password;
+    delete ret.googleAccessToken;
+    delete ret.googleRefreshToken;
+    delete ret.calendarOAuthState;
+    delete ret.calendarOAuthStateExpires;
+    delete ret.googleCalendarSyncToken;
+    delete ret.twoFactorSecret;
+    delete ret.recoveryCodes;
+    delete ret.emailVerificationToken;
+    delete ret.emailVerificationExpires;
+    delete ret.resetPasswordToken;
+    delete ret.resetPasswordExpires;
+    delete ret.failedLoginAttempts;
+    delete ret.lockUntil;
     return ret;
   }
 });

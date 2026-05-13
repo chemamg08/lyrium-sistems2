@@ -15,6 +15,7 @@ import WritingReview from "./pages/WritingReview";
 import FiscalAdvisory from "./pages/FiscalAdvisory";
 import TaxCompliance from "./pages/TaxCompliance";
 import Automations from "./pages/Automations";
+import Cases from "./pages/Cases";
 import Login from "./pages/Login";
 import Landing from "./pages/Landing";
 import LegalPage from "./pages/LegalPage";
@@ -25,6 +26,7 @@ import VerifyEmail from "./pages/VerifyEmail";
 import NotFound from "./pages/NotFound";
 import AdminPanel from "./pages/AdminPanel";
 import SignDocument from "./pages/SignDocument";
+import PublicEvidenceViewer from "./pages/PublicEvidenceViewer";
 import CookieBanner from "./components/CookieBanner";
 import GoogleAnalytics from "./components/GoogleAnalytics";
 import ErrorBoundary from "./components/ErrorBoundary";
@@ -52,6 +54,7 @@ const App = () => (
           <Route path="/reset-password" element={<ResetPassword />} />
           <Route path="/verify-email" element={<VerifyEmail />} />
           <Route path="/firmar/:token" element={<SignDocument />} />
+          <Route path="/public/evidence/:token" element={<PublicEvidenceViewer />} />
           <Route path="/admin" element={<AdminPanel />} />
           <Route element={<AppLayout />}>
             <Route path="/" element={<Dashboard />} />
@@ -64,6 +67,7 @@ const App = () => (
             <Route path="/fiscal" element={<FiscalAdvisory />} />
             <Route path="/tax-compliance" element={<TaxCompliance />} />
             <Route path="/automatizaciones" element={<Automations />} />
+            <Route path="/casos" element={<Cases />} />
           </Route>
           <Route path="*" element={<NotFound />} />
         </Routes>

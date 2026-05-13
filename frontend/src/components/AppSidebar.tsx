@@ -3,7 +3,7 @@ import { useState, useEffect } from "react";
 import { useTranslation } from "react-i18next";
 import { useTheme } from "next-themes";
 import { useIsMobile } from "@/hooks/use-mobile";
-import { authFetch } from "@/lib/authFetch";
+import { authFetch, logout as logoutUser } from "@/lib/authFetch";
 import {
   LayoutDashboard,
   Users,
@@ -16,6 +16,7 @@ import {
   ReceiptText,
   Scale,
   Zap,
+  Briefcase,
   PanelLeftClose,
   PanelLeft,
   LogOut,
@@ -47,8 +48,10 @@ const AppSidebar = ({
   const { theme, setTheme } = useTheme();
   const [isMainAccount, setIsMainAccount] = useState(true);
   const [emailUnread, setEmailUnread] = useState(0);
+  const [pendingCases, setPendingCases] = useState(0);
 
-  const navItems = [
+  const isFreePlan = sessionStorage.getItem('plan') === 'free';
+  const allNavItems = [
     { to: "/", icon: LayoutDashboard, label: t('nav.dashboard') },
     { to: "/clientes", icon: Users, label: t('nav.clients') },
     { to: "/resumenes", icon: FileText, label: t('nav.documents') },
@@ -59,7 +62,11 @@ const AppSidebar = ({
     { to: "/fiscal", icon: Calculator, label: t('nav.fiscal') },
     { to: "/tax-compliance", icon: ReceiptText, label: t('nav.taxCompliance'), beta: true },
     { to: "/automatizaciones", icon: Zap, label: t('nav.automations') },
+    { to: "/casos", icon: Briefcase, label: t('nav.cases') },
   ];
+  const navItems = isFreePlan
+    ? allNavItems.filter(item => item.to !== '/automatizaciones')
+    : allNavItems;
 
   useEffect(() => {
     const userType = sessionStorage.getItem('userType');
@@ -85,9 +92,27 @@ const AppSidebar = ({
     return () => clearInterval(interval);
   }, []);
 
+  useEffect(() => {
+    const fetchPendingCases = async () => {
+      const accId = sessionStorage.getItem('accountId');
+      if (!accId) return;
+      try {
+        const res = await authFetch(`${import.meta.env.VITE_API_URL}/cases?accountId=${accId}&status=pending`);
+        if (res.ok) {
+          const data = await res.json();
+          setPendingCases(data.length || 0);
+        }
+      } catch (err) {
+        console.error(err);
+      }
+    };
+    fetchPendingCases();
+    const interval = setInterval(fetchPendingCases, 30000);
+    return () => clearInterval(interval);
+  }, []);
+
   const handleLogout = () => {
-    sessionStorage.clear();
-    navigate("/login");
+    logoutUser();
   };
 
   const handleNavClick = () => {
@@ -156,6 +181,11 @@ const AppSidebar = ({
                         {t('nav.beta')}
                       </span>
                     ) : null}
+                    {item.to === '/casos' && pendingCases > 0 && (
+                      <span className="ml-auto bg-red-500 text-white text-[10px] font-bold px-1.5 py-0.5 rounded-full">
+                        {pendingCases}
+                      </span>
+                    )}
                   </span>
                   {item.to === '/automatizaciones' && emailUnread > 0 && (
                     <span className="h-5 min-w-5 px-1 rounded-full bg-destructive text-destructive-foreground text-[10px] font-bold flex items-center justify-center">{emailUnread}</span>
@@ -248,21 +278,29 @@ const AppSidebar = ({
             >
               <div className="relative shrink-0">
                 <item.icon className="h-4 w-4" />
+                {collapsed && item.to === '/casos' && pendingCases > 0 && (
+                  <span className="absolute -top-1.5 -right-1.5 h-3.5 min-w-3.5 px-0.5 rounded-full bg-red-500 text-white text-[8px] font-bold flex items-center justify-center">{pendingCases}</span>
+                )}
                 {collapsed && item.to === '/automatizaciones' && emailUnread > 0 && (
                   <span className="absolute -top-1.5 -right-1.5 h-3.5 min-w-3.5 px-0.5 rounded-full bg-destructive text-destructive-foreground text-[8px] font-bold flex items-center justify-center">{emailUnread}</span>
                 )}
               </div>
-              {!collapsed && (
-                <span className="flex-1 flex items-center gap-2">
-                  <span>{item.label}</span>
-                  {item.beta ? (
-                    <span className="px-1.5 py-0.5 rounded-full text-[10px] font-semibold bg-amber-500/20 text-amber-700 dark:text-amber-300">
-                      {t('nav.beta')}
-                    </span>
-                  ) : null}
-                </span>
-              )}
-              {!collapsed && item.to === '/automatizaciones' && emailUnread > 0 && (
+                {!collapsed && (
+                  <span className="flex-1 flex items-center gap-2">
+                    <span>{item.label}</span>
+                    {item.beta ? (
+                      <span className="px-1.5 py-0.5 rounded-full text-[10px] font-semibold bg-amber-500/20 text-amber-700 dark:text-amber-300">
+                        {t('nav.beta')}
+                      </span>
+                    ) : null}
+                    {item.to === '/casos' && pendingCases > 0 && (
+                      <span className="ml-auto bg-red-500 text-white text-[10px] font-bold px-1.5 py-0.5 rounded-full">
+                        {pendingCases}
+                      </span>
+                    )}
+                  </span>
+                )}
+                {!collapsed && item.to === '/automatizaciones' && emailUnread > 0 && (
                 <span className="h-5 min-w-5 px-1 rounded-full bg-destructive text-destructive-foreground text-[10px] font-bold flex items-center justify-center">{emailUnread}</span>
               )}
             </NavLink>

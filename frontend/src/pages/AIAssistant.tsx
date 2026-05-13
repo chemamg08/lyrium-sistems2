@@ -1,15 +1,17 @@
 import { useEffect, useRef, useState } from "react";
-import { Send, StopCircle, Trash2, Paperclip, FileText, Brain, FolderOpen, MessageSquare, Search, Plus, Pencil, Check, X } from "lucide-react";
+import { Send, StopCircle, Trash2, Paperclip, FileText, Brain, FolderOpen, MessageSquare, Search, Plus, Pencil, Check, X, Flag, PanelLeftClose } from "lucide-react";
 import ReactMarkdown from "react-markdown";
 import { useTranslation } from "react-i18next";
 import { useToast } from "@/components/ui/use-toast";
 import { useStreamingChat } from "@/hooks/useStreamingChat";
 import { authFetch } from '../lib/authFetch';
+import ModuleGuide from "@/components/ModuleGuide";
 
 interface Message {
   id: string;
   role: "user" | "assistant";
   content: string;
+  reasoning?: string;
 }
 
 interface Chat {
@@ -47,7 +49,11 @@ const AIAssistant = () => {
   const fileRef = useRef<HTMLInputElement>(null);
   const activeChatIdRef = useRef<string | null>(null);
   const pollingRef = useRef<ReturnType<typeof setInterval> | null>(null);
-  const { streamingText, isStreaming, startStream, cancelStream } = useStreamingChat();
+  const { streamingText, streamingReasoning, isStreaming, startStream, cancelStream } = useStreamingChat();
+  const pendingReasoningRef = useRef('');
+  const [showFlagPanel, setShowFlagPanel] = useState(false);
+  const [flaggedMessages, setFlaggedMessages] = useState<any[]>([]);
+  const [highlightedMsgId, setHighlightedMsgId] = useState<string | null>(null);
 
   useEffect(() => {
     loadChats();
@@ -144,6 +150,7 @@ const AIAssistant = () => {
       if (response.ok) {
         const data = await response.json();
         setMessages(data.messages || []);
+        setFlaggedMessages((data.messages || []).filter((m: any) => m.flags && m.flags.length > 0).map(m => ({ id: m.id, role: m.role, content: m.content, flags: m.flags })));
       }
     } catch (error) {
       console.error("Error al cargar chat del asistente:", error);
@@ -201,6 +208,40 @@ const AIAssistant = () => {
   const handleCancel = () => {
     cancelStream();
     setIsLoading(false);
+  };
+
+  const toggleFlag = async (messageId: string) => {
+    const msg = messages.find(m => m.id === messageId);
+    if (!msg) return;
+    const isFlagged = msg.flags && msg.flags.length > 0;
+    try {
+      if (isFlagged) {
+        const flagId = msg.flags[msg.flags.length - 1].id;
+        const res = await authFetch(`${API_URL}/flags/assistant/${activeChatId}/messages/${messageId}/flags/${flagId}`, { method: 'DELETE' });
+        if (res.ok) {
+          const data = await res.json();
+          setMessages(prev => prev.map(m => m.id === messageId ? { ...m, flags: data.flags } : m));
+          setFlaggedMessages(prev => prev.filter(f => f.id !== messageId));
+        }
+      } else {
+        const res = await authFetch(`${API_URL}/flags/assistant/${activeChatId}/messages/${messageId}`, { method: 'POST' });
+        if (res.ok) {
+          const data = await res.json();
+          setMessages(prev => prev.map(m => m.id === messageId ? { ...m, flags: data.flags } : m));
+          setFlaggedMessages(prev => [...prev, { id: messageId, role: msg.role, content: msg.content, flags: data.flags }]);
+        }
+      }
+    } catch (err) { console.error(err); }
+  };
+
+  const scrollToMessage = (messageId: string) => {
+    const el = document.getElementById(`msg-${messageId}`);
+    if (el) {
+      el.scrollIntoView({ behavior: 'smooth', block: 'center' });
+      setHighlightedMsgId(messageId);
+      setTimeout(() => setHighlightedMsgId(null), 2000);
+      setShowFlagPanel(false);
+    }
   };
 
   const uploadFile = async (file: File) => {
@@ -274,18 +315,22 @@ const AIAssistant = () => {
     sessionStorage.setItem(`streaming_assistant_${activeChatId}`, String(currentMsgCount));
 
     try {
+      pendingReasoningRef.current = '';
       await startStream({
         endpoint: "/assistant/chat/message/stream",
         body: { accountId, chatId: activeChatId, content, ...(fileContext ? { fileContext } : {}), ...(ragEnabled ? { ragEnabled: true } : {}) },
+        onDoneReasoning: (fullReasoning) => { pendingReasoningRef.current = fullReasoning; },
         onDone: (fullText) => {
           // Limpiar flag de streaming
           const doneChatId = activeChatIdRef.current;
           if (doneChatId) sessionStorage.removeItem(`streaming_assistant_${doneChatId}`);
 
           const content = ragEnabled ? `${fullText}\n<!-- rag-enhanced -->` : fullText;
-          setMessages(prev => [...prev, { id: `ai-${Date.now()}`, role: 'assistant', content }]);
+          setMessages(prev => [...prev, { id: `ai-${Date.now()}`, role: 'assistant', content, reasoning: pendingReasoningRef.current || undefined }]);
+          pendingReasoningRef.current = '';
           setIsLoading(false);
           loadChats();
+          if (activeChatIdRef.current) loadChat(activeChatIdRef.current);
         },
       });
     } catch (error) {
@@ -327,6 +372,7 @@ const AIAssistant = () => {
 
   return (
     <div className="flex h-[calc(100vh-0px)] relative">
+      <ModuleGuide moduleId="assistant" />
       {/* Delete chat modal */}
       {showDeleteChatConfirm && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 backdrop-blur-sm">
@@ -455,6 +501,18 @@ const AIAssistant = () => {
             <h2 className="text-lg md:text-xl font-semibold text-foreground">{t('assistant.title')}</h2>
             <p className="text-sm text-muted-foreground mt-1">{t('assistant.subtitle')}</p>
           </div>
+          <button
+            onClick={() => setShowFlagPanel(!showFlagPanel)}
+            className="p-2 rounded-lg hover:bg-muted text-muted-foreground transition-colors relative"
+            title={t('chat.flaggedMessages') || 'Mensajes marcados'}
+          >
+            <Flag size={18} />
+            {flaggedMessages.length > 0 && (
+              <span className="absolute -top-1 -right-1 h-4 w-4 bg-yellow-500 text-[10px] text-black rounded-full flex items-center justify-center font-bold">
+                {flaggedMessages.length}
+              </span>
+            )}
+          </button>
         </div>
 
         <div
@@ -486,12 +544,24 @@ const AIAssistant = () => {
             return (
             <div key={msg.id} className={`flex ${msg.role === "user" ? "justify-end" : "justify-start"}`}>
               <div
-                className={`max-w-[85%] md:max-w-[70%] rounded-lg px-4 py-3 text-sm leading-relaxed prose prose-sm dark:prose-invert prose-p:my-1 prose-ul:my-1 prose-ol:my-1 ${
+                id={`msg-${msg.id}`}
+                className={`max-w-[85%] md:max-w-[70%] rounded-lg px-4 py-3 text-sm leading-relaxed prose prose-sm dark:prose-invert prose-p:my-1 prose-ul:my-1 prose-ol:my-1 relative group transition-all ${highlightedMsgId === msg.id ? 'ring-2 ring-yellow-500' : ''} ${msg.flags && msg.flags.length > 0 ? 'border-l-2 border-l-yellow-500' : ''} ${
                   msg.role === "user"
                     ? "bg-chat-user text-chat-user-foreground"
                     : "bg-chat-ai text-chat-ai-foreground"
                 }`}
               >
+                {msg.role === 'assistant' && msg.reasoning && (
+                  <details className="mb-2 not-prose">
+                    <summary className="text-xs text-muted-foreground cursor-pointer select-none flex items-center gap-1.5 list-none">
+                      <Brain className="h-3 w-3" />
+                      <span>Pensando...</span>
+                    </summary>
+                    <div className="mt-1.5 text-xs text-muted-foreground/80 font-mono whitespace-pre-wrap border-t border-border/40 pt-1.5" style={{ maxHeight: '4.5em', overflowY: 'auto' }}>
+                      {msg.reasoning}
+                    </div>
+                  </details>
+                )}
                 <ReactMarkdown>{displayContent}</ReactMarkdown>
                 {isRagEnhanced && (
                   <div className="flex items-center justify-end gap-1 mt-2 pt-1.5 border-t border-border/30 not-prose">
@@ -499,6 +569,13 @@ const AIAssistant = () => {
                     <span className="text-[10px] text-muted-foreground">{t('improveAI.ragUsed')}</span>
                   </div>
                 )}
+                <button
+                  onClick={() => toggleFlag(msg.id)}
+                  className="absolute top-1 right-1 p-1 rounded opacity-0 group-hover:opacity-100 transition-opacity hover:bg-black/10"
+                  title={msg.flags && msg.flags.length > 0 ? (t('chat.unflag') || 'Desmarcar') : (t('chat.flagMessage') || 'Marcar')}
+                >
+                  <Flag size={14} className={msg.flags && msg.flags.length > 0 ? 'text-yellow-500 fill-yellow-500' : 'text-muted-foreground'} />
+                </button>
               </div>
             </div>
             );
@@ -514,9 +591,20 @@ const AIAssistant = () => {
             </div>
           )}
 
-          {isStreaming && streamingText && (
+          {isStreaming && (streamingText || streamingReasoning) && (
             <div className="flex justify-start">
               <div className="max-w-[85%] md:max-w-[70%] rounded-lg px-4 py-3 text-sm leading-relaxed prose prose-sm dark:prose-invert prose-p:my-1 prose-ul:my-1 prose-ol:my-1 bg-chat-ai text-chat-ai-foreground">
+                {streamingReasoning && (
+                  <details className="mb-2 not-prose" open>
+                    <summary className="text-xs text-muted-foreground cursor-pointer select-none flex items-center gap-1.5 list-none">
+                      <Brain className="h-3 w-3" />
+                      <span>Pensando...</span>
+                    </summary>
+                    <div className="mt-1.5 text-xs text-muted-foreground/80 font-mono whitespace-pre-wrap border-t border-border/40 pt-1.5" style={{ maxHeight: '4.5em', overflowY: 'auto' }}>
+                      {streamingReasoning}
+                    </div>
+                  </details>
+                )}
                 <ReactMarkdown>{streamingText}</ReactMarkdown>
               </div>
             </div>
@@ -589,6 +677,41 @@ const AIAssistant = () => {
           </div>
         </div>
       </div>
+
+      {/* Flag Panel Drawer */}
+      {showFlagPanel && (
+        <div className="absolute top-0 right-0 h-full w-80 bg-card border-l border-border z-30 flex flex-col shadow-xl">
+          <div className="flex items-center justify-between p-4 border-b">
+            <h3 className="font-semibold flex items-center gap-2">
+              <Flag size={16} className="text-yellow-500" />
+              {t('chat.flaggedMessages') || 'Mensajes marcados'} ({flaggedMessages.length})
+            </h3>
+            <button onClick={() => setShowFlagPanel(false)} className="p-1 rounded hover:bg-muted">
+              <X size={16} />
+            </button>
+          </div>
+          <div className="flex-1 overflow-y-auto p-3 space-y-2">
+            {flaggedMessages.length === 0 ? (
+              <p className="text-sm text-muted-foreground text-center py-8">{t('chat.noFlaggedMessages') || 'No hay mensajes marcados'}</p>
+            ) : (
+              flaggedMessages.map((fm: any) => (
+                <button
+                  key={fm.id}
+                  onClick={() => scrollToMessage(fm.id)}
+                  className="w-full text-left p-3 rounded-lg bg-muted/50 hover:bg-muted transition-colors"
+                >
+                  <div className="flex items-center gap-2 mb-1">
+                    <span className={`text-[10px] px-1.5 py-0.5 rounded ${fm.role === 'user' ? 'bg-primary/20 text-primary' : 'bg-muted-foreground/20 text-muted-foreground'}`}>
+                      {fm.role === 'user' ? (t('chat.you') || 'Tú') : 'Lyra'}
+                    </span>
+                  </div>
+                  <p className="text-xs text-muted-foreground line-clamp-2">{fm.content.substring(0, 120)}...</p>
+                </button>
+              ))
+            )}
+          </div>
+        </div>
+      )}
     </div>
   );
 };

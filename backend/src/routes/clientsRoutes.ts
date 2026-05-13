@@ -23,6 +23,12 @@ import {
   updateInvoice,
   sendInvoiceEmail,
   getEmailAccounts,
+  getClientReminders,
+  createReminder,
+  updateReminder,
+  deleteReminder,
+  getAllReminders,
+  updateInvoicePaymentStatus,
 } from '../controllers/clientsController.js';
 
 const __filename = fileURLToPath(import.meta.url);
@@ -98,5 +104,15 @@ router.post('/invoices/:invoiceId/send', sendInvoiceEmail);
 
 // Email accounts (for invoice sending)
 router.get('/email-accounts', getEmailAccounts);
+
+// Reminders
+router.get('/clients/:id/reminders', getClientReminders);
+router.post('/clients/:id/reminders', createReminder);
+router.put('/reminders/:reminderId', updateReminder);
+router.delete('/reminders/:reminderId', deleteReminder);
+router.get('/reminders', getAllReminders);
+
+// Invoice payment status
+router.put('/invoices/:invoiceId/payment-status', updateInvoicePaymentStatus);
 
 export default router;

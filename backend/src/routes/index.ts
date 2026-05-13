@@ -28,7 +28,12 @@ import webhookRoutes from './webhookRoutes.js';
 import publicApiRoutes from './publicApiRoutes.js';
 import taxComplianceRoutes from './taxComplianceRoutes.js';
 import whatsappRoutes from './whatsappRoutes.js';
-import { whatsappMetaCallback, whatsappWebhook, whatsappWebhookVerify } from '../controllers/whatsappController.js';
+import casesRoutes from './casesRoutes.js';
+import suggestionRoutes from './suggestionRoutes.js';
+import { getPublicInvoice } from '../controllers/publicInvoiceController.js';
+import publicEvidenceRoutes from './publicEvidenceRoutes.js';
+import { flagMessage, unflagMessage } from '../controllers/messageFlagsController.js';
+import { serveWAPublicAttachment, whatsappMetaCallback, whatsappWebhook, whatsappWebhookVerify } from '../controllers/whatsappController.js';
 import { getStats, incrementStat } from '../controllers/statsController.js';
 
 const router = Router();
@@ -43,6 +48,9 @@ router.use('/v1', publicApiRoutes); // Public API (API key auth inside)
 router.get('/whatsapp/meta/callback', whatsappMetaCallback); // WhatsApp Meta OAuth callback (no auth)
 router.get('/whatsapp/webhook', whatsappWebhookVerify); // WhatsApp webhook verify (Meta, no auth)
 router.post('/whatsapp/webhook', whatsappWebhook); // WhatsApp webhook events (Meta, no auth)
+router.get('/whatsapp/public-attachments/:filename', serveWAPublicAttachment); // Signed public media fetch for Meta
+router.get('/invoice/:invoiceId', getPublicInvoice);
+router.use('/public', publicEvidenceRoutes);
 
 // Admin routes (auth + admin middleware inside)
 router.use('/admin', adminRoutes);
@@ -72,6 +80,12 @@ router.use('/integrations/webhooks', webhookRoutes);
 router.use('/calendar', calendarRoutes);
 router.get('/stats', getStats);
 router.post('/stats/increment', incrementStat);
+router.use('/cases', casesRoutes);
+router.use('/suggestions', suggestionRoutes);
+
+// Message flags
+router.post('/flags/:chatType/:chatId/messages/:messageId', flagMessage);
+router.delete('/flags/:chatType/:chatId/messages/:messageId/flags/:flagId', unflagMessage);
 
 export default router;
 

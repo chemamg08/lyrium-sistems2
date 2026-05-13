@@ -1,17 +1,60 @@
 import { Outlet, Navigate } from "react-router-dom";
-import { useState } from "react";
-import { Menu } from "lucide-react";
+import { useEffect, useState } from "react";
+import { Menu, Scale } from "lucide-react";
 import { useIsMobile } from "@/hooks/use-mobile";
+import { authFetch, persistUserSession } from "@/lib/authFetch";
 import AppSidebar from "./AppSidebar";
 import ProfileModal from "./ProfileModal";
+
+const API_URL = import.meta.env.VITE_API_URL;
 
 const AppLayout = () => {
   const [collapsed, setCollapsed] = useState(false);
   const [showProfileModal, setShowProfileModal] = useState(false);
   const [mobileOpen, setMobileOpen] = useState(false);
+  const [authState, setAuthState] = useState<'checking' | 'authenticated' | 'unauthenticated'>('checking');
   const isMobile = useIsMobile();
 
-  if (!sessionStorage.getItem('userId')) {
+  useEffect(() => {
+    let cancelled = false;
+
+    const restoreSession = async () => {
+      try {
+        const res = await authFetch(`${API_URL}/accounts/me`);
+        if (!res.ok) {
+          if (!cancelled) setAuthState('unauthenticated');
+          return;
+        }
+
+        const data = await res.json();
+        if (!data?.user?.id) {
+          if (!cancelled) setAuthState('unauthenticated');
+          return;
+        }
+
+        persistUserSession(data.user);
+        if (!cancelled) setAuthState('authenticated');
+      } catch {
+        if (!cancelled) setAuthState('unauthenticated');
+      }
+    };
+
+    restoreSession();
+    return () => {
+      cancelled = true;
+    };
+  }, []);
+
+  if (authState === 'checking') {
+    return (
+      <div className="flex flex-col items-center justify-center min-h-screen bg-background gap-4">
+        <Scale className="h-10 w-10 text-primary animate-spin" />
+        <span className="text-muted-foreground text-sm">Cargando tu espacio de trabajo…</span>
+      </div>
+    );
+  }
+
+  if (authState === 'unauthenticated') {
     return <Navigate to="/landing" replace />;
   }
 

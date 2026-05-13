@@ -1,14 +1,68 @@
 /**
- * Stripe Integration Tests — Lyrium Systems
+ * Unified Stripe Integration Suite — Lyrium Systems
  *
- * 29 tests con API REAL de Stripe (modo test) + MongoDB mockeado.
- * Verifica pagos, suscripciones, webhooks, fechas y login expirado end-to-end.
+ * Archivo unico para Stripe.
+ * Usa Stripe real en modo test y los handlers reales de subscriptions.ts.
+ * Incluye una capa Mongo real aislada para los flujos principales cuando MONGODB_URI
+ * está disponible en el entorno de integración.
  *
- * Ejecutar:  npm run test:integration
+ * Ejecutar: npm run test:integration -- src/test/stripe.integration.test.ts
  */
 
-import { describe, it, expect, beforeAll, afterAll, beforeEach, vi } from 'vitest';
+import { describe, it, expect, beforeAll, afterAll, beforeEach, afterEach, vi } from 'vitest';
 import Stripe from 'stripe';
+import dotenv from 'dotenv';
+import path from 'path';
+import mongoose from 'mongoose';
+
+dotenv.config({ path: path.resolve(import.meta.dirname, '../../.env') });
+
+if (!process.env.JWT_SECRET) {
+  process.env.JWT_SECRET = 'integration-test-secret';
+}
+
+const mongoUri = process.env.MONGODB_URI;
+const fallbackTestDbName = `lyrium_vitest_${Date.now()}_${Math.random().toString(36).slice(2, 8)}`;
+
+if (mongoUri) {
+  process.env.VITEST_REAL_MONGO = '1';
+  if (!process.env.VITEST_MONGO_DB_NAME) {
+    process.env.VITEST_MONGO_DB_NAME = fallbackTestDbName;
+  }
+} else {
+  process.env.VITEST_REAL_MONGO = '0';
+}
+
+const globalMongoSetupKey = '__lyriumStripeIntegrationMongoSetup';
+if (mongoUri && !(globalThis as any)[globalMongoSetupKey]) {
+  (globalThis as any)[globalMongoSetupKey] = true;
+
+  beforeAll(async () => {
+    if (mongoose.connection.readyState === 0) {
+      await mongoose.connect(mongoUri, {
+        dbName: process.env.VITEST_MONGO_DB_NAME,
+      });
+    }
+  });
+
+  afterEach(async () => {
+    if (mongoose.connection.readyState !== 1) {
+      return;
+    }
+
+    const collections = Object.values(mongoose.connection.collections);
+    for (const collection of collections) {
+      await collection.deleteMany({});
+    }
+  });
+
+  afterAll(async () => {
+    if (mongoose.connection.readyState === 1) {
+      await mongoose.connection.dropDatabase();
+      await mongoose.disconnect();
+    }
+  });
+}
 
 // ─── Stripe real (test mode) ─────────────────────────────────────────────────
 
@@ -26,7 +80,7 @@ const PRICES = {
 
 // ─── Hoisted mocks — solo MongoDB, NO Stripe ─────────────────────────────────
 
-const { SubMock, AccMock, SubaccMock, InvMocks, BcryptMock, AuthMocks } = vi.hoisted(() => {
+const { SubMock, AccMock, SubaccMock, StripeWebhookEventMock, InvMocks, BcryptMock, AuthMocks } = vi.hoisted(() => {
   const saveFn = vi.fn(async function (this: any) { return this; });
   const updateOneFn = vi.fn(async function () { return {}; });
   return {
@@ -40,11 +94,16 @@ const { SubMock, AccMock, SubaccMock, InvMocks, BcryptMock, AuthMocks } = vi.hoi
     AccMock: {
       findOne: vi.fn(),
       findById: vi.fn(),
+      findByIdAndUpdate: vi.fn(),
       find: vi.fn(),
     },
     SubaccMock: {
       findOne: vi.fn(),
       find: vi.fn(),
+    },
+    StripeWebhookEventMock: {
+      findById: vi.fn(),
+      create: vi.fn(),
     },
     InvMocks: {
       generateInvoicePDF: vi.fn().mockResolvedValue(Buffer.from('pdf')),
@@ -58,12 +117,14 @@ const { SubMock, AccMock, SubaccMock, InvMocks, BcryptMock, AuthMocks } = vi.hoi
       hash: vi.fn().mockResolvedValue('$2b$10$hashed'),
     },
     AuthMocks: {
+      authMiddleware: vi.fn((_req: any, _res: any, next: any) => next()),
       generateToken: vi.fn().mockReturnValue('test-jwt-token'),
       generateRefreshToken: vi.fn().mockReturnValue('test-refresh-token'),
       setAuthCookies: vi.fn(),
       clearAuthCookies: vi.fn(),
       verifyRefreshToken: vi.fn(),
       verifyOwnership: vi.fn(),
+      AuthRequest: {},
       AuthPayload: {},
     },
   };
@@ -72,6 +133,7 @@ const { SubMock, AccMock, SubaccMock, InvMocks, BcryptMock, AuthMocks } = vi.hoi
 vi.mock('../models/Subscription.js', () => ({ Subscription: SubMock }));
 vi.mock('../models/Account.js', () => ({ Account: AccMock }));
 vi.mock('../models/Subaccount.js', () => ({ Subaccount: SubaccMock }));
+vi.mock('../models/StripeWebhookEvent.js', () => ({ StripeWebhookEvent: StripeWebhookEventMock }));
 vi.mock('../models/Client.js', () => ({ Client: { find: vi.fn(), deleteMany: vi.fn() } }));
 vi.mock('../services/invoiceService.js', () => InvMocks);
 vi.mock('bcrypt', () => ({ default: BcryptMock }));
@@ -79,15 +141,20 @@ vi.mock('speakeasy', () => ({ default: { totp: { verify: vi.fn().mockReturnValue
 vi.mock('nodemailer', () => ({
   default: {
     createTransport: vi.fn().mockReturnValue({
-      sendMail: vi.fn().mockResolvedValue({ messageId: 'test' }),
+      sendMail: vi.fn(async () => {
+        throw new Error('SMTP must not be used in stripe.integration.test.ts');
+      }),
     }),
   },
 }));
 vi.mock('../middleware/auth.js', () => AuthMocks);
-vi.mock('mongoose', async (importOriginal) => {
-  const actual: any = await importOriginal();
-  return { ...actual, default: { ...actual.default, model: vi.fn() } };
-});
+
+const HAS_REAL_MONGO = Boolean(mongoUri);
+
+let RealAccountModel: any;
+let RealSubscriptionModel: any;
+let RealInvoiceModel: any;
+let RealSubaccountModel: any;
 
 // ─── Tracking para cleanup ───────────────────────────────────────────────────
 
@@ -133,8 +200,25 @@ function mockDoc(data: Record<string, any>) {
   };
 }
 
-function mockReq(body: any = {}, query: any = {}, headers: any = {}) {
-  return { body, query, headers, params: {} } as any;
+function mockReq(body: any = {}, query: any = {}, headers: any = {}, user?: any) {
+  const requestedAccountId = typeof body?.accountId === 'string'
+    ? body.accountId
+    : typeof query?.accountId === 'string'
+      ? query.accountId
+      : 'acc_test';
+
+  return {
+    body,
+    query,
+    headers,
+    params: {},
+    user: user || {
+      userId: requestedAccountId,
+      email: 'owner@lyrium-test.io',
+      type: 'main',
+      role: 'user',
+    },
+  } as any;
 }
 
 function mockRes() {
@@ -156,6 +240,18 @@ function signWebhookPayload(payload: string): string {
   return `t=${timestamp},v1=${signature}`;
 }
 
+function futureDate(days: number): string {
+  const date = new Date();
+  date.setDate(date.getDate() + days);
+  return date.toISOString();
+}
+
+function pastDate(days: number): string {
+  const date = new Date();
+  date.setDate(date.getDate() - days);
+  return date.toISOString();
+}
+
 async function waitForTestClock(clockId: string, maxWaitMs = 90_000): Promise<void> {
   const start = Date.now();
   while (Date.now() - start < maxWaitMs) {
@@ -169,6 +265,109 @@ async function waitForTestClock(clockId: string, maxWaitMs = 90_000): Promise<vo
   }
   throw new Error(`Test clock did not reach 'ready' within ${maxWaitMs}ms`);
 }
+
+async function waitForInvoiceRecord(accountId: string, timeoutMs = 10_000) {
+  const start = Date.now();
+
+  while (Date.now() - start < timeoutMs) {
+    const invoice = await RealInvoiceModel.findOne({ accountId }).sort({ date: -1 });
+    if (invoice) {
+      return invoice;
+    }
+
+    await new Promise((resolve) => setTimeout(resolve, 100));
+  }
+
+  throw new Error(`Invoice for account ${accountId} was not created within ${timeoutMs}ms`);
+}
+
+function useRealMongoBackedModels() {
+  if (!HAS_REAL_MONGO) {
+    throw new Error('Real Mongo integration is not available in this environment');
+  }
+
+  AccMock.findOne.mockImplementation((filter: any) => RealAccountModel.findOne(filter));
+  AccMock.findById.mockImplementation((id: string) => RealAccountModel.findById(id));
+  AccMock.find.mockImplementation((filter: any = {}) => RealAccountModel.find(filter));
+  AccMock.findByIdAndUpdate.mockImplementation((id: string, update: any, options: any) =>
+    RealAccountModel.findByIdAndUpdate(id, update, options)
+  );
+
+  SubMock.findOne.mockImplementation((filter: any) => RealSubscriptionModel.findOne(filter));
+  SubMock.create.mockImplementation((doc: any) => RealSubscriptionModel.create(doc));
+  SubMock.updateOne.mockImplementation((filter: any, update: any) => RealSubscriptionModel.updateOne(filter, update));
+  SubMock.find.mockImplementation((filter: any = {}) => RealSubscriptionModel.find(filter));
+  SubMock.deleteMany.mockImplementation((filter: any = {}) => RealSubscriptionModel.deleteMany(filter));
+
+  SubaccMock.findOne.mockImplementation((filter: any) => RealSubaccountModel.findOne(filter));
+  SubaccMock.find.mockImplementation((filter: any = {}) => RealSubaccountModel.find(filter));
+}
+
+async function createRealAccount(accountId: string, overrides: Record<string, any> = {}) {
+  return RealAccountModel.create({
+    _id: accountId,
+    name: 'Stripe Test User',
+    email: `${accountId}@lyrium-test.io`,
+    password: '$2b$10$hashed',
+    country: 'ES',
+    type: 'main',
+    role: 'user',
+    emailVerified: true,
+    companyName: 'Lyrium Test',
+    companyEmail: `${accountId}@lyrium-test.io`,
+    companyAddress: '',
+    companyPhone: '',
+    companyCIF: '',
+    invoiceNotes: '',
+    nextInvoiceNumber: 1,
+    createdAt: new Date().toISOString(),
+    ...overrides,
+  });
+}
+
+async function createRealSubscription(accountId: string, overrides: Record<string, any> = {}) {
+  return RealSubscriptionModel.create({
+    _id: `sub_${accountId}`,
+    accountId,
+    plan: 'starter',
+    interval: 'monthly',
+    status: 'trial',
+    trialEndDate: futureDate(14),
+    currentPeriodStart: new Date().toISOString(),
+    currentPeriodEnd: futureDate(14),
+    autoRenew: false,
+    stripeCustomerId: null,
+    stripeSubscriptionId: null,
+    stripePaymentMethodId: null,
+    paymentMethod: null,
+    createdAt: new Date().toISOString(),
+    updatedAt: new Date().toISOString(),
+    ...overrides,
+  });
+}
+
+beforeEach(() => {
+  AuthMocks.verifyOwnership.mockImplementation((req: any, accountId: string) => {
+    const user = req?.user;
+    if (!user) return false;
+    if (user.role === 'admin') return true;
+    if (user.type === 'subaccount' && user.parentAccountId === accountId) return true;
+    return user.userId === accountId;
+  });
+  StripeWebhookEventMock.findById.mockResolvedValue(null);
+  StripeWebhookEventMock.create.mockImplementation(async (doc: any) => mockDoc(doc));
+});
+
+beforeAll(async () => {
+  if (!HAS_REAL_MONGO) {
+    return;
+  }
+
+  ({ Account: RealAccountModel } = await vi.importActual('../models/Account.js') as any);
+  ({ Subscription: RealSubscriptionModel } = await vi.importActual('../models/Subscription.js') as any);
+  ({ Invoice: RealInvoiceModel } = await vi.importActual('../models/Invoice.js') as any);
+  ({ Subaccount: RealSubaccountModel } = await vi.importActual('../models/Subaccount.js') as any);
+});
 
 // =============================================================================
 // SECCIÓN 1: PAGOS REALES EN STRIPE + confirmPayment
@@ -795,6 +994,109 @@ describe('3. Webhooks con firma real', () => {
 
     expect(existingSub.status).toBe('past_due');
     expect(existingSub.save).toHaveBeenCalled();
+  });
+
+  it('Test 18b — webhook duplicado con mismo event.id → se procesa una sola vez', async () => {
+    const existingSub = mockDoc({
+      _id: 'sub_18b', accountId: 'acc_18b', plan: 'starter', interval: 'monthly',
+      status: 'active', stripeCustomerId: 'cus_test_18b',
+      currentPeriodEnd: new Date().toISOString(),
+      paymentMethod: { brand: 'visa', last4: '4242' },
+    });
+    SubMock.findOne.mockResolvedValue(existingSub);
+
+    const webhookRecord = mockDoc({
+      _id: 'evt_test_18b',
+      status: 'processing',
+      attempts: 1,
+      accountId: 'acc_18b',
+      stripeCustomerId: 'cus_test_18b',
+    });
+    StripeWebhookEventMock.create.mockResolvedValue(webhookRecord);
+    StripeWebhookEventMock.findById
+      .mockResolvedValueOnce(null)
+      .mockResolvedValueOnce(webhookRecord);
+
+    const event = {
+      id: 'evt_test_18b',
+      type: 'invoice.paid',
+      data: {
+        object: {
+          id: 'in_test_18b',
+          customer: 'cus_test_18b',
+          billing_reason: 'subscription_cycle',
+          lines: {
+            data: [{
+              period: {
+                start: Math.floor(Date.now() / 1000),
+                end: Math.floor(Date.now() / 1000) + 30 * 86400,
+              },
+            }],
+          },
+        },
+      },
+    };
+
+    const payload = JSON.stringify(event);
+    const sig = signWebhookPayload(payload);
+    const req1 = mockReq(payload, {}, { 'stripe-signature': sig });
+    const req2 = mockReq(payload, {}, { 'stripe-signature': sig });
+    const res1 = mockRes();
+    const res2 = mockRes();
+
+    await handleWebhook(req1, res1);
+    await handleWebhook(req2, res2);
+
+    expect(res1.json).toHaveBeenCalledWith({ received: true });
+    expect(res2.json).toHaveBeenCalledWith({ received: true, duplicate: true });
+    expect(SubMock.findOne).toHaveBeenCalledTimes(1);
+    expect(existingSub.save).toHaveBeenCalledTimes(1);
+  });
+
+  it('Test 18c — invoice.payment_failed atrasado no degrada una suscripción más nueva', async () => {
+    const existingSub = mockDoc({
+      _id: 'sub_18c',
+      accountId: 'acc_18c',
+      stripeCustomerId: 'cus_test_18c',
+      status: 'active',
+      currentPeriodEnd: futureDate(60),
+      updatedAt: new Date().toISOString(),
+    });
+    SubMock.findOne.mockResolvedValue(existingSub);
+
+    const staleEnd = Math.floor((Date.now() + 30 * 86400000) / 1000);
+    const staleStart = Math.floor((Date.now() + 29 * 86400000) / 1000);
+    const event = {
+      id: 'evt_test_18c',
+      created: Math.floor(Date.now() / 1000) - 3600,
+      type: 'invoice.payment_failed',
+      data: {
+        object: {
+          id: 'in_test_18c',
+          customer: 'cus_test_18c',
+          billing_reason: 'subscription_cycle',
+          lines: {
+            data: [{
+              period: {
+                start: staleStart,
+                end: staleEnd,
+              },
+            }],
+          },
+        },
+      },
+    };
+
+    const payload = JSON.stringify(event);
+    const sig = signWebhookPayload(payload);
+    const req = mockReq(payload, {}, { 'stripe-signature': sig });
+    const res = mockRes();
+
+    await handleWebhook(req, res);
+
+    expect(res.json).toHaveBeenCalledWith({ received: true });
+    expect(existingSub.status).toBe('active');
+    expect(existingSub.save).not.toHaveBeenCalled();
   });
 });
 
@@ -1968,5 +2270,495 @@ describe('6. Login con suscripción expirada', () => {
     const successData = res2.json.mock.calls[0][0];
     expect(successData.success).toBe(true);
     expect(successData.user.email).toBe('renew@lyrium.io');
+  });
+});
+
+// =============================================================================
+// SECCIÓN 13: Handlers reales que faltaban en la suite unificada
+// =============================================================================
+
+describe('13. Handlers reales restantes de subscriptions.ts', () => {
+  let changePlan: any;
+  let cancelAutoRenew: any;
+  let validateSubscription: any;
+
+  beforeAll(async () => {
+    const mod = await import('../subscriptions.js');
+    changePlan = mod.changePlan;
+    cancelAutoRenew = mod.cancelAutoRenew;
+    validateSubscription = mod.validateSubscription;
+  });
+
+  beforeEach(() => {
+    vi.clearAllMocks();
+  });
+
+  it('Test 54 — changePlan real: Starter mensual → Advanced mensual por handler', async () => {
+    const customer = await makeCustomer('change-plan-upgrade@lyrium-test.io');
+    const paymentMethod = await makePM();
+    await stripe.paymentMethods.attach(paymentMethod.id, { customer: customer.id });
+
+    const stripeSubscription = await stripe.subscriptions.create({
+      customer: customer.id,
+      items: [{ price: PRICES.starterMonthly }],
+      default_payment_method: paymentMethod.id,
+    });
+
+    const preservedPeriodEnd = futureDate(20);
+    const localSubscription = mockDoc({
+      _id: 'sub_54',
+      accountId: 'acc_54',
+      status: 'active',
+      plan: 'starter',
+      interval: 'monthly',
+      stripeSubscriptionId: stripeSubscription.id,
+      currentPeriodEnd: preservedPeriodEnd,
+      updatedAt: new Date().toISOString(),
+    });
+
+    SubMock.findOne.mockResolvedValue(localSubscription);
+
+    const req = mockReq({
+      accountId: 'acc_54',
+      newPlan: 'advanced',
+      newInterval: 'monthly',
+    });
+    const res = mockRes();
+
+    await changePlan(req, res);
+
+    expect(res.json).toHaveBeenCalled();
+    expect(res.json.mock.calls[0][0].success).toBe(true);
+    expect(localSubscription.plan).toBe('advanced');
+    expect(localSubscription.interval).toBe('monthly');
+    expect(localSubscription.currentPeriodEnd).toBe(preservedPeriodEnd);
+    expect(localSubscription.save).toHaveBeenCalled();
+
+    const updatedStripeSubscription = await stripe.subscriptions.retrieve(stripeSubscription.id);
+    expect(updatedStripeSubscription.items.data[0]?.price.id).toBe(PRICES.advancedMonthly);
+  });
+
+  it('Test 55 — changePlan real: Starter mensual → Starter anual por handler', async () => {
+    const customer = await makeCustomer('change-plan-interval@lyrium-test.io');
+    const paymentMethod = await makePM();
+    await stripe.paymentMethods.attach(paymentMethod.id, { customer: customer.id });
+
+    const stripeSubscription = await stripe.subscriptions.create({
+      customer: customer.id,
+      items: [{ price: PRICES.starterMonthly }],
+      default_payment_method: paymentMethod.id,
+    });
+
+    const localSubscription = mockDoc({
+      _id: 'sub_55',
+      accountId: 'acc_55',
+      status: 'active',
+      plan: 'starter',
+      interval: 'monthly',
+      stripeSubscriptionId: stripeSubscription.id,
+      currentPeriodEnd: futureDate(25),
+      updatedAt: new Date().toISOString(),
+    });
+
+    SubMock.findOne.mockResolvedValue(localSubscription);
+
+    const req = mockReq({
+      accountId: 'acc_55',
+      newPlan: 'starter',
+      newInterval: 'annual',
+    });
+    const res = mockRes();
+
+    await changePlan(req, res);
+
+    expect(res.json).toHaveBeenCalled();
+    expect(res.json.mock.calls[0][0].success).toBe(true);
+    expect(localSubscription.plan).toBe('starter');
+    expect(localSubscription.interval).toBe('annual');
+
+    const updatedStripeSubscription = await stripe.subscriptions.retrieve(stripeSubscription.id);
+    expect(updatedStripeSubscription.items.data[0]?.price.id).toBe(PRICES.starterAnnual);
+  });
+
+  it('Test 56 — cancelAutoRenew real: cancela Stripe, desvincula tarjeta y limpia estado local', async () => {
+    const customer = await makeCustomer('cancel-autorenew@lyrium-test.io');
+    const paymentMethod = await makePM();
+    await stripe.paymentMethods.attach(paymentMethod.id, { customer: customer.id });
+
+    const stripeSubscription = await stripe.subscriptions.create({
+      customer: customer.id,
+      items: [{ price: PRICES.advancedMonthly }],
+      default_payment_method: paymentMethod.id,
+    });
+
+    const localSubscription = mockDoc({
+      _id: 'sub_56',
+      accountId: 'acc_56',
+      status: 'active',
+      plan: 'advanced',
+      interval: 'monthly',
+      autoRenew: true,
+      stripeSubscriptionId: stripeSubscription.id,
+      stripePaymentMethodId: paymentMethod.id,
+      paymentMethod: { brand: 'visa', last4: '4242' },
+      updatedAt: new Date().toISOString(),
+    });
+
+    SubMock.findOne.mockResolvedValue(localSubscription);
+
+    const req = mockReq({ accountId: 'acc_56' });
+    const res = mockRes();
+
+    await cancelAutoRenew(req, res);
+
+    expect(res.json).toHaveBeenCalled();
+    expect(res.json.mock.calls[0][0].success).toBe(true);
+    expect(localSubscription.autoRenew).toBe(false);
+    expect(localSubscription.stripeSubscriptionId).toBeNull();
+    expect(localSubscription.stripePaymentMethodId).toBeNull();
+    expect(localSubscription.paymentMethod).toBeNull();
+    expect(localSubscription.save).toHaveBeenCalled();
+
+    const canceledStripeSubscription = await stripe.subscriptions.retrieve(stripeSubscription.id);
+    expect(canceledStripeSubscription.status).toBe('canceled');
+
+    const detachedPaymentMethod = await stripe.paymentMethods.retrieve(paymentMethod.id);
+    expect(detachedPaymentMethod.customer).toBeNull();
+  });
+
+  it('Test 57 — validateSubscription real del handler: periodo vigente devuelve valid=true', async () => {
+    const localSubscription = mockDoc({
+      _id: 'sub_57',
+      accountId: 'acc_57',
+      status: 'active',
+      currentPeriodEnd: futureDate(7),
+      updatedAt: new Date().toISOString(),
+    });
+
+    SubMock.findOne.mockResolvedValue(localSubscription);
+
+    const req = mockReq({}, { accountId: 'acc_57' });
+    const res = mockRes();
+
+    await validateSubscription(req, res);
+
+    expect(res.json).toHaveBeenCalled();
+    const payload = res.json.mock.calls[0][0];
+    expect(payload.valid).toBe(true);
+    expect(payload.subscription.accountId).toBe('acc_57');
+    expect(localSubscription.save).not.toHaveBeenCalled();
+  });
+
+  it('Test 58 — validateSubscription real del handler: periodo expirado marca expired y devuelve valid=false', async () => {
+    const localSubscription = mockDoc({
+      _id: 'sub_58',
+      accountId: 'acc_58',
+      status: 'active',
+      currentPeriodEnd: pastDate(2),
+      updatedAt: new Date().toISOString(),
+    });
+
+    SubMock.findOne.mockResolvedValue(localSubscription);
+
+    const req = mockReq({}, { accountId: 'acc_58' });
+    const res = mockRes();
+
+    await validateSubscription(req, res);
+
+    expect(res.json).toHaveBeenCalledWith({ valid: false, reason: 'expired' });
+    expect(localSubscription.status).toBe('expired');
+    expect(localSubscription.save).toHaveBeenCalled();
+  });
+});
+
+// =============================================================================
+// SECCIÓN 14: Persistencia real en Mongo aislada
+// =============================================================================
+
+const mongoIt = HAS_REAL_MONGO ? it : it.skip;
+
+describe('14. Persistencia real en Mongo aislada', () => {
+  let createPaymentIntent: any;
+  let confirmPayment: any;
+  let changePlan: any;
+  let cancelAutoRenew: any;
+  let validateSubscription: any;
+  let handleWebhook: any;
+
+  beforeAll(async () => {
+    const mod = await import('../subscriptions.js');
+    createPaymentIntent = mod.createPaymentIntent;
+    confirmPayment = mod.confirmPayment;
+    changePlan = mod.changePlan;
+    cancelAutoRenew = mod.cancelAutoRenew;
+    validateSubscription = mod.validateSubscription;
+    handleWebhook = mod.handleWebhook;
+  });
+
+  beforeEach(() => {
+    vi.clearAllMocks();
+    if (HAS_REAL_MONGO) {
+      useRealMongoBackedModels();
+    }
+  });
+
+  mongoIt('Test 59 — createPaymentIntent crea customer real y persiste stripeCustomerId en Mongo', async () => {
+    const accountId = 'acc_real_59';
+    await createRealAccount(accountId, { email: 'mongo-createpi@lyrium-test.io' });
+    await createRealSubscription(accountId, { stripeCustomerId: null });
+
+    const req = mockReq({ accountId, plan: 'starter', interval: 'monthly', autoRenew: false });
+    const res = mockRes();
+
+    await createPaymentIntent(req, res);
+
+    const payload = res.json.mock.calls[0][0];
+    expect(payload.paymentIntentId).toEqual(expect.any(String));
+    expect(payload.customerId).toEqual(expect.any(String));
+
+    const storedSub = await RealSubscriptionModel.findOne({ accountId });
+    expect(storedSub).toBeTruthy();
+    expect(storedSub.stripeCustomerId).toBe(payload.customerId);
+
+    const stripeCustomer = await stripe.customers.retrieve(payload.customerId);
+    expect((stripeCustomer as Stripe.Customer).email).toBe('mongo-createpi@lyrium-test.io');
+  });
+
+  mongoIt('Test 60 — confirmPayment persiste Subscription e Invoice reales en Mongo', async () => {
+    const accountId = 'acc_real_60';
+    const accountEmail = 'mongo-confirmpayment@lyrium-test.io';
+    await createRealAccount(accountId, { email: accountEmail, companyEmail: accountEmail });
+
+    const customer = await makeCustomer(accountEmail);
+    const paymentMethod = await makePM();
+    await stripe.paymentMethods.attach(paymentMethod.id, { customer: customer.id });
+
+    await createRealSubscription(accountId, {
+      status: 'trial',
+      trialEndDate: null,
+      currentPeriodEnd: pastDate(1),
+      stripeCustomerId: customer.id,
+    });
+
+    const paymentIntent = await stripe.paymentIntents.create({
+      amount: 19700,
+      currency: 'eur',
+      customer: customer.id,
+      payment_method: paymentMethod.id,
+      confirm: true,
+      automatic_payment_methods: { enabled: true, allow_redirects: 'never' },
+      metadata: { accountId, plan: 'starter', interval: 'monthly', autoRenew: 'false' },
+    });
+
+    const req = mockReq({ accountId, plan: 'starter', interval: 'monthly', paymentIntentId: paymentIntent.id });
+    const res = mockRes();
+
+    await confirmPayment(req, res);
+
+    expect(res.json.mock.calls[0][0].success).toBe(true);
+
+    const storedSub = await RealSubscriptionModel.findOne({ accountId });
+    expect(storedSub.status).toBe('active');
+    expect(storedSub.plan).toBe('starter');
+    expect(storedSub.paymentMethod?.brand).toBe('visa');
+    expect(storedSub.paymentMethod?.last4).toBe('4242');
+
+    const storedInvoice = await waitForInvoiceRecord(accountId);
+    expect(storedInvoice.accountId).toBe(accountId);
+    expect(storedInvoice.totalAmount).toBe(197);
+    expect(storedInvoice.clientEmail).toBe(accountEmail);
+  });
+
+  mongoIt('Test 61 — changePlan persiste en Mongo y actualiza Stripe real', async () => {
+    const accountId = 'acc_real_61';
+    await createRealAccount(accountId);
+
+    const customer = await makeCustomer('mongo-changeplan@lyrium-test.io');
+    const paymentMethod = await makePM();
+    await stripe.paymentMethods.attach(paymentMethod.id, { customer: customer.id });
+
+    const stripeSubscription = await stripe.subscriptions.create({
+      customer: customer.id,
+      items: [{ price: PRICES.starterMonthly }],
+      default_payment_method: paymentMethod.id,
+    });
+
+    await createRealSubscription(accountId, {
+      status: 'active',
+      plan: 'starter',
+      interval: 'monthly',
+      stripeCustomerId: customer.id,
+      stripeSubscriptionId: stripeSubscription.id,
+      currentPeriodEnd: futureDate(20),
+      trialEndDate: null,
+      autoRenew: true,
+    });
+
+    const req = mockReq({ accountId, newPlan: 'advanced', newInterval: 'annual' });
+    const res = mockRes();
+
+    await changePlan(req, res);
+
+    expect(res.json.mock.calls[0][0].success).toBe(true);
+
+    const storedSub = await RealSubscriptionModel.findOne({ accountId });
+    expect(storedSub.plan).toBe('advanced');
+    expect(storedSub.interval).toBe('annual');
+
+    const updatedStripeSubscription = await stripe.subscriptions.retrieve(stripeSubscription.id);
+    expect(updatedStripeSubscription.items.data[0]?.price.id).toBe(PRICES.advancedAnnual);
+  });
+
+  mongoIt('Test 62 — cancelAutoRenew limpia Mongo y Stripe reales', async () => {
+    const accountId = 'acc_real_62';
+    await createRealAccount(accountId);
+
+    const customer = await makeCustomer('mongo-cancel@lyrium-test.io');
+    const paymentMethod = await makePM();
+    await stripe.paymentMethods.attach(paymentMethod.id, { customer: customer.id });
+
+    const stripeSubscription = await stripe.subscriptions.create({
+      customer: customer.id,
+      items: [{ price: PRICES.advancedMonthly }],
+      default_payment_method: paymentMethod.id,
+    });
+
+    await createRealSubscription(accountId, {
+      status: 'active',
+      plan: 'advanced',
+      interval: 'monthly',
+      autoRenew: true,
+      stripeCustomerId: customer.id,
+      stripeSubscriptionId: stripeSubscription.id,
+      stripePaymentMethodId: paymentMethod.id,
+      paymentMethod: { brand: 'visa', last4: '4242' },
+      trialEndDate: null,
+      currentPeriodEnd: futureDate(20),
+    });
+
+    const req = mockReq({ accountId });
+    const res = mockRes();
+
+    await cancelAutoRenew(req, res);
+
+    expect(res.json.mock.calls[0][0].success).toBe(true);
+
+    const storedSub = await RealSubscriptionModel.findOne({ accountId });
+    expect(storedSub.autoRenew).toBe(false);
+    expect(storedSub.stripeSubscriptionId).toBeNull();
+    expect(storedSub.stripePaymentMethodId).toBeNull();
+    expect(storedSub.paymentMethod).toBeNull();
+
+    const canceledStripeSubscription = await stripe.subscriptions.retrieve(stripeSubscription.id);
+    expect(canceledStripeSubscription.status).toBe('canceled');
+  });
+
+  mongoIt('Test 63 — validateSubscription marca expired en Mongo real', async () => {
+    const accountId = 'acc_real_63';
+    await createRealAccount(accountId);
+    await createRealSubscription(accountId, {
+      status: 'active',
+      trialEndDate: null,
+      currentPeriodEnd: pastDate(2),
+    });
+
+    const req = mockReq({}, { accountId });
+    const res = mockRes();
+
+    await validateSubscription(req, res);
+
+    expect(res.json).toHaveBeenCalledWith({ valid: false, reason: 'expired' });
+
+    const storedSub = await RealSubscriptionModel.findOne({ accountId });
+    expect(storedSub.status).toBe('expired');
+  });
+
+  mongoIt('Test 64 — handleWebhook invoice.paid actualiza Subscription real en Mongo', async () => {
+    const accountId = 'acc_real_64';
+    const customer = await makeCustomer('mongo-webhook@lyrium-test.io');
+
+    await createRealAccount(accountId, { email: 'mongo-webhook@lyrium-test.io', companyEmail: 'mongo-webhook@lyrium-test.io' });
+    await createRealSubscription(accountId, {
+      status: 'past_due',
+      plan: 'starter',
+      interval: 'monthly',
+      stripeCustomerId: customer.id,
+      trialEndDate: null,
+      currentPeriodEnd: pastDate(1),
+    });
+
+    const payload = JSON.stringify({
+      id: 'evt_real_64',
+      type: 'invoice.paid',
+      data: {
+        object: {
+          id: 'in_real_64',
+          customer: customer.id,
+          billing_reason: 'subscription_cycle',
+        },
+      },
+    });
+
+    const req = mockReq({}, {}, { 'stripe-signature': signWebhookPayload(payload) });
+    req.body = payload;
+    const res = mockRes();
+
+    await handleWebhook(req, res);
+
+    expect(res.json).toHaveBeenCalledWith({ received: true });
+
+    const storedSub = await RealSubscriptionModel.findOne({ accountId });
+    expect(storedSub.status).toBe('active');
+    expect(new Date(storedSub.currentPeriodEnd).getTime()).toBeGreaterThan(Date.now());
+  });
+
+  mongoIt('Test 65 — reconciliación Stripe→Mongo corrige drift local', async () => {
+    const { runStripeReconciliationOnce } = await import('../services/stripeReconciliationService.js');
+
+    const accountId = 'acc_real_65';
+    await createRealAccount(accountId, {
+      email: 'mongo-reconcile@lyrium-test.io',
+      companyEmail: 'mongo-reconcile@lyrium-test.io',
+    });
+
+    const customer = await makeCustomer('mongo-reconcile@lyrium-test.io');
+    const paymentMethod = await makePM();
+    await stripe.paymentMethods.attach(paymentMethod.id, { customer: customer.id });
+    await stripe.customers.update(customer.id, {
+      invoice_settings: { default_payment_method: paymentMethod.id },
+    });
+
+    const stripeSubscription = await stripe.subscriptions.create({
+      customer: customer.id,
+      items: [{ price: PRICES.advancedAnnual }],
+      default_payment_method: paymentMethod.id,
+    });
+
+    await createRealSubscription(accountId, {
+      status: 'past_due',
+      plan: 'starter',
+      interval: 'monthly',
+      autoRenew: false,
+      stripeCustomerId: customer.id,
+      stripeSubscriptionId: stripeSubscription.id,
+      stripePaymentMethodId: null,
+      paymentMethod: null,
+      trialEndDate: null,
+      currentPeriodStart: pastDate(40),
+      currentPeriodEnd: pastDate(10),
+    });
+
+    const result = await runStripeReconciliationOnce();
+    expect(result.skipped).toBe(false);
+    expect(result.updated).toBeGreaterThanOrEqual(1);
+
+    const storedSub = await RealSubscriptionModel.findOne({ accountId });
+    expect(storedSub.plan).toBe('advanced');
+    expect(storedSub.interval).toBe('annual');
+    expect(storedSub.status).toBe('active');
+    expect(storedSub.autoRenew).toBe(true);
+    expect(storedSub.stripePaymentMethodId).toBe(paymentMethod.id);
+    expect(storedSub.paymentMethod?.last4).toBe('4242');
+    expect(new Date(storedSub.currentPeriodEnd).getTime()).toBeGreaterThan(Date.now());
   });
 });

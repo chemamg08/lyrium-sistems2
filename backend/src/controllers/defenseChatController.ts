@@ -1,13 +1,15 @@
+import { randomUUID } from 'crypto';
 import { Request, Response } from 'express';
 import fs from 'fs/promises';
 import path from 'path';
 import { fileURLToPath } from 'url';
-import { callDefenseAI, extractDefenseStrategy, streamDefenseAI, getAiClient, AI_MODEL, buildContextMessages } from '../services/aiService.js';
+import { callDefenseAI, extractDefenseStrategy, streamDefenseAI, getAiClient, AI_MODEL, buildContextMessages, stripThinkTags } from '../services/aiService.js';
 import { generateDefensePDF } from '../services/pdfService.js';
 import { getAccountSpecialties } from '../services/specialtiesService.js';
 import { getLegalContextForAccount, buildCountryLegalSystemPrompt, getAccountCountry } from '../services/legalKnowledgeService.js';
 import { hasLegalIntent } from '../services/legalIntentService.js';
 import { DefenseChat } from '../models/DefenseChat.js';
+import { DefenseEvidence } from '../models/DefenseEvidence.js';
 import { Chat } from '../models/Chat.js';
 import { Client } from '../models/Client.js';
 import { Stat } from '../models/Stat.js';
@@ -51,9 +53,7 @@ export const getDefenseChats = async (req: Request, res: Response) => {
     
     const filter: any = { accountId: accountId as string };
     const user = (req as any).user;
-    if (user?.type === 'subaccount') {
-      filter.createdBy = user.userId;
-    }
+    filter.createdBy = user?.userId || '';
     
     const chats = await DefenseChat.find(filter)
       .sort({ lastModified: -1 });
@@ -124,9 +124,7 @@ export const deleteDefenseChatById = async (req: Request, res: Response) => {
 
     const deleteFilter: any = { _id: chatId, accountId: accountId as string };
     const user = (req as any).user;
-    if (user?.type === 'subaccount') {
-      deleteFilter.createdBy = user.userId;
-    }
+    deleteFilter.createdBy = user?.userId || '';
 
     const result = await DefenseChat.findOneAndDelete(deleteFilter);
     
@@ -151,9 +149,10 @@ export const updateDefenseChatTitle = async (req: Request, res: Response) => {
       return res.status(400).json({ error: 'chatId, accountId y title son requeridos' });
     }
     if (!verifyOwnership(req, accountId as string)) return res.status(403).json({ error: 'Acceso denegado' });
+    const user = (req as any).user;
 
     const chat = await DefenseChat.findOneAndUpdate(
-      { _id: chatId, accountId },
+      { _id: chatId, accountId, createdBy: user?.userId || '' },
       { title, lastModified: new Date().toISOString() },
       { returnDocument: 'after' }
     );
@@ -183,17 +182,11 @@ export const getDefenseChat = async (req: Request, res: Response) => {
     const user = (req as any).user;
     
     if (chatId && typeof chatId === 'string') {
-      const getFilter: any = { accountId: accountId as string, _id: chatId };
-      if (user?.type === 'subaccount') {
-        getFilter.createdBy = user.userId;
-      }
+      const getFilter: any = { accountId: accountId as string, _id: chatId, createdBy: user?.userId || '' };
       chat = await DefenseChat.findOne(getFilter);
     } else {
       // Retrocompatibilidad: devolver el primer/más reciente chat de la cuenta
-      const getFilter: any = { accountId: accountId as string };
-      if (user?.type === 'subaccount') {
-        getFilter.createdBy = user.userId;
-      }
+      const getFilter: any = { accountId: accountId as string, createdBy: user?.userId || '' };
       chat = await DefenseChat.findOne(getFilter)
         .sort({ lastModified: -1 });
     }
@@ -227,14 +220,15 @@ export const sendDefenseMessage = async (req: Request, res: Response) => {
       return res.status(400).json({ error: 'accountId es requerido' });
     }
     if (!verifyOwnership(req, accountId as string)) return res.status(403).json({ error: 'Acceso denegado' });
+    const user = (req as any).user;
 
     let chat;
     
     if (chatId && typeof chatId === 'string') {
-      chat = await DefenseChat.findOne({ accountId, _id: chatId });
+      chat = await DefenseChat.findOne({ accountId, _id: chatId, createdBy: user?.userId || '' });
     } else {
       // Retrocompatibilidad: buscar el primer chat de la cuenta
-      chat = await DefenseChat.findOne({ accountId });
+      chat = await DefenseChat.findOne({ accountId, createdBy: user?.userId || '' });
     }
     
     if (!chat) {
@@ -242,6 +236,7 @@ export const sendDefenseMessage = async (req: Request, res: Response) => {
       chat = new DefenseChat({
         _id: chatId || Date.now().toString() + Math.random().toString(36).substr(2, 9),
         accountId,
+        createdBy: user?.userId || '',
         title: 'Defensa General',
         createdAt: new Date().toISOString(),
         lastModified: new Date().toISOString(),
@@ -322,6 +317,7 @@ export const sendDefenseMessage = async (req: Request, res: Response) => {
         };
         chat.messages.push(assistantMessage);
 
+        chat.markModified('messages');
         await chat.save();
 
         return res.json({ 
@@ -415,7 +411,7 @@ async function wantsSaveStrategy(userMessage: string): Promise<boolean> {
       max_tokens: 5,
       temperature: 0
     });
-    const answer = (response.choices[0].message.content || '').toLowerCase().trim();
+    const answer = stripThinkTags(response.choices[0].message.content || '').toLowerCase().trim();
     return answer.startsWith('s');
   } catch {
     return false;
@@ -429,15 +425,17 @@ export const streamDefenseMessage = async (req: Request, res: Response) => {
     if (!content || !content.trim()) return res.status(400).json({ error: 'El contenido es requerido' });
     if (!accountId) return res.status(400).json({ error: 'accountId es requerido' });
     if (!verifyOwnership(req, accountId as string)) return res.status(403).json({ error: 'Acceso denegado' });
+    const user = (req as any).user;
 
     let chat = chatId
-      ? await DefenseChat.findOne({ accountId, _id: chatId })
-      : await DefenseChat.findOne({ accountId });
+      ? await DefenseChat.findOne({ accountId, _id: chatId, createdBy: user?.userId || '' })
+      : await DefenseChat.findOne({ accountId, createdBy: user?.userId || '' });
 
     if (!chat) {
       chat = new DefenseChat({
         _id: chatId || Date.now().toString() + Math.random().toString(36).substr(2, 9),
         accountId,
+        createdBy: user?.userId || '',
         title: 'Defensa General',
         createdAt: new Date().toISOString(),
         lastModified: new Date().toISOString(),
@@ -603,18 +601,24 @@ export const exportDefenseChat = async (req: Request, res: Response) => {
       return res.status(400).json({ error: 'accountId es requerido' });
     }
     if (!verifyOwnership(req, accountId as string)) return res.status(403).json({ error: 'Acceso denegado' });
+    const user = (req as any).user;
 
     let defenseChat;
     
     if (chatId) {
-      defenseChat = await DefenseChat.findOne({ accountId, _id: chatId });
+      defenseChat = await DefenseChat.findOne({ accountId, _id: chatId, createdBy: user?.userId || '' });
     } else {
       // Retrocompatibilidad: usar el primer chat
-      defenseChat = await DefenseChat.findOne({ accountId });
+      defenseChat = await DefenseChat.findOne({ accountId, createdBy: user?.userId || '' });
     }
 
     if (!defenseChat || !defenseChat.savedStrategies || defenseChat.savedStrategies.length === 0) {
       return res.status(400).json({ error: 'No hay estrategias guardadas para exportar' });
+    }
+
+    const client = await Client.findOne({ _id: clientId, accountId });
+    if (!client) {
+      return res.status(403).json({ error: 'Cliente no válido para esta cuenta' });
     }
 
     // Crear nuevo chat en la colección de chats de clientes
@@ -628,7 +632,9 @@ export const exportDefenseChat = async (req: Request, res: Response) => {
     });
 
     // Generar PDF con estrategias guardadas
-    const pdfStream = generateDefensePDF(defenseChat.savedStrategies as any[], chatTitle);
+    const publicBaseUrl = process.env.FRONTEND_URL || `${req.protocol}://${req.get('host')}`;
+    const evidences = await DefenseEvidence.find({ chatId: defenseChat._id, isDeleted: false });
+    const pdfStream = generateDefensePDF(defenseChat.savedStrategies as any[], chatTitle, evidences.map(e => ({ fileName: e.fileName, publicToken: e.publicToken })), publicBaseUrl);
 
     // Guardar PDF también en archivos del cliente
     const fileId = Date.now().toString();
@@ -697,12 +703,13 @@ export const downloadDefensePDF = async (req: Request, res: Response) => {
       return res.status(400).json({ error: 'accountId es requerido' });
     }
     if (!verifyOwnership(req, accountId as string)) return res.status(403).json({ error: 'Acceso denegado' });
+    const user = (req as any).user;
 
     let defenseChat;
     if (chatId) {
-      defenseChat = await DefenseChat.findOne({ accountId, _id: chatId });
+      defenseChat = await DefenseChat.findOne({ accountId, _id: chatId, createdBy: user?.userId || '' });
     } else {
-      defenseChat = await DefenseChat.findOne({ accountId });
+      defenseChat = await DefenseChat.findOne({ accountId, createdBy: user?.userId || '' });
     }
 
     if (!defenseChat || !defenseChat.savedStrategies || defenseChat.savedStrategies.length === 0) {
@@ -722,7 +729,9 @@ export const downloadDefensePDF = async (req: Request, res: Response) => {
       pdfTitle = found.title || pdfTitle;
     }
 
-    const pdfStream = generateDefensePDF(strategiesToExport, pdfTitle);
+    const publicBaseUrl = process.env.FRONTEND_URL || `${req.protocol}://${req.get('host')}`;
+    const evidences = await DefenseEvidence.find({ chatId: defenseChat._id, isDeleted: false });
+    const pdfStream = generateDefensePDF(strategiesToExport, pdfTitle, evidences.map(e => ({ fileName: e.fileName, publicToken: e.publicToken })), publicBaseUrl);
 
     res.setHeader('Content-Type', 'application/pdf');
     res.setHeader('Content-Disposition', `attachment; filename="${encodeURIComponent(pdfTitle)}.pdf"`);
@@ -746,25 +755,29 @@ export const importDefenseChat = async (req: Request, res: Response) => {
       return res.status(400).json({ error: 'accountId es requerido' });
     }
     if (!verifyOwnership(req, accountId as string)) return res.status(403).json({ error: 'Acceso denegado' });
+    const user = (req as any).user;
 
     const chatToImport = await Chat.findById(sourceChatId);
 
     if (!chatToImport) {
       return res.status(404).json({ error: 'Chat no encontrado' });
     }
+    const sourceClient = await Client.findOne({ _id: chatToImport.clientId, accountId });
+    if (!sourceClient) {
+      return res.status(403).json({ error: 'Chat fuente no pertenece a esta cuenta' });
+    }
 
     let defenseChat;
     
     if (targetChatId) {
-      defenseChat = await DefenseChat.findOne({ accountId, _id: targetChatId });
-    } else {
-      defenseChat = await DefenseChat.findOne({ accountId });
+      defenseChat = await DefenseChat.findOne({ accountId, _id: targetChatId, createdBy: user?.userId || '' });
     }
     
     if (!defenseChat) {
       defenseChat = new DefenseChat({
         _id: targetChatId || Date.now().toString() + Math.random().toString(36).substr(2, 9),
         accountId: accountId as string,
+        createdBy: user?.userId || '',
         title: `Importado: ${chatToImport.title}`,
         createdAt: new Date().toISOString(),
         lastModified: new Date().toISOString(),
@@ -774,6 +787,8 @@ export const importDefenseChat = async (req: Request, res: Response) => {
       });
     } else {
       defenseChat.messages = [...chatToImport.messages] as any;
+      defenseChat.savedStrategies = [];
+      defenseChat.title = `Importado: ${chatToImport.title}`;
       defenseChat.lastModified = new Date().toISOString();
     }
 
@@ -798,9 +813,10 @@ export const getSavedStrategies = async (req: Request, res: Response) => {
       return res.status(400).json({ error: 'accountId es requerido' });
     }
     if (!verifyOwnership(req, accountId as string)) return res.status(403).json({ error: 'Acceso denegado' });
+    const user = (req as any).user;
     
     if (chatId && typeof chatId === 'string') {
-      const defenseChat = await DefenseChat.findOne({ accountId: accountId as string, _id: chatId });
+      const defenseChat = await DefenseChat.findOne({ accountId: accountId as string, _id: chatId, createdBy: user?.userId || '' });
       if (!defenseChat || !defenseChat.savedStrategies) {
         return res.json({ strategies: [] });
       }
@@ -808,7 +824,7 @@ export const getSavedStrategies = async (req: Request, res: Response) => {
     }
 
     // Devolver estrategias de todos los chats de la cuenta
-    const accountChats = await DefenseChat.find({ accountId: accountId as string });
+    const accountChats = await DefenseChat.find({ accountId: accountId as string, createdBy: user?.userId || '' });
     const allStrategies = accountChats.flatMap(c => c.savedStrategies || []);
     res.json({ strategies: allStrategies });
   } catch (error) {
@@ -827,15 +843,17 @@ export const deleteStrategy = async (req: Request, res: Response) => {
       return res.status(400).json({ error: 'accountId es requerido' });
     }
     if (!verifyOwnership(req, accountId as string)) return res.status(403).json({ error: 'Acceso denegado' });
+    const user = (req as any).user;
     
     let defenseChat;
     
     if (chatId) {
-      defenseChat = await DefenseChat.findOne({ accountId, _id: chatId });
+      defenseChat = await DefenseChat.findOne({ accountId, _id: chatId, createdBy: user?.userId || '' });
     } else {
       // Buscar en todos los chats de la cuenta
       defenseChat = await DefenseChat.findOne({
         accountId,
+        createdBy: user?.userId || '',
         'savedStrategies.id': id
       });
     }
@@ -857,33 +875,28 @@ export const deleteStrategy = async (req: Request, res: Response) => {
 
 // POST /api/defense-chat/upload-pdf - Extraer texto de PDF subido al chat
 export const uploadPdfToChat = async (req: Request, res: Response) => {
+  if (!req.file) {
+    return res.status(400).json({ error: 'No se recibió ningún archivo' });
+  }
+  const pdfPath = req.file.path;
   try {
-    if (!req.file) {
-      return res.status(400).json({ error: 'No se recibió ningún archivo' });
-    }
-
-    const pdfPath = req.file.path;
-
     const pdfBuffer = await fs.readFile(pdfPath);
-    const pdfParseModule: any = await import('pdf-parse');
-    const PDFParse = pdfParseModule.PDFParse;
+    const { PDFParse } = await import('pdf-parse');
     const parser = new PDFParse({ data: pdfBuffer });
-    const result = await parser.getText();
-    const extractedText = (result.text || 'No se pudo extraer texto del PDF').substring(0, 15000);
-
-    // Eliminar archivo temporal
-    await fs.unlink(pdfPath).catch(() => {});
-
-    res.json({
-      filename: sanitizeFilename(req.file.originalname),
-      text: extractedText
-    });
+    let extractedText = 'No se pudo extraer texto del PDF';
+    try {
+      const result = await parser.getText();
+      extractedText = result.text || extractedText;
+    } finally {
+      await parser.destroy().catch(() => {});
+    }
+    extractedText = extractedText.substring(0, 15000);
+    res.json({ filename: sanitizeFilename(req.file.originalname), text: extractedText });
   } catch (error) {
     console.error('Error extrayendo texto del PDF:', error);
-    if (req.file?.path) {
-      await fs.unlink(req.file.path).catch(() => {});
-    }
     res.status(500).json({ error: 'Error al procesar el PDF' });
+  } finally {
+    await fs.unlink(pdfPath).catch(() => {});
   }
 };
 
@@ -896,11 +909,306 @@ export const clearDefenseChat = async (req: Request, res: Response) => {
       return res.status(400).json({ error: 'accountId es requerido' });
     }
     if (!verifyOwnership(req, accountId as string)) return res.status(403).json({ error: 'Acceso denegado' });
+    const user = (req as any).user;
     
-    await DefenseChat.deleteMany({ accountId });
+    await DefenseChat.deleteMany({ accountId, createdBy: user?.userId || '' });
     res.json({ message: 'Chat de defensa limpiado' });
   } catch (error) {
     console.error('Error al limpiar chat:', error);
     res.status(500).json({ error: 'Error al limpiar chat' });
+  }
+};
+
+// GET /api/defense-chat/:chatId/evidence
+export const getEvidence = async (req: Request, res: Response) => {
+  try {
+    const { chatId } = req.params;
+    const { accountId } = req.query;
+    if (!accountId) return res.status(400).json({ error: 'accountId requerido' });
+    if (!verifyOwnership(req, accountId as string)) return res.status(403).json({ error: 'Acceso denegado' });
+    const user = (req as any).user;
+    const chat = await DefenseChat.findOne({ _id: chatId, accountId: accountId as string, createdBy: user?.userId || '' });
+    if (!chat || chat.accountId !== accountId) return res.status(403).json({ error: 'Acceso denegado' });
+    const evidence = await DefenseEvidence.find({ chatId }).sort({ exhibitNumber: 1 });
+    res.json(evidence);
+  } catch (error) {
+    console.error('Error al obtener pruebas:', error);
+    res.status(500).json({ error: 'Error al obtener pruebas' });
+  }
+};
+
+// POST /api/defense-chat/:chatId/evidence
+export const createEvidence = async (req: Request, res: Response) => {
+  try {
+    const { chatId } = req.params;
+    const { accountId, exhibitNumber, type, description, fileName, dateObtained, status } = req.body;
+    if (!accountId) return res.status(400).json({ error: 'accountId requerido' });
+    if (!verifyOwnership(req, accountId)) return res.status(403).json({ error: 'Acceso denegado' });
+    const user = (req as any).user;
+    const chat = await DefenseChat.findOne({ _id: chatId, accountId, createdBy: user?.userId || '' });
+    if (!chat || chat.accountId !== accountId) return res.status(403).json({ error: 'Acceso denegado' });
+    const evidence = await DefenseEvidence.create({
+      _id: Date.now().toString(),
+      chatId,
+      accountId,
+      createdBy: user?.userId || '',
+      exhibitNumber: exhibitNumber || '',
+      type: type || '',
+      description: description || '',
+      fileName: fileName || '',
+      dateObtained: dateObtained || '',
+      status: status || 'pending',
+    });
+    res.status(201).json(evidence.toJSON());
+  } catch (error) {
+    console.error('Error al crear prueba:', error);
+    res.status(500).json({ error: 'Error al crear prueba' });
+  }
+};
+
+// PUT /api/defense-chat/evidence/:evidenceId
+export const updateEvidence = async (req: Request, res: Response) => {
+  try {
+    const { evidenceId } = req.params;
+    const { accountId, exhibitNumber, type, description, fileName, dateObtained, status } = req.body;
+    if (!accountId) return res.status(400).json({ error: 'accountId requerido' });
+    if (!verifyOwnership(req, accountId)) return res.status(403).json({ error: 'Acceso denegado' });
+    const user = (req as any).user;
+    const evidence = await DefenseEvidence.findById(evidenceId);
+    if (!evidence) return res.status(404).json({ error: 'Prueba no encontrada' });
+    if (evidence.accountId !== accountId) return res.status(403).json({ error: 'Acceso denegado' });
+    if (evidence.createdBy !== user?.userId) return res.status(403).json({ error: 'Acceso denegado' });
+    if (exhibitNumber !== undefined) evidence.exhibitNumber = exhibitNumber;
+    if (type !== undefined) evidence.type = type;
+    if (description !== undefined) evidence.description = description;
+    if (fileName !== undefined) evidence.fileName = fileName;
+    if (dateObtained !== undefined) evidence.dateObtained = dateObtained;
+    if (status !== undefined) evidence.status = status;
+    await evidence.save();
+    res.json(evidence.toJSON());
+  } catch (error) {
+    console.error('Error al actualizar prueba:', error);
+    res.status(500).json({ error: 'Error al actualizar prueba' });
+  }
+};
+
+// DELETE /api/defense-chat/evidence/:evidenceId
+export const deleteEvidence = async (req: Request, res: Response) => {
+  try {
+    const { evidenceId } = req.params;
+    const { accountId } = req.query;
+    if (!accountId) return res.status(400).json({ error: 'accountId requerido' });
+    if (!verifyOwnership(req, accountId as string)) return res.status(403).json({ error: 'Acceso denegado' });
+    const user = (req as any).user;
+    const evidence = await DefenseEvidence.findById(evidenceId);
+    if (!evidence) return res.status(404).json({ error: 'Prueba no encontrada' });
+    if (evidence.accountId !== accountId) return res.status(403).json({ error: 'Acceso denegado' });
+    if (evidence.createdBy !== user?.userId) return res.status(403).json({ error: 'Acceso denegado' });
+    await DefenseEvidence.findByIdAndDelete(evidenceId);
+    res.json({ ok: true });
+  } catch (error) {
+    console.error('Error al eliminar prueba:', error);
+    res.status(500).json({ error: 'Error al eliminar prueba' });
+  }
+};
+
+// POST /api/defense-chat/:chatId/simulate-counter-replica
+export const simulateCounterReplica = async (req: Request, res: Response) => {
+  try {
+    const { chatId } = req.params;
+    const { accountId, strategyId } = req.body;
+    if (!accountId) return res.status(400).json({ error: 'accountId requerido' });
+    if (!verifyOwnership(req, accountId)) return res.status(403).json({ error: 'Acceso denegado' });
+    const user = (req as any).user;
+    const chat = await DefenseChat.findOne({ _id: chatId, accountId, createdBy: user?.userId || '' });
+    if (!chat || chat.accountId !== accountId) return res.status(403).json({ error: 'Acceso denegado' });
+
+    const { simulateCounterReplicaAI } = await import('../services/aiService.js');
+    const result = await simulateCounterReplicaAI(chat);
+
+    if (strategyId) {
+      const strategy = chat.savedStrategies.find((s: any) => s.id === strategyId);
+      if (strategy) {
+        strategy.counterReplica = result;
+        chat.markModified('savedStrategies');
+        await chat.save();
+      }
+    } else if (chat.savedStrategies.length > 0) {
+      const lastStrategy = chat.savedStrategies[chat.savedStrategies.length - 1];
+      lastStrategy.counterReplica = result;
+      chat.markModified('savedStrategies');
+      await chat.save();
+    }
+
+    res.json({ success: true, counterReplica: result });
+  } catch (error: any) {
+    console.error('Error al simular contrarréplica:', error);
+    res.status(500).json({ error: error.message || 'Error al simular contrarréplica' });
+  }
+};
+
+const EVIDENCE_QUOTA_BYTES = 10 * 1024 * 1024 * 1024; // 10 GB
+
+// POST /api/defense-chat/:chatId/evidence/upload
+export const uploadEvidence = async (req: Request, res: Response) => {
+  try {
+    const { chatId } = req.params;
+    const { accountId, exhibitNumber, type, description, dateObtained, status } = req.body;
+    if (!accountId) return res.status(400).json({ error: 'accountId requerido' });
+    if (!verifyOwnership(req, accountId)) return res.status(403).json({ error: 'Acceso denegado' });
+    if (!req.file) return res.status(400).json({ error: 'No se recibió ningún archivo' });
+
+    const user = (req as any).user;
+    const userId = user?.userId || '';
+
+    const chat = await DefenseChat.findOne({ _id: chatId, accountId, createdBy: userId });
+    if (!chat) return res.status(404).json({ error: 'Chat no encontrado' });
+
+    // Validar cuota
+    const quotaAgg = await DefenseEvidence.aggregate([
+      { $match: { createdBy: userId, isDeleted: false } },
+      { $group: { _id: null, total: { $sum: '$fileSize' } } }
+    ]);
+    const usedBytes = quotaAgg[0]?.total || 0;
+    if (usedBytes + req.file.size > EVIDENCE_QUOTA_BYTES) {
+      await fs.unlink(req.file.path).catch(() => {});
+      return res.status(413).json({ error: 'Cuota de almacenamiento excedida (10 GB)' });
+    }
+
+    const evidence = await DefenseEvidence.create({
+      _id: Date.now().toString(),
+      chatId,
+      accountId,
+      createdBy: userId,
+      exhibitNumber: exhibitNumber || '',
+      type: type || '',
+      description: description || '',
+      fileName: req.file.originalname,
+      filePath: req.file.path,
+      fileSize: req.file.size,
+      mimeType: req.file.mimetype,
+      publicToken: randomUUID(),
+      dateObtained: dateObtained || '',
+      status: status || 'pending',
+      isDeleted: false,
+      deletedAt: null,
+      createdAt: new Date().toISOString(),
+    });
+
+    res.status(201).json(evidence.toJSON());
+  } catch (error) {
+    console.error('Error al subir evidencia:', error);
+    if (req.file?.path) await fs.unlink(req.file.path).catch(() => {});
+    res.status(500).json({ error: 'Error al subir evidencia' });
+  }
+};
+
+// GET /api/defense-chat/evidence/library
+export const getEvidenceLibrary = async (req: Request, res: Response) => {
+  try {
+    const { accountId } = req.query;
+    if (!accountId) return res.status(400).json({ error: 'accountId requerido' });
+    if (!verifyOwnership(req, accountId as string)) return res.status(403).json({ error: 'Acceso denegado' });
+    const user = (req as any).user;
+    const docs = await DefenseEvidence.find({ accountId: accountId as string, createdBy: user?.userId || '', isDeleted: false }).sort({ createdAt: -1 });
+    res.json(docs.map(d => d.toJSON()));
+  } catch (error) {
+    console.error('Error al obtener biblioteca:', error);
+    res.status(500).json({ error: 'Error al obtener biblioteca' });
+  }
+};
+
+// GET /api/defense-chat/evidence/trash
+export const getEvidenceTrash = async (req: Request, res: Response) => {
+  try {
+    const { accountId } = req.query;
+    if (!accountId) return res.status(400).json({ error: 'accountId requerido' });
+    if (!verifyOwnership(req, accountId as string)) return res.status(403).json({ error: 'Acceso denegado' });
+    const user = (req as any).user;
+    const docs = await DefenseEvidence.find({ accountId: accountId as string, createdBy: user?.userId || '', isDeleted: true }).sort({ deletedAt: -1 });
+    res.json(docs.map(d => d.toJSON()));
+  } catch (error) {
+    console.error('Error al obtener papelera:', error);
+    res.status(500).json({ error: 'Error al obtener papelera' });
+  }
+};
+
+// POST /api/defense-chat/evidence/:evidenceId/trash
+export const trashEvidence = async (req: Request, res: Response) => {
+  try {
+    const { evidenceId } = req.params;
+    const { accountId } = req.body;
+    if (!accountId) return res.status(400).json({ error: 'accountId requerido' });
+    if (!verifyOwnership(req, accountId)) return res.status(403).json({ error: 'Acceso denegado' });
+    const user = (req as any).user;
+    const evidence = await DefenseEvidence.findOne({ _id: evidenceId, accountId, createdBy: user?.userId || '' });
+    if (!evidence) return res.status(404).json({ error: 'Prueba no encontrada' });
+    evidence.isDeleted = true;
+    evidence.deletedAt = new Date().toISOString();
+    await evidence.save();
+    res.json({ ok: true });
+  } catch (error) {
+    console.error('Error al mover a papelera:', error);
+    res.status(500).json({ error: 'Error al mover a papelera' });
+  }
+};
+
+// POST /api/defense-chat/evidence/:evidenceId/restore
+export const restoreEvidence = async (req: Request, res: Response) => {
+  try {
+    const { evidenceId } = req.params;
+    const { accountId } = req.body;
+    if (!accountId) return res.status(400).json({ error: 'accountId requerido' });
+    if (!verifyOwnership(req, accountId)) return res.status(403).json({ error: 'Acceso denegado' });
+    const user = (req as any).user;
+    const evidence = await DefenseEvidence.findOne({ _id: evidenceId, accountId, createdBy: user?.userId || '' });
+    if (!evidence) return res.status(404).json({ error: 'Prueba no encontrada' });
+    evidence.isDeleted = false;
+    evidence.deletedAt = null;
+    await evidence.save();
+    res.json({ ok: true });
+  } catch (error) {
+    console.error('Error al restaurar:', error);
+    res.status(500).json({ error: 'Error al restaurar' });
+  }
+};
+
+// DELETE /api/defense-chat/evidence/:evidenceId/permanent
+export const permanentDeleteEvidence = async (req: Request, res: Response) => {
+  try {
+    const { evidenceId } = req.params;
+    const { accountId } = req.query;
+    if (!accountId) return res.status(400).json({ error: 'accountId requerido' });
+    if (!verifyOwnership(req, accountId as string)) return res.status(403).json({ error: 'Acceso denegado' });
+    const user = (req as any).user;
+    const evidence = await DefenseEvidence.findOne({ _id: evidenceId, accountId: accountId as string, createdBy: user?.userId || '' });
+    if (!evidence) return res.status(404).json({ error: 'Prueba no encontrada' });
+    if (evidence.filePath) {
+      await fs.unlink(evidence.filePath).catch(() => {});
+    }
+    await DefenseEvidence.deleteOne({ _id: evidenceId });
+    res.json({ ok: true });
+  } catch (error) {
+    console.error('Error al eliminar permanentemente:', error);
+    res.status(500).json({ error: 'Error al eliminar' });
+  }
+};
+
+// GET /api/defense-chat/evidence/quota
+export const getEvidenceQuota = async (req: Request, res: Response) => {
+  try {
+    const { accountId } = req.query;
+    if (!accountId) return res.status(400).json({ error: 'accountId requerido' });
+    if (!verifyOwnership(req, accountId as string)) return res.status(403).json({ error: 'Acceso denegado' });
+    const user = (req as any).user;
+    const quotaAgg = await DefenseEvidence.aggregate([
+      { $match: { createdBy: user?.userId || '', isDeleted: false } },
+      { $group: { _id: null, total: { $sum: '$fileSize' } } }
+    ]);
+    const used = quotaAgg[0]?.total || 0;
+    res.json({ used, limit: EVIDENCE_QUOTA_BYTES });
+  } catch (error) {
+    console.error('Error al obtener cuota:', error);
+    res.status(500).json({ error: 'Error al obtener cuota' });
   }
 };

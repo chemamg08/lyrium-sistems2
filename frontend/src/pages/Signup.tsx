@@ -1,4 +1,4 @@
-import { useState, useMemo } from "react";
+import { useState, useMemo, useEffect } from "react";
 import { useNavigate } from "react-router-dom";
 import { motion } from "framer-motion";
 import { Button } from "@/components/ui/button";
@@ -110,6 +110,9 @@ const Signup = () => {
   const [countryOpen, setCountryOpen] = useState(false);
   const [isLoading, setIsLoading] = useState(false);
   const [acceptedTerms, setAcceptedTerms] = useState(false);
+  const [promoCode, setPromoCode] = useState('');
+  const [promoCodeStatus, setPromoCodeStatus] = useState<'idle' | 'valid' | 'invalid'>('idle');
+  const [promoCodeInfo, setPromoCodeInfo] = useState<any>(null);
   const navigate = useNavigate();
 
   const pwChecks = useMemo(() => ({
@@ -121,6 +124,35 @@ const Signup = () => {
   }), [password]);
 
   const allValid = pwChecks.length && pwChecks.upper && pwChecks.lower && pwChecks.number && pwChecks.special;
+
+  useEffect(() => {
+    if (!promoCode.trim()) {
+      setPromoCodeStatus('idle');
+      setPromoCodeInfo(null);
+      return;
+    }
+    const timer = setTimeout(async () => {
+      try {
+        const res = await fetch(`${API_URL}/subscriptions/validate-promo-code`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ code: promoCode.trim() }),
+        });
+        if (res.ok) {
+          const data = await res.json();
+          setPromoCodeStatus('valid');
+          setPromoCodeInfo(data);
+        } else {
+          setPromoCodeStatus('invalid');
+          setPromoCodeInfo(null);
+        }
+      } catch {
+        setPromoCodeStatus('invalid');
+        setPromoCodeInfo(null);
+      }
+    }, 500);
+    return () => clearTimeout(timer);
+  }, [promoCode]);
 
   const handleSignup = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -140,7 +172,7 @@ const Signup = () => {
       const response = await fetch(`${API_URL}/accounts/register`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ name, email, password, country }),
+        body: JSON.stringify({ name, email, password, country, acceptedTerms, promoCode: promoCode.trim() || undefined }),
         credentials: 'include',
       });
 
@@ -148,8 +180,8 @@ const Signup = () => {
         const data = await response.json();
         toast({ title: t('auth.accountCreated') });
         // Redirect to 2FA setup only if backend requires it
-        if (data.needsSetup2FA && (data.account?.id || data.account?.['_id'])) {
-          navigate(`/setup-2fa?userId=${data.account.id || data.account['_id']}&userType=main`);
+        if (data.needsSetup2FA && data.setupToken) {
+          navigate(`/setup-2fa?setupToken=${encodeURIComponent(data.setupToken)}`);
         } else {
           navigate("/login");
         }
@@ -295,6 +327,29 @@ const Signup = () => {
                     </div>
                   ))}
                 </div>
+              )}
+            </div>
+            <div className="space-y-2">
+              <label htmlFor="promoCode" className="text-sm font-medium">
+                Código promocional <span className="text-xs text-muted-foreground">(opcional)</span>
+              </label>
+              <Input
+                id="promoCode"
+                type="text"
+                placeholder="Ej: VERANO25"
+                value={promoCode}
+                onChange={(e) => setPromoCode(e.target.value)}
+                className={promoCodeStatus === 'valid' ? 'border-green-500' : promoCodeStatus === 'invalid' ? 'border-red-500' : ''}
+              />
+              {promoCodeStatus === 'valid' && promoCodeInfo && (
+                <p className="text-xs text-green-500">
+                  {promoCodeInfo.type === 'percentage_discount'
+                    ? `✓ ${promoCodeInfo.value}% de descuento durante ${promoCodeInfo.durationMonths} meses`
+                    : `✓ ${promoCodeInfo.value} meses gratuitos`}
+                </p>
+              )}
+              {promoCodeStatus === 'invalid' && promoCode.length > 2 && (
+                <p className="text-xs text-red-400">Código no válido o inactivo</p>
               )}
             </div>
             <div className="flex items-start gap-2 pt-1">

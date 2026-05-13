@@ -227,6 +227,7 @@ export const streamClientMessage = async (req: Request, res: Response) => {
 
     const assistantMessage: Message = { id: (Date.now() + 1).toString(), role: 'assistant', content: fullText };
     chat.messages.push(assistantMessage);
+    chat.markModified('messages');
     await chat.save();
   } catch (error) {
     console.error('Error streaming cliente:', error);

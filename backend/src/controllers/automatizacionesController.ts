@@ -52,6 +52,39 @@ async function saveAccount(accountId: string, data: Record<string, any>) {
   await Automation.findByIdAndUpdate(accountId, { $set: { ...data, accountId } }, { upsert: true, returnDocument: 'after' });
 }
 
+function sanitizeCuentaCorreo(cuenta: Record<string, any>) {
+  return {
+    ...cuenta,
+    password: '',
+    hasPassword: !!String(cuenta?.password || '').trim(),
+  };
+}
+
+function sanitizeWhatsAppSession(session: Record<string, any> | null | undefined) {
+  if (!session) return session;
+
+  const { accessToken: _accessToken, ...safeSession } = session;
+  return {
+    ...safeSession,
+    hasAccessToken: !!String(session.accessToken || '').trim(),
+  };
+}
+
+function buildAutomationClientDto(account: any) {
+  const serialized = typeof account?.toJSON === 'function' ? account.toJSON() : account;
+
+  return {
+    ...serialized,
+    cuentasCorreo: Array.isArray(serialized?.cuentasCorreo)
+      ? serialized.cuentasCorreo.map((cuenta: Record<string, any>) => sanitizeCuentaCorreo(cuenta))
+      : [],
+    whatsappSessions: Array.isArray(serialized?.whatsappSessions)
+      ? serialized.whatsappSessions.map((session: Record<string, any>) => sanitizeWhatsAppSession(session))
+      : [],
+    whatsappSession: sanitizeWhatsAppSession(serialized?.whatsappSession),
+  };
+}
+
 // Extract PDF text
 async function extractPdfText(pdfPath: string): Promise<string> {
   try {
@@ -107,7 +140,7 @@ export const getData: RequestHandler = async (req, res) => {
   if (!verifyOwnership(req as AuthRequest, accountId)) { res.status(403).json({ error: 'Acceso denegado' }); return; }
   try {
     const account = await getAccount(accountId);
-    res.json(account.toJSON());
+    res.json(buildAutomationClientDto(account));
   } catch (err: any) {
     res.status(500).json({ error: err.message });
   }
@@ -118,14 +151,15 @@ export const getSubcuentas: RequestHandler = async (req, res) => {
   const accountId = req.query.accountId as string;
   try {
     if (!accountId) {
-      const all = await Subaccount.find();
-      res.json(all.map(s => s.toJSON()));
+      res.status(400).json({ error: 'accountId requerido' });
       return;
     }
     if (!verifyOwnership(req as AuthRequest, accountId)) { res.status(403).json({ error: 'Acceso denegado' }); return; }
     const subs = await Subaccount.find({ parentAccountId: accountId });
     res.json(subs.map(s => s.toJSON()));
-  } catch { res.json([]); }
+  } catch (err: any) {
+    res.status(500).json({ error: err.message || 'Error interno' });
+  }
 };
 
 // POST especialidad
@@ -191,13 +225,47 @@ export const deleteEspecialidad: RequestHandler = async (req, res) => {
 
 // POST cuenta correo
 export const createCuentaCorreo: RequestHandler = async (req, res) => {
-  const { accountId, plataforma, correo, password } = req.body;
+  const {
+    accountId,
+    plataforma,
+    correo,
+    password,
+    customSmtpHost,
+    customSmtpPort,
+    customImapHost,
+    customImapPort,
+  } = req.body;
   if (!accountId) { res.status(400).json({ error: 'accountId requerido' }); return; }
   if (!verifyOwnership(req as AuthRequest, accountId)) { res.status(403).json({ error: 'Acceso denegado' }); return; }
   if (!correo) { res.status(400).json({ error: 'correo requerido' }); return; }
   try {
     const account = await getAccount(accountId);
-    const nueva = { id: Date.now().toString(), plataforma: plataforma || 'gmail', correo, password: encryptPassword(password || ''), createdAt: new Date().toISOString() };
+    const plataformaNormalizada = String(plataforma || 'gmail').trim().toLowerCase();
+    const smtpHost = String(customSmtpHost || '').trim();
+    const imapHost = String(customImapHost || '').trim();
+    const smtpPort = Number(customSmtpPort);
+    const imapPort = Number(customImapPort);
+    const smtpPortValid = Number.isInteger(smtpPort) && smtpPort > 0 && smtpPort <= 65535 ? smtpPort : 587;
+    const imapPortValid = Number.isInteger(imapPort) && imapPort > 0 && imapPort <= 65535 ? imapPort : 993;
+
+    if (plataformaNormalizada === 'custom') {
+      if (!smtpHost || !imapHost) {
+        res.status(400).json({ error: 'customSmtpHost y customImapHost requeridos para plataforma custom' });
+        return;
+      }
+    }
+
+    const nueva = {
+      id: Date.now().toString(),
+      plataforma: plataformaNormalizada,
+      correo: String(correo).trim(),
+      password: encryptPassword(password || ''),
+      createdAt: new Date().toISOString(),
+      customSmtpHost: plataformaNormalizada === 'custom' ? smtpHost : '',
+      customSmtpPort: plataformaNormalizada === 'custom' ? smtpPortValid : 587,
+      customImapHost: plataformaNormalizada === 'custom' ? imapHost : '',
+      customImapPort: plataformaNormalizada === 'custom' ? imapPortValid : 993,
+    };
     account.cuentasCorreo.push(nueva);
     await saveAccount(accountId, { cuentasCorreo: account.cuentasCorreo });
     // Start polling so emails are always fetched
@@ -217,6 +285,9 @@ export const deleteCuentaCorreo: RequestHandler = async (req, res) => {
     const account = await getAccount(accountId);
     account.cuentasCorreo = account.cuentasCorreo.filter(c => c.id !== req.params.id);
     await saveAccount(accountId, { cuentasCorreo: account.cuentasCorreo });
+    if (account.cuentasCorreo.length === 0) {
+      stopPolling(accountId);
+    }
     res.json({ ok: true });
   } catch (err: any) {
     res.status(500).json({ error: err.message });
@@ -492,8 +563,11 @@ export const sendManualEmailHandler: RequestHandler = async (req, res) => {
       size: f.size,
       path: f.path,
     }));
-    const ok = await sendManualEmail(accountId, conversationId, messageText, attachmentFiles.length > 0 ? attachmentFiles : undefined);
-    if (!ok) { res.status(404).json({ error: 'Conversación o cuenta de correo no encontrada' }); return; }
+    const result = await sendManualEmail(accountId, conversationId, messageText, attachmentFiles.length > 0 ? attachmentFiles : undefined);
+    if (!result.ok) {
+      if (result.notFound) { res.status(404).json({ error: result.error || 'Conversación o cuenta de correo no encontrada' }); return; }
+      res.status(502).json({ error: result.error || 'Error al enviar el email' }); return;
+    }
     res.json({ ok: true, attachments: attachmentFiles.map(a => ({ id: a.id, filename: a.filename, originalName: a.originalName, mimeType: a.mimeType, size: a.size })) });
   } catch (err: any) {
     res.status(500).json({ error: err.message || 'Error al enviar email' });
@@ -585,14 +659,35 @@ export const removeConversationFromFolder: RequestHandler = async (req, res) => 
   }
 };
 
-// GET download email attachment
 export const downloadEmailAttachment: RequestHandler = async (req, res) => {
+  const accountId = req.query.accountId as string;
+  if (!accountId) { res.status(400).json({ error: 'accountId requerido' }); return; }
+  if (!verifyOwnership(req as AuthRequest, accountId)) { res.status(403).json({ error: 'Acceso denegado' }); return; }
+
   const { filename } = req.params;
   if (!filename) { res.status(400).json({ error: 'filename requerido' }); return; }
-  const sanitized = path.basename(filename);
-  const filePath = path.join(EMAIL_ATTACHMENTS_DIR, sanitized);
-  if (!fs.existsSync(filePath)) { res.status(404).json({ error: 'Archivo no encontrado' }); return; }
-  res.download(filePath, sanitized);
+  try {
+    const account = await getAccount(accountId);
+    const conversations = account.emailConversations || [];
+    let found = false;
+    for (const conv of conversations) {
+      for (const msg of conv.messages || []) {
+        for (const att of msg.attachments || []) {
+          if (att.filename === filename) { found = true; break; }
+        }
+        if (found) break;
+      }
+      if (found) break;
+    }
+    if (!found) { res.status(404).json({ error: 'Archivo no encontrado' }); return; }
+
+    const sanitized = path.basename(filename);
+    const filePath = path.join(EMAIL_ATTACHMENTS_DIR, sanitized);
+    if (!fs.existsSync(filePath)) { res.status(404).json({ error: 'Archivo no encontrado' }); return; }
+    res.download(filePath, sanitized);
+  } catch (err: any) {
+    res.status(500).json({ error: err.message });
+  }
 };
 
 // GET classify rules

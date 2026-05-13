@@ -3,17 +3,31 @@ import fs from 'fs/promises';
 import path from 'path';
 import { fileURLToPath } from 'url';
 import { SpecialtiesSettings } from '../models/SpecialtiesSettings.js';
+import type { AuthPayload } from '../middleware/auth.js';
 import { verifyOwnership } from '../middleware/auth.js';
+import { ensureAccountLogoDir, getAccountLogoPath } from '../utils/accountLogo.js';
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
 
-const LOGO_PATH = path.join(__dirname, '../../uploads/logo.png');
+const getCurrentAccountId = (req: Request): string | null => {
+  const user = (req as any).user as AuthPayload | undefined;
+  if (!user) {
+    return null;
+  }
+
+  return user.type === 'subaccount' ? user.parentAccountId || null : user.userId;
+};
 
 // POST /api/settings/logo - Subir logo
 export const uploadLogo = async (req: Request, res: Response) => {
   try {
     const file = (req as any).file;
+    const accountId = getCurrentAccountId(req);
+
+    if (!accountId || !verifyOwnership(req, accountId)) {
+      return res.status(403).json({ error: 'Acceso denegado' });
+    }
     
     if (!file) {
       return res.status(400).json({ error: 'No se subió ningún archivo' });
@@ -24,8 +38,11 @@ export const uploadLogo = async (req: Request, res: Response) => {
       return res.status(400).json({ error: 'El archivo debe ser una imagen' });
     }
 
+    const logoPath = getAccountLogoPath(accountId);
+    await ensureAccountLogoDir(accountId);
+
     // Guardar como logo.png
-    await fs.copyFile(file.path, LOGO_PATH);
+    await fs.copyFile(file.path, logoPath);
 
     // Eliminar archivo temporal de multer
     await fs.unlink(file.path);
@@ -40,7 +57,12 @@ export const uploadLogo = async (req: Request, res: Response) => {
 // GET /api/settings/logo - Verificar si existe logo
 export const hasLogo = async (req: Request, res: Response) => {
   try {
-    await fs.access(LOGO_PATH);
+    const accountId = getCurrentAccountId(req);
+    if (!accountId || !verifyOwnership(req, accountId)) {
+      return res.status(403).json({ error: 'Acceso denegado' });
+    }
+
+    await fs.access(getAccountLogoPath(accountId));
     res.json({ hasLogo: true });
   } catch {
     res.json({ hasLogo: false });
@@ -50,7 +72,12 @@ export const hasLogo = async (req: Request, res: Response) => {
 // DELETE /api/settings/logo - Eliminar logo
 export const deleteLogo = async (req: Request, res: Response) => {
   try {
-    await fs.unlink(LOGO_PATH);
+    const accountId = getCurrentAccountId(req);
+    if (!accountId || !verifyOwnership(req, accountId)) {
+      return res.status(403).json({ error: 'Acceso denegado' });
+    }
+
+    await fs.unlink(getAccountLogoPath(accountId));
     res.json({ message: 'Logo eliminado exitosamente' });
   } catch (error) {
     res.status(404).json({ error: 'No hay logo para eliminar' });

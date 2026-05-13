@@ -63,6 +63,10 @@ export interface CuentaCorreoConfig {
   plataforma: string;
   correo: string;
   password: string;
+  customSmtpHost?: string;
+  customSmtpPort?: number;
+  customImapHost?: string;
+  customImapPort?: number;
 }
 
 export interface IncomingEmailAttachment {
@@ -83,6 +87,7 @@ export interface IncomingEmail {
   references?: string;
   inReplyTo?: string;
   attachments?: IncomingEmailAttachment[];
+  uid?: number;
 }
 
 interface PlatformConfig {
@@ -108,7 +113,12 @@ function getPlatformConfig(plataforma: string, custom?: { smtpHost?: string; smt
 
 // Fetch unread emails via IMAP
 export function fetchUnreadEmails(cuenta: CuentaCorreoConfig): Promise<IncomingEmail[]> {
-  const config = getPlatformConfig(cuenta.plataforma);
+  const config = getPlatformConfig(cuenta.plataforma, {
+    smtpHost: cuenta.customSmtpHost,
+    smtpPort: cuenta.customSmtpPort,
+    imapHost: cuenta.customImapHost,
+    imapPort: cuenta.customImapPort,
+  });
 
   return new Promise((resolve, reject) => {
     const imap = new Imap({
@@ -148,10 +158,28 @@ export function fetchUnreadEmails(cuenta: CuentaCorreoConfig): Promise<IncomingE
         const handleUids = (uids: number[]) => {
           if (!uids || uids.length === 0) { imap.end(); return resolve([]); }
 
-          const f = imap.fetch(uids, { bodies: '', markSeen: true });
+          const f = imap.fetch(uids, { bodies: '', markSeen: false });
           let pending = uids.length;
 
           f.on('message', (msg) => {
+            let uid: number | undefined;
+            let parsedEmail: IncomingEmail | null = null;
+            let parserDone = false;
+            let messageDone = false;
+
+            const finalizeMessage = () => {
+              if (!parserDone || !messageDone) return;
+              if (parsedEmail) {
+                emails.push({ ...parsedEmail, uid });
+              }
+              pending--;
+              if (pending === 0) imap.end();
+            };
+
+            msg.once('attributes', (attrs: any) => {
+              if (typeof attrs?.uid === 'number') uid = attrs.uid;
+            });
+
             msg.on('body', (stream) => {
               simpleParser(stream as any, (parseErr: Error | null, parsed: ParsedMail) => {
                 if (!parseErr) {
@@ -173,7 +201,7 @@ export function fetchUnreadEmails(cuenta: CuentaCorreoConfig): Promise<IncomingE
                       }
                     }
                   }
-                  emails.push({
+                  parsedEmail = {
                     from: fromAddr?.address || '',
                     fromName: fromAddr?.name || fromAddr?.address || '',
                     to: cuenta.correo,
@@ -186,16 +214,17 @@ export function fetchUnreadEmails(cuenta: CuentaCorreoConfig): Promise<IncomingE
                       : Array.isArray(parsed.references) ? parsed.references.join(' ') : undefined,
                     inReplyTo: parsed.inReplyTo as string | undefined,
                     attachments: incomingAttachments.length > 0 ? incomingAttachments : undefined,
-                  });
+                  };
                 }
-                pending--;
-                if (pending === 0) { imap.end(); }
+                parserDone = true;
+                finalizeMessage();
               });
             });
-          });
 
-          f.once('end', () => {
-            setTimeout(() => { if (pending === 0) resolve(emails); }, 300);
+            msg.once('end', () => {
+              messageDone = true;
+              finalizeMessage();
+            });
           });
 
           f.once('error', (fetchErr: Error) => { imap.end(); reject(fetchErr); });
@@ -211,6 +240,50 @@ export function fetchUnreadEmails(cuenta: CuentaCorreoConfig): Promise<IncomingE
   });
 }
 
+export function markEmailsAsSeen(cuenta: CuentaCorreoConfig, uids: number[]): Promise<void> {
+  const validUids = uids.filter((uid) => Number.isInteger(uid) && uid > 0);
+  if (validUids.length === 0) return Promise.resolve();
+
+  const config = getPlatformConfig(cuenta.plataforma, {
+    smtpHost: cuenta.customSmtpHost,
+    smtpPort: cuenta.customSmtpPort,
+    imapHost: cuenta.customImapHost,
+    imapPort: cuenta.customImapPort,
+  });
+
+  return new Promise((resolve, reject) => {
+    const imap = new Imap({
+      user: cuenta.correo,
+      password: cuenta.password,
+      host: config.imapHost,
+      port: config.imapPort,
+      tls: true,
+      tlsOptions: { rejectUnauthorized: false },
+      authTimeout: 10000,
+    });
+
+    imap.once('ready', () => {
+      imap.openBox('INBOX', false, (err) => {
+        if (err) { imap.end(); reject(err); return; }
+
+        imap.addFlags(validUids, '\\Seen', (flagErr) => {
+          if (flagErr) {
+            imap.end();
+            reject(flagErr);
+            return;
+          }
+
+          imap.end();
+          resolve();
+        });
+      });
+    });
+
+    imap.once('error', (imapErr: Error) => reject(imapErr));
+    imap.connect();
+  });
+}
+
 // Send email via SMTP (automation - uses CuentaCorreoConfig)
 export async function sendEmailViaCuenta(
   cuenta: CuentaCorreoConfig,
@@ -219,7 +292,12 @@ export async function sendEmailViaCuenta(
   body: string,
   attachments?: Array<{ filename: string; content: Buffer; mimeType: string }>,
 ): Promise<string> {
-  const config = getPlatformConfig(cuenta.plataforma);
+  const config = getPlatformConfig(cuenta.plataforma, {
+    smtpHost: cuenta.customSmtpHost,
+    smtpPort: cuenta.customSmtpPort,
+    imapHost: cuenta.customImapHost,
+    imapPort: cuenta.customImapPort,
+  });
   const useSecure = config.secure === true || config.smtpPort === 465;
 
   const transporter = nodemailer.createTransport({
@@ -253,7 +331,12 @@ export async function replyToEmail(
   references?: string,
   attachments?: Array<{ filename: string; path: string }>,
 ): Promise<string> {
-  const config = getPlatformConfig(cuenta.plataforma);
+  const config = getPlatformConfig(cuenta.plataforma, {
+    smtpHost: cuenta.customSmtpHost,
+    smtpPort: cuenta.customSmtpPort,
+    imapHost: cuenta.customImapHost,
+    imapPort: cuenta.customImapPort,
+  });
   const useSecure = config.secure === true || config.smtpPort === 465;
 
   const transporter = nodemailer.createTransport({

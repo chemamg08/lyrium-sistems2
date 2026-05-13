@@ -1,4 +1,5 @@
 import mongoose, { Schema } from 'mongoose';
+import { buildAssignedSubaccountFields } from '../utils/clientAssignments.js';
 
 export interface IClientFile {
   id: string;
@@ -31,7 +32,8 @@ export interface IClient {
   clientType: string;
   fiscalInfo: any;
   autoCreated: boolean;
-  assignedSubaccountId: string;
+  assignedSubaccountId: string | null;
+  assignedSubaccountIds: string[];
   notes: string;
   timerEntries: ITimerEntry[];
 }
@@ -68,12 +70,22 @@ const clientSchema = new Schema<IClient>({
   fiscalInfo: { type: Schema.Types.Mixed, default: {} },
   autoCreated: { type: Boolean, default: false },
   assignedSubaccountId: { type: String, default: null },
+  assignedSubaccountIds: { type: [String], default: [] },
   notes: { type: String, default: '' },
   timerEntries: { type: [timerEntrySchema], default: [] },
 }, { _id: false, versionKey: false });
 
+clientSchema.pre('save', function () {
+  const fields = buildAssignedSubaccountFields(this.assignedSubaccountIds, this.assignedSubaccountId);
+  this.assignedSubaccountIds = fields.assignedSubaccountIds;
+  this.assignedSubaccountId = fields.assignedSubaccountId;
+});
+
 clientSchema.set('toJSON', {
   transform: (_doc: any, ret: any) => {
+    const fields = buildAssignedSubaccountFields(ret.assignedSubaccountIds, ret.assignedSubaccountId);
+    ret.assignedSubaccountIds = fields.assignedSubaccountIds;
+    ret.assignedSubaccountId = fields.assignedSubaccountId;
     ret.id = ret._id;
     delete ret._id;
     return ret;

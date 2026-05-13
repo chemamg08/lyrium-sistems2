@@ -25,6 +25,8 @@ import {
   deleteWhatsAppClassifyRule,
   serveWAAttachment,
   waAttachmentMiddleware,
+  refreshWhatsAppToken,
+  getTokenStatus,
 } from '../controllers/whatsappController.js';
 
 const router = Router();
@@ -36,6 +38,10 @@ router.post('/meta/connect-token', connectWhatsAppWithToken);
 router.post('/meta/connect-manual', connectWhatsAppManual);
 router.get('/status', getWhatsAppStatus);
 router.post('/disconnect', disconnectWhatsApp);
+
+// Token management
+router.post('/refresh-token', refreshWhatsAppToken);
+router.get('/token-status', getTokenStatus);
 
 // Auto-reply switch
 router.put('/switch', updateWhatsAppSwitch);

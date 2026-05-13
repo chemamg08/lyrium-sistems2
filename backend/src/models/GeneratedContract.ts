@@ -6,6 +6,7 @@ export interface IGeneratedContract {
   contractBaseId: string;
   fileName: string;
   filePath: string;
+  docxFilePath?: string;
   variables: any;
   createdAt: string;
 }
@@ -16,6 +17,7 @@ const generatedContractSchema = new Schema<IGeneratedContract>({
   contractBaseId: { type: String, default: '' },
   fileName: { type: String, required: true },
   filePath: { type: String, required: true },
+  docxFilePath: { type: String, default: '' },
   variables: { type: Schema.Types.Mixed, default: {} },
   createdAt: { type: String, default: () => new Date().toISOString() },
 }, { _id: false, versionKey: false });

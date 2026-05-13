@@ -47,8 +47,7 @@ const Setup2FA = () => {
   const { toast } = useToast();
   const navigate = useNavigate();
   const [searchParams] = useSearchParams();
-  const userId = searchParams.get('userId') || '';
-  const userType = searchParams.get('userType') || 'main';
+  const setupToken = searchParams.get('setupToken') || '';
 
   const [step, setStep] = useState<'qr' | 'verify' | 'recovery'>('qr');
   const [otpauthUrl, setOtpauthUrl] = useState('');
@@ -60,12 +59,17 @@ const Setup2FA = () => {
 
   // Step 1: Generate QR code
   const handleGenerateQR = async () => {
+    if (!setupToken) {
+      toast({ title: 'Setup token no valido o caducado', variant: 'destructive' });
+      return;
+    }
+
     setIsLoading(true);
     try {
       const res = await fetch(`${API_URL}/accounts/setup-2fa`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ userId, userType }),
+        body: JSON.stringify({ setupToken }),
         credentials: 'include',
       });
       const data = await res.json();
@@ -86,12 +90,17 @@ const Setup2FA = () => {
   // Step 2: Verify code
   const handleVerify = async (e: React.FormEvent) => {
     e.preventDefault();
+    if (!setupToken) {
+      toast({ title: 'Setup token no valido o caducado', variant: 'destructive' });
+      return;
+    }
+
     setIsLoading(true);
     try {
       const res = await fetch(`${API_URL}/accounts/verify-2fa-setup`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ userId, userType, token: verifyCode }),
+        body: JSON.stringify({ setupToken, token: verifyCode }),
         credentials: 'include',
       });
       const data = await res.json();

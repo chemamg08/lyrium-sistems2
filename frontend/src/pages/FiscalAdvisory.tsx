@@ -34,7 +34,7 @@ import {
 } from "@/components/ui/alert-dialog";
 import { Checkbox } from "@/components/ui/checkbox";
 import { useToast } from "@/hooks/use-toast";
-import { Send, Trash2, Plus, Mail, Settings, Calculator, StopCircle, Search, Check, ChevronsUpDown, ChevronDown, X, Info, Download, ReceiptText } from "lucide-react";
+import { Send, Trash2, Plus, Mail, Settings, Calculator, StopCircle, Search, Check, ChevronsUpDown, ChevronDown, X, Info, Download, ReceiptText, Flag, Brain } from "lucide-react";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import {
   Command,
@@ -151,10 +151,13 @@ const TABS_CONFIG: Record<string, { basic: FieldDef[]; advanced: FieldDef[] }> =
 };
 
 interface Message {
+  id: string;
   role: "user" | "assistant";
   content: string;
   timestamp: string;
   offerPdf?: boolean;
+  flags?: Array<{ id: string }>;
+  reasoning?: string;
 }
 
 interface FiscalChatListItem {
@@ -266,7 +269,11 @@ export default function FiscalAdvisory() {
   const [showChatSelector, setShowChatSelector] = useState(false);
   const [messageInput, setMessageInput] = useState("");
   const [isSending, setIsSending] = useState(false);
-  const { streamingText: fiscalStreamingText, isStreaming: fiscalIsStreaming, startStream: fiscalStartStream, cancelStream: fiscalCancelStream } = useStreamingChat();
+  const { streamingText: fiscalStreamingText, streamingReasoning: fiscalStreamingReasoning, isStreaming: fiscalIsStreaming, startStream: fiscalStartStream, cancelStream: fiscalCancelStream } = useStreamingChat();
+  const pendingFiscalReasoningRef = useRef('');
+
+  const [showFlagPanel, setShowFlagPanel] = useState(false);
+  const [highlightedMsgId, setHighlightedMsgId] = useState<string | null>(null);
 
   // Alerts (need clients for recipients)
   const [alerts, setAlerts] = useState<FiscalAlert[]>([]);
@@ -546,11 +553,45 @@ export default function FiscalAdvisory() {
     setIsSending(false);
   };
 
+  const toggleFlag = async (messageId: string) => {
+    const msg = activeChat?.messages?.find((m: any) => m.id === messageId);
+    if (!msg) return;
+    const isFlagged = msg.flags && msg.flags.length > 0;
+    const chatId = activeChat?.id || '';
+    try {
+      if (isFlagged) {
+        const flagId = msg.flags[msg.flags.length - 1].id;
+        const res = await authFetch(`${import.meta.env.VITE_API_URL}/flags/fiscal/${chatId}/messages/${messageId}/flags/${flagId}`, { method: 'DELETE' });
+        if (res.ok) {
+          const data = await res.json();
+          setActiveChat(prev => prev ? { ...prev, messages: prev.messages.map((m: any) => m.id === messageId ? { ...m, flags: data.flags } : m) } : null);
+        }
+      } else {
+        const res = await authFetch(`${import.meta.env.VITE_API_URL}/flags/fiscal/${chatId}/messages/${messageId}`, { method: 'POST' });
+        if (res.ok) {
+          const data = await res.json();
+          setActiveChat(prev => prev ? { ...prev, messages: prev.messages.map((m: any) => m.id === messageId ? { ...m, flags: data.flags } : m) } : null);
+        }
+      }
+    } catch (err) { console.error(err); }
+  };
+
+  const scrollToMessage = (messageId: string) => {
+    const el = document.getElementById(`msg-${messageId}`);
+    if (el) {
+      el.scrollIntoView({ behavior: 'smooth', block: 'center' });
+      setHighlightedMsgId(messageId);
+      setTimeout(() => setHighlightedMsgId(null), 2000);
+      setShowFlagPanel(false);
+    }
+  };
+
   const handleSendMessage = async () => {
     if (!messageInput.trim() || isSending || !activeChatId) return;
 
     const userText = messageInput;
     const userMessage: Message = {
+      id: `msg-${Date.now()}`,
       role: "user",
       content: userText,
       timestamp: new Date().toISOString(),
@@ -559,23 +600,30 @@ export default function FiscalAdvisory() {
     setActiveChat((prev) => prev ? ({ ...prev, messages: [...prev.messages, userMessage] }) : prev);
     setMessageInput("");
     setIsSending(true);
+    pendingFiscalReasoningRef.current = '';
 
     try {
       await fiscalStartStream({
         endpoint: `/fiscal/chats/${activeChatId}/message/stream`,
         body: { message: userText },
         headers: { 'x-account-id': accountId || '' },
+        onDoneReasoning: (fullReasoning) => {
+          pendingFiscalReasoningRef.current = fullReasoning;
+        },
         onDone: async (fullText) => {
           const hasOfferPdf = fullText.includes('[OFFER_PDF]');
           const cleanText = fullText.replace(/\[OFFER_PDF\]/g, '').trim();
           const assistantMessage: Message = {
+            id: `ai-${Date.now()}`,
             role: "assistant",
             content: cleanText,
             timestamp: new Date().toISOString(),
             offerPdf: hasOfferPdf,
+            reasoning: pendingFiscalReasoningRef.current || undefined,
           };
           setActiveChat((prev) => prev ? ({ ...prev, messages: [...prev.messages, assistantMessage] }) : prev);
           setIsSending(false);
+          pendingFiscalReasoningRef.current = '';
         },
       });
     } catch (error) {
@@ -1030,6 +1078,18 @@ export default function FiscalAdvisory() {
                       <Trash2 className="w-4 h-4" />
                     </button>
                   )}
+                  <button
+                    onClick={() => setShowFlagPanel(!showFlagPanel)}
+                    className="flex items-center justify-center w-8 h-8 rounded-md border border-border hover:bg-accent transition-colors text-muted-foreground relative"
+                    title="Mensajes marcados"
+                  >
+                    <Flag size={16} />
+                    {activeChat?.messages?.filter((m: any) => m.flags && m.flags.length > 0).length > 0 && (
+                      <span className="absolute -top-1 -right-1 h-4 w-4 bg-yellow-500 text-[10px] text-black rounded-full flex items-center justify-center font-bold">
+                        {activeChat?.messages?.filter((m: any) => m.flags && m.flags.length > 0).length}
+                      </span>
+                    )}
+                  </button>
                   {selectedCalcClient && (
                     <button
                       onClick={openCalcModal}
@@ -1115,20 +1175,41 @@ export default function FiscalAdvisory() {
             <CardContent className="flex-1 flex flex-col">
               <div className="flex-1 overflow-y-auto mb-4 space-y-4 max-h-[calc(100vh-320px)] border rounded-lg p-4">
                 {activeChat && activeChat.messages.length > 0 ? (
-                  activeChat.messages.map((msg, idx) => (
+                  activeChat.messages.map((msg: any, idx: number) => (
                     <div
-                      key={idx}
+                      key={msg.id || idx}
                       className={`flex ${msg.role === "user" ? "justify-end" : "justify-start"}`}
                     >
                       <div className="max-w-[90%] md:max-w-[80%]">
                         <div
-                          className={`rounded-lg p-3 prose prose-sm dark:prose-invert prose-p:my-1 prose-ul:my-1 prose-ol:my-1 ${
+                          id={`msg-${msg.id || idx}`}
+                          className={`rounded-lg p-3 prose prose-sm dark:prose-invert prose-p:my-1 prose-ul:my-1 prose-ol:my-1 relative group transition-all ${highlightedMsgId === (msg.id || `${idx}`) ? 'ring-2 ring-yellow-500' : ''} ${msg.flags && msg.flags.length > 0 ? 'border-l-2 border-l-yellow-500' : ''} ${
                             msg.role === "user"
                               ? "bg-primary text-primary-foreground"
                               : "bg-muted"
                           }`}
                         >
+                          {msg.role === 'assistant' && msg.reasoning && (
+                            <details className="mb-2 not-prose">
+                              <summary className="text-xs text-muted-foreground cursor-pointer select-none flex items-center gap-1.5 list-none">
+                                <Brain className="h-3 w-3" />
+                                <span>Pensando...</span>
+                              </summary>
+                              <div className="mt-1.5 text-xs text-muted-foreground/80 font-mono whitespace-pre-wrap border-t border-border/40 pt-1.5" style={{ maxHeight: '4.5em', overflowY: 'auto' }}>
+                                {msg.reasoning}
+                              </div>
+                            </details>
+                          )}
                           <ReactMarkdown>{msg.content.replace(/\[OFFER_PDF\]/g, '')}</ReactMarkdown>
+                          {msg.role === "assistant" && (
+                            <button
+                              onClick={() => toggleFlag(msg.id || `${idx}`)}
+                              className="absolute top-1 right-1 p-1 rounded opacity-0 group-hover:opacity-100 transition-opacity hover:bg-black/10"
+                              title={msg.flags && msg.flags.length > 0 ? 'Desmarcar' : 'Marcar'}
+                            >
+                              <Flag size={14} className={msg.flags && msg.flags.length > 0 ? 'text-yellow-500 fill-yellow-500' : 'text-muted-foreground'} />
+                            </button>
+                          )}
                         </div>
                         {msg.role === "assistant" && (msg.offerPdf || msg.content.includes('[OFFER_PDF]')) && activeChatId && (
                           <div className="mt-2 flex">
@@ -1172,9 +1253,20 @@ export default function FiscalAdvisory() {
                     </div>
                   </div>
                 )}
-                {fiscalIsStreaming && fiscalStreamingText && (
+                {fiscalIsStreaming && (fiscalStreamingText || fiscalStreamingReasoning) && (
                   <div className="flex justify-start">
-                    <div className="max-w-[85%] md:max-w-[70%] rounded-lg p-3 text-sm leading-relaxed prose prose-sm dark:prose-invert prose-p:my-1 prose-ul:my-1 prose-ol:my-1 bg-muted">
+                    <div className="max-w-[85%] md:max-w-[70%] rounded-lg p-3 text-sm leading-relaxed prose prose-sm dark:prose-invert prose-p:my-1 prose-ul:my-1 prose-ol:my-1 bg-muted relative group">
+                      {fiscalStreamingReasoning && (
+                        <details className="mb-2 not-prose" open>
+                          <summary className="text-xs text-muted-foreground cursor-pointer select-none flex items-center gap-1.5 list-none">
+                            <Brain className="h-3 w-3" />
+                            <span>Pensando...</span>
+                          </summary>
+                          <div className="mt-1.5 text-xs text-muted-foreground/80 font-mono whitespace-pre-wrap border-t border-border/40 pt-1.5" style={{ maxHeight: '4.5em', overflowY: 'auto' }}>
+                            {fiscalStreamingReasoning}
+                          </div>
+                        </details>
+                      )}
                       <ReactMarkdown>{fiscalStreamingText}</ReactMarkdown>
                     </div>
                   </div>
@@ -1540,11 +1632,40 @@ export default function FiscalAdvisory() {
                 }
                 placeholder={t('fiscal.emailPasswordPlaceholder')}
               />
-              {emailConfig.platform === "gmail" && (
-                <p className="text-xs text-muted-foreground mt-1">
-                  {t('fiscal.gmailNote')}
-                </p>
-              )}
+              {(() => {
+                const platformGuides: Record<string, { text: string; link?: string }> = {
+                  gmail: { text: "Para Gmail, usa una contraseña de aplicación.", link: "https://support.google.com/accounts/answer/185833" },
+                  outlook: { text: "Para Outlook/Hotmail, usa una contraseña de aplicación.", link: "https://support.microsoft.com/account-billing/usar-contrase%C3%B1as-de-aplicaci%C3%B3n-con-el-correo-de Outlook-como-autenticaci%C3%B3n-de-dos-factores-b8c22536-7b10-4e06-8f9b-3d8c5c8d8a0e" },
+                  yahoo: { text: "Para Yahoo, usa una contraseña de aplicación.", link: "https://help.yahoo.com/kb/SLN15241.html" },
+                  icloud: { text: "Para iCloud, usa una contraseña de aplicación.", link: "https://support.apple.com/es-es/102654" },
+                  "office365": { text: "Para Office 365, usa una contraseña de aplicación.", link: "https://support.microsoft.com/account-billing/usar-contrase%C3%B1as-de-aplicaci%C3%B3n-con-el-correo-de-Outlook-como-autenticaci%C3%B3n-de-dos-factores-b8c22536-7b10-4e06-8f9b-3d8c5c8d8a0e" },
+                  hostinger: { text: "Para Hostinger, usa la contraseña normal de tu panel de hosting." },
+                  ionos: { text: "Para IONOS, usa la contraseña normal de tu panel de hosting." },
+                  ovh: { text: "Para OVH, usa la contraseña normal de tu panel de hosting." },
+                  godaddy: { text: "Para GoDaddy, usa la contraseña normal de tu panel de hosting." },
+                  custom: { text: "Para servidores personalizados, usa la contraseña de tu panel de hosting." },
+                  zoho: { text: "Para Zoho, se recomienda usar una contraseña de aplicación.", link: "https://help.zoho.com/portal/en/kb/bigin/settings/security/articles/generate-an-app-specific-password" },
+                };
+                const guide = platformGuides[emailConfig.platform];
+                if (!guide) return null;
+                return (
+                  <div className="mt-2 rounded-md border border-amber-500/20 bg-amber-500/10 p-2.5">
+                    <p className="text-xs text-amber-600 dark:text-amber-400 font-medium">
+                      {guide.text}
+                      {guide.link && (
+                        <a
+                          href={guide.link}
+                          target="_blank"
+                          rel="noopener noreferrer"
+                          className="ml-1 underline hover:text-amber-700 dark:hover:text-amber-300"
+                        >
+                          ¿Cómo obtenerla?
+                        </a>
+                      )}
+                    </p>
+                  </div>
+                );
+              })()}
             </div>
           </div>
 
@@ -1820,6 +1941,41 @@ export default function FiscalAdvisory() {
                 {new Intl.NumberFormat(i18n.language, { style: "currency", currency: calcResult.currency || cCode }).format(calcResult.total)}
               </span>
             </div>
+          </div>
+        </div>
+      )}
+
+      {/* Flag Panel Drawer */}
+      {showFlagPanel && (
+        <div className="absolute top-0 right-0 h-full w-80 bg-card border-l border-border z-30 flex flex-col shadow-xl">
+          <div className="flex items-center justify-between p-4 border-b">
+            <h3 className="font-semibold flex items-center gap-2">
+              <Flag size={16} className="text-yellow-500" />
+              Mensajes marcados ({activeChat?.messages?.filter((m: any) => m.flags && m.flags.length > 0).length || 0})
+            </h3>
+            <button onClick={() => setShowFlagPanel(false)} className="p-1 rounded hover:bg-muted">
+              <X size={16} />
+            </button>
+          </div>
+          <div className="flex-1 overflow-y-auto p-3 space-y-2">
+            {activeChat?.messages?.filter((m: any) => m.flags && m.flags.length > 0).length === 0 ? (
+              <p className="text-sm text-muted-foreground text-center py-8">No hay mensajes marcados</p>
+            ) : (
+              activeChat?.messages?.filter((m: any) => m.flags && m.flags.length > 0).map((msg: any) => (
+                <button
+                  key={msg.id}
+                  onClick={() => scrollToMessage(msg.id)}
+                  className="w-full text-left p-3 rounded-lg bg-muted/50 hover:bg-muted transition-colors"
+                >
+                  <div className="flex items-center gap-2 mb-1">
+                    <span className={`text-[10px] px-1.5 py-0.5 rounded ${msg.role === 'user' ? 'bg-primary/20 text-primary' : 'bg-muted-foreground/20 text-muted-foreground'}`}>
+                      {msg.role === 'user' ? 'Tú' : 'Lyra'}
+                    </span>
+                  </div>
+                  <p className="text-xs text-muted-foreground line-clamp-2">{msg.content.substring(0, 120)}...</p>
+                </button>
+              ))
+            )}
           </div>
         </div>
       )}

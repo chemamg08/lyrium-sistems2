@@ -1,5 +1,6 @@
 import PDFDocument from 'pdfkit';
 import nodemailer from 'nodemailer';
+import QRCode from 'qrcode';
 import { getVatRate, getTaxLabel } from '../utils/vatRates.js';
 
 export interface InvoiceData {
@@ -26,6 +27,10 @@ export interface InvoiceData {
   ownerName: string;
   ownerNIF: string;
   ownerAddress: string;
+  // Verification
+  huella?: string;
+  huellaAnterior?: string;
+  publicInvoiceId?: string;
 }
 
 function formatDate(date: Date): string {
@@ -105,8 +110,20 @@ function formatLocalCurrency(eurAmount: number, lc: LocalCurrency): string {
  * - Totals: base + tax + total
  * - Payment method with last 4 digits
  * - Footer: LYRIUM + owner info
+ * - Verification QR code (if huella provided)
  */
-export function generateInvoicePDF(data: InvoiceData): Promise<Buffer> {
+export async function generateInvoicePDF(data: InvoiceData): Promise<Buffer> {
+  // Pre-generate QR code if huella is provided
+  let qrBuffer: Buffer | null = null;
+  if (data.huella && data.publicInvoiceId) {
+    const qrUrl = `https://lyrium.io/invoice/${data.publicInvoiceId}`;
+    qrBuffer = await QRCode.toBuffer(qrUrl, {
+      type: 'png',
+      width: 200,
+      margin: 1,
+    });
+  }
+
   return new Promise((resolve, reject) => {
     try {
       const doc = new PDFDocument({
@@ -364,6 +381,25 @@ export function generateInvoicePDF(data: InvoiceData): Promise<Buffer> {
         .fontSize(4.5)
         .fillColor('#999999')
         .text(ownerLine, ownerX, footerY + 52, { width: lyriumW, align: 'center' });
+
+      // ====== VERIFICATION QR CODE ======
+      if (qrBuffer) {
+        const qrY = footerY + 70;
+        const qrSize = 50;
+        const qrX = marginL;
+
+        doc.image(qrBuffer, qrX, qrY, { width: qrSize, height: qrSize });
+
+        doc.font('Helvetica')
+          .fontSize(5)
+          .fillColor('#999999')
+          .text('Verifiable invoice', qrX + qrSize + 6, qrY + 4, { width: 80 });
+
+        doc.font('Helvetica')
+          .fontSize(4)
+          .fillColor('#bbbbbb')
+          .text(data.huella!.substring(0, 32) + '...', qrX + qrSize + 6, qrY + 12, { width: 80 });
+      }
 
       doc.end();
     } catch (err) {

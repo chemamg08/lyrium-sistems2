@@ -5,6 +5,7 @@ import {
   deleteAssistantChat, 
   getAssistantChat, 
   getAssistantChats,
+  getDailyIaUsage,
   renameAssistantChat,
   sendAssistantMessage,
   streamAssistantMessage,
@@ -23,6 +24,8 @@ router.get('/chat', getAssistantChat);
 router.post('/chat/message', sendAssistantMessage);
 router.post('/chat/message/stream', streamAssistantMessage);
 router.delete('/chat/:accountId', clearAssistantChat);
+
+router.get('/daily-usage', getDailyIaUsage);
 
 // Subir archivo para contexto (PDF o TXT)
 router.post('/upload-file', uploadAssistantFileMw.single('file'), uploadAssistantFile);

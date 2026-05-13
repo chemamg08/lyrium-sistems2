@@ -9,6 +9,14 @@ import RenewalModal from "@/components/RenewalModal";
 import i18n, { getLanguageForCountry } from "@/i18n";
 import { useTranslation } from "react-i18next";
 import { useToast } from "@/components/ui/use-toast";
+import {
+  Dialog,
+  DialogContent,
+  DialogHeader,
+  DialogTitle,
+  DialogDescription,
+} from "@/components/ui/dialog";
+import { persistUserSession } from "@/lib/authFetch";
 
 const API_URL = import.meta.env.VITE_API_URL;
 
@@ -43,6 +51,17 @@ const WavesBg = () => (
   </div>
 );
 
+const BackToLandingButton = ({ onClick }: { onClick: () => void }) => (
+  <button
+    type="button"
+    onClick={onClick}
+    className="absolute top-5 left-6 z-10 inline-flex items-center gap-2 rounded-full border border-white/10 bg-white/5 px-3 py-1.5 text-sm text-white/70 transition-colors hover:bg-white/10 hover:text-white"
+  >
+    <ArrowLeft className="h-4 w-4" />
+    <span>Landing</span>
+  </button>
+);
+
 const Login = () => {
   const { t } = useTranslation();
   const { toast } = useToast();
@@ -65,6 +84,8 @@ const Login = () => {
     country?: string;
   } | null>(null);
   const [showRenewalModal, setShowRenewalModal] = useState(false);
+  const [showFreePlanDialog, setShowFreePlanDialog] = useState(false);
+  const [activatingFree, setActivatingFree] = useState(false);
   const navigate = useNavigate();
   const [searchParams] = useSearchParams();
 
@@ -92,37 +113,22 @@ const Login = () => {
       const data = await response.json();
 
       if (response.ok && data.success) {
-        // Guardar información del usuario en sessionStorage
-        sessionStorage.setItem('userId', data.user.id);
-        sessionStorage.setItem('userName', data.user.name);
-        sessionStorage.setItem('userEmail', data.user.email);
-        sessionStorage.setItem('userType', data.user.type);
+        persistUserSession(data.user);
         const userCountry = data.user.country || 'ES';
-        sessionStorage.setItem('country', userCountry);
 
         // Check if admin
         if (data.user.role === 'admin') {
-          sessionStorage.setItem('userRole', 'admin');
-          sessionStorage.setItem('accountId', data.user.id);
           navigate('/admin');
           return;
         }
         const lang = getLanguageForCountry(userCountry);
         i18n.changeLanguage(lang);
         localStorage.setItem('appLanguage', lang);
-        
-        // Si es subcuenta, guardar el parentAccountId y usarlo como accountId
-        if (data.user.type === 'subaccount' && data.user.parentAccountId) {
-          sessionStorage.setItem('parentAccountId', data.user.parentAccountId);
-          sessionStorage.setItem('accountId', data.user.parentAccountId);
-        } else {
-          sessionStorage.setItem('accountId', data.user.id);
-        }
-        
+
         navigate("/");
-      } else if (data.needs2FASetup) {
+      } else if (data.needs2FASetup && data.setupToken) {
         // Redirect to 2FA setup
-        navigate(`/setup-2fa?userId=${data.userId}&userType=${data.userType}`);
+        navigate(`/setup-2fa?setupToken=${encodeURIComponent(data.setupToken)}`);
       } else if (response.status === 403 && data.emailNotVerified) {
         setEmailNotVerified(true);
       } else if (response.status === 403 && data.requires2FA) {
@@ -195,6 +201,7 @@ const Login = () => {
   return (
     <div className="relative min-h-screen flex items-center justify-center px-4 bg-[#080808] overflow-hidden" style={darkVars}>
       <WavesBg />
+      <BackToLandingButton onClick={() => navigate("/landing")} />
       {/* Branding top-right */}
       <div className="absolute top-5 right-6 z-10 flex items-center gap-3">
         <Scale className="h-6 w-6 text-white/50" />
@@ -202,7 +209,7 @@ const Login = () => {
       </div>
       <Card className="relative z-10 w-full max-w-md bg-white/[0.04] border-white/10">
         <CardHeader className="space-y-1">
-          <CardTitle className="text-2xl font-bold text-center">Lyrium Systems</CardTitle>
+          <CardTitle className="text-2xl font-bold text-center">Lyrium</CardTitle>
           <CardDescription className="text-center">
             {view === 'login' ? t('auth.enterCredentials') : t('auth.forgotPasswordDesc')}
           </CardDescription>
@@ -258,12 +265,21 @@ const Login = () => {
                   </p>
                   <p className="text-sm text-destructive/80">{subscriptionError.message}</p>
                   {subscriptionError.type === 'main' && (
-                    <Button 
+                    <Button
                       onClick={handlePayment}
                       className="mt-3 w-full"
                       variant="destructive"
                     >
                       {t('auth.renewSubscription')}
+                    </Button>
+                  )}
+                  {subscriptionError.type === 'main' && (
+                    <Button
+                      onClick={() => setShowFreePlanDialog(true)}
+                      className="mt-2 w-full"
+                      variant="outline"
+                    >
+                      Acceder sin cargo
                     </Button>
                   )}
                   {subscriptionError.type === 'subaccount' && (
@@ -420,6 +436,63 @@ const Login = () => {
           userCountry={subscriptionError.country || 'ES'}
         />
       )}
+
+      {/* Free Plan Confirmation Dialog */}
+      <Dialog open={showFreePlanDialog} onOpenChange={setShowFreePlanDialog}>
+        <DialogContent className="sm:max-w-md">
+          <DialogHeader>
+            <DialogTitle>Acceder sin cargo</DialogTitle>
+            <DialogDescription>
+              Al seleccionar el plan Sin Cargo, podrás seguir usando Lyrium con las siguientes limitaciones:
+            </DialogDescription>
+          </DialogHeader>
+          <ul className="list-disc pl-5 text-sm text-muted-foreground space-y-1">
+            <li>Máximo 10 clientes</li>
+            <li>Máximo 5 casos activos</li>
+            <li>50 mensajes con IA al día</li>
+            <li>Sin acceso a Automatizaciones</li>
+            <li>Sin subida de archivos a Mejorar IA</li>
+            <li>Sin subcuentas</li>
+          </ul>
+          <p className="text-xs text-muted-foreground mt-2">
+            Si bajas de un plan de pago, tendrás una semana de gracia con todos tus datos antes de que se apliquen los límites.
+          </p>
+          <div className="flex justify-end gap-2 mt-4">
+            <Button variant="outline" onClick={() => setShowFreePlanDialog(false)}>Cancelar</Button>
+            <Button
+              disabled={activatingFree}
+              onClick={async () => {
+                setActivatingFree(true);
+                try {
+                  const res = await fetch(`${API_URL}/accounts/activate-free`, {
+                    method: 'POST',
+                    credentials: 'include',
+                    headers: { 'Content-Type': 'application/json' },
+                  });
+                  const data = await res.json();
+                  if (data.success) {
+                    // Re-fetch session to persist plan
+                    const meRes = await fetch(`${API_URL}/accounts/me`, { credentials: 'include' });
+                    const meData = await meRes.json();
+                    if (meData.success && meData.user) {
+                      persistUserSession(meData.user);
+                    }
+                    navigate('/');
+                  } else {
+                    toast({ title: data.error || 'Error al activar plan sin cargo', variant: 'destructive' });
+                  }
+                } catch {
+                  toast({ title: 'Error al activar plan sin cargo', variant: 'destructive' });
+                } finally {
+                  setActivatingFree(false);
+                }
+              }}
+            >
+              {activatingFree ? 'Activando…' : 'Confirmar y entrar'}
+            </Button>
+          </div>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 };

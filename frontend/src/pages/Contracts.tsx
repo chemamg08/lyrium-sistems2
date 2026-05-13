@@ -5,6 +5,7 @@ import ContractChatInterface from "@/components/ContractChatInterface";
 import { useTranslation } from "react-i18next";
 import { useToast } from "@/components/ui/use-toast";
 import { authFetch } from '../lib/authFetch';
+import ModuleGuide from "@/components/ModuleGuide";
 
 interface ContractBase {
   id: string;
@@ -448,6 +449,12 @@ const Contracts = () => {
 
       if (response.ok) {
         await loadContracts();
+        if (contractToDelete === selectedContract?.id) {
+          setSelectedContract(null);
+          setCurrentChatId(null);
+          sessionStorage.removeItem('selectedContractId');
+          sessionStorage.removeItem(`currentChat_${contractToDelete}`);
+        }
         setShowDeleteConfirm(false);
         setContractToDelete(null);
       } else {
@@ -490,6 +497,7 @@ const Contracts = () => {
 
   return (
     <div className="flex flex-col h-screen">
+      <ModuleGuide moduleId="contracts" />
       {/* Top bar with buttons */}
       <div className="border-b border-border px-3 md:px-6 py-3 flex items-center justify-end gap-2 flex-wrap">
         {/* Selector de chats */}
@@ -774,7 +782,7 @@ const Contracts = () => {
               </div>
               <div>
                 <label className="text-xs font-medium text-muted-foreground mb-1 block">{t('contracts.uploadModal.file')}</label>
-                <input type="file" ref={fileRef} onChange={(e) => setUploadFile(e.target.files?.[0] || null)} className="hidden" />
+                <input type="file" ref={fileRef} accept="application/pdf" onChange={(e) => setUploadFile(e.target.files?.[0] || null)} className="hidden" />
                 <div
                   onDragEnter={handleDragEnter}
                   onDragOver={handleDragOver}

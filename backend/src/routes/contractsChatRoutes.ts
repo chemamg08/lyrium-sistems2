@@ -9,6 +9,7 @@ import {
   sendContractMessage,
   streamContractMessage,
   downloadGeneratedContract,
+  downloadGeneratedContractDOCX,
   deleteContractChat,
   deleteEmptyContractChats,
   createTemporaryChat,
@@ -54,5 +55,8 @@ router.delete('/:chatId', deleteContractChat);
 
 // GET /api/contracts/generated/:id/download - Descargar contrato generado
 router.get('/generated/:id/download', downloadGeneratedContract);
+
+// GET /api/contracts/generated/:id/download-docx - Descargar contrato generado (DOCX)
+router.get('/generated/:id/download-docx', downloadGeneratedContractDOCX);
 
 export default router;

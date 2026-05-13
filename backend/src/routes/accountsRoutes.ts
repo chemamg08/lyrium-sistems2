@@ -15,10 +15,12 @@ import {
   deleteSubaccount,
   assignClientToSubaccount,
   getClientsBySubaccount,
+  getCurrentSession,
   changeEmail,
   changePassword,
   getBillingProfile,
-  updateBillingProfile
+  updateBillingProfile,
+  activateFreePlan
 } from '../controllers/accountsController.js';
 import { authMiddleware } from '../middleware/auth.js';
 import { loginLimiter, registerLimiter, passwordResetLimiter, twoFactorLimiter, resendVerificationLimiter } from '../middleware/rateLimiter.js';
@@ -30,6 +32,7 @@ router.post('/register', registerLimiter, createAccount);
 router.post('/login', loginLimiter, login);
 router.post('/logout', logoutHandler);
 router.post('/refresh', refreshAccessToken);
+router.get('/me', authMiddleware as any, getCurrentSession);
 
 // 2FA setup (public - called right after registration)
 router.post('/setup-2fa', twoFactorLimiter, setup2FA);
@@ -42,6 +45,9 @@ router.post('/resend-verification', resendVerificationLimiter, resendVerificatio
 // Password reset
 router.post('/forgot-password', passwordResetLimiter, forgotPassword);
 router.post('/reset-password', passwordResetLimiter, resetPassword);
+
+// Activar plan sin cargo (auth required)
+router.post('/activate-free', authMiddleware as any, activateFreePlan);
 
 // Subcuentas (auth required)
 router.post('/subaccounts', authMiddleware as any, createSubaccount);

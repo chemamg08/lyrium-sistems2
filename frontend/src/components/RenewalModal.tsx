@@ -23,7 +23,7 @@ interface RenewalModalProps {
 }
 
 interface PlanConfig {
-  id: 'starter' | 'advanced';
+  id: 'starter' | 'individual' | 'advanced';
   name: string;
   monthlyPrice: number;
   annualPrice: number;
@@ -35,8 +35,10 @@ interface PlanConfig {
 interface PaymentFormProps {
   clientSecret: string;
   accountId: string;
-  plan: 'starter' | 'advanced';
+  plan: 'starter' | 'individual' | 'advanced';
   interval: 'monthly' | 'annual';
+  isJunior?: boolean;
+  proofUrl?: string | null;
   paymentIntentId?: string;
   setupIntentId?: string;
   subscriptionId?: string;
@@ -44,7 +46,7 @@ interface PaymentFormProps {
   onCancel: () => void;
 }
 
-const PaymentForm = ({ clientSecret, accountId, plan, interval, paymentIntentId, setupIntentId, subscriptionId, onSuccess, onCancel }: PaymentFormProps) => {
+const PaymentForm = ({ clientSecret, accountId, plan, interval, isJunior, proofUrl, paymentIntentId, setupIntentId, subscriptionId, onSuccess, onCancel }: PaymentFormProps) => {
   const { t } = useTranslation();
   const { toast } = useToast();
   const stripe = useStripe();
@@ -90,6 +92,8 @@ const PaymentForm = ({ clientSecret, accountId, plan, interval, paymentIntentId,
               interval,
               setupIntentId,
               subscriptionId,
+              isJunior: plan === 'individual' && isJunior ? true : undefined,
+              proofUrl,
             }),
           });
 
@@ -120,6 +124,8 @@ const PaymentForm = ({ clientSecret, accountId, plan, interval, paymentIntentId,
               interval,
               paymentIntentId,
               subscriptionId,
+              isJunior: plan === 'individual' && isJunior ? true : undefined,
+              proofUrl,
             }),
           });
 
@@ -194,15 +200,22 @@ const RenewalModal = ({ isOpen, onClose, onSuccess, accountId, userEmail, userCo
   const { t } = useTranslation();
   const { toast } = useToast();
   const currency = getCurrencyForCountry(userCountry);
-  const [selectedPlan, setSelectedPlan] = useState<'starter' | 'advanced'>('starter');
+  const [selectedPlan, setSelectedPlan] = useState<'starter' | 'individual' | 'advanced'>('starter');
   const [selectedInterval, setSelectedInterval] = useState<'monthly' | 'annual'>('monthly');
   const [autoRenew, setAutoRenew] = useState(false);
+  const [isJunior, setIsJunior] = useState(false);
+  const [juniorProofFile, setJuniorProofFile] = useState<File | null>(null);
+  const [proofUrl, setProofUrl] = useState<string | null>(null);
+  const [uploadStatus, setUploadStatus] = useState<'idle' | 'uploading' | 'success' | 'error'>('idle');
   const [isLoading, setIsLoading] = useState(false);
   const [showPaymentModal, setShowPaymentModal] = useState(false);
   const [clientSecret, setClientSecret] = useState<string | null>(null);
   const [paymentIntentId, setPaymentIntentId] = useState<string | null>(null);
   const [setupIntentId, setSetupIntentId] = useState<string | null>(null);
   const [subscriptionId, setSubscriptionId] = useState<string | null>(null);
+  const [promoCode, setPromoCode] = useState('');
+  const [appliedPromo, setAppliedPromo] = useState<any>(null);
+  const [promoCodeValidating, setPromoCodeValidating] = useState(false);
 
   const PLANS: PlanConfig[] = [
     {
@@ -214,6 +227,14 @@ const RenewalModal = ({ isOpen, onClose, onSuccess, accountId, userEmail, userCo
       features: [t('profile.featureUpTo4'), t('profile.featureAllFeatures'), t('profile.featurePrioritySupport')]
     },
     {
+      id: 'individual',
+      name: 'Plan Individual',
+      monthlyPrice: 60,
+      annualPrice: 600,
+      maxSubaccounts: 0,
+      features: ['Acceso completo a la app para el titular', t('profile.featureAllFeatures'), t('profile.featurePrioritySupport')]
+    },
+    {
       id: 'advanced',
       name: t('profile.planAdvanced'),
       monthlyPrice: 350,
@@ -222,6 +243,71 @@ const RenewalModal = ({ isOpen, onClose, onSuccess, accountId, userEmail, userCo
       features: [t('profile.featureUpTo10'), t('profile.featureAllFeatures'), t('profile.featurePrioritySupport')]
     }
   ];
+
+  const getDisplayedPrice = (planId: string, interval: 'monthly' | 'annual', junior: boolean) => {
+    let price = 0;
+    if (planId !== 'individual' || !junior) {
+      const plan = PLANS.find(p => p.id === planId);
+      price = interval === 'monthly' ? (plan?.monthlyPrice ?? 0) : (plan?.annualPrice ?? 0);
+    } else {
+      price = interval === 'monthly' ? 45 : 480;
+    }
+    if (appliedPromo && appliedPromo.type === 'percentage_discount') {
+      price = Math.round(price * (1 - appliedPromo.value / 100));
+    }
+    return price;
+  };
+
+  const handleUploadJuniorProof = async () => {
+    if (!juniorProofFile) return;
+    setUploadStatus('uploading');
+    try {
+      const formData = new FormData();
+      formData.append('proof', juniorProofFile);
+      const res = await authFetch(`${API_URL}/subscriptions/junior-proof`, {
+        method: 'POST',
+        body: formData,
+      });
+      if (res.ok) {
+        const data = await res.json();
+        setProofUrl(data.proofUrl || null);
+        setUploadStatus('success');
+        toast({ title: 'Documento subido correctamente' });
+      } else {
+        setUploadStatus('error');
+        toast({ title: 'Error al subir el documento', variant: 'destructive' });
+      }
+    } catch {
+      setUploadStatus('error');
+      toast({ title: 'Error al subir el documento', variant: 'destructive' });
+    }
+  };
+
+  const handleValidatePromoCode = async () => {
+    if (!promoCode.trim()) return;
+    setPromoCodeValidating(true);
+    try {
+      const res = await authFetch(`${API_URL}/subscriptions/validate-promo-code`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ code: promoCode.trim() }),
+      });
+      if (res.ok) {
+        const data = await res.json();
+        setAppliedPromo(data);
+        toast({ title: 'Código aplicado correctamente' });
+      } else {
+        const err = await res.json();
+        setAppliedPromo(null);
+        toast({ title: err.error || 'Código no válido', variant: 'destructive' });
+      }
+    } catch {
+      setAppliedPromo(null);
+      toast({ title: 'Error al validar código', variant: 'destructive' });
+    } finally {
+      setPromoCodeValidating(false);
+    }
+  };
 
   const handleSubscribe = async () => {
     setIsLoading(true);
@@ -234,6 +320,8 @@ const RenewalModal = ({ isOpen, onClose, onSuccess, accountId, userEmail, userCo
           plan: selectedPlan,
           interval: selectedInterval,
           autoRenew,
+          isJunior: selectedPlan === 'individual' && isJunior ? true : undefined,
+          promoCode: appliedPromo ? appliedPromo.code : promoCode.trim() || undefined,
         }),
       });
 
@@ -329,7 +417,7 @@ const RenewalModal = ({ isOpen, onClose, onSuccess, accountId, userEmail, userCo
                       )}
                     </div>
                     <p className="text-2xl font-bold mb-3">
-                      {formatPrice(plan.monthlyPrice, currency)}<span className="text-sm font-normal text-muted-foreground">{t('profile.perMonth')}</span>
+                      {formatPrice(getDisplayedPrice(plan.id, 'monthly', isJunior), currency)}<span className="text-sm font-normal text-muted-foreground">{t('profile.perMonth')}</span>
                     </p>
                     <ul className="space-y-1 text-xs text-muted-foreground">
                       {plan.features.map((feature, idx) => (
@@ -360,7 +448,7 @@ const RenewalModal = ({ isOpen, onClose, onSuccess, accountId, userEmail, userCo
                       )}
                     </div>
                     <p className="text-2xl font-bold mb-1">
-                      {formatPrice(plan.annualPrice, currency)}<span className="text-sm font-normal text-muted-foreground">{t('profile.perYear')}</span>
+                      {formatPrice(getDisplayedPrice(plan.id, 'annual', isJunior), currency)}<span className="text-sm font-normal text-muted-foreground">{t('profile.perYear')}</span>
                     </p>
                     <p className="text-xs text-green-600 dark:text-green-400 mb-3">
                       {t('profile.savePerYear', { amount: formatPrice(plan.monthlyPrice * 12 - plan.annualPrice, currency) })}
@@ -373,6 +461,77 @@ const RenewalModal = ({ isOpen, onClose, onSuccess, accountId, userEmail, userCo
                   </div>
                 </div>
               ))}
+            </div>
+
+            {/* Junior discount toggle */}
+            {selectedPlan === 'individual' && (
+              <div className="bg-muted/30 border border-border rounded-lg p-4 mb-6 space-y-4">
+                <div className="flex items-center justify-between">
+                  <div>
+                    <p className="font-medium">Descuento junior</p>
+                    <p className="text-xs text-muted-foreground">Soy abogado junior (licenciado hace menos de 2 años)</p>
+                  </div>
+                  <Switch
+                    checked={isJunior}
+                    onCheckedChange={setIsJunior}
+                  />
+                </div>
+                {isJunior && (
+                  <div className="space-y-3">
+                    <div>
+                      <label className="text-sm font-medium block mb-1">Subir prueba</label>
+                      <input
+                        type="file"
+                        onChange={(e) => setJuniorProofFile(e.target.files?.[0] || null)}
+                        className="block w-full text-sm text-muted-foreground file:mr-4 file:py-2 file:px-4 file:rounded-full file:border-0 file:text-sm file:font-semibold file:bg-primary file:text-primary-foreground hover:file:bg-primary/90"
+                      />
+                    </div>
+                    <Button
+                      onClick={handleUploadJuniorProof}
+                      disabled={!juniorProofFile || uploadStatus === 'uploading'}
+                      size="sm"
+                    >
+                      {uploadStatus === 'uploading' ? 'Subiendo...' : 'Subir documento'}
+                    </Button>
+                    {uploadStatus === 'success' && (
+                      <p className="text-xs text-green-600 dark:text-green-400">Documento subido correctamente.</p>
+                    )}
+                    {uploadStatus === 'error' && (
+                      <p className="text-xs text-destructive">Error al subir el documento. Inténtalo de nuevo.</p>
+                    )}
+                  </div>
+                )}
+              </div>
+            )}
+
+            {/* Código promocional */}
+            <div className="bg-muted/30 border border-border rounded-lg p-4 mb-6 space-y-3">
+              <label className="text-sm font-medium block">Código promocional</label>
+              <div className="flex gap-2">
+                <input
+                  type="text"
+                  value={promoCode}
+                  onChange={(e) => setPromoCode(e.target.value)}
+                  placeholder="Ej: VERANO25"
+                  className="flex-1 px-3 py-2 bg-background border rounded-lg text-sm"
+                />
+                <Button
+                  type="button"
+                  onClick={handleValidatePromoCode}
+                  disabled={promoCodeValidating || !promoCode.trim()}
+                  variant="outline"
+                  size="sm"
+                >
+                  {promoCodeValidating ? 'Validando...' : 'Aplicar'}
+                </Button>
+              </div>
+              {appliedPromo && (
+                <p className="text-xs text-green-600 dark:text-green-400">
+                  {appliedPromo.type === 'percentage_discount'
+                    ? `✓ ${appliedPromo.value}% de descuento durante ${appliedPromo.durationMonths} meses`
+                    : `✓ ${appliedPromo.value} meses gratuitos`}
+                </p>
+              )}
             </div>
 
             {/* Renovación Automática */}
@@ -399,12 +558,15 @@ const RenewalModal = ({ isOpen, onClose, onSuccess, accountId, userEmail, userCo
             {/* Botón de pago */}
             <Button 
               onClick={handleSubscribe} 
-              disabled={isLoading}
+              disabled={isLoading || (selectedPlan === 'individual' && isJunior && !proofUrl)}
               className="w-full"
               size="lg"
             >
               {isLoading ? t('renewal.processing') : t('renewal.continueToPayment')}
             </Button>
+            {selectedPlan === 'individual' && isJunior && !proofUrl && (
+              <p className="text-xs text-destructive mt-2">Debes subir la prueba de abogado junior antes de continuar.</p>
+            )}
           </div>
         </div>
       </div>
@@ -417,7 +579,7 @@ const RenewalModal = ({ isOpen, onClose, onSuccess, accountId, userEmail, userCo
               <div>
                 <h3 className="text-lg font-semibold">{t('profile.paymentInfoTitle')}</h3>
                 <p className="text-sm text-muted-foreground mt-1">
-                  {selectedPlan === 'starter' ? t('profile.planStarter') : t('profile.planAdvanced')} - {selectedInterval === 'monthly' ? t('profile.monthly') : t('profile.annual')}
+                  {selectedPlan === 'starter' ? t('profile.planStarter') : selectedPlan === 'individual' ? 'Plan Individual' : t('profile.planAdvanced')} - {selectedInterval === 'monthly' ? t('profile.monthly') : t('profile.annual')}
                 </p>
               </div>
             </div>
@@ -429,6 +591,8 @@ const RenewalModal = ({ isOpen, onClose, onSuccess, accountId, userEmail, userCo
                   accountId={accountId}
                   plan={selectedPlan}
                   interval={selectedInterval}
+                  isJunior={isJunior}
+                  proofUrl={proofUrl}
                   paymentIntentId={paymentIntentId || undefined}
                   setupIntentId={setupIntentId || undefined}
                   subscriptionId={subscriptionId || undefined}

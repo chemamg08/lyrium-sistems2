@@ -2,6 +2,7 @@ import { Router, Request, Response } from 'express';
 import { uploadImproveAI } from '../config/multerImproveAI.js';
 import { ImproveAIFolder, ImproveAIFile, ImproveAIFragment } from '../models/ImproveAIFile.js';
 import { processImproveAIFile, resolveAccountId } from '../services/ragService.js';
+import { verifyOwnership } from '../middleware/auth.js';
 import { promises as fs } from 'fs';
 import path from 'path';
 import { fileURLToPath } from 'url';
@@ -14,12 +15,53 @@ const MAX_STORAGE_BYTES = 600 * 1024 * 1024; // 600MB per account group
 
 const router = Router();
 
+async function resolveOwnedRootAccountId(req: Request, accountId: string) {
+  const rootId = await resolveAccountId(accountId);
+  if (!verifyOwnership(req, rootId)) {
+    return null;
+  }
+  return rootId;
+}
+
+async function getOwnedFolder(req: Request, folderId: string, rootId?: string) {
+  const folder = await ImproveAIFolder.findById(folderId);
+  if (!folder) {
+    return null;
+  }
+  if (!verifyOwnership(req, folder.accountId)) {
+    return false;
+  }
+  if (rootId && folder.accountId !== rootId) {
+    return false;
+  }
+  return folder;
+}
+
+async function getOwnedFile(req: Request, fileId: string) {
+  const file = await ImproveAIFile.findById(fileId);
+  if (!file) {
+    return null;
+  }
+  if (!verifyOwnership(req, file.accountId)) {
+    return false;
+  }
+  return file;
+}
+
 // GET /api/improve-ai/folders?accountId=xxx&parentFolder=yyy
 router.get('/folders', async (req: Request, res: Response) => {
   try {
     const { accountId, parentFolder } = req.query;
     if (!accountId) return res.status(400).json({ error: 'accountId es requerido' });
-    const rootId = await resolveAccountId(accountId as string);
+    const rootId = await resolveOwnedRootAccountId(req, accountId as string);
+    if (!rootId) return res.status(403).json({ error: 'Acceso denegado' });
+
+    if (parentFolder) {
+      const folder = await getOwnedFolder(req, parentFolder as string, rootId);
+      if (folder === null) return res.status(404).json({ error: 'Carpeta no encontrada' });
+      if (folder === false) return res.status(403).json({ error: 'Acceso denegado' });
+    }
+
     const query: any = { accountId: rootId };
     query.parentFolder = parentFolder ? parentFolder as string : null;
     const folders = await ImproveAIFolder.find(query).sort({ name: 1 });
@@ -35,7 +77,15 @@ router.get('/files', async (req: Request, res: Response) => {
   try {
     const { accountId, folderId } = req.query;
     if (!accountId) return res.status(400).json({ error: 'accountId es requerido' });
-    const rootId = await resolveAccountId(accountId as string);
+    const rootId = await resolveOwnedRootAccountId(req, accountId as string);
+    if (!rootId) return res.status(403).json({ error: 'Acceso denegado' });
+
+    if (folderId) {
+      const folder = await getOwnedFolder(req, folderId as string, rootId);
+      if (folder === null) return res.status(404).json({ error: 'Carpeta no encontrada' });
+      if (folder === false) return res.status(403).json({ error: 'Acceso denegado' });
+    }
+
     const query: any = { accountId: rootId };
     query.folderId = folderId ? folderId as string : null;
     const files = await ImproveAIFile.find(query).sort({ uploadedAt: -1 });
@@ -51,7 +101,15 @@ router.post('/folders', async (req: Request, res: Response) => {
   try {
     const { accountId, name, parentFolder } = req.body;
     if (!accountId || !name) return res.status(400).json({ error: 'accountId y name son requeridos' });
-    const rootId = await resolveAccountId(accountId);
+    const rootId = await resolveOwnedRootAccountId(req, accountId);
+    if (!rootId) return res.status(403).json({ error: 'Acceso denegado' });
+
+    if (parentFolder) {
+      const folder = await getOwnedFolder(req, parentFolder, rootId);
+      if (folder === null) return res.status(404).json({ error: 'Carpeta no encontrada' });
+      if (folder === false) return res.status(403).json({ error: 'Acceso denegado' });
+    }
+
     const folder = new ImproveAIFolder({
       _id: Date.now().toString() + Math.random().toString(36).substr(2, 9),
       accountId: rootId,
@@ -71,7 +129,14 @@ router.post('/upload', uploadImproveAI.array('files', 10), async (req: Request, 
   try {
     const { accountId, folderId, uploadedBy } = req.body;
     if (!accountId) return res.status(400).json({ error: 'accountId es requerido' });
-    const rootId = await resolveAccountId(accountId);
+    const rootId = await resolveOwnedRootAccountId(req, accountId);
+    if (!rootId) return res.status(403).json({ error: 'Acceso denegado' });
+
+    if (folderId) {
+      const folder = await getOwnedFolder(req, folderId, rootId);
+      if (folder === null) return res.status(404).json({ error: 'Carpeta no encontrada' });
+      if (folder === false) return res.status(403).json({ error: 'Acceso denegado' });
+    }
 
     const files = req.files as Express.Multer.File[];
     if (!files || files.length === 0) return res.status(400).json({ error: 'No se recibieron archivos' });
@@ -131,8 +196,9 @@ router.post('/upload', uploadImproveAI.array('files', 10), async (req: Request, 
 // GET /api/improve-ai/view/:fileId
 router.get('/view/:fileId', async (req: Request, res: Response) => {
   try {
-    const file = await ImproveAIFile.findById(req.params.fileId);
-    if (!file) return res.status(404).json({ error: 'Archivo no encontrado' });
+    const file = await getOwnedFile(req, req.params.fileId);
+    if (file === null) return res.status(404).json({ error: 'Archivo no encontrado' });
+    if (file === false) return res.status(403).json({ error: 'Acceso denegado' });
     const filePath = file.storagePath;
     res.setHeader('Content-Type', 'application/pdf');
     res.setHeader('Content-Disposition', `inline; filename="${encodeURIComponent(file.originalName)}"`);
@@ -147,8 +213,9 @@ router.get('/view/:fileId', async (req: Request, res: Response) => {
 // DELETE /api/improve-ai/files/:fileId
 router.delete('/files/:fileId', async (req: Request, res: Response) => {
   try {
-    const file = await ImproveAIFile.findById(req.params.fileId);
-    if (!file) return res.status(404).json({ error: 'Archivo no encontrado' });
+    const file = await getOwnedFile(req, req.params.fileId);
+    if (file === null) return res.status(404).json({ error: 'Archivo no encontrado' });
+    if (file === false) return res.status(403).json({ error: 'Acceso denegado' });
 
     // Delete physical file
     await fs.unlink(file.storagePath).catch(() => {});
@@ -168,11 +235,12 @@ router.delete('/files/:fileId', async (req: Request, res: Response) => {
 router.delete('/folders/:folderId', async (req: Request, res: Response) => {
   try {
     const folderId = req.params.folderId;
-    const folder = await ImproveAIFolder.findById(folderId);
-    if (!folder) return res.status(404).json({ error: 'Carpeta no encontrada' });
+    const folder = await getOwnedFolder(req, folderId);
+    if (folder === null) return res.status(404).json({ error: 'Carpeta no encontrada' });
+    if (folder === false) return res.status(403).json({ error: 'Acceso denegado' });
 
     // Recursively delete all subfolders and files
-    await deleteFolderRecursive(folderId);
+    await deleteFolderRecursive(folderId, folder.accountId);
     res.json({ success: true });
   } catch (error) {
     console.error('Error deleting folder:', error);
@@ -180,21 +248,21 @@ router.delete('/folders/:folderId', async (req: Request, res: Response) => {
   }
 });
 
-async function deleteFolderRecursive(folderId: string) {
+async function deleteFolderRecursive(folderId: string, accountId: string) {
   // Delete files in this folder
-  const files = await ImproveAIFile.find({ folderId });
+  const files = await ImproveAIFile.find({ folderId, accountId });
   for (const file of files) {
     await fs.unlink(file.storagePath).catch(() => {});
     await ImproveAIFragment.deleteMany({ fileId: file._id });
     await ImproveAIFile.findByIdAndDelete(file._id);
   }
   // Delete subfolders recursively
-  const subfolders = await ImproveAIFolder.find({ parentFolder: folderId });
+  const subfolders = await ImproveAIFolder.find({ parentFolder: folderId, accountId });
   for (const sub of subfolders) {
-    await deleteFolderRecursive(sub._id);
+    await deleteFolderRecursive(sub._id, accountId);
   }
   // Delete the folder itself
-  await ImproveAIFolder.findByIdAndDelete(folderId);
+  await ImproveAIFolder.findOneAndDelete({ _id: folderId, accountId });
 }
 
 // GET /api/improve-ai/storage?accountId=xxx
@@ -202,7 +270,8 @@ router.get('/storage', async (req: Request, res: Response) => {
   try {
     const { accountId } = req.query;
     if (!accountId) return res.status(400).json({ error: 'accountId es requerido' });
-    const rootId = await resolveAccountId(accountId as string);
+    const rootId = await resolveOwnedRootAccountId(req, accountId as string);
+    if (!rootId) return res.status(403).json({ error: 'Acceso denegado' });
     const result = await ImproveAIFile.aggregate([
       { $match: { accountId: rootId } },
       { $group: { _id: null, total: { $sum: '$size' }, count: { $sum: 1 } } }
@@ -221,7 +290,8 @@ router.get('/has-files', async (req: Request, res: Response) => {
   try {
     const { accountId } = req.query;
     if (!accountId) return res.status(400).json({ error: 'accountId es requerido' });
-    const rootId = await resolveAccountId(accountId as string);
+    const rootId = await resolveOwnedRootAccountId(req, accountId as string);
+    if (!rootId) return res.status(403).json({ error: 'Acceso denegado' });
     const count = await ImproveAIFragment.countDocuments({ accountId: rootId });
     res.json({ hasFiles: count > 0 });
   } catch (error) {

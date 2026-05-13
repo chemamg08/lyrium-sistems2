@@ -1,9 +1,11 @@
 import { TaxRateSnapshot, ITaxRateSnapshot } from '../models/TaxRateSnapshot.js';
 import { ExternalTaxSnapshot, getExternalTaxSnapshot } from './taxApiService.js';
+import { runWithDistributedLock } from './distributedLockService.js';
 
 const DEFAULT_COUNTRIES = ['ES', 'MX', 'AR', 'CO', 'CL', 'PE', 'BR', 'DO'];
 const DEFAULT_SYNC_INTERVAL_MS = 12 * 60 * 60 * 1000;
 const DEFAULT_STALE_AFTER_MS = 72 * 60 * 60 * 1000;
+const TAX_SYNC_LOCK_TTL_MS = 30 * 60 * 1000;
 
 let workerRunning = false;
 
@@ -232,13 +234,15 @@ export async function getTaxSnapshotForCountry(country?: string): Promise<Extern
 }
 
 export async function syncTaxSnapshotsForCountries(countries: string[]): Promise<void> {
-  for (const country of countries) {
-    try {
-      await syncTaxSnapshotForCountry(country);
-    } catch (error: any) {
-      console.warn(`[taxRateSync] Failed country ${country}:`, error?.message || error);
+  await runWithDistributedLock('tax-sync-service', TAX_SYNC_LOCK_TTL_MS, async () => {
+    for (const country of countries) {
+      try {
+        await syncTaxSnapshotForCountry(country);
+      } catch (error: any) {
+        console.warn(`[taxRateSync] Failed country ${country}:`, error?.message || error);
+      }
     }
-  }
+  });
 }
 
 export function startTaxRateSyncWorker(): void {

@@ -35,6 +35,15 @@ export const sendForSignature = async (req: Request, res: Response) => {
       return res.status(403).json({ error: 'Acceso denegado' });
     }
 
+    const client = await Client.findById(clientId);
+    if (!client) {
+      return res.status(404).json({ error: 'Cliente no encontrado' });
+    }
+
+    if (!verifyOwnership(req, client.accountId) || client.accountId !== chat.accountId) {
+      return res.status(403).json({ error: 'Acceso denegado' });
+    }
+
     const result = await createSignatureRequest({
       generatedContractId,
       chatId: contract.chatId,

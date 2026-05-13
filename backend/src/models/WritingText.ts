@@ -3,6 +3,7 @@ import mongoose, { Schema } from 'mongoose';
 export interface IWritingText {
   _id: string;
   accountId: string;
+  createdBy: string;
   title: string;
   content: string;
   createdAt: string;
@@ -12,6 +13,7 @@ export interface IWritingText {
 const writingTextSchema = new Schema<IWritingText>({
   _id: { type: String, required: true },
   accountId: { type: String, required: true, index: true },
+  createdBy: { type: String, default: '' },
   title: { type: String, required: true },
   content: { type: String, default: '' },
   createdAt: { type: String, default: () => new Date().toISOString() },

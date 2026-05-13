@@ -49,10 +49,10 @@ import {
   FileDown,
   Loader2,
 } from "lucide-react";
-import html2pdf from "html2pdf.js";
 import { useToast } from "@/hooks/use-toast";
 import { useTranslation } from "react-i18next";
 import { authFetch } from '../lib/authFetch';
+import ModuleGuide from "@/components/ModuleGuide";
 
 const API_URL = import.meta.env.VITE_API_URL;
 
@@ -81,6 +81,8 @@ let _reviewPromise: Promise<any> | null = null;
 let _reviewResults: TextSuggestion[] | null = null;
 let _reviewInProgress = false;
 let _reviewAbort: AbortController | null = null;
+let _reviewTextId: string | null = null;
+let _reviewContentHash: string | null = null;
 
 const WritingReview = () => {
   const navigate = useNavigate();
@@ -129,7 +131,7 @@ const WritingReview = () => {
       debounceRef.current = setTimeout(() => {
         const accountId = sessionStorage.getItem("accountId");
         if (!accountId) return;
-        localStorage.setItem(`writing_draft_${accountId}`, editor.getHTML());
+        localStorage.setItem(`writing_draft_${accountId}_${currentTextId || 'new'}`, editor.getHTML());
       }, 800);
     },
     onSelectionUpdate: () => {
@@ -167,7 +169,8 @@ const WritingReview = () => {
     if (!editor) return;
     const accountId = sessionStorage.getItem("accountId");
     if (!accountId) return;
-    const draft = localStorage.getItem(`writing_draft_${accountId}`);
+    // Cargar borrador de documento nuevo (currentTextId es null al inicio)
+    const draft = localStorage.getItem(`writing_draft_${accountId}_new`);
     if (draft) {
       editor.commands.setContent(draft);
     }
@@ -186,6 +189,10 @@ const WritingReview = () => {
     let cancelled = false;
 
     const restore = async () => {
+      // Solo restaurar si la revisión pertenece al documento actual y el texto no ha cambiado
+      if (_reviewTextId !== currentTextId) {
+        return;
+      }
       // Si hay una revisión en curso, esperar a que termine
       if (_reviewPromise) {
         setIsReviewing(true);
@@ -199,13 +206,23 @@ const WritingReview = () => {
 
       // Si hay resultados almacenados, aplicar highlights
       if (_reviewResults && _reviewResults.length > 0) {
-        const withPos: SuggestionWithPosition[] = [];
-        for (const s of _reviewResults) {
-          const range = findPmRange(s.original);
-          if (range) {
-            withPos.push({ ...s, start: range.from, end: range.to });
-          }
+        const text = editor.getText() || '';
+        if (_reviewContentHash && text.slice(0, 200) !== _reviewContentHash) {
+          // El texto ha cambiado desde que se envió la revisión, descartar
+          _reviewResults = null;
+          _reviewTextId = null;
+          _reviewContentHash = null;
+          return;
         }
+        const withPos: SuggestionWithPosition[] = _reviewResults
+          .filter((s: any) => typeof s.from === 'number' && typeof s.to === 'number')
+          .map((s: any) => ({
+            original: s.original,
+            suggestion: s.suggestion,
+            reason: s.reason,
+            start: s.from,
+            end: s.to,
+          }));
         if (cancelled) return;
         setSuggestions(withPos);
         withPos.forEach((sug) => {
@@ -253,6 +270,11 @@ const WritingReview = () => {
         const data = await response.json();
         editor?.commands.setContent(data.content || "");
         setCurrentTextId(textId);
+        // Cargar borrador específico de este documento si existe
+        const draft = localStorage.getItem(`writing_draft_${accountId}_${textId}`);
+        if (draft && editor) {
+          editor.commands.setContent(draft);
+        }
         setSuggestions([]);
       }
     } catch (error) {
@@ -300,7 +322,7 @@ const WritingReview = () => {
             description: t('writing.savedDesc'),
           });
           const accountId2 = sessionStorage.getItem("accountId");
-          if (accountId2) localStorage.removeItem(`writing_draft_${accountId2}`);
+          if (accountId2) localStorage.removeItem(`writing_draft_${accountId2}_${currentTextId || 'new'}`);
           loadTexts();
         } else {
           const errorData = await response.json();
@@ -351,7 +373,7 @@ const WritingReview = () => {
           description: t('writing.createdDesc'),
         });
         const accountId2 = sessionStorage.getItem("accountId");
-        if (accountId2) localStorage.removeItem(`writing_draft_${accountId2}`);
+        if (accountId2) localStorage.removeItem(`writing_draft_${accountId2}_new`);
         loadTexts();
       }
     } catch (error) {
@@ -467,6 +489,8 @@ const WritingReview = () => {
     _reviewAbort = controller;
     _reviewResults = null;
     _reviewInProgress = true;
+    _reviewTextId = currentTextId;
+    _reviewContentHash = text.slice(0, 200);
 
     setIsReviewing(true);
     setSuggestions([]);
@@ -497,21 +521,18 @@ const WritingReview = () => {
       // Aplicar highlights solo si el editor sigue vivo (componente montado)
       if (editor && !editor.isDestroyed) {
         if (rawSuggestions.length > 0) {
-          const suggestionsWithPos: SuggestionWithPosition[] = [];
-          
-          for (const suggestion of rawSuggestions) {
-            const range = findPmRange(suggestion.original);
-            if (range) {
-              suggestionsWithPos.push({
-                ...suggestion,
-                start: range.from,
-                end: range.to,
-              });
-            }
-          }
+          const suggestionsWithPos: SuggestionWithPosition[] = rawSuggestions
+            .filter((s: any) => typeof s.from === 'number' && typeof s.to === 'number')
+            .map((s: any) => ({
+              original: s.original,
+              suggestion: s.suggestion,
+              reason: s.reason,
+              start: s.from,
+              end: s.to,
+            }));
 
           setSuggestions(suggestionsWithPos);
-          
+
           suggestionsWithPos.forEach((sug) => {
             editor.chain()
               .focus()
@@ -581,7 +602,7 @@ const WritingReview = () => {
     });
   };
 
-  const handleExport = () => {
+  const handleExport = async () => {
     if (!editor) return;
 
     const currentText = texts.find((t) => t.id === currentTextId);
@@ -608,6 +629,8 @@ const WritingReview = () => {
       jsPDF: { unit: 'mm', format: 'a4', orientation: 'portrait' },
     };
 
+    const html2pdfMod = await import('html2pdf.js');
+    const html2pdf = html2pdfMod.default;
     html2pdf().set(opt).from(container).save();
   };
 
@@ -616,7 +639,7 @@ const WritingReview = () => {
     editor?.commands.setContent("");
     setSuggestions([]);
     const accountId = sessionStorage.getItem("accountId");
-    if (accountId) localStorage.removeItem(`writing_draft_${accountId}`);
+    if (accountId) localStorage.removeItem(`writing_draft_${accountId}_new`);
     toast({
       title: t('writing.newDocument'),
       description: t('writing.startingNewDoc'),
@@ -710,6 +733,7 @@ const WritingReview = () => {
         }
       `}</style>
     <div className="h-full flex flex-col">
+      <ModuleGuide moduleId="writing" />
       {/* Barra de herramientas superior */}
       <div className="border-b border-border bg-card p-4 space-y-4">
         {/* Fila 1: Selector y acciones */}

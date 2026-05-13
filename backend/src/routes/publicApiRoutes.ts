@@ -14,14 +14,40 @@ const __dirname = path.dirname(__filename);
 
 const router = Router();
 
+interface ApiClientUploadRequest extends ApiKeyRequest {
+  validatedClientId?: string;
+}
+
 // All routes require API key auth
 router.use(apiKeyAuth as any);
+
+async function validateApiClientOwnership(req: ApiClientUploadRequest, res: Response, next: NextFunction) {
+  try {
+    const accountId = req.apiKeyAccountId;
+    const { clientId } = req.params;
+
+    if (!accountId) {
+      return res.status(401).json({ error: 'Invalid API key.' });
+    }
+
+    const client = await Client.findOne({ _id: clientId, accountId }).select('_id').lean();
+    if (!client) {
+      return res.status(404).json({ error: 'Client not found' });
+    }
+
+    req.validatedClientId = String(client._id);
+    next();
+  } catch (error) {
+    console.error('Public API - validate client error:', error);
+    res.status(500).json({ error: 'Error validating client' });
+  }
+}
 
 // Multer for file uploads via API
 const apiUploadStorage = multer.diskStorage({
   destination: async (req, file, cb) => {
     const fs = await import('fs/promises');
-    const clientId = req.params.clientId;
+    const clientId = (req as ApiClientUploadRequest).validatedClientId || req.params.clientId;
     const dir = path.join(__dirname, '../../uploads/clients', clientId);
     await fs.mkdir(dir, { recursive: true });
     cb(null, dir);
@@ -115,7 +141,7 @@ router.get('/clients/:clientId/files', async (req: ApiKeyRequest, res: Response)
 });
 
 // POST /api/v1/clients/:clientId/files — Upload file to client
-router.post('/clients/:clientId/files', apiUpload.single('file'), async (req: ApiKeyRequest, res: Response) => {
+router.post('/clients/:clientId/files', validateApiClientOwnership, apiUpload.single('file'), async (req: ApiClientUploadRequest, res: Response) => {
   try {
     const accountId = req.apiKeyAccountId!;
     const { clientId } = req.params;

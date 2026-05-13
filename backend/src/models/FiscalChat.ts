@@ -1,9 +1,16 @@
 import mongoose, { Schema } from 'mongoose';
 
+export interface IFlag {
+  id: string;
+  createdAt: string;
+}
+
 export interface IFiscalMessage {
+  id?: string;
   role: 'user' | 'assistant';
   content: string;
   timestamp?: string;
+  flags?: IFlag[];
 }
 
 export interface IFiscalChat {
@@ -18,10 +25,17 @@ export interface IFiscalChat {
   summary?: string;
 }
 
+const flagSchema = new Schema({
+  id: String,
+  createdAt: String,
+}, { _id: false });
+
 const fiscalMessageSchema = new Schema({
+  id: String,
   role: { type: String, enum: ['user', 'assistant'] },
   content: String,
   timestamp: String,
+  flags: { type: [flagSchema], default: [] },
 }, { _id: false });
 
 const fiscalChatSchema = new Schema<IFiscalChat>({

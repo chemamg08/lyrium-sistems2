@@ -22,6 +22,7 @@ import { EmailConfig } from '../models/EmailConfig.js';
 import { WritingText } from '../models/WritingText.js';
 import { SpecialtiesSettings } from '../models/SpecialtiesSettings.js';
 import { SharedFile } from '../models/SharedFile.js';
+import { runWithDistributedLock } from './distributedLockService.js';
 
 dotenv.config();
 
@@ -34,6 +35,7 @@ const stripe = new Stripe(process.env.STRIPE_SECRET_KEY, {
 
 const GRACE_PERIOD_MS = 30 * 24 * 60 * 60 * 1000; // 30 días
 const INTERVAL_MS     = 20 * 60 * 60 * 1000;       // 20 horas
+const CLEANUP_LOCK_TTL_MS = 2 * 60 * 60 * 1000;    // 2 horas
 
 function isExpiredForDeletion(record: Record<string, any>): boolean {
   const now = Date.now();
@@ -58,79 +60,80 @@ function isExpiredForDeletion(record: Record<string, any>): boolean {
 }
 
 async function runCleanup(): Promise<void> {
+  await runWithDistributedLock('cleanup-service', CLEANUP_LOCK_TTL_MS, async () => {
 
-  const subscriptions = await Subscription.find().lean();
-  const expiredAccountIds = new Set<string>(
-    subscriptions
-      .filter(isExpiredForDeletion)
-      .map((s) => s.accountId as string)
-  );
+    const subscriptions = await Subscription.find().lean();
+    const expiredAccountIds = new Set<string>(
+      subscriptions
+        .filter(isExpiredForDeletion)
+        .map((s) => s.accountId as string)
+    );
 
-  if (expiredAccountIds.size === 0) {
-    return;
-  }
+    if (expiredAccountIds.size === 0) {
+      return;
+    }
 
-  const ids = [...expiredAccountIds];
+    const ids = [...expiredAccountIds];
 
-  // Cancel active Stripe subscriptions before deleting
-  const expiredSubscriptions = subscriptions.filter(
-    (s) => expiredAccountIds.has(s.accountId as string)
-  );
-  for (const sub of expiredSubscriptions) {
-    if (sub.stripeSubscriptionId) {
-      try {
-        await stripe.subscriptions.cancel(sub.stripeSubscriptionId);
-      } catch (err: any) {
-        // Ignore if already cancelled or not found
+    // Cancel active Stripe subscriptions before deleting
+    const expiredSubscriptions = subscriptions.filter(
+      (s) => expiredAccountIds.has(s.accountId as string)
+    );
+    for (const sub of expiredSubscriptions) {
+      if (sub.stripeSubscriptionId) {
+        try {
+          await stripe.subscriptions.cancel(sub.stripeSubscriptionId);
+        } catch (err: any) {
+          // Ignore if already cancelled or not found
+        }
       }
     }
-  }
 
-  // Eliminar subscriptions expiradas
-  await Subscription.deleteMany({ accountId: { $in: ids } });
+    // Eliminar subscriptions expiradas
+    await Subscription.deleteMany({ accountId: { $in: ids } });
 
-  // Eliminar cuenta principal
-  await Account.deleteMany({ _id: { $in: ids } });
+    // Eliminar cuenta principal
+    await Account.deleteMany({ _id: { $in: ids } });
 
-  // Eliminar subaccounts (campo real es parentAccountId, no accountId)
-  await Subaccount.deleteMany({
-    $or: [
-      { parentAccountId: { $in: ids } },
-      { _id: { $in: ids } },
-    ],
+    // Eliminar subaccounts (campo real es parentAccountId, no accountId)
+    await Subaccount.deleteMany({
+      $or: [
+        { parentAccountId: { $in: ids } },
+        { _id: { $in: ids } },
+      ],
+    });
+
+    // Buscar clientIds de las cuentas eliminadas para borrar chats (Chat no tiene accountId, solo clientId)
+    const clients = await Client.find({ accountId: { $in: ids } }).select('_id').lean();
+    const clientIds = clients.map((c) => String(c._id));
+
+    // Buscar contractChatIds para borrar GeneratedContracts (vinculados por chatId)
+    const contractChats = await ContractChat.find({ accountId: { $in: ids } }).select('_id').lean();
+    const contractChatIds = contractChats.map((c) => String(c._id));
+
+    // Eliminar datos con campo accountId directo
+    await Promise.all([
+      Client.deleteMany({ accountId: { $in: ids } }),
+      Chat.deleteMany({ clientId: { $in: clientIds } }),
+      AssistantChat.deleteMany({ accountId: { $in: ids } }),
+      FiscalChat.deleteMany({ accountId: { $in: ids } }),
+      ContractChat.deleteMany({ accountId: { $in: ids } }),
+      DefenseChat.deleteMany({ accountId: { $in: ids } }),
+      DocumentSummariesChat.deleteMany({ accountId: { $in: ids } }),
+      Automation.deleteMany({ accountId: { $in: ids } }),
+      Calculation.deleteMany({ accountId: { $in: ids } }),
+      FiscalProfile.deleteMany({ accountId: { $in: ids } }),
+      FiscalAlert.deleteMany({ accountId: { $in: ids } }),
+      Stat.deleteMany({ _id: { $in: ids } }),
+      Job.deleteMany({ accountId: { $in: ids } }),
+      Contract.deleteMany({ accountId: { $in: ids } }),
+      GeneratedContract.deleteMany({ chatId: { $in: contractChatIds } }),
+      EmailConfig.deleteMany({ accountId: { $in: ids } }),
+      WritingText.deleteMany({ accountId: { $in: ids } }),
+      SpecialtiesSettings.deleteMany({ accountId: { $in: ids } }),
+      SharedFile.deleteMany({ senderId: { $in: ids } }),
+    ]);
   });
-
-  // Buscar clientIds de las cuentas eliminadas para borrar chats (Chat no tiene accountId, solo clientId)
-  const clients = await Client.find({ accountId: { $in: ids } }).select('_id').lean();
-  const clientIds = clients.map((c) => String(c._id));
-
-  // Buscar contractChatIds para borrar GeneratedContracts (vinculados por chatId)
-  const contractChats = await ContractChat.find({ accountId: { $in: ids } }).select('_id').lean();
-  const contractChatIds = contractChats.map((c) => String(c._id));
-
-  // Eliminar datos con campo accountId directo
-  await Promise.all([
-    Client.deleteMany({ accountId: { $in: ids } }),
-    Chat.deleteMany({ clientId: { $in: clientIds } }),
-    AssistantChat.deleteMany({ accountId: { $in: ids } }),
-    FiscalChat.deleteMany({ accountId: { $in: ids } }),
-    ContractChat.deleteMany({ accountId: { $in: ids } }),
-    DefenseChat.deleteMany({ accountId: { $in: ids } }),
-    DocumentSummariesChat.deleteMany({ accountId: { $in: ids } }),
-    Automation.deleteMany({ accountId: { $in: ids } }),
-    Calculation.deleteMany({ accountId: { $in: ids } }),
-    FiscalProfile.deleteMany({ accountId: { $in: ids } }),
-    FiscalAlert.deleteMany({ accountId: { $in: ids } }),
-    Stat.deleteMany({ _id: { $in: ids } }),
-    Job.deleteMany({ accountId: { $in: ids } }),
-    Contract.deleteMany({ accountId: { $in: ids } }),
-    GeneratedContract.deleteMany({ chatId: { $in: contractChatIds } }),
-    EmailConfig.deleteMany({ accountId: { $in: ids } }),
-    WritingText.deleteMany({ accountId: { $in: ids } }),
-    SpecialtiesSettings.deleteMany({ accountId: { $in: ids } }),
-    SharedFile.deleteMany({ senderId: { $in: ids } }),
-  ]);
-
 }
 
 export function startCleanupWorker(): void {

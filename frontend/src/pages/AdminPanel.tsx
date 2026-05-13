@@ -4,11 +4,12 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { useToast } from '@/components/ui/use-toast';
-import { authFetch } from '@/lib/authFetch';
+import { authFetch, persistUserSession, logout as logoutUser } from '@/lib/authFetch';
 import {
   Users, TrendingUp, Clock, XCircle, AlertTriangle,
   Search, ChevronLeft, ChevronRight, Eye, UserPlus,
   Shield, LogOut, ArrowLeft, Save, Power, PowerOff,
+  Plus,
 } from 'lucide-react';
 
 const API_URL = import.meta.env.VITE_API_URL;
@@ -24,6 +25,7 @@ interface Stats {
   monthlyCount: number;
   annualCount: number;
   monthlyRevenue: number;
+  pendingJuniorVerifications: number;
 }
 
 interface UserRow {
@@ -35,6 +37,7 @@ interface UserRow {
   emailVerified: boolean;
   twoFactorEnabled: boolean;
   disabled: boolean;
+  juniorDiscountStatus?: string;
   subscription: {
     id: string;
     plan: string;
@@ -47,6 +50,16 @@ interface UserRow {
     stripeCustomerId: string | null;
     stripeSubscriptionId: string | null;
   } | null;
+}
+
+interface JuniorVerification {
+  accountId: string;
+  name: string;
+  email: string;
+  country: string;
+  status: 'pending' | 'verified' | 'rejected';
+  requestedAt: string;
+  proofUrl: string | null;
 }
 
 interface UserDetail {
@@ -63,13 +76,14 @@ interface UserDetail {
   };
   subscription: any;
   subaccounts: { id: string; name: string; email: string; createdAt: string; twoFactorEnabled: boolean }[];
+  invoices: { id: string; invoiceNumber: string; publicId: string; date: string; concept: string; totalAmount: number }[];
 }
 
 const AdminPanel = () => {
   const navigate = useNavigate();
   const { toast } = useToast();
 
-  const [view, setView] = useState<'dashboard' | 'users' | 'userDetail' | 'createUser'>('dashboard');
+  const [view, setView] = useState<'dashboard' | 'users' | 'userDetail' | 'createUser' | 'suggestions' | 'juniorVerifications' | 'promoCodes' | 'invoices'>('dashboard');
   const [stats, setStats] = useState<Stats | null>(null);
   const [users, setUsers] = useState<UserRow[]>([]);
   const [searchQuery, setSearchQuery] = useState('');
@@ -78,6 +92,9 @@ const AdminPanel = () => {
   const [totalUsers, setTotalUsers] = useState(0);
   const [selectedUser, setSelectedUser] = useState<UserDetail | null>(null);
   const [loading, setLoading] = useState(false);
+  const [authChecked, setAuthChecked] = useState(false);
+  const [juniorVerifications, setJuniorVerifications] = useState<JuniorVerification[]>([]);
+  const [juniorVerificationsLoading, setJuniorVerificationsLoading] = useState(false);
 
   // Edit subscription form
   const [editPlan, setEditPlan] = useState('');
@@ -93,12 +110,73 @@ const AdminPanel = () => {
   const [newPlan, setNewPlan] = useState('starter');
   const [newInterval, setNewInterval] = useState('monthly');
 
+  // Suggestions states
+  const [suggestions, setSuggestions] = useState<{ _id: string; text: string; createdAt: string }[]>([]);
+  const [suggestionsLoading, setSuggestionsLoading] = useState(false);
+
+  // Promo codes states
+  const [promoCodes, setPromoCodes] = useState<any[]>([]);
+  const [promoCodesLoading, setPromoCodesLoading] = useState(false);
+  const [showPromoForm, setShowPromoForm] = useState(false);
+  const [editingPromo, setEditingPromo] = useState<any>(null);
+  const [promoForm, setPromoForm] = useState({
+    code: '',
+    type: 'percentage_discount' as 'percentage_discount' | 'free_months',
+    value: '',
+    durationMonths: '12',
+    maxUses: '',
+    expiresAt: '',
+  });
+
+  // Revenue date range
+  const [revenueStart, setRevenueStart] = useState('');
+  const [revenueEnd, setRevenueEnd] = useState('');
+  const [revenueAmount, setRevenueAmount] = useState<number | null>(null);
+  const [revenueLoading, setRevenueLoading] = useState(false);
+
+  // Invoices list
+  const [invoicesList, setInvoicesList] = useState<any[]>([]);
+  const [invoicesLoading, setInvoicesLoading] = useState(false);
+  const [invoiceStart, setInvoiceStart] = useState('');
+  const [invoiceEnd, setInvoiceEnd] = useState('');
+
   // Check admin role on mount
   useEffect(() => {
-    const role = sessionStorage.getItem('userRole');
-    if (role !== 'admin') {
-      navigate('/login');
-    }
+    let cancelled = false;
+
+    const ensureAdminSession = async () => {
+      try {
+        const res = await authFetch(`${API_URL}/accounts/me`);
+        if (!res.ok) {
+          navigate('/login');
+          return;
+        }
+
+        const data = await res.json();
+        if (!data?.user?.id) {
+          navigate('/login');
+          return;
+        }
+
+        persistUserSession(data.user);
+        if (data.user.role !== 'admin') {
+          navigate('/login');
+          return;
+        }
+
+        if (!cancelled) {
+          setAuthChecked(true);
+        }
+      } catch {
+        navigate('/login');
+      }
+    };
+
+    ensureAdminSession();
+
+    return () => {
+      cancelled = true;
+    };
   }, [navigate]);
 
   const fetchStats = useCallback(async () => {
@@ -154,15 +232,218 @@ const AdminPanel = () => {
     }
   }, []);
 
-  useEffect(() => {
-    fetchStats();
-  }, [fetchStats]);
+  const fetchSuggestions = useCallback(async () => {
+    setSuggestionsLoading(true);
+    try {
+      const res = await authFetch(`${API_URL}/admin/suggestions`);
+      if (res.ok) {
+        const data = await res.json();
+        setSuggestions(data);
+      }
+    } catch (err) {
+      console.error('Error fetching suggestions:', err);
+    } finally {
+      setSuggestionsLoading(false);
+    }
+  }, []);
+
+  const fetchJuniorVerifications = useCallback(async () => {
+    setJuniorVerificationsLoading(true);
+    try {
+      const res = await authFetch(`${API_URL}/admin/junior-verifications`);
+      if (res.ok) {
+        const data = await res.json();
+        setJuniorVerifications(data.verifications || []);
+      }
+    } catch (err) {
+      console.error('Error fetching junior verifications:', err);
+    } finally {
+      setJuniorVerificationsLoading(false);
+    }
+  }, []);
+
+  const fetchPromoCodes = useCallback(async () => {
+    setPromoCodesLoading(true);
+    try {
+      const res = await authFetch(`${API_URL}/admin/promo-codes`);
+      if (res.ok) {
+        const data = await res.json();
+        setPromoCodes(data);
+      }
+    } catch (error) {
+      console.error('Error fetching promo codes:', error);
+    } finally {
+      setPromoCodesLoading(false);
+    }
+  }, []);
+
+  const fetchRevenue = useCallback(async (start: string, end: string) => {
+    if (!start || !end) return;
+    setRevenueLoading(true);
+    try {
+      const params = new URLSearchParams({ start, end });
+      const res = await authFetch(`${API_URL}/admin/revenue?${params}`);
+      if (res.ok) {
+        const data = await res.json();
+        setRevenueAmount(data.totalRevenue);
+      }
+    } catch (err) {
+      console.error('Error fetching revenue:', err);
+    } finally {
+      setRevenueLoading(false);
+    }
+  }, []);
+
+  const fetchInvoices = useCallback(async (start: string, end: string) => {
+    if (!start || !end) return;
+    setInvoicesLoading(true);
+    try {
+      const params = new URLSearchParams({ start, end });
+      const res = await authFetch(`${API_URL}/admin/invoices?${params}`);
+      if (res.ok) {
+        const data = await res.json();
+        setInvoicesList(data.invoices || []);
+      }
+    } catch (err) {
+      console.error('Error fetching invoices:', err);
+    } finally {
+      setInvoicesLoading(false);
+    }
+  }, []);
+
+  const handleSavePromoCode = async () => {
+    try {
+      const body = {
+        code: promoForm.code,
+        type: promoForm.type,
+        value: Number(promoForm.value),
+        durationMonths: Number(promoForm.durationMonths),
+        maxUses: promoForm.maxUses ? Number(promoForm.maxUses) : null,
+        expiresAt: promoForm.expiresAt || null,
+      };
+      const url = editingPromo
+        ? `${API_URL}/admin/promo-codes/${editingPromo._id || editingPromo.id}`
+        : `${API_URL}/admin/promo-codes`;
+      const method = editingPromo ? 'PUT' : 'POST';
+      const res = await authFetch(url, { method, headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body) });
+      if (res.ok) {
+        toast({ title: editingPromo ? 'Código actualizado' : 'Código creado' });
+        setShowPromoForm(false);
+        setEditingPromo(null);
+        setPromoForm({ code: '', type: 'percentage_discount', value: '', durationMonths: '12', maxUses: '', expiresAt: '' });
+        fetchPromoCodes();
+      } else {
+        const err = await res.json();
+        toast({ title: err.error || 'Error', variant: 'destructive' });
+      }
+    } catch (error) {
+      toast({ title: 'Error al guardar código', variant: 'destructive' });
+    }
+  };
+
+  const handleDeletePromoCode = async (id: string) => {
+    if (!confirm('¿Eliminar este código promocional?')) return;
+    try {
+      const res = await authFetch(`${API_URL}/admin/promo-codes/${id}`, { method: 'DELETE' });
+      if (res.ok) {
+        toast({ title: 'Código eliminado' });
+        fetchPromoCodes();
+      }
+    } catch (error) {
+      toast({ title: 'Error al eliminar', variant: 'destructive' });
+    }
+  };
+
+  const handleTogglePromoActive = async (code: any) => {
+    try {
+      const res = await authFetch(`${API_URL}/admin/promo-codes/${code._id || code.id}`, {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ active: !code.active }),
+      });
+      if (res.ok) {
+        fetchPromoCodes();
+      }
+    } catch (error) {
+      toast({ title: 'Error', variant: 'destructive' });
+    }
+  };
+
+  const handleVerifyJunior = async (userId: string, status: 'verified' | 'rejected') => {
+    if (status === 'rejected' && !window.confirm('¿Estás seguro de que quieres rechazar esta solicitud?')) return;
+    try {
+      const res = await authFetch(`${API_URL}/admin/users/${userId}/verify-junior`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ status }),
+      });
+      if (res.ok) {
+        toast({ title: status === 'verified' ? 'Verificación aceptada' : 'Verificación rechazada' });
+        fetchJuniorVerifications();
+      } else {
+        toast({ title: 'Error al actualizar verificación', variant: 'destructive' });
+      }
+    } catch {
+      toast({ title: 'Error de conexión', variant: 'destructive' });
+    }
+  };
+
+  const handleDeleteSuggestion = async (id: string) => {
+    if (!window.confirm('¿Eliminar esta sugerencia?')) return;
+    try {
+      const res = await authFetch(`${API_URL}/admin/suggestions/${id}`, { method: 'DELETE' });
+      if (res.ok) {
+        toast({ title: 'Sugerencia eliminada' });
+        fetchSuggestions();
+      } else {
+        toast({ title: 'Error al eliminar sugerencia', variant: 'destructive' });
+      }
+    } catch {
+      toast({ title: 'Error al eliminar sugerencia', variant: 'destructive' });
+    }
+  };
 
   useEffect(() => {
-    if (view === 'users') {
+    if (!authChecked) return;
+    const now = new Date();
+    const y = now.getFullYear();
+    const m = String(now.getMonth() + 1).padStart(2, '0');
+    const d = String(now.getDate()).padStart(2, '0');
+    const startOfMonth = `${y}-${m}-01`;
+    const today = `${y}-${m}-${d}`;
+    setRevenueStart(startOfMonth);
+    setRevenueEnd(today);
+    fetchRevenue(startOfMonth, today);
+  }, [authChecked, fetchRevenue]);
+
+  useEffect(() => {
+    if (!authChecked) return;
+    fetchStats();
+  }, [authChecked, fetchStats]);
+
+  useEffect(() => {
+    if (authChecked && view === 'users') {
       fetchUsers(searchQuery, page);
     }
-  }, [view, page, fetchUsers, searchQuery]);
+    if (authChecked && view === 'suggestions') {
+      fetchSuggestions();
+    }
+    if (authChecked && view === 'juniorVerifications') {
+      fetchJuniorVerifications();
+    }
+    if (authChecked && view === 'promoCodes') {
+      fetchPromoCodes();
+    }
+    if (authChecked && view === 'invoices') {
+      if (invoiceStart && invoiceEnd) {
+        fetchInvoices(invoiceStart, invoiceEnd);
+      }
+    }
+  }, [authChecked, view, page, fetchUsers, searchQuery, fetchSuggestions, fetchJuniorVerifications, fetchPromoCodes, invoiceStart, invoiceEnd, fetchInvoices]);
+
+  if (!authChecked) {
+    return <div className="min-h-screen bg-background" />;
+  }
 
   const handleSearch = (e: React.FormEvent) => {
     e.preventDefault();
@@ -266,12 +547,8 @@ const AdminPanel = () => {
     }
   };
 
-  const handleLogout = async () => {
-    try {
-      await authFetch(`${API_URL}/accounts/logout`, { method: 'POST' });
-    } catch {}
-    sessionStorage.clear();
-    navigate('/login');
+  const handleLogout = () => {
+    logoutUser();
   };
 
   const formatDate = (d: string | null) => {
@@ -325,6 +602,10 @@ const AdminPanel = () => {
             { key: 'dashboard', label: 'Dashboard' },
             { key: 'users', label: 'Usuarios' },
             { key: 'createUser', label: 'Crear Cuenta' },
+            { key: 'suggestions', label: 'Sugerencias' },
+            { key: 'juniorVerifications', label: 'Verificaciones Junior' },
+            { key: 'promoCodes', label: 'Códigos Promocionales' },
+            { key: 'invoices', label: 'Facturas' },
           ].map(tab => (
             <button
               key={tab.key}
@@ -351,13 +632,14 @@ const AdminPanel = () => {
             {stats ? (
               <>
                 {/* Stats cards */}
-                <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-5 gap-4">
+                <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-6 gap-4">
                   {[
                     { label: 'Total Usuarios', value: stats.totalUsers, icon: Users, color: 'text-white/70' },
                     { label: 'Activos', value: stats.active, icon: TrendingUp, color: 'text-green-400' },
                     { label: 'En Trial', value: stats.trial, icon: Clock, color: 'text-blue-400' },
                     { label: 'Cancelados', value: stats.cancelled, icon: XCircle, color: 'text-red-400' },
                     { label: 'Expirados', value: stats.expired, icon: AlertTriangle, color: 'text-orange-400' },
+                    { label: 'Junior Pendientes', value: stats.pendingJuniorVerifications ?? 0, icon: Shield, color: 'text-yellow-400' },
                   ].map(stat => (
                     <Card key={stat.label} className="bg-white/[0.04] border-white/10">
                       <CardContent className="p-4">
@@ -375,10 +657,38 @@ const AdminPanel = () => {
                 <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
                   <Card className="bg-white/[0.04] border-white/10">
                     <CardHeader className="pb-2">
-                      <CardTitle className="text-sm font-medium text-white/60">Ingresos este mes</CardTitle>
+                      <CardTitle className="text-sm font-medium text-white/60">Ingresos</CardTitle>
                     </CardHeader>
                     <CardContent>
-                      <p className="text-3xl font-bold text-white">{stats.monthlyRevenue.toFixed(2)} €</p>
+                      <div className="flex items-center gap-2 mb-3">
+                        <input
+                          type="date"
+                          value={revenueStart}
+                          onChange={(e) => setRevenueStart(e.target.value)}
+                          className="px-2 py-1 rounded bg-white/[0.06] border border-white/10 text-sm text-white focus:outline-none focus:border-white/30"
+                        />
+                        <span className="text-white/40 text-sm">hasta</span>
+                        <input
+                          type="date"
+                          value={revenueEnd}
+                          onChange={(e) => setRevenueEnd(e.target.value)}
+                          className="px-2 py-1 rounded bg-white/[0.06] border border-white/10 text-sm text-white focus:outline-none focus:border-white/30"
+                        />
+                        <Button
+                          size="sm"
+                          variant="outline"
+                          className="border-white/20 text-white hover:bg-white/10"
+                          onClick={() => fetchRevenue(revenueStart, revenueEnd)}
+                          disabled={revenueLoading || !revenueStart || !revenueEnd}
+                        >
+                          Calcular
+                        </Button>
+                      </div>
+                      {revenueLoading ? (
+                        <div className="animate-spin rounded-full h-5 w-5 border-b-2 border-white/30" />
+                      ) : (
+                        <p className="text-3xl font-bold text-white">{revenueAmount != null ? revenueAmount.toFixed(2) : '—'} €</p>
+                      )}
                     </CardContent>
                   </Card>
 
@@ -457,6 +767,7 @@ const AdminPanel = () => {
                     <th className="text-left px-4 py-3 text-xs font-medium text-white/40 uppercase">Estado</th>
                     <th className="text-left px-4 py-3 text-xs font-medium text-white/40 uppercase">Vence</th>
                     <th className="text-left px-4 py-3 text-xs font-medium text-white/40 uppercase">Cuenta</th>
+                    <th className="text-left px-4 py-3 text-xs font-medium text-white/40 uppercase">Descuento</th>
                     <th className="text-right px-4 py-3 text-xs font-medium text-white/40 uppercase"></th>
                   </tr>
                 </thead>
@@ -484,6 +795,15 @@ const AdminPanel = () => {
                           <span className="inline-flex px-2 py-0.5 text-xs font-medium rounded-full border bg-green-500/20 text-green-400 border-green-500/30">Activa</span>
                         )}
                       </td>
+                      <td className="px-4 py-3">
+                        {user.juniorDiscountStatus ? (
+                          <span className={`inline-flex px-2 py-0.5 text-xs font-medium rounded-full border ${user.juniorDiscountStatus === 'verified' ? 'bg-green-500/20 text-green-400 border-green-500/30' : user.juniorDiscountStatus === 'pending' ? 'bg-yellow-500/20 text-yellow-400 border-yellow-500/30' : 'bg-red-500/20 text-red-400 border-red-500/30'}`}>
+                            {user.juniorDiscountStatus === 'verified' ? 'Junior' : user.juniorDiscountStatus === 'pending' ? 'Pendiente' : 'Rechazado'}
+                          </span>
+                        ) : (
+                          <span className="text-xs text-white/20">—</span>
+                        )}
+                      </td>
                       <td className="px-4 py-3 text-right">
                         <button
                           onClick={() => fetchUserDetail(user.id)}
@@ -497,7 +817,7 @@ const AdminPanel = () => {
                   ))}
                   {users.length === 0 && !loading && (
                     <tr>
-                      <td colSpan={7} className="px-4 py-8 text-center text-white/30 text-sm">No se encontraron usuarios</td>
+                      <td colSpan={8} className="px-4 py-8 text-center text-white/30 text-sm">No se encontraron usuarios</td>
                     </tr>
                   )}
                 </tbody>
@@ -616,6 +936,7 @@ const AdminPanel = () => {
                           className="w-full px-3 py-2 rounded-md bg-white/[0.06] border border-white/10 text-sm text-white focus:outline-none focus:border-white/30"
                         >
                           <option value="starter">Starter</option>
+                          <option value="individual">Individual</option>
                           <option value="advanced">Avanzado</option>
                         </select>
                       </div>
@@ -692,6 +1013,49 @@ const AdminPanel = () => {
                 </CardContent>
               </Card>
             )}
+
+            {/* Invoices */}
+            {selectedUser.invoices && selectedUser.invoices.length > 0 && (
+              <Card className="bg-white/[0.04] border-white/10">
+                <CardHeader>
+                  <CardTitle className="text-lg text-white/90">Facturas ({selectedUser.invoices.length})</CardTitle>
+                </CardHeader>
+                <CardContent>
+                  <div className="border border-white/10 rounded-lg overflow-hidden">
+                    <table className="w-full">
+                      <thead>
+                        <tr className="border-b border-white/10 bg-white/[0.03]">
+                          <th className="text-left px-4 py-3 text-xs font-medium text-white/40 uppercase">Nº Factura</th>
+                          <th className="text-left px-4 py-3 text-xs font-medium text-white/40 uppercase">Fecha</th>
+                          <th className="text-left px-4 py-3 text-xs font-medium text-white/40 uppercase">Concepto</th>
+                          <th className="text-left px-4 py-3 text-xs font-medium text-white/40 uppercase">Importe</th>
+                          <th className="text-right px-4 py-3 text-xs font-medium text-white/40 uppercase"></th>
+                        </tr>
+                      </thead>
+                      <tbody>
+                        {selectedUser.invoices.map((inv) => (
+                          <tr key={inv.id} className="border-b border-white/5 hover:bg-white/[0.02] transition-colors">
+                            <td className="px-4 py-3 text-sm text-white/80">{inv.invoiceNumber}</td>
+                            <td className="px-4 py-3 text-sm text-white/60">{formatDate(inv.date)}</td>
+                            <td className="px-4 py-3 text-sm text-white/60">{inv.concept || '—'}</td>
+                            <td className="px-4 py-3 text-sm text-white/80">{inv.totalAmount?.toFixed(2)} €</td>
+                            <td className="px-4 py-3 text-right">
+                              <button
+                                onClick={() => window.open(`${window.location.origin}/invoice/${inv.publicId}`, '_blank')}
+                                className="p-1.5 rounded hover:bg-white/10 text-white/40 hover:text-white transition-colors"
+                                title="Ver factura"
+                              >
+                                <Eye className="h-4 w-4" />
+                              </button>
+                            </td>
+                          </tr>
+                        ))}
+                      </tbody>
+                    </table>
+                  </div>
+                </CardContent>
+              </Card>
+            )}
           </div>
         )}
 
@@ -726,14 +1090,15 @@ const AdminPanel = () => {
                   <div className="grid grid-cols-2 gap-4">
                     <div>
                       <label className="text-xs text-white/40 mb-1 block">Plan</label>
-                      <select
-                        value={newPlan}
-                        onChange={(e) => setNewPlan(e.target.value)}
-                        className="w-full px-3 py-2 rounded-md bg-white/[0.06] border border-white/10 text-sm text-white focus:outline-none focus:border-white/30"
-                      >
-                        <option value="starter">Starter</option>
-                        <option value="advanced">Avanzado</option>
-                      </select>
+                        <select
+                          value={newPlan}
+                          onChange={(e) => setNewPlan(e.target.value)}
+                          className="w-full px-3 py-2 rounded-md bg-white/[0.06] border border-white/10 text-sm text-white focus:outline-none focus:border-white/30"
+                        >
+                          <option value="starter">Starter</option>
+                          <option value="individual">Individual</option>
+                          <option value="advanced">Avanzado</option>
+                        </select>
                     </div>
                     <div>
                       <label className="text-xs text-white/40 mb-1 block">Periodo</label>
@@ -761,7 +1126,285 @@ const AdminPanel = () => {
             </Card>
           </div>
         )}
+
+        {/* ============= SUGGESTIONS ============= */}
+        {view === 'suggestions' && (
+          <div className="space-y-6">
+            <h2 className="text-xl font-semibold text-white/90">Sugerencias</h2>
+            {suggestionsLoading ? (
+              <div className="text-white/50">Cargando...</div>
+            ) : suggestions.length === 0 ? (
+              <div className="text-white/50">No hay sugerencias.</div>
+            ) : (
+              <div className="space-y-4">
+                {suggestions.map((s) => (
+                  <Card key={s._id} className="bg-white/[0.04] border-white/10">
+                    <CardContent className="pt-6">
+                      <p className="text-sm text-white/80 whitespace-pre-wrap">{s.text}</p>
+                      <div className="mt-4 flex items-center justify-between">
+                        <span className="text-xs text-white/40">{new Date(s.createdAt).toLocaleString()}</span>
+                        <Button
+                          size="sm"
+                          variant="destructive"
+                          onClick={() => handleDeleteSuggestion(s._id)}
+                        >
+                          Eliminar
+                        </Button>
+                      </div>
+                    </CardContent>
+                  </Card>
+                ))}
+              </div>
+            )}
+          </div>
+        )}
+
+        {/* ============= PROMO CODES ============= */}
+        {view === 'promoCodes' && (
+          <div>
+            <div className="flex items-center justify-between mb-6">
+              <h2 className="text-2xl font-bold">Códigos promocionales</h2>
+              <Button onClick={() => { setShowPromoForm(true); setEditingPromo(null); setPromoForm({ code: '', type: 'percentage_discount', value: '', durationMonths: '12', maxUses: '', expiresAt: '' }); }}>
+                <Plus className="h-4 w-4 mr-2" /> Nuevo código
+              </Button>
+            </div>
+            {promoCodesLoading ? (
+              <p className="text-muted-foreground">Cargando...</p>
+            ) : (
+              <div className="bg-card border rounded-lg overflow-hidden">
+                <table className="w-full text-sm">
+                  <thead className="bg-muted">
+                    <tr>
+                      <th className="text-left p-3 font-medium">Código</th>
+                      <th className="text-left p-3 font-medium">Tipo</th>
+                      <th className="text-left p-3 font-medium">Valor</th>
+                      <th className="text-left p-3 font-medium">Duración</th>
+                      <th className="text-left p-3 font-medium">Usos</th>
+                      <th className="text-left p-3 font-medium">Expira</th>
+                      <th className="text-left p-3 font-medium">Estado</th>
+                      <th className="text-right p-3 font-medium">Acciones</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {promoCodes.map((code) => (
+                      <tr key={code._id || code.id} className="border-t">
+                        <td className="p-3 font-mono font-medium">{code.code}</td>
+                        <td className="p-3">{code.type === 'percentage_discount' ? 'Descuento %' : 'Meses gratis'}</td>
+                        <td className="p-3">{code.type === 'percentage_discount' ? `${code.value}%` : `${code.value} meses`}</td>
+                        <td className="p-3">{code.durationMonths} meses</td>
+                        <td className="p-3">{code.usedCount} / {code.maxUses ?? '∞'}</td>
+                        <td className="p-3">{code.expiresAt ? new Date(code.expiresAt).toLocaleDateString() : 'Nunca'}</td>
+                        <td className="p-3">
+                          <span className={`px-2 py-1 rounded-full text-xs ${code.active ? 'bg-green-500/20 text-green-400' : 'bg-red-500/20 text-red-400'}`}>
+                            {code.active ? 'Activo' : 'Inactivo'}
+                          </span>
+                        </td>
+                        <td className="p-3 text-right space-x-2">
+                          <Button size="sm" variant="outline" onClick={() => handleTogglePromoActive(code)}>
+                            {code.active ? 'Desactivar' : 'Activar'}
+                          </Button>
+                          <Button size="sm" variant="outline" onClick={() => { setEditingPromo(code); setPromoForm({ code: code.code, type: code.type, value: String(code.value), durationMonths: String(code.durationMonths), maxUses: code.maxUses ? String(code.maxUses) : '', expiresAt: code.expiresAt ? code.expiresAt.split('T')[0] : '' }); setShowPromoForm(true); }}>
+                            Editar
+                          </Button>
+                          <Button size="sm" variant="destructive" onClick={() => handleDeletePromoCode(code._id || code.id)}>
+                            Eliminar
+                          </Button>
+                        </td>
+                      </tr>
+                    ))}
+                    {promoCodes.length === 0 && (
+                      <tr><td colSpan={8} className="p-6 text-center text-muted-foreground">No hay códigos promocionales</td></tr>
+                    )}
+                  </tbody>
+                </table>
+              </div>
+            )}
+          </div>
+        )}
+
+        {/* ============= INVOICES ============= */}
+        {view === 'invoices' && (
+          <div className="space-y-6">
+            <div className="flex items-center justify-between">
+              <h2 className="text-xl font-semibold text-white/90">Facturas</h2>
+            </div>
+
+            <div className="flex items-center gap-3">
+              <input
+                type="date"
+                value={invoiceStart}
+                onChange={(e) => setInvoiceStart(e.target.value)}
+                className="px-3 py-2 rounded bg-white/[0.06] border border-white/10 text-sm text-white focus:outline-none focus:border-white/30"
+              />
+              <span className="text-white/40 text-sm">hasta</span>
+              <input
+                type="date"
+                value={invoiceEnd}
+                onChange={(e) => setInvoiceEnd(e.target.value)}
+                className="px-3 py-2 rounded bg-white/[0.06] border border-white/10 text-sm text-white focus:outline-none focus:border-white/30"
+              />
+              <Button
+                variant="outline"
+                className="border-white/20 text-white hover:bg-white/10"
+                onClick={() => fetchInvoices(invoiceStart, invoiceEnd)}
+                disabled={invoicesLoading || !invoiceStart || !invoiceEnd}
+              >
+                Buscar
+              </Button>
+            </div>
+
+            {invoicesLoading ? (
+              <div className="flex justify-center py-12">
+                <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-white/30" />
+              </div>
+            ) : invoicesList.length === 0 ? (
+              <div className="text-white/50 text-sm">No hay facturas en el rango seleccionado.</div>
+            ) : (
+              <div className="border border-white/10 rounded-lg overflow-hidden">
+                <table className="w-full">
+                  <thead>
+                    <tr className="border-b border-white/10 bg-white/[0.03]">
+                      <th className="text-left px-4 py-3 text-xs font-medium text-white/40 uppercase">Nº Factura</th>
+                      <th className="text-left px-4 py-3 text-xs font-medium text-white/40 uppercase">Cliente</th>
+                      <th className="text-left px-4 py-3 text-xs font-medium text-white/40 uppercase">Email</th>
+                      <th className="text-left px-4 py-3 text-xs font-medium text-white/40 uppercase">Fecha</th>
+                      <th className="text-left px-4 py-3 text-xs font-medium text-white/40 uppercase">Importe</th>
+                      <th className="text-right px-4 py-3 text-xs font-medium text-white/40 uppercase"></th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {invoicesList.map((inv) => (
+                      <tr key={inv.id} className="border-b border-white/5 hover:bg-white/[0.02] transition-colors">
+                        <td className="px-4 py-3 text-sm text-white/80">{inv.invoiceNumber}</td>
+                        <td className="px-4 py-3 text-sm text-white/60">{inv.clientName || '—'}</td>
+                        <td className="px-4 py-3 text-sm text-white/60">{inv.clientEmail || '—'}</td>
+                        <td className="px-4 py-3 text-sm text-white/60">{formatDate(inv.date)}</td>
+                        <td className="px-4 py-3 text-sm text-white/80">{inv.totalAmount?.toFixed(2)} €</td>
+                        <td className="px-4 py-3 text-right">
+                          <button
+                            onClick={() => window.open(`${window.location.origin}/invoice/${inv.publicId}`, '_blank')}
+                            className="p-1.5 rounded hover:bg-white/10 text-white/40 hover:text-white transition-colors"
+                            title="Ver factura"
+                          >
+                            <Eye className="h-4 w-4" />
+                          </button>
+                        </td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+            )}
+          </div>
+        )}
+
+        {/* ============= JUNIOR VERIFICATIONS ============= */}
+        {view === 'juniorVerifications' && (
+          <div className="space-y-6">
+            <h2 className="text-xl font-semibold text-white/90">Verificaciones Junior</h2>
+            {juniorVerificationsLoading ? (
+              <div className="text-white/50">Cargando...</div>
+            ) : juniorVerifications.length === 0 ? (
+              <div className="text-white/50">No hay verificaciones pendientes.</div>
+            ) : (
+              <div className="border border-white/10 rounded-lg overflow-hidden">
+                <table className="w-full">
+                  <thead>
+                    <tr className="border-b border-white/10 bg-white/[0.03]">
+                      <th className="text-left px-4 py-3 text-xs font-medium text-white/40 uppercase">Nombre</th>
+                      <th className="text-left px-4 py-3 text-xs font-medium text-white/40 uppercase">Email</th>
+                      <th className="text-left px-4 py-3 text-xs font-medium text-white/40 uppercase">País</th>
+                      <th className="text-left px-4 py-3 text-xs font-medium text-white/40 uppercase">Estado</th>
+                      <th className="text-left px-4 py-3 text-xs font-medium text-white/40 uppercase">Fecha</th>
+                      <th className="text-left px-4 py-3 text-xs font-medium text-white/40 uppercase">Prueba</th>
+                      <th className="text-right px-4 py-3 text-xs font-medium text-white/40 uppercase">Acciones</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {juniorVerifications.map((v) => (
+                      <tr key={v.accountId} className="border-b border-white/5 hover:bg-white/[0.02] transition-colors">
+                        <td className="px-4 py-3 text-sm text-white/80">{v.name}</td>
+                        <td className="px-4 py-3 text-sm text-white/60">{v.email}</td>
+                        <td className="px-4 py-3 text-sm text-white/60">{v.country}</td>
+                        <td className="px-4 py-3">
+                          <span className={`inline-flex px-2 py-0.5 text-xs font-medium rounded-full border ${v.status === 'pending' ? 'bg-yellow-500/20 text-yellow-400 border-yellow-500/30' : v.status === 'verified' ? 'bg-green-500/20 text-green-400 border-green-500/30' : 'bg-red-500/20 text-red-400 border-red-500/30'}`}>
+                            {v.status === 'pending' ? 'Pendiente' : v.status === 'verified' ? 'Verificado' : 'Rechazado'}
+                          </span>
+                        </td>
+                        <td className="px-4 py-3 text-sm text-white/50">{formatDate(v.requestedAt)}</td>
+                        <td className="px-4 py-3">
+                          {v.proofUrl ? (
+                            <a href={v.proofUrl} target="_blank" rel="noopener noreferrer" className="text-sm text-blue-400 hover:text-blue-300">Ver prueba</a>
+                          ) : (
+                            <span className="text-xs text-white/30">—</span>
+                          )}
+                        </td>
+                        <td className="px-4 py-3 text-right">
+                          <div className="flex items-center justify-end gap-2">
+                            <button
+                              onClick={() => handleVerifyJunior(v.accountId, 'verified')}
+                              className="px-2 py-1 rounded text-xs font-medium bg-green-500/20 text-green-400 border border-green-500/30 hover:bg-green-500/30 transition-colors"
+                            >
+                              Aceptar
+                            </button>
+                            <button
+                              onClick={() => handleVerifyJunior(v.accountId, 'rejected')}
+                              className="px-2 py-1 rounded text-xs font-medium bg-red-500/20 text-red-400 border border-red-500/30 hover:bg-red-500/30 transition-colors"
+                            >
+                              Rechazar
+                            </button>
+                          </div>
+                        </td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+            )}
+          </div>
+        )}
       </div>
+
+      {showPromoForm && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 p-4">
+          <div className="bg-card border rounded-xl w-full max-w-md p-6">
+            <h3 className="text-lg font-bold mb-4">{editingPromo ? 'Editar código' : 'Nuevo código promocional'}</h3>
+            <div className="space-y-4">
+              <div>
+                <label className="text-sm font-medium block mb-1">Código</label>
+                <input value={promoForm.code} onChange={(e) => setPromoForm({ ...promoForm, code: e.target.value.toUpperCase() })} className="w-full px-3 py-2 bg-muted border rounded-lg text-sm" placeholder="EJ: VERANO25" />
+              </div>
+              <div>
+                <label className="text-sm font-medium block mb-1">Tipo</label>
+                <select value={promoForm.type} onChange={(e) => setPromoForm({ ...promoForm, type: e.target.value as any })} className="w-full px-3 py-2 bg-muted border rounded-lg text-sm">
+                  <option value="percentage_discount">Descuento porcentaje</option>
+                  <option value="free_months">Meses gratuitos</option>
+                </select>
+              </div>
+              <div>
+                <label className="text-sm font-medium block mb-1">Valor</label>
+                <input type="number" value={promoForm.value} onChange={(e) => setPromoForm({ ...promoForm, value: e.target.value })} className="w-full px-3 py-2 bg-muted border rounded-lg text-sm" placeholder={promoForm.type === 'percentage_discount' ? 'Ej: 25' : 'Ej: 3'} />
+              </div>
+              <div>
+                <label className="text-sm font-medium block mb-1">Duración (meses)</label>
+                <input type="number" value={promoForm.durationMonths} onChange={(e) => setPromoForm({ ...promoForm, durationMonths: e.target.value })} className="w-full px-3 py-2 bg-muted border rounded-lg text-sm" placeholder="12" />
+              </div>
+              <div>
+                <label className="text-sm font-medium block mb-1">Usos máximos (dejar vacío para ilimitado)</label>
+                <input type="number" value={promoForm.maxUses} onChange={(e) => setPromoForm({ ...promoForm, maxUses: e.target.value })} className="w-full px-3 py-2 bg-muted border rounded-lg text-sm" placeholder="Ilimitado" />
+              </div>
+              <div>
+                <label className="text-sm font-medium block mb-1">Fecha de expiración</label>
+                <input type="date" value={promoForm.expiresAt} onChange={(e) => setPromoForm({ ...promoForm, expiresAt: e.target.value })} className="w-full px-3 py-2 bg-muted border rounded-lg text-sm" />
+              </div>
+              <div className="flex justify-end gap-3 pt-2">
+                <Button variant="outline" onClick={() => { setShowPromoForm(false); setEditingPromo(null); }}>Cancelar</Button>
+                <Button onClick={handleSavePromoCode}>{editingPromo ? 'Guardar cambios' : 'Crear código'}</Button>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 };

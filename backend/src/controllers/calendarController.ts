@@ -3,6 +3,7 @@ import { google } from 'googleapis';
 import crypto from 'crypto';
 import { Account } from '../models/Account.js';
 import { Subaccount } from '../models/Subaccount.js';
+import { CalendarEvent } from '../models/CalendarEvent.js';
 import { verifyOwnership } from '../middleware/auth.js';
 import { dispatchWebhook } from '../services/webhookService.js';
 
@@ -126,6 +127,32 @@ const buildStartEnd = (startDateTime: string, endDateTime: string | undefined, a
   };
 };
 
+function serializeCalendarEvent(event: any) {
+  const serialized = typeof event?.toJSON === 'function' ? event.toJSON() : event;
+
+  return {
+    id: serialized?.id || serialized?._id || '',
+    title: serialized?.title || '',
+    description: serialized?.description || '',
+    startDateTime: serialized?.startDateTime || '',
+    endDateTime: serialized?.endDateTime || '',
+    allDay: !!serialized?.allDay,
+    colorId: serialized?.colorId || '',
+    recurrence: Array.isArray(serialized?.recurrence) ? serialized.recurrence : [],
+    location: serialized?.location || '',
+    attendees: Array.isArray(serialized?.attendees) ? serialized.attendees : [],
+    updatedAt: serialized?.updatedAt || null,
+  };
+}
+
+async function resolveCalendarEventRecord(accountId: string, eventId: string) {
+  return CalendarEvent.findOne({
+    accountId,
+    deleted: false,
+    $or: [{ _id: eventId }, { googleEventId: eventId }],
+  });
+}
+
 // GET /api/calendar/auth-url?accountId=xxx
 export const getAuthUrl = async (req: Request, res: Response) => {
   const { accountId } = req.query;
@@ -230,6 +257,7 @@ export const getCalendarStatus = async (req: Request, res: Response) => {
     res.json({
       connected: !!(result.record as any).googleCalendarConnected,
       email: result.record.email,
+      lastSyncedAt: (result.record as any).googleCalendarLastSyncedAt || null,
     });
   } catch (error) {
     res.status(500).json({ error: 'Error al obtener estado' });
@@ -246,34 +274,12 @@ export const getEvents = async (req: Request, res: Response) => {
       return res.status(403).json({ error: 'Acceso denegado' });
     }
 
-    const setup = await setupOAuth(accountId as string);
-    if (!setup) return res.status(401).json({ error: 'Google Calendar no conectado' });
+    const events = await CalendarEvent.find({ accountId, deleted: false })
+      .sort({ startDateTime: 1 });
 
-    const calendar = google.calendar({ version: 'v3', auth: setup.oauth2Client });
-    const today = new Date();
-    today.setHours(0, 0, 0, 0);
-    const response = await calendar.events.list({
-      calendarId: 'primary',
-      timeMin: today.toISOString(),
-      maxResults: 50,
-      singleEvents: true,
-      orderBy: 'startTime',
-    });
-
-    res.json({ events: response.data.items || [] });
-  } catch (error: any) {
-    console.error('Error al obtener eventos:', error);
-    if (error?.code === 401) {
-      const result = await findUserRecord(req.query.accountId as string);
-      if (result) {
-        const Model = getModel(result.isSubaccount);
-        await Model.updateOne(
-          { _id: req.query.accountId },
-          { googleCalendarConnected: false, googleAccessToken: null }
-        );
-      }
-      return res.status(401).json({ error: 'Token expirado, reconecta Google Calendar' });
-    }
+    res.json({ events: events.map((event) => serializeCalendarEvent(event)) });
+  } catch (error) {
+    console.error('[getEvents] error:', error);
     res.status(500).json({ error: 'Error al obtener eventos' });
   }
 };
@@ -308,7 +314,33 @@ export const createCalendarEvent = async (req: Request, res: Response) => {
 
     dispatchWebhook(accountId, 'calendar_event_created', { eventId: event.data.id, title, startDateTime }).catch(() => {});
 
-    res.json({ success: true, event: event.data });
+    const now = new Date().toISOString();
+    const localId = `${accountId}_${event.data.id}`;
+    const isAllDay = !!(event.data.start as any)?.date;
+    const storedEvent = await CalendarEvent.findOneAndUpdate(
+      { accountId, googleEventId: event.data.id! },
+      {
+        _id: localId,
+        accountId,
+        googleEventId: event.data.id!,
+        title: event.data.summary || '',
+        description: event.data.description || '',
+        startDateTime: isAllDay ? (event.data.start as any).date : (event.data.start as any)?.dateTime || now,
+        endDateTime: isAllDay ? (event.data.end as any).date : (event.data.end as any)?.dateTime || now,
+        allDay: isAllDay,
+        source: 'lyrium',
+        lastSyncedAt: now,
+        deleted: false,
+        location: event.data.location || '',
+        attendees: (event.data.attendees || []).map((a: any) => a.email).filter(Boolean),
+        colorId: event.data.colorId || '',
+        recurrence: event.data.recurrence || [],
+        updatedAt: event.data.updated || now,
+      },
+      { upsert: true, returnDocument: 'after' }
+    );
+
+    res.json({ success: true, event: serializeCalendarEvent(storedEvent) });
   } catch (error: any) {
     console.error('Error al crear evento:', error);
     res.status(500).json({ error: 'Error al crear evento' });
@@ -326,11 +358,15 @@ export const updateCalendarEvent = async (req: Request, res: Response) => {
       return res.status(403).json({ error: 'Acceso denegado' });
     }
 
+    const existingEvent = await resolveCalendarEventRecord(accountId, eventId);
+    if (!existingEvent) return res.status(404).json({ error: 'Evento no encontrado' });
+
     const setup = await setupOAuth(accountId);
     if (!setup) return res.status(401).json({ error: 'Google Calendar no conectado' });
 
     const tz = COUNTRY_TIMEZONE[setup.account.country] || 'Europe/Madrid';
     const calendar = google.calendar({ version: 'v3', auth: setup.oauth2Client });
+    const googleEventId = existingEvent.googleEventId;
 
     const requestBody: any = {};
     if (title !== undefined) requestBody.summary = title;
@@ -345,12 +381,32 @@ export const updateCalendarEvent = async (req: Request, res: Response) => {
 
     const event = await calendar.events.patch({
       calendarId: 'primary',
-      eventId,
+      eventId: googleEventId,
       requestBody,
     });
-    dispatchWebhook(accountId, 'calendar_event_updated', { eventId, title: event.data.summary, start: event.data.start });
+    dispatchWebhook(accountId, 'calendar_event_updated', { eventId: googleEventId, title: event.data.summary, start: event.data.start });
 
-    res.json({ success: true, event: event.data });
+    const now = new Date().toISOString();
+    const isAllDay = !!(event.data.start as any)?.date;
+    const storedEvent = await CalendarEvent.findOneAndUpdate(
+      { accountId, googleEventId },
+      {
+        title: event.data.summary,
+        description: event.data.description || '',
+        startDateTime: isAllDay ? (event.data.start as any).date : (event.data.start as any)?.dateTime,
+        endDateTime: isAllDay ? (event.data.end as any).date : (event.data.end as any)?.dateTime,
+        allDay: isAllDay,
+        location: event.data.location || '',
+        attendees: (event.data.attendees || []).map((a: any) => a.email).filter(Boolean),
+        colorId: event.data.colorId || '',
+        recurrence: event.data.recurrence || [],
+        updatedAt: event.data.updated || now,
+        lastSyncedAt: now,
+      },
+      { upsert: true, returnDocument: 'after' }
+    );
+
+    res.json({ success: true, event: serializeCalendarEvent(storedEvent || existingEvent) });
   } catch (error: any) {
     console.error('Error al actualizar evento:', error);
     res.status(500).json({ error: 'Error al actualizar evento' });
@@ -368,12 +424,20 @@ export const deleteCalendarEvent = async (req: Request, res: Response) => {
       return res.status(403).json({ error: 'Acceso denegado' });
     }
 
+    const existingEvent = await resolveCalendarEventRecord(accountId as string, eventId);
+    if (!existingEvent) return res.status(404).json({ error: 'Evento no encontrado' });
+
     const setup = await setupOAuth(accountId as string);
     if (!setup) return res.status(401).json({ error: 'Google Calendar no conectado' });
 
     const calendar = google.calendar({ version: 'v3', auth: setup.oauth2Client });
-    await calendar.events.delete({ calendarId: 'primary', eventId });
-    dispatchWebhook(accountId as string, 'calendar_event_deleted', { eventId });
+    await calendar.events.delete({ calendarId: 'primary', eventId: existingEvent.googleEventId });
+    dispatchWebhook(accountId as string, 'calendar_event_deleted', { eventId: existingEvent.googleEventId });
+
+    await CalendarEvent.updateOne(
+      { _id: existingEvent._id },
+      { deleted: true }
+    );
 
     res.json({ success: true });
   } catch (error: any) {
@@ -403,5 +467,22 @@ export const disconnectCalendar = async (req: Request, res: Response) => {
     res.json({ success: true });
   } catch (error) {
     res.status(500).json({ error: 'Error al desconectar' });
+  }
+};
+
+// POST /api/calendar/sync
+export const syncCalendar = async (req: Request, res: Response) => {
+  try {
+    const { accountId } = req.body;
+    if (!accountId) return res.status(400).json({ error: 'accountId requerido' });
+    if (!verifyOwnership(req, accountId)) {
+      return res.status(403).json({ error: 'Acceso denegado' });
+    }
+    const { syncAccountCalendar } = await import('../jobs/calendarSyncJob.js');
+    await syncAccountCalendar(accountId);
+    res.json({ success: true, message: 'Sincronización completada' });
+  } catch (error: any) {
+    console.error('[syncCalendar] error:', error);
+    res.status(500).json({ error: error.message || 'Error al sincronizar' });
   }
 };

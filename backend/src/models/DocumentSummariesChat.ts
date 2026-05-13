@@ -11,11 +11,17 @@ export interface IUploadedFile {
   size: number;
 }
 
+export interface IFlag {
+  id: string;
+  createdAt: string;
+}
+
 export interface IDocSummaryMessage {
   id: string;
   role: 'user' | 'assistant';
   content: string;
   metadata?: any;
+  flags?: IFlag[];
 }
 
 export interface IDocumentSummariesChat {
@@ -29,6 +35,11 @@ export interface IDocumentSummariesChat {
   lastModified: string;
   chatSummary?: string;
 }
+
+const flagSchema = new Schema({
+  id: String,
+  createdAt: String,
+}, { _id: false });
 
 const uploadedFileSchema = new Schema({
   id: String,
@@ -46,6 +57,7 @@ const docSummaryMessageSchema = new Schema({
   role: { type: String, enum: ['user', 'assistant'] },
   content: String,
   metadata: Schema.Types.Mixed,
+  flags: { type: [flagSchema], default: [] },
 }, { _id: false });
 
 const documentSummariesChatSchema = new Schema<IDocumentSummariesChat>({

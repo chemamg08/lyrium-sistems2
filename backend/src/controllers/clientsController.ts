@@ -4,8 +4,13 @@ import path from 'path';
 import { fileURLToPath } from 'url';
 import crypto from 'crypto';
 import { Client } from '../models/Client.js';
+import { ClientReminder } from '../models/ClientReminder.js';
+import { Chat } from '../models/Chat.js';
+import { Account } from '../models/Account.js';
+import { Subscription } from '../models/Subscription.js';
 import { verifyOwnership } from '../middleware/auth.js';
-import { Invoice, InvoiceSettings } from '../models/Invoice.js';
+import { Invoice, InvoiceSettings, generateInvoicePublicId } from '../models/Invoice.js';
+import Case from '../models/Case.js';
 import { Automation } from '../models/Automation.js';
 import { PLATFORM_CONFIGS, CuentaCorreoConfig } from '../services/emailService.js';
 import { decryptPassword } from '../services/emailProcessorService.js';
@@ -17,6 +22,63 @@ const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
 
 const UPLOADS_DIR = path.join(__dirname, '../../uploads/clients');
+
+type UploadedFileLike = { path?: string };
+
+const getUploadedFiles = (req: Request): UploadedFileLike[] => {
+  const multiple = (((req as any).files as UploadedFileLike[] | undefined) || []).filter(Boolean);
+  const single = (req as any).file as UploadedFileLike | undefined;
+
+  return single ? [...multiple, single] : multiple;
+};
+
+const cleanupUploadedFiles = async (files: UploadedFileLike[]) => {
+  await Promise.all(
+    files.map(async (file) => {
+      if (!file?.path) {
+        return;
+      }
+
+      try {
+        await fs.unlink(file.path);
+      } catch {
+        // El archivo puede haberse movido o eliminado ya.
+      }
+    })
+  );
+};
+
+const roundCurrency = (value: number) => Math.round((Number(value) || 0) * 100) / 100;
+
+const normalizeInvoiceLines = (lines: any[] = []) => {
+  return lines.map((line: any) => {
+    const quantity = Number(line?.quantity);
+    const price = Number(line?.price);
+    const safeQuantity = Number.isFinite(quantity) ? quantity : 1;
+    const safePrice = Number.isFinite(price) ? price : 0;
+
+    return {
+      id: line?.id || Date.now().toString() + Math.random().toString(36).substring(7),
+      concept: line?.concept || '',
+      quantity: safeQuantity,
+      price: safePrice,
+      subtotal: roundCurrency(safeQuantity * safePrice),
+    };
+  });
+};
+
+const calculateInvoiceAmounts = (lines: any[], rawTaxRate: any, fallbackRate = 21) => {
+  const normalizedLines = normalizeInvoiceLines(lines);
+  const parsedRate = Number(rawTaxRate);
+  const taxRate = Number.isFinite(parsedRate) ? parsedRate : fallbackRate;
+  const baseAmount = roundCurrency(
+    normalizedLines.reduce((sum: number, line: any) => sum + line.subtotal, 0)
+  );
+  const taxAmount = roundCurrency((baseAmount * taxRate) / 100);
+  const totalAmount = roundCurrency(baseAmount + taxAmount);
+
+  return { normalizedLines, taxRate, baseAmount, taxAmount, totalAmount };
+};
 
 // Crear directorio para cliente si no existe
 const ensureClientDir = async (clientId: string): Promise<string> => {
@@ -67,22 +129,40 @@ export const getClients = async (req: Request, res: Response) => {
 
 // POST /api/clients - Crear nuevo cliente
 export const createClient = async (req: Request, res: Response) => {
+  const uploadedFiles = getUploadedFiles(req);
+  let clientId: string | null = null;
+
   try {
     const { name, email, phone, summary, accountId, clientType, fiscalInfo } = req.body;
     
     if (!name) {
+      await cleanupUploadedFiles(uploadedFiles);
       return res.status(400).json({ error: 'El nombre es requerido' });
     }
     
     if (!accountId) {
+      await cleanupUploadedFiles(uploadedFiles);
       return res.status(400).json({ error: 'accountId es requerido' });
     }
 
     if (!verifyOwnership(req, accountId)) {
+      await cleanupUploadedFiles(uploadedFiles);
       return res.status(403).json({ error: 'Acceso denegado' });
     }
 
-    const clientId = Date.now().toString();
+    const subscription = await Subscription.findOne({ accountId });
+    if (subscription && subscription.plan === 'free') {
+      const totalClients = await Client.countDocuments({ accountId });
+      // Grace period: if planDowngradedAt exists and is within 7 days, allow all existing clients
+      const account = await Account.findById(accountId).select('planDowngradedAt').lean();
+      const inGracePeriod = account?.planDowngradedAt && (new Date().getTime() - new Date(account.planDowngradedAt).getTime()) < 7 * 24 * 60 * 60 * 1000;
+      if (!inGracePeriod && totalClients >= 10) {
+        await cleanupUploadedFiles(uploadedFiles);
+        return res.status(403).json({ error: 'Has alcanzado el límite de 10 clientes del plan Sin Cargo. Suscríbete a un plan de pago para añadir más.' });
+      }
+    }
+
+    clientId = Date.now().toString();
     const files: any[] = [];
     const reqFiles = (req as any).files as any[];
     
@@ -134,6 +214,16 @@ export const createClient = async (req: Request, res: Response) => {
 
     res.status(201).json(newClient.toJSON());
   } catch (error) {
+    await cleanupUploadedFiles(uploadedFiles);
+
+    if (clientId) {
+      try {
+        await fs.rm(path.join(UPLOADS_DIR, clientId), { recursive: true, force: true });
+      } catch {
+        // Ignore cleanup errors on rollback.
+      }
+    }
+
     console.error('Error al crear cliente:', error);
     res.status(500).json({ error: 'Error al crear cliente' });
   }
@@ -141,6 +231,9 @@ export const createClient = async (req: Request, res: Response) => {
 
 // PUT /api/clients/:id - Actualizar cliente
 export const updateClient = async (req: Request, res: Response) => {
+  const uploadedFiles = getUploadedFiles(req);
+  const movedFilePaths: string[] = [];
+
   try {
     const { id } = req.params;
     const { name, email, phone, summary, clientType, fiscalInfo } = req.body;
@@ -148,10 +241,12 @@ export const updateClient = async (req: Request, res: Response) => {
     const client = await Client.findById(id);
 
     if (!client) {
+      await cleanupUploadedFiles(uploadedFiles);
       return res.status(404).json({ error: 'Cliente no encontrado' });
     }
 
     if (!verifyOwnership(req, client.accountId)) {
+      await cleanupUploadedFiles(uploadedFiles);
       return res.status(403).json({ error: 'Acceso denegado' });
     }
 
@@ -176,6 +271,7 @@ export const updateClient = async (req: Request, res: Response) => {
         const newPath = path.join(clientDir, newFilename);
         
         await fs.rename(oldPath, newPath);
+        movedFilePaths.push(newPath);
         
         let extractedText: string | undefined;
         if (safeName.toLowerCase().endsWith('.pdf')) {
@@ -196,6 +292,17 @@ export const updateClient = async (req: Request, res: Response) => {
     dispatchWebhook(client.accountId, 'client_updated', { clientId: client._id, name: client.name, email: client.email, phone: client.phone });
     res.json(client.toJSON());
   } catch (error) {
+    await cleanupUploadedFiles(uploadedFiles);
+    await Promise.all(
+      movedFilePaths.map(async (filePath) => {
+        try {
+          await fs.unlink(filePath);
+        } catch {
+          // Ignore rollback errors for moved files.
+        }
+      })
+    );
+
     console.error('Error al actualizar cliente:', error);
     res.status(500).json({ error: 'Error al actualizar cliente' });
   }
@@ -214,6 +321,20 @@ export const deleteClient = async (req: Request, res: Response) => {
     if (!verifyOwnership(req, client.accountId)) {
       return res.status(403).json({ error: 'Acceso denegado' });
     }
+
+    const invoicesCount = await Invoice.countDocuments({ clientId: id });
+    if (invoicesCount > 0) {
+      return res.status(409).json({ error: 'No se puede eliminar un cliente con facturas' });
+    }
+
+    await Promise.all([
+      ClientReminder.deleteMany({ clientId: id }),
+      Chat.deleteMany({ clientId: id }),
+      Case.updateMany(
+        { linkedClientId: id },
+        { $unset: { linkedClientId: '', linkedClientName: '' } }
+      ),
+    ]);
 
     // Eliminar carpeta de archivos del cliente
     const clientDir = path.join(UPLOADS_DIR, id);
@@ -330,15 +451,19 @@ export const getClientFile = async (req: Request, res: Response) => {
 const MAX_CLIENT_STORAGE = 100 * 1024 * 1024; // 100MB per client
 
 export const uploadClientFile = async (req: Request, res: Response) => {
+  const uploadedFiles = getUploadedFiles(req);
+
   try {
     const { clientId } = req.params;
     const client = await Client.findById(clientId);
 
     if (!client) {
+      await cleanupUploadedFiles(uploadedFiles);
       return res.status(404).json({ error: 'Cliente no encontrado' });
     }
 
     if (!verifyOwnership(req, client.accountId)) {
+      await cleanupUploadedFiles(uploadedFiles);
       return res.status(403).json({ error: 'Acceso denegado' });
     }
 
@@ -351,11 +476,7 @@ export const uploadClientFile = async (req: Request, res: Response) => {
     // Check total storage for this client
     const currentUsage = client.files.reduce((total: number, f: any) => total + (f.fileSize || 0), 0);
     if (currentUsage + file.size > MAX_CLIENT_STORAGE) {
-      // Delete the uploaded file since we're rejecting it
-      try {
-        const uploadedPath = path.join(UPLOADS_DIR, clientId, file.filename);
-        await fs.unlink(uploadedPath);
-      } catch (_) {}
+      await cleanupUploadedFiles(uploadedFiles);
       const usedMB = (currentUsage / (1024 * 1024)).toFixed(1);
       const limitMB = (MAX_CLIENT_STORAGE / (1024 * 1024)).toFixed(0);
       return res.status(413).json({ error: 'STORAGE_LIMIT', usedMB, limitMB });
@@ -365,8 +486,7 @@ export const uploadClientFile = async (req: Request, res: Response) => {
     const safeName = sanitizeFilename(file.originalname);
     let extractedText: string | undefined;
     if (safeName.toLowerCase().endsWith('.pdf')) {
-      const filePath = path.join(UPLOADS_DIR, clientId, file.filename);
-      extractedText = await extractTextFromPDF(filePath);
+      extractedText = await extractTextFromPDF(file.path);
     }
 
     const newFile = {
@@ -384,6 +504,7 @@ export const uploadClientFile = async (req: Request, res: Response) => {
 
     res.status(201).json(newFile);
   } catch (error) {
+    await cleanupUploadedFiles(uploadedFiles);
     res.status(500).json({ error: 'Error al subir archivo' });
   }
 };
@@ -474,15 +595,9 @@ export const getInvoiceSettings = async (req: Request, res: Response) => {
     const { accountId } = req.query;
     if (!accountId) return res.status(400).json({ error: 'accountId requerido' });
     if (!verifyOwnership(req, accountId as string)) return res.status(403).json({ error: 'Acceso denegado' });
-    let settings = await InvoiceSettings.findOne({ accountId: accountId as string });
-    if (!settings) {
-      settings = await InvoiceSettings.create({
-        _id: (accountId as string) + '_settings',
-        accountId: accountId as string,
-        firmName: '', firmAddress: '', firmPhone: '', firmNIF: '', firmInfo: '', fiscalTerritory: 'comun', paymentMethod: '',
-        defaultTaxRate: 21, nextInvoiceNumber: 1,
-      });
-    }
+    await ensureInvoiceSettings(accountId as string);
+    const settings = await InvoiceSettings.findOne({ accountId: accountId as string });
+    if (!settings) return res.status(500).json({ error: 'Error al obtener configuración' });
     res.json(settings.toJSON());
   } catch (error) {
     res.status(500).json({ error: 'Error al obtener configuración' });
@@ -517,6 +632,7 @@ export const getClientInvoices = async (req: Request, res: Response) => {
     if (!client) return res.status(404).json({ error: 'Cliente no encontrado' });
     if (!verifyOwnership(req, client.accountId)) return res.status(403).json({ error: 'Acceso denegado' });
     const invoices = await Invoice.find({ clientId: id }).sort({ date: -1 });
+    await ensureInvoicePublicIds(invoices as any[]);
     res.json(invoices.map(i => i.toJSON()));
   } catch (error) {
     res.status(500).json({ error: 'Error al obtener facturas' });
@@ -530,12 +646,62 @@ function calcularHuellaVeriFactu(firmNIF: string, invoiceNumber: string, date: s
   return crypto.createHash('sha256').update(input, 'utf8').digest('hex').toUpperCase();
 }
 
+const buildDefaultInvoiceSettings = (accountId: string) => ({
+  _id: `${accountId}_settings`,
+  accountId,
+  firmName: '',
+  firmAddress: '',
+  firmPhone: '',
+  firmNIF: '',
+  firmInfo: '',
+  fiscalTerritory: 'comun',
+  paymentMethod: '',
+  defaultTaxRate: 21,
+  nextInvoiceNumber: 1,
+});
+
+async function ensureInvoiceSettings(accountId: string): Promise<void> {
+  try {
+    await InvoiceSettings.updateOne(
+      { accountId },
+      { $setOnInsert: buildDefaultInvoiceSettings(accountId) },
+      { upsert: true }
+    );
+  } catch (error: any) {
+    if (error?.code !== 11000) {
+      throw error;
+    }
+  }
+}
+
+async function reserveNextInvoiceNumber(accountId: string): Promise<number> {
+  await ensureInvoiceSettings(accountId);
+
+  const previousSettings = await InvoiceSettings.findOneAndUpdate(
+    { accountId },
+    { $inc: { nextInvoiceNumber: 1 } },
+    { returnDocument: 'before' }
+  );
+
+  return previousSettings?.nextInvoiceNumber || 1;
+}
+
+async function ensureInvoicePublicIds(invoices: any[]): Promise<void> {
+  const missingPublicIds = invoices.filter((invoice) => !invoice.publicId);
+
+  await Promise.all(
+    missingPublicIds.map(async (invoice) => {
+      invoice.publicId = generateInvoicePublicId();
+      await invoice.save();
+    })
+  );
+}
+
 // POST /api/clients/:id/invoices
 export const createInvoice = async (req: Request, res: Response) => {
   try {
     const { id } = req.params;
-    const { accountId, firmName, firmAddress, firmPhone, firmNIF, firmInfo, fiscalTerritory, paymentMethod, taxRate, lines, country } = req.body;
-    if (!accountId) return res.status(400).json({ error: 'accountId requerido' });
+    const { firmName, firmAddress, firmPhone, firmNIF, firmInfo, fiscalTerritory, paymentMethod, taxRate, lines, country } = req.body;
 
     // Bloquear territorios forales (TicketBAI)
     if (country === 'ES' && FORAL_TERRITORIES.includes((fiscalTerritory || '').toLowerCase())) {
@@ -546,34 +712,20 @@ export const createInvoice = async (req: Request, res: Response) => {
     if (!client) return res.status(404).json({ error: 'Cliente no encontrado' });
     if (!verifyOwnership(req, client.accountId)) return res.status(403).json({ error: 'Acceso denegado' });
 
-    // Get and increment invoice number
-    let settings = await InvoiceSettings.findOne({ accountId });
-    if (!settings) {
-      settings = await InvoiceSettings.create({
-        _id: accountId + '_settings', accountId,
-        firmName: '', firmAddress: '', firmPhone: '', firmNIF: '', fiscalTerritory: 'comun', paymentMethod: '',
-        defaultTaxRate: 21, nextInvoiceNumber: 1,
-      });
-    }
+    const effectiveAccountId = client.accountId;
+
     const year = new Date().getFullYear();
-    const num = settings.nextInvoiceNumber || 1;
+    const num = await reserveNextInvoiceNumber(effectiveAccountId);
     const invoiceNumber = `${year}-${String(num).padStart(3, '0')}`;
-    settings.nextInvoiceNumber = num + 1;
-    await settings.save();
 
-    // Calculate totals
-    const baseAmount = (lines || []).reduce((sum: number, l: any) => sum + (l.subtotal || 0), 0);
-    const rate = taxRate ?? 21;
-    const taxAmount = Math.round(baseAmount * rate) / 100;
-    const totalAmount = baseAmount + taxAmount;
+    const { normalizedLines, taxRate: rate, baseAmount, taxAmount, totalAmount } = calculateInvoiceAmounts(lines, taxRate, 21);
 
-    // VeriFactu: calcular hash encadenado (solo cuentas ES territorio común)
+    // Chained hash for invoice verification (all countries)
     let huella = '';
     let huellaAnterior = '';
     let verifactuTimestamp = '';
-    const isSpainComun = country === 'ES' && !FORAL_TERRITORIES.includes((fiscalTerritory || '').toLowerCase());
-    if (isSpainComun && firmNIF) {
-      const lastInvoice = await Invoice.findOne({ accountId, huella: { $ne: '' } }).sort({ verifactuTimestamp: -1 });
+    if (firmNIF) {
+      const lastInvoice = await Invoice.findOne({ accountId: effectiveAccountId, huella: { $ne: '' } }).sort({ verifactuTimestamp: -1 });
       huellaAnterior = lastInvoice?.huella || '';
       const dateStr = new Date().toISOString().split('T')[0];
       huella = calcularHuellaVeriFactu(firmNIF || '', invoiceNumber, dateStr, totalAmount, huellaAnterior);
@@ -583,8 +735,9 @@ export const createInvoice = async (req: Request, res: Response) => {
     const invoice = await Invoice.create({
       _id: Date.now().toString(),
       clientId: id,
-      accountId,
+      accountId: effectiveAccountId,
       invoiceNumber,
+      publicId: generateInvoicePublicId(),
       date: new Date().toISOString().split('T')[0],
       firmName: firmName || '',
       firmAddress: firmAddress || '',
@@ -596,13 +749,7 @@ export const createInvoice = async (req: Request, res: Response) => {
       clientEmail: client.email,
       clientPhone: client.phone,
       taxRate: rate,
-      lines: (lines || []).map((l: any) => ({
-        id: Date.now().toString() + Math.random().toString(36).substring(7),
-        concept: l.concept || '',
-        quantity: l.quantity || 1,
-        price: l.price || 0,
-        subtotal: l.subtotal || 0,
-      })),
+      lines: normalizedLines,
       baseAmount,
       taxAmount,
       totalAmount,
@@ -611,7 +758,7 @@ export const createInvoice = async (req: Request, res: Response) => {
       verifactuTimestamp,
     });
 
-    dispatchWebhook(accountId, 'invoice_created', { invoiceId: invoice._id, invoiceNumber, clientId: id, clientName: client.name, totalAmount });
+    dispatchWebhook(effectiveAccountId, 'invoice_created', { invoiceId: invoice._id, invoiceNumber, clientId: id, clientName: client.name, totalAmount });
     res.status(201).json(invoice.toJSON());
   } catch (error) {
     console.error('Error al crear factura:', error);
@@ -642,36 +789,30 @@ export const deleteInvoice = async (req: Request, res: Response) => {
 export const updateInvoice = async (req: Request, res: Response) => {
   try {
     const { invoiceId } = req.params;
-    const { accountId, firmName, firmAddress, firmPhone, paymentMethod, taxRate, lines } = req.body;
-    if (!accountId) return res.status(400).json({ error: 'accountId requerido' });
+    const { firmName, firmAddress, firmPhone, paymentMethod, taxRate, lines } = req.body;
 
     const invoice = await Invoice.findById(invoiceId);
     if (!invoice) return res.status(404).json({ error: 'Factura no encontrada' });
     if (!verifyOwnership(req, invoice.accountId)) return res.status(403).json({ error: 'Acceso denegado' });
 
-    const baseAmount = (lines || []).reduce((sum: number, l: any) => sum + (l.subtotal || 0), 0);
-    const rate = taxRate ?? invoice.taxRate;
-    const taxAmount = Math.round(baseAmount * rate) / 100;
-    const totalAmount = baseAmount + taxAmount;
+    const { normalizedLines, taxRate: rate, baseAmount, taxAmount, totalAmount } = calculateInvoiceAmounts(
+      lines,
+      taxRate,
+      invoice.taxRate
+    );
 
     invoice.firmName = firmName ?? invoice.firmName;
     invoice.firmAddress = firmAddress ?? invoice.firmAddress;
     invoice.firmPhone = firmPhone ?? invoice.firmPhone;
     invoice.paymentMethod = paymentMethod ?? invoice.paymentMethod;
     invoice.taxRate = rate;
-    invoice.lines = (lines || []).map((l: any) => ({
-      id: l.id || Date.now().toString() + Math.random().toString(36).substring(7),
-      concept: l.concept || '',
-      quantity: l.quantity || 1,
-      price: l.price || 0,
-      subtotal: l.subtotal || 0,
-    }));
+    invoice.lines = normalizedLines;
     invoice.baseAmount = baseAmount;
     invoice.taxAmount = taxAmount;
     invoice.totalAmount = totalAmount;
 
     await invoice.save();
-    dispatchWebhook(accountId, 'invoice_updated', { invoiceId: invoice._id, invoiceNumber: invoice.invoiceNumber, totalAmount });
+    dispatchWebhook(invoice.accountId, 'invoice_updated', { invoiceId: invoice._id, invoiceNumber: invoice.invoiceNumber, totalAmount });
     res.json(invoice.toJSON());
   } catch (error) {
     console.error('Error al actualizar factura:', error);
@@ -683,9 +824,9 @@ export const updateInvoice = async (req: Request, res: Response) => {
 export const sendInvoiceEmail = async (req: Request, res: Response) => {
   try {
     const { invoiceId } = req.params;
-    const { accountId, cuentaCorreoId, pdfBase64, recipientEmail, message } = req.body;
-    if (!accountId || !cuentaCorreoId || !pdfBase64) {
-      return res.status(400).json({ error: 'accountId, cuentaCorreoId y pdfBase64 son requeridos' });
+    const { cuentaCorreoId, pdfBase64, recipientEmail, message } = req.body;
+    if (!cuentaCorreoId || !pdfBase64) {
+      return res.status(400).json({ error: 'cuentaCorreoId y pdfBase64 son requeridos' });
     }
 
     const invoice = await Invoice.findById(invoiceId);
@@ -693,7 +834,7 @@ export const sendInvoiceEmail = async (req: Request, res: Response) => {
     if (!verifyOwnership(req, invoice.accountId)) return res.status(403).json({ error: 'Acceso denegado' });
 
     // Get email account
-    const automation = await Automation.findOne({ accountId });
+    const automation = await Automation.findOne({ accountId: invoice.accountId });
     if (!automation) return res.status(404).json({ error: 'No hay cuentas de correo configuradas' });
     const cuenta = automation.cuentasCorreo.find((c: any) => c.id === cuentaCorreoId);
     if (!cuenta) return res.status(404).json({ error: 'Cuenta de correo no encontrada' });
@@ -756,5 +897,123 @@ export const getEmailAccounts = async (req: Request, res: Response) => {
     })));
   } catch (error) {
     res.status(500).json({ error: 'Error al obtener cuentas' });
+  }
+};
+
+// GET /api/clients/:id/reminders
+export const getClientReminders = async (req: Request, res: Response) => {
+  try {
+    const { id } = req.params;
+    const { accountId } = req.query;
+    if (!accountId) return res.status(400).json({ error: 'accountId requerido' });
+    const client = await Client.findById(id);
+    if (!client) return res.status(404).json({ error: 'Cliente no encontrado' });
+    if (!verifyOwnership(req, client.accountId)) return res.status(403).json({ error: 'Acceso denegado' });
+    const reminders = await ClientReminder.find({ clientId: id }).sort({ dateFrom: 1 });
+    res.json(reminders);
+  } catch (error) {
+    console.error('Error al obtener recordatorios:', error);
+    res.status(500).json({ error: 'Error al obtener recordatorios' });
+  }
+};
+
+// POST /api/clients/:id/reminders
+export const createReminder = async (req: Request, res: Response) => {
+  try {
+    const { id } = req.params;
+    const { accountId, title, dateFrom, dateTo, type, notes } = req.body;
+    if (!accountId) return res.status(400).json({ error: 'accountId requerido' });
+    const client = await Client.findById(id);
+    if (!client) return res.status(404).json({ error: 'Cliente no encontrado' });
+    if (!verifyOwnership(req, client.accountId)) return res.status(403).json({ error: 'Acceso denegado' });
+    const reminder = await ClientReminder.create({
+      _id: Date.now().toString(),
+      clientId: id,
+      clientName: client.name,
+      accountId,
+      title: title || '',
+      dateFrom: dateFrom || '',
+      dateTo: dateTo || '',
+      type: type || '',
+      notes: notes || '',
+    });
+    res.status(201).json(reminder.toJSON());
+  } catch (error) {
+    console.error('Error al crear recordatorio:', error);
+    res.status(500).json({ error: 'Error al crear recordatorio' });
+  }
+};
+
+// PUT /api/reminders/:reminderId
+export const updateReminder = async (req: Request, res: Response) => {
+  try {
+    const { reminderId } = req.params;
+    const { accountId, title, dateFrom, dateTo, type, notes } = req.body;
+    if (!accountId) return res.status(400).json({ error: 'accountId requerido' });
+    const reminder = await ClientReminder.findById(reminderId);
+    if (!reminder) return res.status(404).json({ error: 'Recordatorio no encontrado' });
+    if (!verifyOwnership(req, reminder.accountId)) return res.status(403).json({ error: 'Acceso denegado' });
+    reminder.title = title ?? reminder.title;
+    reminder.dateFrom = dateFrom ?? reminder.dateFrom;
+    reminder.dateTo = dateTo ?? reminder.dateTo;
+    reminder.type = type ?? reminder.type;
+    reminder.notes = notes ?? reminder.notes;
+    await reminder.save();
+    res.json(reminder.toJSON());
+  } catch (error) {
+    console.error('Error al actualizar recordatorio:', error);
+    res.status(500).json({ error: 'Error al actualizar recordatorio' });
+  }
+};
+
+// DELETE /api/reminders/:reminderId
+export const deleteReminder = async (req: Request, res: Response) => {
+  try {
+    const { reminderId } = req.params;
+    const { accountId } = req.query;
+    if (!accountId) return res.status(400).json({ error: 'accountId requerido' });
+    const reminder = await ClientReminder.findById(reminderId);
+    if (!reminder) return res.status(404).json({ error: 'Recordatorio no encontrado' });
+    if (!verifyOwnership(req, reminder.accountId)) return res.status(403).json({ error: 'Acceso denegado' });
+    await ClientReminder.findByIdAndDelete(reminderId);
+    res.json({ ok: true });
+  } catch (error) {
+    console.error('Error al eliminar recordatorio:', error);
+    res.status(500).json({ error: 'Error al eliminar recordatorio' });
+  }
+};
+
+// GET /api/reminders?accountId=xxx
+export const getAllReminders = async (req: Request, res: Response) => {
+  try {
+    const { accountId } = req.query;
+    if (!accountId) return res.status(400).json({ error: 'accountId requerido' });
+    if (!verifyOwnership(req, accountId as string)) return res.status(403).json({ error: 'Acceso denegado' });
+    const reminders = await ClientReminder.find({ accountId }).sort({ dateFrom: 1 });
+    res.json(reminders);
+  } catch (error) {
+    console.error('Error al obtener recordatorios:', error);
+    res.status(500).json({ error: 'Error al obtener recordatorios' });
+  }
+};
+
+// PUT /api/invoices/:invoiceId/payment-status
+export const updateInvoicePaymentStatus = async (req: Request, res: Response) => {
+  try {
+    const { invoiceId } = req.params;
+    const { accountId, paymentStatus } = req.body;
+    if (!accountId) return res.status(400).json({ error: 'accountId requerido' });
+    if (!['pending', 'paid', 'unpaid'].includes(paymentStatus)) {
+      return res.status(400).json({ error: 'Estado de pago no válido' });
+    }
+    const invoice = await Invoice.findById(invoiceId);
+    if (!invoice) return res.status(404).json({ error: 'Factura no encontrada' });
+    if (!verifyOwnership(req, invoice.accountId)) return res.status(403).json({ error: 'Acceso denegado' });
+    invoice.paymentStatus = paymentStatus;
+    await invoice.save();
+    res.json(invoice.toJSON());
+  } catch (error) {
+    console.error('Error al actualizar estado de pago:', error);
+    res.status(500).json({ error: 'Error al actualizar estado de pago' });
   }
 };

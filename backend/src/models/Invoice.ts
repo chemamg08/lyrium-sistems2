@@ -1,3 +1,4 @@
+import crypto from 'crypto';
 import mongoose, { Schema } from 'mongoose';
 
 export interface IInvoiceLine {
@@ -13,6 +14,7 @@ export interface IInvoice {
   clientId: string;
   accountId: string;
   invoiceNumber: string;
+  publicId: string;
   date: string;
   firmName: string;
   firmAddress: string;
@@ -34,6 +36,7 @@ export interface IInvoice {
   huella: string;
   huellaAnterior: string;
   verifactuTimestamp: string;
+  paymentStatus?: 'pending' | 'paid' | 'unpaid';
 }
 
 export interface IInvoiceSettings {
@@ -58,11 +61,14 @@ const invoiceLineSchema = new Schema({
   subtotal: { type: Number, default: 0 },
 }, { _id: false });
 
+export const generateInvoicePublicId = (): string => crypto.randomBytes(16).toString('hex');
+
 const invoiceSchema = new Schema<IInvoice>({
   _id: { type: String, required: true },
   clientId: { type: String, required: true, index: true },
   accountId: { type: String, required: true },
   invoiceNumber: { type: String, required: true },
+  publicId: { type: String, default: generateInvoicePublicId },
   date: { type: String, required: true },
   firmName: { type: String, default: '' },
   firmAddress: { type: String, default: '' },
@@ -83,7 +89,17 @@ const invoiceSchema = new Schema<IInvoice>({
   huella: { type: String, default: '' },
   huellaAnterior: { type: String, default: '' },
   verifactuTimestamp: { type: String, default: '' },
+  paymentStatus: { type: String, enum: ['pending', 'paid', 'unpaid'], default: 'pending' },
 }, { _id: false, versionKey: false });
+
+invoiceSchema.pre('validate', function () {
+  if (!this.publicId) {
+    this.publicId = generateInvoicePublicId();
+  }
+});
+
+invoiceSchema.index({ publicId: 1 }, { unique: true, sparse: true });
+invoiceSchema.index({ accountId: 1, invoiceNumber: 1 }, { unique: true });
 
 invoiceSchema.set('toJSON', {
   transform: (_doc: any, ret: any) => {
