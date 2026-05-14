@@ -285,6 +285,7 @@ const Signup = () => {
                         <CommandItem
                           key={c.value}
                           value={c.label}
+                          disabled={c.value !== 'ES'}
                           onSelect={() => { setCountry(c.value); setCountryOpen(false); }}
                         >
                           <Check className={`mr-2 h-4 w-4 ${country === c.value ? "opacity-100" : "opacity-0"}`} />
