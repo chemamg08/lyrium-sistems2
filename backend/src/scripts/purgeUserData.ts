@@ -1,5 +1,6 @@
 import dotenv from 'dotenv';
 import mongoose from 'mongoose';
+import type { Db } from 'mongodb';
 
 dotenv.config();
 
@@ -53,8 +54,8 @@ type CollectionSummary = {
   after: number;
 };
 
-async function purgeCollection(name: string): Promise<CollectionSummary> {
-  const collection = mongoose.connection.db.collection(name);
+async function purgeCollection(db: Db, name: string): Promise<CollectionSummary> {
+  const collection = db.collection(name);
   const before = await collection.countDocuments();
   const result = await collection.deleteMany({});
   const after = await collection.countDocuments();
@@ -75,10 +76,15 @@ async function main() {
   await mongoose.connect(MONGODB_URI, { dbName: DB_NAME });
 
   try {
+    const db = mongoose.connection.db;
+    if (!db) {
+      throw new Error('No se pudo obtener la conexión a la base de datos');
+    }
+
     const summaries: CollectionSummary[] = [];
 
     for (const collectionName of USER_DATA_COLLECTIONS) {
-      summaries.push(await purgeCollection(collectionName));
+      summaries.push(await purgeCollection(db, collectionName));
     }
 
     const deletedTotal = summaries.reduce((acc, item) => acc + item.deleted, 0);
