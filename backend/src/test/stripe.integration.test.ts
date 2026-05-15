@@ -13,9 +13,11 @@ import { describe, it, expect, beforeAll, afterAll, beforeEach, afterEach, vi } 
 import Stripe from 'stripe';
 import dotenv from 'dotenv';
 import path from 'path';
+import { fileURLToPath } from 'url';
 import mongoose from 'mongoose';
 
-dotenv.config({ path: path.resolve(import.meta.dirname, '../../.env') });
+const __dirname = path.dirname(fileURLToPath(import.meta.url));
+dotenv.config({ path: path.resolve(__dirname, '../../.env'), override: true });
 
 if (!process.env.JWT_SECRET) {
   process.env.JWT_SECRET = 'integration-test-secret';
@@ -2760,5 +2762,184 @@ describe('14. Persistencia real en Mongo aislada', () => {
     expect(storedSub.stripePaymentMethodId).toBe(paymentMethod.id);
     expect(storedSub.paymentMethod?.last4).toBe('4242');
     expect(new Date(storedSub.currentPeriodEnd).getTime()).toBeGreaterThan(Date.now());
+  });
+});
+
+// =============================================================================
+// SECCIÓN 15: PLAN SIN CARGO
+// =============================================================================
+
+describe('15. Plan sin cargo', () => {
+  let login: any;
+  let activateFreePlan: any;
+  let validateSubscription: any;
+  let createSubaccount: any;
+
+  beforeAll(async () => {
+    const mod = await import('../controllers/accountsController.js');
+    login = mod.login;
+    activateFreePlan = mod.activateFreePlan;
+    createSubaccount = mod.createSubaccount;
+    const subMod = await import('../subscriptions.js');
+    validateSubscription = subMod.validateSubscription;
+  });
+
+  beforeEach(() => {
+    vi.clearAllMocks();
+    if (HAS_REAL_MONGO) {
+      useRealMongoBackedModels();
+    }
+  });
+
+  it('Test 66 — Login expirado principal → 403 con needsPayment y canAccessFree', async () => {
+    const mockUser = {
+      _id: 'acc_free_66',
+      name: 'Free Test User',
+      email: 'free66@lyrium.io',
+      password: '$2b$10$hashed',
+      country: 'ES',
+      role: 'user',
+      emailVerified: true,
+      twoFactorEnabled: true,
+      twoFactorSecret: 'JBSWY3DPEHPK3PXP',
+      disabled: false,
+      failedLoginAttempts: 0,
+      lockUntil: null,
+      updateOne: vi.fn().mockResolvedValue({}),
+      save: vi.fn(),
+    };
+
+    const expiredSub = mockDoc({
+      _id: 'sub_free_66',
+      accountId: 'acc_free_66',
+      status: 'expired',
+      currentPeriodEnd: new Date(Date.now() - 86400000).toISOString(),
+    });
+
+    AccMock.findOne.mockResolvedValue(mockUser);
+    SubaccMock.findOne.mockResolvedValue(null);
+    SubMock.findOne.mockResolvedValue(expiredSub);
+    BcryptMock.compare.mockResolvedValue(true);
+
+    const req = mockReq({ email: 'free66@lyrium.io', password: 'Test1234!', totpCode: '123456' });
+    const res = mockRes();
+
+    await login(req, res);
+
+    expect(res.status).toHaveBeenCalledWith(403);
+    const data = res.json.mock.calls[0][0];
+    expect(data.needsPayment).toBe(true);
+    expect(data.canAccessFree).toBe(true);
+    expect(data.type).toBe('main');
+  });
+
+  mongoIt('Test 67 — Activar plan sin cargo desde expirado → free activo hasta 2099', async () => {
+    const accountId = 'acc_real_free_67';
+    await createRealAccount(accountId, { email: 'free67@lyrium-test.io' });
+    await createRealSubscription(accountId, {
+      status: 'expired',
+      currentPeriodEnd: pastDate(5),
+      plan: 'starter',
+      interval: 'monthly',
+    });
+
+    const req = mockReq({}, {}, {}, {
+      userId: accountId,
+      email: 'free67@lyrium-test.io',
+      type: 'main',
+      role: 'user',
+    });
+    const res = mockRes();
+
+    await activateFreePlan(req, res);
+
+    expect(res.json).toHaveBeenCalledWith({ success: true, plan: 'free' });
+
+    const storedSub = await RealSubscriptionModel.findOne({ accountId });
+    expect(storedSub.plan).toBe('free');
+    expect(storedSub.status).toBe('active');
+    expect(new Date(storedSub.currentPeriodEnd).getFullYear()).toBe(2099);
+
+    const storedAccount = await RealAccountModel.findById(accountId);
+    expect(storedAccount.planDowngradedAt).toBeDefined();
+  });
+
+  mongoIt('Test 68 — Login con plan free activo → 200 exitoso', async () => {
+    const accountId = 'acc_real_free_68';
+    await createRealAccount(accountId, {
+      email: 'free68@lyrium-test.io',
+      emailVerified: true,
+      twoFactorEnabled: true,
+      twoFactorSecret: 'JBSWY3DPEHPK3PXP',
+    });
+    await createRealSubscription(accountId, {
+      plan: 'free',
+      status: 'active',
+      currentPeriodEnd: new Date('2099-12-31').toISOString(),
+    });
+
+    BcryptMock.compare.mockResolvedValue(true);
+    AccMock.findOne.mockImplementation((filter: any) => RealAccountModel.findOne(filter));
+    SubMock.findOne.mockImplementation((filter: any) => RealSubscriptionModel.findOne(filter));
+
+    const req = mockReq({ email: 'free68@lyrium-test.io', password: 'Test1234!', totpCode: '123456' });
+    const res = mockRes();
+
+    await login(req, res);
+
+    expect(res.json).toHaveBeenCalled();
+    const data = res.json.mock.calls[0][0];
+    expect(data.success).toBe(true);
+    expect(data.user.email).toBe('free68@lyrium-test.io');
+    expect(data.needsPayment).toBeUndefined();
+  });
+
+  it('Test 69 — validateSubscription con plan free → siempre valid=true', async () => {
+    const freeSub = mockDoc({
+      _id: 'sub_free_69',
+      accountId: 'acc_free_69',
+      plan: 'free',
+      status: 'active',
+      currentPeriodEnd: new Date('2099-12-31').toISOString(),
+      updatedAt: new Date().toISOString(),
+    });
+    SubMock.findOne.mockResolvedValue(freeSub);
+
+    const req = mockReq({}, { accountId: 'acc_free_69' });
+    const res = mockRes();
+
+    await validateSubscription(req, res);
+
+    expect(res.json).toHaveBeenCalledWith({ valid: true, subscription: expect.any(Object) });
+    expect(freeSub.save).not.toHaveBeenCalled();
+  });
+
+  it('Test 70 — Crear subcuenta con plan free → 403', async () => {
+    const freeSub = mockDoc({
+      _id: 'sub_free_70',
+      accountId: 'acc_free_70_parent',
+      plan: 'free',
+      status: 'active',
+      currentPeriodEnd: new Date('2099-12-31').toISOString(),
+    });
+    SubMock.findOne.mockResolvedValue(freeSub);
+
+    const req = mockReq({
+      name: 'Sub Test',
+      email: 'sub70@lyrium.io',
+      password: 'Test1234!',
+      parentAccountId: 'acc_free_70_parent',
+    }, {}, {}, {
+      userId: 'acc_free_70_parent',
+      email: 'parent@lyrium.io',
+      type: 'main',
+      role: 'user',
+    });
+    const res = mockRes();
+
+    await createSubaccount(req, res);
+
+    expect(res.status).toHaveBeenCalledWith(403);
+    expect(res.json.mock.calls[0][0].error).toContain('plan Sin Cargo');
   });
 });

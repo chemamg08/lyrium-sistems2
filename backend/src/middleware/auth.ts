@@ -175,7 +175,10 @@ async function checkAccountAndSubscription(decoded: AuthPayload, req: AuthReques
         const subscription = await Subscription.findOne({ accountId: subscriptionAccountId });
         if (subscription) {
           if (subscription.plan === 'free' && subscription.status === 'active') {
-            return next();
+            if (decoded.type === 'main') {
+              return next();
+            }
+            return res.status(403).json({ error: 'El plan Sin Cargo no permite el acceso a subcuentas.' });
           }
           const periodEnd = new Date(subscription.currentPeriodEnd);
           if (periodEnd < new Date()) {
