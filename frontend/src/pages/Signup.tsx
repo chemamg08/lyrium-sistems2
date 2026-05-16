@@ -110,6 +110,7 @@ const Signup = () => {
   const [countryOpen, setCountryOpen] = useState(false);
   const [isLoading, setIsLoading] = useState(false);
   const [acceptedTerms, setAcceptedTerms] = useState(false);
+  const [acceptedResponseDelayNotice, setAcceptedResponseDelayNotice] = useState(false);
   const [promoCode, setPromoCode] = useState('');
   const [promoCodeStatus, setPromoCodeStatus] = useState<'idle' | 'valid' | 'invalid'>('idle');
   const [promoCodeInfo, setPromoCodeInfo] = useState<any>(null);
@@ -367,7 +368,18 @@ const Signup = () => {
                 <a href="/privacidad" target="_blank" rel="noopener noreferrer" className="underline hover:text-foreground">{t('auth.privacyLink')}</a>
               </label>
             </div>
-            <Button type="submit" className="w-full" disabled={isLoading || !acceptedTerms}>
+            <div className="flex items-start gap-2">
+              <Checkbox
+                id="response-delay-notice"
+                checked={acceptedResponseDelayNotice}
+                onCheckedChange={(v) => setAcceptedResponseDelayNotice(v === true)}
+                className="mt-0.5"
+              />
+              <label htmlFor="response-delay-notice" className="text-xs text-muted-foreground leading-tight cursor-pointer">
+                Entiendo que, para garantizar respuestas seguras y precisas, la IA legal puede tardar m&aacute;s en responder en algunos casos.
+              </label>
+            </div>
+            <Button type="submit" className="w-full" disabled={isLoading || !acceptedTerms || !acceptedResponseDelayNotice}>
               {isLoading ? t('auth.creating') : t('auth.createAccount')}
             </Button>
             <Button 
