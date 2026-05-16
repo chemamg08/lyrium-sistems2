@@ -48,6 +48,7 @@ import { cn } from "@/lib/utils";
 import { useTranslation } from "react-i18next";
 import { useStreamingChat } from "@/hooks/useStreamingChat";
 import { authFetch } from '../lib/authFetch';
+import ThinkingDetails from "@/components/ThinkingDetails";
 import { getCurrencyForCountry } from '../i18n';
 
 const API_URL = import.meta.env.VITE_API_URL;
@@ -1190,15 +1191,7 @@ export default function FiscalAdvisory() {
                           }`}
                         >
                           {msg.role === 'assistant' && msg.reasoning && (
-                            <details className="mb-2 not-prose">
-                              <summary className="text-xs text-muted-foreground cursor-pointer select-none flex items-center gap-1.5 list-none">
-                                <Brain className="h-3 w-3" />
-                                <span>Pensando...</span>
-                              </summary>
-                              <div className="mt-1.5 text-xs text-muted-foreground/80 font-mono whitespace-pre-wrap border-t border-border/40 pt-1.5" style={{ maxHeight: '4.5em', overflowY: 'auto' }}>
-                                {msg.reasoning}
-                              </div>
-                            </details>
+                            <ThinkingDetails content={msg.reasoning} />
                           )}
                           <ReactMarkdown>{msg.content.replace(/\[OFFER_PDF\]/g, '')}</ReactMarkdown>
                           {msg.role === "assistant" && (
@@ -1257,15 +1250,7 @@ export default function FiscalAdvisory() {
                   <div className="flex justify-start">
                     <div className="max-w-[85%] md:max-w-[70%] rounded-lg p-3 text-sm leading-relaxed prose prose-sm dark:prose-invert prose-p:my-1 prose-ul:my-1 prose-ol:my-1 bg-muted relative group">
                       {fiscalStreamingReasoning && (
-                        <details className="mb-2 not-prose" open>
-                          <summary className="text-xs text-muted-foreground cursor-pointer select-none flex items-center gap-1.5 list-none">
-                            <Brain className="h-3 w-3" />
-                            <span>Pensando...</span>
-                          </summary>
-                          <div className="mt-1.5 text-xs text-muted-foreground/80 font-mono whitespace-pre-wrap border-t border-border/40 pt-1.5" style={{ maxHeight: '4.5em', overflowY: 'auto' }}>
-                            {fiscalStreamingReasoning}
-                          </div>
-                        </details>
+                        <ThinkingDetails content={fiscalStreamingReasoning} open />
                       )}
                       <ReactMarkdown>{fiscalStreamingText}</ReactMarkdown>
                     </div>

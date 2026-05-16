@@ -297,10 +297,14 @@ export async function generateContractFromText(
 
     // Tipografía
     const bodySize = 10.5;
+    const clauseSize = 10;
+    const compactSize = 9.25;
     const h1Size = 16;
     const h2Size = 13;
     const h3Size = 11.5;
     const lhBody = 16;
+    const lhClause = 15;
+    const lhCompact = 13.5;
     const lhH1 = 26;
     const lhH2 = 21;
     const lhH3 = 18;
@@ -359,6 +363,25 @@ export async function generateContractFromText(
       return segs.length ? segs : [{ text: src, bold: false }];
     }
 
+    function splitTokenToFit(word: string, isBold: boolean, maxW: number, fs: number) {
+      const targetFont = isBold ? boldFont : font;
+      if (targetFont.widthOfTextAtSize(word, fs) <= maxW) return [word];
+
+      const parts: string[] = [];
+      let current = '';
+      for (const char of word) {
+        const next = current + char;
+        if (current && targetFont.widthOfTextAtSize(next, fs) > maxW) {
+          parts.push(`${current}-`);
+          current = char;
+        } else {
+          current = next;
+        }
+      }
+      if (current) parts.push(current);
+      return parts;
+    }
+
     // Wrap mixed inline segments to maxWidth → array of display lines (keeping **..** markers)
     function wrapInline(segs: { text: string; bold: boolean }[], maxW: number, fs: number): string[] {
       const spW = font.widthOfTextAtSize(' ', fs);
@@ -366,7 +389,10 @@ export async function generateContractFromText(
       const words: Word[] = [];
       for (const seg of segs) {
         const tokens = seg.text.split(/\s+/).filter(Boolean);
-        for (const t of tokens) words.push({ word: t, bold: seg.bold });
+        for (const token of tokens) {
+          const tokenParts = splitTokenToFit(token, seg.bold, maxW, fs);
+          tokenParts.forEach((part) => words.push({ word: part, bold: seg.bold }));
+        }
       }
       const lines: string[] = [];
       let curLine = '';
@@ -398,6 +424,14 @@ export async function generateContractFromText(
         currentPage.drawText(seg.text, { x, y: ly, size: fs, font: f, color: rgb(0.05, 0.05, 0.05) });
         x += f.widthOfTextAtSize(seg.text, fs);
       }
+    }
+
+    function isClauseLine(src: string) {
+      return /^(\d+([.)]|\.\d+)|[A-Z]\)|CL[AÁ]USULA|ANEXO|APARTADO)/i.test(src.trim());
+    }
+
+    function isCompactLine(src: string) {
+      return /^(Firmado|Firma|DNI|NIF|Email|Correo|Tel[eé]fono|En\s+\w+|Lugar|Fecha)/i.test(src.trim());
     }
 
     // ── Main render loop ──────────────────────────────────────────────
@@ -459,13 +493,25 @@ export async function generateContractFromText(
       }
 
       // Normal paragraph (with optional **bold** spans)
-      const wrapped = wrapInline(parseInline(line.trim()), maxWidth, bodySize);
+      const trimmedLine = line.trim();
+      const paragraphSize = isCompactLine(trimmedLine)
+        ? compactSize
+        : isClauseLine(trimmedLine)
+          ? clauseSize
+          : bodySize;
+      const paragraphLineHeight = isCompactLine(trimmedLine)
+        ? lhCompact
+        : isClauseLine(trimmedLine)
+          ? lhClause
+          : lhBody;
+      const paragraphIndent = isClauseLine(trimmedLine) ? 14 : 0;
+      const wrapped = wrapInline(parseInline(trimmedLine), maxWidth - paragraphIndent, paragraphSize);
       for (const wl of wrapped) {
-        checkNewPage(lhBody);
-        drawInlineLine(wl, marginX, y, bodySize);
-        y -= lhBody;
+        checkNewPage(paragraphLineHeight);
+        drawInlineLine(wl, marginX + paragraphIndent, y, paragraphSize);
+        y -= paragraphLineHeight;
       }
-      y -= lhBody * 0.18; // small gap after paragraph
+      y -= paragraphLineHeight * 0.18; // small gap after paragraph
     }
 
     // ── Page numbers ──────────────────────────────────────────────────
@@ -570,7 +616,28 @@ export async function generateContractDOCX(text: string, outputFileName: string)
       continue;
     }
 
-    const runs = parseInlineMarkdown(line);
+    if (/^(\d+([.)]|\.\d+)|[A-Z]\)|CL[AÁ]USULA|ANEXO|APARTADO)/i.test(line)) {
+      const runs = parseInlineMarkdown(line, 22);
+      children.push(new Paragraph({
+        children: runs,
+        spacing: { before: 80, after: 100 },
+        indent: { left: 240 },
+        alignment: AlignmentType.JUSTIFIED,
+      }));
+      continue;
+    }
+
+    if (/^(Firmado|Firma|DNI|NIF|Email|Correo|Tel[eé]fono|En\s+\w+|Lugar|Fecha)/i.test(line)) {
+      const runs = parseInlineMarkdown(line, 20);
+      children.push(new Paragraph({
+        children: runs,
+        spacing: { after: 90 },
+        alignment: AlignmentType.JUSTIFIED,
+      }));
+      continue;
+    }
+
+    const runs = parseInlineMarkdown(line, 24);
     children.push(new Paragraph({
       children: runs,
       spacing: { after: 120 },
@@ -604,7 +671,7 @@ export async function generateContractDOCX(text: string, outputFileName: string)
 /**
  * Parse inline markdown: **bold** text becomes TextRun objects.
  */
-function parseInlineMarkdown(text: string): TextRun[] {
+function parseInlineMarkdown(text: string, size = 24): TextRun[] {
   const runs: TextRun[] = [];
   const regex = /\*\*(.+?)\*\*/g;
   let lastIndex = 0;
@@ -613,19 +680,19 @@ function parseInlineMarkdown(text: string): TextRun[] {
   while ((match = regex.exec(text)) !== null) {
     if (match.index > lastIndex) {
       const before = text.substring(lastIndex, match.index);
-      if (before) runs.push(new TextRun({ text: before, size: 24, font: 'Calibri' }));
+      if (before) runs.push(new TextRun({ text: before, size, font: 'Calibri' }));
     }
-    runs.push(new TextRun({ text: match[1], bold: true, size: 24, font: 'Calibri' }));
+    runs.push(new TextRun({ text: match[1], bold: true, size, font: 'Calibri' }));
     lastIndex = regex.lastIndex;
   }
 
   if (lastIndex < text.length) {
     const remaining = text.substring(lastIndex);
-    if (remaining) runs.push(new TextRun({ text: remaining, size: 24, font: 'Calibri' }));
+    if (remaining) runs.push(new TextRun({ text: remaining, size, font: 'Calibri' }));
   }
 
   if (runs.length === 0) {
-    runs.push(new TextRun({ text, size: 24, font: 'Calibri' }));
+    runs.push(new TextRun({ text, size, font: 'Calibri' }));
   }
 
   return runs;

@@ -10,6 +10,8 @@ import { QRCodeSVG } from 'qrcode.react';
 import NewCaseModal from '@/components/NewCaseModal';
 import ModuleGuide from "@/components/ModuleGuide";
 import { Button } from "@/components/ui/button";
+import SpecialtiesManagerModal from "@/components/SpecialtiesManagerModal";
+import ThinkingDetails from "@/components/ThinkingDetails";
 
 interface Client {
   id: string;
@@ -153,6 +155,12 @@ interface Subaccount {
   id: string;
   name: string;
   email: string;
+}
+
+interface SpecialityItem {
+  id: string;
+  nombre: string;
+  descripcion?: string;
 }
 
 const getAssignedSubaccountIds = (client?: Pick<Client, 'assignedSubaccountId' | 'assignedSubaccountIds'> | null): string[] => {
@@ -366,6 +374,11 @@ const Clients = () => {
   const [globalRemindersSearch, setGlobalRemindersSearch] = useState('');
   const [globalRemindersSubFilter, setGlobalRemindersSubFilter] = useState<string>('all');
   const [reminderToDelete, setReminderToDelete] = useState<string | null>(null);
+  const [specialities, setSpecialities] = useState<SpecialityItem[]>([]);
+  const [showSpecialities, setShowSpecialities] = useState(false);
+  const [showSpecialityForm, setShowSpecialityForm] = useState(false);
+  const [editingSpecialityId, setEditingSpecialityId] = useState<string | null>(null);
+  const [specialityForm, setSpecialityForm] = useState({ nombre: '', descripcion: '' });
 
   useEffect(() => {
     const country = sessionStorage.getItem('country') || 'ES';
@@ -443,6 +456,24 @@ const Clients = () => {
 
     return () => clearTimeout(timer);
   }, []);
+
+  const loadSpecialities = useCallback(async () => {
+    const accId = sessionStorage.getItem('accountId');
+    if (!accId) return;
+
+    try {
+      const response = await authFetch(`${API_URL}/automatizaciones?accountId=${accId}`);
+      if (!response.ok) return;
+      const data = await response.json();
+      setSpecialities(data.especialidades || []);
+    } catch (error) {
+      console.error('Error al cargar especialidades:', error);
+    }
+  }, []);
+
+  useEffect(() => {
+    loadSpecialities();
+  }, [loadSpecialities]);
 
   useEffect(() => {
     if (lyriClientId) {
@@ -1659,6 +1690,56 @@ const Clients = () => {
 
   const activeLyriChat = lyriChats.find((c) => c.id === activeLyriChatId);
 
+  const saveSpeciality = async () => {
+    const accId = sessionStorage.getItem('accountId');
+    if (!accId || !specialityForm.nombre.trim()) return;
+
+    try {
+      const url = editingSpecialityId
+        ? `${API_URL}/automatizaciones/especialidades/${editingSpecialityId}`
+        : `${API_URL}/automatizaciones/especialidades`;
+      const method = editingSpecialityId ? 'PUT' : 'POST';
+      const response = await authFetch(url, {
+        method,
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          accountId: accId,
+          nombre: specialityForm.nombre.trim(),
+          descripcion: specialityForm.descripcion.trim(),
+        }),
+      });
+      if (!response.ok) return;
+
+      setEditingSpecialityId(null);
+      setShowSpecialityForm(false);
+      setSpecialityForm({ nombre: '', descripcion: '' });
+      await loadSpecialities();
+    } catch (error) {
+      console.error('Error al guardar especialidad:', error);
+    }
+  };
+
+  const startEditSpeciality = (speciality: SpecialityItem) => {
+    setEditingSpecialityId(speciality.id);
+    setSpecialityForm({ nombre: speciality.nombre, descripcion: speciality.descripcion || '' });
+    setShowSpecialityForm(true);
+  };
+
+  const deleteSpeciality = async (specialityId: string) => {
+    const accId = sessionStorage.getItem('accountId');
+    if (!accId) return;
+
+    try {
+      const response = await authFetch(`${API_URL}/automatizaciones/especialidades/${specialityId}?accountId=${accId}`, {
+        method: 'DELETE',
+      });
+      if (!response.ok) return;
+      await loadSpecialities();
+    } catch (error) {
+      console.error('Error al eliminar especialidad:', error);
+    }
+  };
+
   const toggleLyriFlag = async (messageId: string) => {
     if (!activeLyriChat) return;
     const msg: any = activeLyriChat.messages.find((m: any) => m.id === messageId);
@@ -1726,6 +1807,13 @@ const Clients = () => {
           <p className="text-sm text-muted-foreground mt-1">{t('clients.count', {count: clients.length})}</p>
         </div>
         <div className="flex items-center gap-3">
+          <button
+            onClick={() => setShowSpecialities(true)}
+            className="flex items-center gap-2 px-4 py-2 rounded-lg border border-border bg-card hover:bg-accent text-foreground text-sm font-medium transition-colors"
+          >
+            <Briefcase className="h-4 w-4" />
+            Especialidades
+          </button>
           <button onClick={() => { setShowGlobalReminders(true); loadGlobalReminders(); }} className="flex items-center gap-2 px-4 py-2 rounded-lg border border-border bg-card hover:bg-accent text-foreground text-sm font-medium transition-colors">
             <Calendar className="h-4 w-4" />
             {t('clients.events') || 'Eventos'}
@@ -3467,15 +3555,7 @@ const Clients = () => {
                     className={`max-w-[70%] rounded-lg px-4 py-3 text-sm leading-relaxed prose prose-sm dark:prose-invert prose-p:my-1 prose-ul:my-1 prose-ol:my-1 relative group transition-all ${highlightedLyriMsgId === msg.id ? 'ring-2 ring-yellow-500' : ''} ${msg.flags && msg.flags.length > 0 ? 'border-l-2 border-l-yellow-500' : ''} ${msg.role === "user" ? "bg-primary text-primary-foreground" : "bg-accent text-accent-foreground"}`}
                   >
                     {msg.role === 'assistant' && msg.reasoning && (
-                      <details className="mb-2 not-prose">
-                        <summary className="text-xs text-muted-foreground cursor-pointer select-none flex items-center gap-1.5 list-none">
-                          <Brain className="h-3 w-3" />
-                          <span>Pensando...</span>
-                        </summary>
-                        <div className="mt-1.5 text-xs text-muted-foreground/80 font-mono whitespace-pre-wrap border-t border-border/40 pt-1.5" style={{ maxHeight: '4.5em', overflowY: 'auto' }}>
-                          {msg.reasoning}
-                        </div>
-                      </details>
+                      <ThinkingDetails content={msg.reasoning} />
                     )}
                     <ReactMarkdown>{msg.content}</ReactMarkdown>
                     <button
@@ -3499,15 +3579,7 @@ const Clients = () => {
                 <div className="flex justify-start">
                   <div className="max-w-[70%] rounded-lg px-4 py-3 text-sm leading-relaxed prose prose-sm dark:prose-invert prose-p:my-1 prose-ul:my-1 prose-ol:my-1 bg-accent text-accent-foreground">
                     {lyriStreamingReasoning && (
-                      <details className="mb-2 not-prose" open>
-                        <summary className="text-xs text-muted-foreground cursor-pointer select-none flex items-center gap-1.5 list-none">
-                          <Brain className="h-3 w-3" />
-                          <span>Pensando...</span>
-                        </summary>
-                        <div className="mt-1.5 text-xs text-muted-foreground/80 font-mono whitespace-pre-wrap border-t border-border/40 pt-1.5" style={{ maxHeight: '4.5em', overflowY: 'auto' }}>
-                          {lyriStreamingReasoning}
-                        </div>
-                      </details>
+                      <ThinkingDetails content={lyriStreamingReasoning} open />
                     )}
                     <ReactMarkdown>{lyriStreamingText}</ReactMarkdown>
                   </div>
@@ -3958,6 +4030,42 @@ const Clients = () => {
           </div>
         </div>
       )}
+
+      <SpecialtiesManagerModal
+        open={showSpecialities}
+        title="Especialidades"
+        specialities={specialities}
+        showCreateForm={showSpecialityForm}
+        editingId={editingSpecialityId}
+        form={specialityForm}
+        createLabel="Crear especialidad"
+        editLabel="Editar especialidad"
+        namePlaceholder="Nombre"
+        descriptionPlaceholder="Describe la especialidad"
+        cancelLabel={t('automations.cancel', 'Cancelar')}
+        saveLabel={t('automations.save', 'Guardar')}
+        emptyLabel="No hay especialidades creadas"
+        singularCountLabel="especialidad"
+        pluralCountLabel="especialidades"
+        onClose={() => {
+          setShowSpecialities(false);
+          setShowSpecialityForm(false);
+          setEditingSpecialityId(null);
+        }}
+        onStartCreate={() => {
+          setEditingSpecialityId(null);
+          setSpecialityForm({ nombre: '', descripcion: '' });
+          setShowSpecialityForm(true);
+        }}
+        onCancelForm={() => {
+          setShowSpecialityForm(false);
+          setEditingSpecialityId(null);
+        }}
+        onSave={saveSpeciality}
+        onEdit={startEditSpeciality}
+        onDelete={deleteSpeciality}
+        onFormChange={setSpecialityForm}
+      />
 
       {/* Global Reminders Modal */}
       {showGlobalReminders && (

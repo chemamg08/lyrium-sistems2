@@ -127,6 +127,12 @@ const DocumentSummaries = () => {
   };
 
   const handleChatCreated = (chatId: string) => {
+    if (!chatId) {
+      setCurrentChatId(null);
+      sessionStorage.removeItem('currentSummaryChat');
+      return;
+    }
+
     setCurrentChatId(chatId);
     sessionStorage.setItem('currentSummaryChat', chatId);
     loadAllChats();

@@ -5,6 +5,7 @@ import { useTranslation } from "react-i18next";
 import { useToast } from "@/components/ui/use-toast";
 import { useStreamingChat } from "@/hooks/useStreamingChat";
 import { authFetch } from '../lib/authFetch';
+import ThinkingDetails from "@/components/ThinkingDetails";
 
 interface UploadedFile {
   id: string;
@@ -649,15 +650,7 @@ const DocumentSummariesChatInterface = ({
                 }`}
               >
                 {msg.role === 'assistant' && msg.reasoning && (
-                  <details className="mb-2 not-prose">
-                    <summary className="text-xs text-muted-foreground cursor-pointer select-none flex items-center gap-1.5 list-none">
-                      <Brain className="h-3 w-3" />
-                      <span>Pensando...</span>
-                    </summary>
-                    <div className="mt-1.5 text-xs text-muted-foreground/80 font-mono whitespace-pre-wrap border-t border-border/40 pt-1.5" style={{ maxHeight: '4.5em', overflowY: 'auto' }}>
-                      {msg.reasoning}
-                    </div>
-                  </details>
+                  <ThinkingDetails content={msg.reasoning} />
                 )}
                 {msg.role === "assistant" ? (
                   <ReactMarkdown>{displayContent}</ReactMarkdown>
@@ -732,15 +725,7 @@ const DocumentSummariesChatInterface = ({
           <div className="flex justify-start">
             <div className="max-w-[85%] md:max-w-[70%] rounded-lg px-4 py-3 text-sm leading-relaxed prose prose-sm dark:prose-invert prose-p:my-1 prose-ul:my-1 prose-ol:my-1 bg-chat-ai text-chat-ai-foreground">
               {streamingReasoning && (
-                <details className="mb-2 not-prose" open>
-                  <summary className="text-xs text-muted-foreground cursor-pointer select-none flex items-center gap-1.5 list-none">
-                    <Brain className="h-3 w-3" />
-                    <span>Pensando...</span>
-                  </summary>
-                  <div className="mt-1.5 text-xs text-muted-foreground/80 font-mono whitespace-pre-wrap border-t border-border/40 pt-1.5" style={{ maxHeight: '4.5em', overflowY: 'auto' }}>
-                    {streamingReasoning}
-                  </div>
-                </details>
+                <ThinkingDetails content={streamingReasoning} open />
               )}
               <ReactMarkdown>{streamingText}</ReactMarkdown>
             </div>

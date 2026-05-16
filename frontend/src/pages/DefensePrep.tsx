@@ -6,6 +6,7 @@ import { useToast } from "@/components/ui/use-toast";
 import { useStreamingChat } from "@/hooks/useStreamingChat";
 import { authFetch } from '../lib/authFetch';
 import ModuleGuide from "@/components/ModuleGuide";
+import ThinkingDetails from "@/components/ThinkingDetails";
 
 interface Client {
   id: string;
@@ -115,6 +116,9 @@ const DefensePrep = () => {
   const [simulatingCounter, setSimulatingCounter] = useState(false);
   const [counterReplicaResult, setCounterReplicaResult] = useState<any>(null);
   const [savingCounter, setSavingCounter] = useState(false);
+  const [counterSaved, setCounterSaved] = useState(false);
+  const [showProvisionalStrategy, setShowProvisionalStrategy] = useState(false);
+  const [isDraggingEvidenceFile, setIsDraggingEvidenceFile] = useState(false);
 
   // Mantener ref sincronizado con el estado para evitar stale closures
   useEffect(() => { activeChatIdRef.current = activeChatId; }, [activeChatId]);
@@ -443,6 +447,7 @@ const DefensePrep = () => {
     if (!accountId) return;
     setSimulatingCounter(true);
     setCounterReplicaResult(null);
+    setCounterSaved(false);
     try {
       const res = await authFetch(`${import.meta.env.VITE_API_URL}/defense-chat/${activeChatId}/simulate-counter-replica`, {
         method: 'POST',
@@ -452,6 +457,7 @@ const DefensePrep = () => {
       if (res.ok) {
         const data = await res.json();
         setCounterReplicaResult(data.counterReplica);
+        setShowProvisionalStrategy(true);
       }
     } catch (err) { console.error(err); }
     setSimulatingCounter(false);
@@ -470,6 +476,7 @@ const DefensePrep = () => {
       });
       if (res.ok) {
         loadSavedStrategies(activeChatId);
+        setCounterSaved(true);
       }
     } catch (err) { console.error(err); }
     setSavingCounter(false);
@@ -1120,6 +1127,14 @@ const DefensePrep = () => {
           >
             {t('defense.evidence') || 'Pruebas'} {evidenceList.length > 0 && <span className="ml-1 text-xs opacity-60">({evidenceList.length})</span>}
           </button>
+          {counterReplicaResult && (
+            <button
+              onClick={() => setShowProvisionalStrategy(true)}
+              className="ml-auto px-4 py-2.5 text-sm font-medium text-muted-foreground hover:text-foreground transition-colors"
+            >
+              Estrategia provisional
+            </button>
+          )}
         </div>
 
         {/* Messages */}
@@ -1165,15 +1180,7 @@ const DefensePrep = () => {
                 }`}
               >
                 {msg.role === 'assistant' && msg.reasoning && (
-                  <details className="mb-2 not-prose">
-                    <summary className="text-xs text-muted-foreground cursor-pointer select-none flex items-center gap-1.5 list-none">
-                      <Brain className="h-3 w-3" />
-                      <span>Pensando...</span>
-                    </summary>
-                    <div className="mt-1.5 text-xs text-muted-foreground/80 font-mono whitespace-pre-wrap border-t border-border/40 pt-1.5" style={{ maxHeight: '4.5em', overflowY: 'auto' }}>
-                      {msg.reasoning}
-                    </div>
-                  </details>
+                  <ThinkingDetails content={msg.reasoning} />
                 )}
                 <ReactMarkdown>{displayContent}</ReactMarkdown>
                 {isRagEnhanced && (
@@ -1196,7 +1203,9 @@ const DefensePrep = () => {
           {(isLoading || isPollingForResponse) && !defIsStreaming && (
             <div className="flex justify-start">
               <div className="bg-chat-ai text-chat-ai-foreground rounded-lg px-4 py-3 text-sm">
-                <span className="inline-block animate-pulse">{t('defense.analyzing')}</span>
+                <span className="inline-block animate-pulse">
+                  {defStreamingReasoning ? 'Pensando...' : (t('defense.analyzing') || 'Analizando defensa')}
+                </span>
               </div>
             </div>
           )}
@@ -1213,15 +1222,7 @@ const DefensePrep = () => {
             <div className="flex justify-start">
               <div className="max-w-[85%] md:max-w-[70%] rounded-lg px-4 py-3 text-sm leading-relaxed prose prose-sm dark:prose-invert prose-p:my-1 prose-ul:my-1 prose-ol:my-1 bg-chat-ai text-chat-ai-foreground">
                 {defStreamingReasoning && (
-                  <details className="mb-2 not-prose" open>
-                    <summary className="text-xs text-muted-foreground cursor-pointer select-none flex items-center gap-1.5 list-none">
-                      <Brain className="h-3 w-3" />
-                      <span>Pensando...</span>
-                    </summary>
-                    <div className="mt-1.5 text-xs text-muted-foreground/80 font-mono whitespace-pre-wrap border-t border-border/40 pt-1.5" style={{ maxHeight: '4.5em', overflowY: 'auto' }}>
-                      {defStreamingReasoning}
-                    </div>
-                  </details>
+                  <ThinkingDetails content={defStreamingReasoning} open />
                 )}
                 <ReactMarkdown>{defStreamingText}</ReactMarkdown>
               </div>
@@ -1279,53 +1280,6 @@ const DefensePrep = () => {
             </button>
           </div>
 
-          {/* Simulation result */}
-          {counterReplicaResult && (
-            <div className="px-4 md:px-8 pb-4">
-              <div className="bg-purple-500/5 border border-purple-500/20 rounded-xl p-5 space-y-4">
-                <h4 className="font-semibold text-purple-400 flex items-center gap-2">
-                  <Shield size={18} />
-                  {t('defense.counterResult') || 'Resultado de la simulación'}
-                </h4>
-                <div>
-                  <p className="text-xs font-medium text-muted-foreground mb-2">{t('defense.opponentArgs') || '⚖️ Argumentos de la contraparte:'}</p>
-                  <ul className="space-y-1">
-                    {counterReplicaResult.opponentArguments?.map((arg: string, i: number) => (
-                      <li key={i} className="text-sm text-muted-foreground flex gap-2"><span className="text-purple-400">•</span>{arg}</li>
-                    ))}
-                  </ul>
-                </div>
-                <div>
-                  <p className="text-xs font-medium text-muted-foreground mb-2">{t('defense.rebuttals') || '🛡️ Cómo rebatirlos:'}</p>
-                  <ul className="space-y-1">
-                    {counterReplicaResult.rebuttals?.map((r: string, i: number) => (
-                      <li key={i} className="text-sm text-muted-foreground flex gap-2"><span className="text-green-400">•</span>{r}</li>
-                    ))}
-                  </ul>
-                </div>
-                <div>
-                  <div className="flex items-center justify-between mb-1">
-                    <p className="text-xs font-medium text-muted-foreground">{t('defense.strength') || '📊 Fortaleza de la defensa'}</p>
-                    <span className="text-sm font-bold text-purple-400">{counterReplicaResult.strengthScore}/100</span>
-                  </div>
-                  <div className="h-2 bg-muted rounded-full overflow-hidden">
-                    <div className="h-full bg-gradient-to-r from-purple-500 to-purple-400 rounded-full transition-all" style={{ width: `${counterReplicaResult.strengthScore}%` }} />
-                  </div>
-                </div>
-                <div className="flex gap-2 pt-2">
-                  <button
-                    onClick={handleSaveCounterReplica}
-                    disabled={savingCounter}
-                    className="flex items-center gap-2 px-3 py-2 rounded-lg bg-green-500/20 text-green-400 text-sm font-medium hover:bg-green-500/30 transition-colors disabled:opacity-50"
-                  >
-                    <CheckCircle2 size={14} />
-                    {t('defense.saveToStrategy') || 'Guardar en estrategia'}
-                  </button>
-                  <button onClick={() => setCounterReplicaResult(null)} className="px-3 py-2 rounded-lg border text-sm hover:bg-muted">{t('cases.cancel') || 'Cerrar'}</button>
-                </div>
-              </div>
-            </div>
-          )}
         </>
 
         {/* Input */}
@@ -1763,11 +1717,31 @@ const DefensePrep = () => {
               {!editingEvidence && (
                 <div>
                   <label className="text-sm font-medium mb-1 block">{t('common.upload') || 'Subir'}</label>
-                  <input
-                    type="file"
-                    onChange={(e) => setEvidenceFile(e.target.files?.[0] || null)}
-                    className="w-full px-3 py-2 bg-muted border rounded-lg text-sm file:mr-3 file:py-1 file:px-3 file:rounded-md file:border-0 file:text-xs file:bg-primary file:text-primary-foreground hover:file:bg-primary/90"
-                  />
+                  <div
+                    onDragOver={(e) => { e.preventDefault(); setIsDraggingEvidenceFile(true); }}
+                    onDragLeave={(e) => {
+                      e.preventDefault();
+                      const relatedTarget = e.relatedTarget as Node | null;
+                      if (!relatedTarget || !e.currentTarget.contains(relatedTarget)) {
+                        setIsDraggingEvidenceFile(false);
+                      }
+                    }}
+                    onDrop={(e) => {
+                      e.preventDefault();
+                      setIsDraggingEvidenceFile(false);
+                      setEvidenceFile(e.dataTransfer.files?.[0] || null);
+                    }}
+                    className={`rounded-lg border border-dashed p-4 transition-colors ${isDraggingEvidenceFile ? 'border-primary bg-primary/10' : 'border-border bg-muted/30'}`}
+                  >
+                    <input
+                      type="file"
+                      onChange={(e) => setEvidenceFile(e.target.files?.[0] || null)}
+                      className="w-full px-3 py-2 bg-muted border rounded-lg text-sm file:mr-3 file:py-1 file:px-3 file:rounded-md file:border-0 file:text-xs file:bg-primary file:text-primary-foreground hover:file:bg-primary/90"
+                    />
+                    <p className="text-xs text-muted-foreground mt-2">
+                      Arrastra y suelta un archivo aqui o seleccionarlo manualmente.
+                    </p>
+                  </div>
                   {evidenceFile && (
                     <p className="text-xs text-muted-foreground mt-1">{evidenceFile.name}</p>
                   )}
@@ -1892,13 +1866,79 @@ const DefensePrep = () => {
               ) : evidenceViewerItem.mimeType?.startsWith('audio/') ? (
                 <audio src={`${import.meta.env.VITE_API_URL}/public/evidence/${evidenceViewerItem.publicToken}`} controls className="w-full max-w-md" />
               ) : evidenceViewerItem.mimeType === 'application/pdf' ? (
-                <iframe src={`${import.meta.env.VITE_API_URL}/public/evidence/${evidenceViewerItem.publicToken}`} className="w-full h-[70vh] rounded" />
+                <iframe src={`/public/evidence/${evidenceViewerItem.publicToken}`} className="w-full h-[70vh] rounded" />
               ) : (
                 <div className="text-center">
                   <p className="text-muted-foreground mb-4">Vista previa no disponible</p>
                   <a href={`${import.meta.env.VITE_API_URL}/public/evidence/${evidenceViewerItem.publicToken}`} download className="px-4 py-2 rounded-lg bg-primary text-primary-foreground text-sm font-medium hover:opacity-90">Descargar archivo</a>
                 </div>
               )}
+            </div>
+          </div>
+        </div>
+      )}
+
+      {showProvisionalStrategy && counterReplicaResult && (
+        <div className="fixed inset-0 bg-black/60 z-[85] flex items-center justify-center p-4" onClick={() => setShowProvisionalStrategy(false)}>
+          <div className="bg-card border border-border rounded-xl w-full max-w-3xl max-h-[85vh] overflow-y-auto p-6 shadow-2xl" onClick={(e) => e.stopPropagation()}>
+            <div className="flex items-center justify-between mb-5">
+              <h4 className="font-semibold text-foreground flex items-center gap-2">
+                <Shield size={18} className="text-purple-400" />
+                Estrategia provisional
+              </h4>
+              <button onClick={() => setShowProvisionalStrategy(false)} className="p-1 hover:bg-accent rounded">
+                <X className="h-4 w-4" />
+              </button>
+            </div>
+
+            <div className="space-y-5">
+              <div>
+                <p className="text-xs font-medium text-muted-foreground mb-2">{t('defense.opponentArgs') || 'Argumentos de la contraparte'}</p>
+                <ul className="space-y-2">
+                  {counterReplicaResult.opponentArguments?.map((arg: string, i: number) => (
+                    <li key={i} className="text-sm text-muted-foreground flex gap-2">
+                      <span className="text-purple-400">•</span>
+                      <span>{arg}</span>
+                    </li>
+                  ))}
+                </ul>
+              </div>
+
+              <div>
+                <p className="text-xs font-medium text-muted-foreground mb-2">{t('defense.rebuttals') || 'Como rebatirlos'}</p>
+                <ul className="space-y-2">
+                  {counterReplicaResult.rebuttals?.map((rebuttal: string, i: number) => (
+                    <li key={i} className="text-sm text-muted-foreground flex gap-2">
+                      <span className="text-green-400">•</span>
+                      <span>{rebuttal}</span>
+                    </li>
+                  ))}
+                </ul>
+              </div>
+
+              <div>
+                <div className="flex items-center justify-between mb-1">
+                  <p className="text-xs font-medium text-muted-foreground">{t('defense.strength') || 'Fortaleza de la defensa'}</p>
+                  <span className="text-sm font-bold text-purple-400">{counterReplicaResult.strengthScore}/100</span>
+                </div>
+                <div className="h-2 bg-muted rounded-full overflow-hidden">
+                  <div className="h-full bg-gradient-to-r from-purple-500 to-purple-400 rounded-full transition-all" style={{ width: `${counterReplicaResult.strengthScore}%` }} />
+                </div>
+              </div>
+            </div>
+
+            <div className="flex gap-2 pt-6">
+              <button
+                onClick={handleSaveCounterReplica}
+                disabled={savingCounter || counterSaved}
+                className="flex items-center gap-2 px-3 py-2 rounded-lg bg-green-500/20 text-green-400 text-sm font-medium hover:bg-green-500/30 transition-colors disabled:opacity-50"
+              >
+                <CheckCircle2 size={14} />
+                {savingCounter ? 'Guardando' : counterSaved ? 'Guardado' : (t('defense.saveToStrategy') || 'Guardar en estrategia')}
+              </button>
+              <button onClick={() => setShowProvisionalStrategy(false)} className="px-3 py-2 rounded-lg border text-sm hover:bg-muted">
+                {t('cases.cancel') || 'Cerrar'}
+              </button>
             </div>
           </div>
         </div>

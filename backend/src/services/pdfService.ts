@@ -5,6 +5,7 @@ interface SavedStrategy {
   id: string;
   title: string;
   date: string;
+  content?: string;
   sections: {
     lineasDefensa: string[];
     argumentosJuridicos: string[];
@@ -12,6 +13,11 @@ interface SavedStrategy {
     puntosDebiles: string[];
     contraArgumentos: string[];
     recomendaciones: string[];
+  };
+  counterReplica?: {
+    opponentArguments: string[];
+    rebuttals: string[];
+    strengthScore: number;
   };
 }
 
@@ -125,6 +131,49 @@ export function generateDefensePDF(strategies: SavedStrategy[], title: string, e
         doc.moveDown(0.5);
       });
       doc.moveDown(1);
+    }
+
+    if (strategy.counterReplica) {
+      const counterReplica = strategy.counterReplica;
+      doc.fontSize(16).fillColor('#5b21b6').text('Contrarréplica Provisional', { underline: true });
+      doc.moveDown(0.5);
+
+      if (counterReplica.opponentArguments?.length > 0) {
+        doc.fontSize(12).fillColor('#1a1a1a').text('Argumentos de la contraparte');
+        doc.moveDown(0.4);
+        doc.fontSize(11).fillColor('#333333');
+        counterReplica.opponentArguments.forEach((argumento, index) => {
+          doc.text(`${index + 1}. ${argumento}`, { indent: 20 });
+          doc.moveDown(0.4);
+        });
+        doc.moveDown(0.6);
+      }
+
+      if (counterReplica.rebuttals?.length > 0) {
+        doc.fontSize(12).fillColor('#1a1a1a').text('Cómo rebatirlos');
+        doc.moveDown(0.4);
+        doc.fontSize(11).fillColor('#333333');
+        counterReplica.rebuttals.forEach((rebuttal, index) => {
+          doc.text(`${index + 1}. ${rebuttal}`, { indent: 20 });
+          doc.moveDown(0.4);
+        });
+        doc.moveDown(0.6);
+      }
+
+      if (typeof counterReplica.strengthScore === 'number') {
+        doc.fontSize(12).fillColor('#1a1a1a').text(`Fortaleza estimada de la defensa: ${counterReplica.strengthScore}/100`);
+        doc.moveDown(1);
+      }
+    }
+
+    if (strategy.content) {
+      doc.fontSize(16).fillColor('#1a1a1a').text('Desarrollo completo de la estrategia', { underline: true });
+      doc.moveDown(0.5);
+      doc.fontSize(10.5).fillColor('#333333').text(strategy.content, {
+        align: 'justify',
+        lineGap: 2,
+      });
+      doc.moveDown(1.2);
     }
   });
 

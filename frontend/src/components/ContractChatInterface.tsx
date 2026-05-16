@@ -5,6 +5,7 @@ import { Send, Download, Loader2, StopCircle, Upload, Paperclip, X, FileText, Br
 import ReactMarkdown from "react-markdown";
 import { useStreamingChat } from "@/hooks/useStreamingChat";
 import { authFetch } from '../lib/authFetch';
+import ThinkingDetails from "@/components/ThinkingDetails";
 
 interface Message {
   id: string;
@@ -123,26 +124,7 @@ const ContractChatInterface = ({
         const streamingFlag = sessionStorage.getItem(`streaming_contract_${data.id}`);
         if (streamingFlag) {
           const expectedMsgCount = parseInt(streamingFlag, 10);
-          setIsPollingForResponse(true);
-          setIsLoading(true);
-          if (pollingRef.current) clearInterval(pollingRef.current);
-          pollingRef.current = setInterval(async () => {
-            try {
-              const res = await authFetch(`${API_URL}/contracts/chat/${data.id}`);
-              if (res.ok) {
-                const chatData = await res.json();
-                const msgs: Message[] = chatData.messages || [];
-                if (msgs.length > expectedMsgCount) {
-                  setMessages(msgs);
-                  setIsPollingForResponse(false);
-                  setIsLoading(false);
-                  sessionStorage.removeItem(`streaming_contract_${data.id}`);
-                  if (pollingRef.current) { clearInterval(pollingRef.current); pollingRef.current = null; }
-                  if (onMessagesChanged) onMessagesChanged();
-                }
-              }
-            } catch { /* ignore */ }
-          }, 2000);
+          startResponsePolling(data.id, expectedMsgCount);
         }
       } else {
         console.error("Error cargando chat, creando uno nuevo");
@@ -287,6 +269,37 @@ const ContractChatInterface = ({
     }
   };
 
+  const startResponsePolling = (targetChatId: string, expectedMsgCount: number) => {
+    setIsPollingForResponse(true);
+    setIsLoading(true);
+    if (pollingRef.current) clearInterval(pollingRef.current);
+
+    let attempts = 0;
+    pollingRef.current = setInterval(async () => {
+      attempts += 1;
+      try {
+        const res = await authFetch(`${API_URL}/contracts/chat/${targetChatId}`);
+        if (!res.ok) return;
+
+        const chatData = await res.json();
+        const msgs: Message[] = chatData.messages || [];
+        if (msgs.length > expectedMsgCount || attempts >= 20) {
+          setMessages(msgs);
+          setIsPollingForResponse(false);
+          setIsLoading(false);
+          sessionStorage.removeItem(`streaming_contract_${targetChatId}`);
+          if (pollingRef.current) {
+            clearInterval(pollingRef.current);
+            pollingRef.current = null;
+          }
+          if (onMessagesChanged) onMessagesChanged();
+        }
+      } catch {
+        // ignore polling errors
+      }
+    }, 2000);
+  };
+
   // Polling: espera hasta que el backend haya guardado el mensaje con contract_generated
   const pollUntilContractReady = async (targetChatId: string, maxAttempts = 12, intervalMs = 800) => {
     for (let i = 0; i < maxAttempts; i++) {
@@ -310,7 +323,14 @@ const ContractChatInterface = ({
 
   const cancelJob = () => {
     cancelStream();
-    setIsLoading(false);
+    if (!chatId) {
+      setIsLoading(false);
+      return;
+    }
+
+    const expectedMsgCount = messages.length;
+    sessionStorage.setItem(`streaming_contract_${chatId}`, String(expectedMsgCount));
+    startResponsePolling(chatId, expectedMsgCount);
   };
 
   const send = async () => {
@@ -698,15 +718,7 @@ const ContractChatInterface = ({
                 {msg.role === "assistant" ? (
                   <>
                     {msg.reasoning && (
-                      <details className="mb-2 not-prose">
-                        <summary className="text-xs text-muted-foreground cursor-pointer select-none flex items-center gap-1.5 list-none">
-                          <Brain className="h-3 w-3" />
-                          <span>Pensando...</span>
-                        </summary>
-                        <div className="mt-1.5 text-xs text-muted-foreground/80 font-mono whitespace-pre-wrap border-t border-border/40 pt-1.5" style={{ maxHeight: '4.5em', overflowY: 'auto' }}>
-                          {msg.reasoning}
-                        </div>
-                      </details>
+                      <ThinkingDetails content={msg.reasoning} />
                     )}
                     <ReactMarkdown>{displayContent}</ReactMarkdown>
                   </>
@@ -795,15 +807,7 @@ const ContractChatInterface = ({
           <div className="flex justify-start">
             <div className="max-w-[85%] md:max-w-[70%] rounded-lg px-4 py-3 text-sm leading-relaxed prose prose-sm dark:prose-invert prose-p:my-1 prose-ul:my-1 prose-ol:my-1 bg-chat-ai text-chat-ai-foreground">
               {streamingReasoning && (
-                <details className="mb-2 not-prose" open>
-                  <summary className="text-xs text-muted-foreground cursor-pointer select-none flex items-center gap-1.5 list-none">
-                    <Brain className="h-3 w-3" />
-                    <span>Pensando...</span>
-                  </summary>
-                  <div className="mt-1.5 text-xs text-muted-foreground/80 font-mono whitespace-pre-wrap border-t border-border/40 pt-1.5" style={{ maxHeight: '4.5em', overflowY: 'auto' }}>
-                    {streamingReasoning}
-                  </div>
-                </details>
+                <ThinkingDetails content={streamingReasoning} open />
               )}
               <ReactMarkdown>{streamingText}</ReactMarkdown>
             </div>

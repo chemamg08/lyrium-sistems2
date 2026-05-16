@@ -23,6 +23,7 @@ import {
 import NewCaseModal from '@/components/NewCaseModal';
 import ModuleGuide from "@/components/ModuleGuide";
 import { Button } from "@/components/ui/button";
+import SpecialtiesManagerModal from "@/components/SpecialtiesManagerModal";
 
 interface ICase {
   _id: string;
@@ -53,6 +54,12 @@ interface IMessage {
   sent: boolean;
 }
 
+interface SpecialityItem {
+  id: string;
+  nombre: string;
+  descripcion?: string;
+}
+
 const STATUS_COLORS: Record<string, string> = {
   pending: 'bg-yellow-500/20 text-yellow-400 border-yellow-500/30',
   assigned: 'bg-blue-500/20 text-blue-400 border-blue-500/30',
@@ -81,7 +88,7 @@ export default function Cases() {
     manual: true,
   });
   const [subaccounts, setSubaccounts] = useState<any[]>([]);
-  const [especialidades, setEspecialidades] = useState<any[]>([]);
+  const [especialidades, setEspecialidades] = useState<SpecialityItem[]>([]);
   const [clients, setClients] = useState<any[]>([]);
   const [selectedCase, setSelectedCase] = useState<ICase | null>(null);
   const [detailOpen, setDetailOpen] = useState(false);
@@ -94,6 +101,10 @@ export default function Cases() {
   const [caseNotesOpen, setCaseNotesOpen] = useState(false);
   const [caseNotesText, setCaseNotesText] = useState('');
   const [isSavingNotes, setIsSavingNotes] = useState(false);
+  const [showSpecialities, setShowSpecialities] = useState(false);
+  const [showSpecialityForm, setShowSpecialityForm] = useState(false);
+  const [editingSpecialityId, setEditingSpecialityId] = useState<string | null>(null);
+  const [specialityForm, setSpecialityForm] = useState({ nombre: '', descripcion: '' });
 
   const accountId = sessionStorage.getItem('accountId');
 
@@ -146,6 +157,59 @@ export default function Cases() {
       console.error(err);
     }
   }, [accountId]);
+
+  const saveSpeciality = async () => {
+    if (!accountId || !specialityForm.nombre.trim()) return;
+
+    try {
+      const url = editingSpecialityId
+        ? `${import.meta.env.VITE_API_URL}/automatizaciones/especialidades/${editingSpecialityId}`
+        : `${import.meta.env.VITE_API_URL}/automatizaciones/especialidades`;
+      const method = editingSpecialityId ? 'PUT' : 'POST';
+      const response = await authFetch(url, {
+        method,
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          accountId,
+          nombre: specialityForm.nombre.trim(),
+          descripcion: specialityForm.descripcion.trim(),
+        }),
+      });
+
+      if (!response.ok) return;
+
+      setEditingSpecialityId(null);
+      setShowSpecialityForm(false);
+      setSpecialityForm({ nombre: '', descripcion: '' });
+      await loadEspecialidades();
+    } catch (err) {
+      console.error(err);
+    }
+  };
+
+  const startEditSpeciality = (speciality: SpecialityItem) => {
+    setEditingSpecialityId(speciality.id);
+    setSpecialityForm({
+      nombre: speciality.nombre,
+      descripcion: speciality.descripcion || '',
+    });
+    setShowSpecialityForm(true);
+  };
+
+  const deleteSpeciality = async (specialityId: string) => {
+    if (!accountId) return;
+
+    try {
+      const response = await authFetch(
+        `${import.meta.env.VITE_API_URL}/automatizaciones/especialidades/${specialityId}?accountId=${accountId}`,
+        { method: 'DELETE' }
+      );
+      if (!response.ok) return;
+      await loadEspecialidades();
+    } catch (err) {
+      console.error(err);
+    }
+  };
 
   useEffect(() => {
     loadCases();
@@ -424,7 +488,7 @@ export default function Cases() {
         </div>
       )}
       {/* Header */}
-      <div className="flex items-center justify-between mb-8">
+      <div className="flex items-center justify-between mb-8 gap-4 flex-wrap">
         <h1 className="text-3xl font-bold flex items-center gap-3">
           <Briefcase size={28} />
           {t('cases.title')}
@@ -432,15 +496,24 @@ export default function Cases() {
             {cases.length}
           </span>
         </h1>
-        {!(isFreePlan && !inGracePeriod && activeCasesCount >= 5) && (
+        <div className="flex items-center gap-2 ml-auto">
           <button
-            onClick={() => setCreateOpen(true)}
-            className="flex items-center gap-2 bg-primary text-primary-foreground px-5 py-2.5 rounded-lg font-medium hover:bg-primary/90 transition-colors"
+            onClick={() => setShowSpecialities(true)}
+            className="flex items-center gap-2 px-4 py-2.5 rounded-lg border border-border bg-card text-foreground hover:bg-accent transition-colors"
           >
-            <Plus size={18} />
-            {t('cases.newCase') || 'Nuevo caso'}
+            <Tag size={16} />
+            Especialidades
           </button>
-        )}
+          {!(isFreePlan && !inGracePeriod && activeCasesCount >= 5) && (
+            <button
+              onClick={() => setCreateOpen(true)}
+              className="flex items-center gap-2 bg-primary text-primary-foreground px-5 py-2.5 rounded-lg font-medium hover:bg-primary/90 transition-colors"
+            >
+              <Plus size={18} />
+              {t('cases.newCase') || 'Nuevo caso'}
+            </button>
+          )}
+        </div>
       </div>
 
       {/* Filters */}
@@ -569,6 +642,42 @@ export default function Cases() {
           }}
         />
       )}
+
+      <SpecialtiesManagerModal
+        open={showSpecialities}
+        title="Especialidades"
+        specialities={especialidades}
+        showCreateForm={showSpecialityForm}
+        editingId={editingSpecialityId}
+        form={specialityForm}
+        createLabel={t('automations.createSpeciality') || 'Crear especialidad'}
+        editLabel={t('automations.editSpeciality') || 'Editar especialidad'}
+        namePlaceholder={t('automations.namePlaceholder') || 'Nombre'}
+        descriptionPlaceholder={t('automations.whatIsIt') || 'Describe esta especialidad'}
+        cancelLabel={t('automations.cancel') || 'Cancelar'}
+        saveLabel={t('automations.save') || 'Guardar'}
+        emptyLabel={t('automations.noSpecialities') || 'No hay especialidades'}
+        singularCountLabel="especialidad"
+        pluralCountLabel="especialidades"
+        onClose={() => {
+          setShowSpecialities(false);
+          setShowSpecialityForm(false);
+          setEditingSpecialityId(null);
+        }}
+        onStartCreate={() => {
+          setEditingSpecialityId(null);
+          setSpecialityForm({ nombre: '', descripcion: '' });
+          setShowSpecialityForm(true);
+        }}
+        onCancelForm={() => {
+          setShowSpecialityForm(false);
+          setEditingSpecialityId(null);
+        }}
+        onSave={saveSpeciality}
+        onEdit={startEditSpeciality}
+        onDelete={deleteSpeciality}
+        onFormChange={setSpecialityForm}
+      />
 
       {/* Detail Modal */}
       {detailOpen && selectedCase && (

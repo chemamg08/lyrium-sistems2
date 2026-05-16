@@ -6,6 +6,7 @@ import { AssistantChat } from '../models/AssistantChat.js';
 import { ContractChat } from '../models/ContractChat.js';
 import { DocumentSummariesChat } from '../models/DocumentSummariesChat.js';
 import { FiscalChat } from '../models/FiscalChat.js';
+import { Client } from '../models/Client.js';
 
 const MODEL_MAP: Record<string, any> = {
   client: Chat,
@@ -16,9 +17,18 @@ const MODEL_MAP: Record<string, any> = {
   fiscal: FiscalChat,
 };
 
-function canAccessChat(req: Request, chat: any): boolean {
+async function canAccessChat(req: Request, chatType: string, chat: any): Promise<boolean> {
   const user = (req as any).user;
-  if (!user || !verifyOwnership(req, chat.accountId)) return false;
+  if (!user) return false;
+
+  let accountId = chat.accountId;
+  if (chatType === 'client') {
+    const client = await Client.findById(chat.clientId);
+    if (!client) return false;
+    accountId = client.accountId;
+  }
+
+  if (!accountId || !verifyOwnership(req, accountId)) return false;
   if (chat.createdBy && chat.createdBy !== user.userId) return false;
   return true;
 }
@@ -31,7 +41,7 @@ export async function flagMessage(req: Request, res: Response) {
 
     const chat = await Model.findById(chatId);
     if (!chat) return res.status(404).json({ error: 'Chat not found' });
-    if (!canAccessChat(req, chat)) return res.status(403).json({ error: 'Acceso denegado' });
+    if (!(await canAccessChat(req, chatType, chat))) return res.status(403).json({ error: 'Acceso denegado' });
 
     const message = (chat.messages as any[]).find((m: any) => m.id === messageId);
     if (!message) return res.status(404).json({ error: 'Message not found' });
@@ -60,7 +70,7 @@ export async function unflagMessage(req: Request, res: Response) {
 
     const chat = await Model.findById(chatId);
     if (!chat) return res.status(404).json({ error: 'Chat not found' });
-    if (!canAccessChat(req, chat)) return res.status(403).json({ error: 'Acceso denegado' });
+    if (!(await canAccessChat(req, chatType, chat))) return res.status(403).json({ error: 'Acceso denegado' });
 
     const message = (chat.messages as any[]).find((m: any) => m.id === messageId);
     if (!message) return res.status(404).json({ error: 'Message not found' });

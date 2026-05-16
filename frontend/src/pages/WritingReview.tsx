@@ -84,6 +84,19 @@ let _reviewAbort: AbortController | null = null;
 let _reviewTextId: string | null = null;
 let _reviewContentHash: string | null = null;
 
+const getDraftOwnerKey = () => {
+  const accountId = sessionStorage.getItem("accountId");
+  const userId = sessionStorage.getItem("userId");
+  if (!accountId || !userId) return null;
+  return `${accountId}_${userId}`;
+};
+
+const getDraftStorageKey = (textId: string | null) => {
+  const ownerKey = getDraftOwnerKey();
+  if (!ownerKey) return null;
+  return `writing_draft_${ownerKey}_${textId || 'new'}`;
+};
+
 const WritingReview = () => {
   const navigate = useNavigate();
   const { t } = useTranslation();
@@ -129,9 +142,9 @@ const WritingReview = () => {
       // Auto-save draft to localStorage
       if (debounceRef.current) clearTimeout(debounceRef.current);
       debounceRef.current = setTimeout(() => {
-        const accountId = sessionStorage.getItem("accountId");
-        if (!accountId) return;
-        localStorage.setItem(`writing_draft_${accountId}_${currentTextId || 'new'}`, editor.getHTML());
+        const draftKey = getDraftStorageKey(currentTextId);
+        if (!draftKey) return;
+        localStorage.setItem(draftKey, editor.getHTML());
       }, 800);
     },
     onSelectionUpdate: () => {
@@ -167,10 +180,10 @@ const WritingReview = () => {
 
   useEffect(() => {
     if (!editor) return;
-    const accountId = sessionStorage.getItem("accountId");
-    if (!accountId) return;
+    const draftKey = getDraftStorageKey(null);
+    if (!draftKey) return;
     // Cargar borrador de documento nuevo (currentTextId es null al inicio)
-    const draft = localStorage.getItem(`writing_draft_${accountId}_new`);
+    const draft = localStorage.getItem(draftKey);
     if (draft) {
       editor.commands.setContent(draft);
     }
@@ -271,7 +284,8 @@ const WritingReview = () => {
         editor?.commands.setContent(data.content || "");
         setCurrentTextId(textId);
         // Cargar borrador específico de este documento si existe
-        const draft = localStorage.getItem(`writing_draft_${accountId}_${textId}`);
+        const draftKey = getDraftStorageKey(textId);
+        const draft = draftKey ? localStorage.getItem(draftKey) : null;
         if (draft && editor) {
           editor.commands.setContent(draft);
         }
@@ -321,8 +335,8 @@ const WritingReview = () => {
             title: t('writing.saved'),
             description: t('writing.savedDesc'),
           });
-          const accountId2 = sessionStorage.getItem("accountId");
-          if (accountId2) localStorage.removeItem(`writing_draft_${accountId2}_${currentTextId || 'new'}`);
+          const draftKey = getDraftStorageKey(currentTextId);
+          if (draftKey) localStorage.removeItem(draftKey);
           loadTexts();
         } else {
           const errorData = await response.json();
@@ -372,8 +386,8 @@ const WritingReview = () => {
           title: t('writing.created'),
           description: t('writing.createdDesc'),
         });
-        const accountId2 = sessionStorage.getItem("accountId");
-        if (accountId2) localStorage.removeItem(`writing_draft_${accountId2}_new`);
+        const draftKey = getDraftStorageKey(null);
+        if (draftKey) localStorage.removeItem(draftKey);
         loadTexts();
       }
     } catch (error) {
@@ -404,8 +418,8 @@ const WritingReview = () => {
           title: t('writing.deleted'),
           description: t('writing.deletedDesc'),
         });
-        const accountId2 = sessionStorage.getItem("accountId");
-        if (accountId2) localStorage.removeItem(`writing_draft_${accountId2}`);
+        const draftKey = getDraftStorageKey(currentTextId);
+        if (draftKey) localStorage.removeItem(draftKey);
         loadTexts();
       }
     } catch (error) {
@@ -577,6 +591,12 @@ const WritingReview = () => {
     editor.chain()
       .focus()
       .setTextSelection({ from: suggestion.start, to: suggestion.end })
+      .unsetHighlight()
+      .run();
+
+    editor.chain()
+      .focus()
+      .setTextSelection({ from: suggestion.start, to: suggestion.end })
       .insertContent(suggestion.suggestion)
       .setTextSelection({ from: suggestion.start, to: suggestion.start + suggestion.suggestion.length })
       .unsetHighlight()
@@ -638,8 +658,8 @@ const WritingReview = () => {
     setCurrentTextId(null);
     editor?.commands.setContent("");
     setSuggestions([]);
-    const accountId = sessionStorage.getItem("accountId");
-    if (accountId) localStorage.removeItem(`writing_draft_${accountId}_new`);
+    const draftKey = getDraftStorageKey(null);
+    if (draftKey) localStorage.removeItem(draftKey);
     toast({
       title: t('writing.newDocument'),
       description: t('writing.startingNewDoc'),

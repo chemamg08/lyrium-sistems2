@@ -1064,8 +1064,35 @@ const ProfileModal = ({ isOpen, onClose }: ProfileModalProps) => {
                   </div>
                 )}
 
+                <div className="mb-4 flex justify-center">
+                  <div className="inline-flex items-center gap-1 rounded-lg border border-border bg-muted/40 p-1">
+                    <button
+                      type="button"
+                      onClick={() => setSelectedInterval('monthly')}
+                      className={`px-4 py-2 text-sm font-medium rounded-md transition-colors ${
+                        selectedInterval === 'monthly'
+                          ? 'bg-background text-foreground shadow-sm'
+                          : 'text-muted-foreground hover:text-foreground'
+                      }`}
+                    >
+                      {t('profile.monthly')}
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => setSelectedInterval('annual')}
+                      className={`px-4 py-2 text-sm font-medium rounded-md transition-colors ${
+                        selectedInterval === 'annual'
+                          ? 'bg-background text-foreground shadow-sm'
+                          : 'text-muted-foreground hover:text-foreground'
+                      }`}
+                    >
+                      {t('profile.annual')}
+                    </button>
+                  </div>
+                </div>
+
                 {/* Tarjetas de precios */}
-                <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-6">
+                <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-4 gap-4 mb-6">
                   {/* Free plan card */}
                   <div>
                     <div
@@ -1100,14 +1127,12 @@ const ProfileModal = ({ isOpen, onClose }: ProfileModalProps) => {
                   </div>
                   {PLANS.map((plan) => (
                     <div key={plan.id}>
-                      {/* Mensual */}
                       <div
                         onClick={() => {
                           setSelectedPlan(plan.id);
-                          setSelectedInterval('monthly');
                         }}
                         className={`border-2 rounded-lg p-4 cursor-pointer transition-all hover:shadow-md ${
-                          selectedPlan === plan.id && selectedInterval === 'monthly'
+                          selectedPlan === plan.id
                             ? 'border-primary bg-primary/5'
                             : 'border-border'
                         }`}
@@ -1115,45 +1140,20 @@ const ProfileModal = ({ isOpen, onClose }: ProfileModalProps) => {
                         <div className="flex items-start justify-between mb-2">
                           <div>
                             <h4 className="font-semibold">{plan.name}</h4>
-                            <p className="text-xs text-muted-foreground">{t('profile.monthly')}</p>
+                            <p className="text-xs text-muted-foreground">
+                              {selectedInterval === 'monthly' ? t('profile.monthly') : t('profile.annual')}
+                            </p>
                           </div>
-                          {selectedPlan === plan.id && selectedInterval === 'monthly' && (
+                          {selectedPlan === plan.id && (
                             <Check className="h-5 w-5 text-primary" />
                           )}
                         </div>
-                        <p className="text-2xl font-bold mb-3">{formatPrice(getDisplayedPrice(plan.id, 'monthly', isJunior), currency)}<span className="text-sm font-normal text-muted-foreground">{t('profile.perMonth')}</span></p>
-                        <ul className="space-y-1 text-xs text-muted-foreground">
-                          {plan.features.map((feature, idx) => (
-                            <li key={idx}>• {feature}</li>
-                          ))}
-                        </ul>
-                      </div>
-
-                      {/* Anual */}
-                      <div
-                        onClick={() => {
-                          setSelectedPlan(plan.id);
-                          setSelectedInterval('annual');
-                        }}
-                        className={`border-2 rounded-lg p-4 cursor-pointer transition-all hover:shadow-md mt-3 ${
-                          selectedPlan === plan.id && selectedInterval === 'annual'
-                            ? 'border-primary bg-primary/5'
-                            : 'border-border'
-                        }`}
-                      >
-                        <div className="flex items-start justify-between mb-2">
-                          <div>
-                            <h4 className="font-semibold">{plan.name}</h4>
-                            <p className="text-xs text-muted-foreground">{t('profile.annual')}</p>
-                          </div>
-                          {selectedPlan === plan.id && selectedInterval === 'annual' && (
-                            <Check className="h-5 w-5 text-primary" />
-                          )}
-                        </div>
-                        <p className="text-2xl font-bold mb-1">{formatPrice(getDisplayedPrice(plan.id, 'annual', isJunior), currency)}<span className="text-sm font-normal text-muted-foreground">{t('profile.perYear')}</span></p>
-                        <p className="text-xs text-green-600 dark:text-green-400 mb-3">
-                          {t('profile.savePerYear', { amount: formatPrice(plan.monthlyPrice * 12 - plan.annualPrice, currency) })}
-                        </p>
+                        <p className="text-2xl font-bold mb-1">{formatPrice(getDisplayedPrice(plan.id, selectedInterval, isJunior), currency)}<span className="text-sm font-normal text-muted-foreground">{selectedInterval === 'monthly' ? t('profile.perMonth') : t('profile.perYear')}</span></p>
+                        {selectedInterval === 'annual' && (
+                          <p className="text-xs text-green-600 dark:text-green-400 mb-3">
+                            {t('profile.savePerYear', { amount: formatPrice(plan.monthlyPrice * 12 - plan.annualPrice, currency) })}
+                          </p>
+                        )}
                         <ul className="space-y-1 text-xs text-muted-foreground">
                           {plan.features.map((feature, idx) => (
                             <li key={idx}>• {feature}</li>

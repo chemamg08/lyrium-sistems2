@@ -7,6 +7,7 @@ import { useState, useEffect, useRef, DragEvent } from "react";
 import { useTranslation } from "react-i18next";
 import { useIsMobile } from "@/hooks/use-mobile";
 import { authFetch } from '../lib/authFetch';
+import SpecialtiesManagerModal from "@/components/SpecialtiesManagerModal";
 import FullCalendar from '@fullcalendar/react';
 import dayGridPlugin from '@fullcalendar/daygrid';
 import timeGridPlugin from '@fullcalendar/timegrid';
@@ -2254,42 +2255,30 @@ const Automations = () => {
           </Modal>
         )}
 
-        {showEspecialidades && (
-          <Modal title={t('automations.specialities')} onClose={() => { setShowEspecialidades(false); setShowCreateEspForm(false); setEditingEspId(null); }}>
-            <div className="flex items-center justify-between mb-5">
-              <span className="text-xs text-muted-foreground">{autoData.especialidades.length} {autoData.especialidades.length !== 1 ? "specialities" : "speciality"}</span>
-              <button onClick={() => { setEditingEspId(null); setEspForm({ nombre: "", descripcion: "" }); setShowCreateEspForm(true); }} className="flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium rounded-md bg-foreground text-background hover:opacity-90">
-                <Plus className="h-3.5 w-3.5" />{t('automations.create')}
-              </button>
-            </div>
-            {showCreateEspForm && (
-              <div className="mb-5 p-4 border border-border rounded-lg bg-muted/20 space-y-3">
-                <p className="text-xs font-medium text-foreground mb-1">{editingEspId ? t('automations.editSpeciality') : t('automations.create')}</p>
-                <input placeholder={t('automations.namePlaceholder')} value={espForm.nombre} onChange={(e) => setEspForm({ ...espForm, nombre: e.target.value })}
-                  className="w-full px-3 py-2 text-sm rounded-md border border-border bg-card text-foreground placeholder:text-muted-foreground focus:outline-none focus:ring-1 focus:ring-ring" />
-                <textarea placeholder={t('automations.whatIsIt')} value={espForm.descripcion} onChange={(e) => setEspForm({ ...espForm, descripcion: e.target.value })} rows={3}
-                  className="w-full px-3 py-2 text-sm rounded-md border border-border bg-card text-foreground placeholder:text-muted-foreground focus:outline-none focus:ring-1 focus:ring-ring resize-none" />
-                <div className="flex gap-2 justify-end">
-                  <button onClick={() => { setShowCreateEspForm(false); setEditingEspId(null); }} className="px-3 py-1.5 text-xs rounded-md border border-border hover:bg-accent text-muted-foreground">{t('automations.cancel')}</button>
-                  <button onClick={saveEspecialidad} className="px-3 py-1.5 text-xs rounded-md bg-foreground text-background hover:opacity-90">{t('automations.save')}</button>
-                </div>
-              </div>
-            )}
-            {autoData.especialidades.length === 0
-              ? <p className="text-sm text-muted-foreground text-center py-6">{t('automations.noSpecialities')}</p>
-              : <div className="space-y-3">
-                  {autoData.especialidades.map((e) => (
-                    <div key={e.id} className="flex items-start justify-between p-4 border border-border rounded-lg bg-muted/20">
-                      <div><p className="text-sm font-medium text-foreground">{e.nombre}</p>{e.descripcion && <p className="text-xs text-muted-foreground mt-0.5">{e.descripcion}</p>}</div>
-                      <div className="flex gap-1">
-                        <button onClick={() => startEditEsp(e)} className="p-1.5 rounded-md hover:bg-accent text-muted-foreground hover:text-foreground"><Pencil className="h-3.5 w-3.5" /></button>
-                        <button onClick={() => deleteEsp(e.id)} className="p-1.5 rounded-md hover:bg-destructive/10 text-muted-foreground hover:text-destructive"><Trash2 className="h-3.5 w-3.5" /></button>
-                      </div>
-                    </div>
-                  ))}
-                </div>}
-          </Modal>
-        )}
+        <SpecialtiesManagerModal
+          open={showEspecialidades}
+          title={t('automations.specialities')}
+          specialities={autoData.especialidades}
+          showCreateForm={showCreateEspForm}
+          editingId={editingEspId}
+          form={espForm}
+          createLabel={t('automations.create')}
+          editLabel={t('automations.editSpeciality')}
+          namePlaceholder={t('automations.namePlaceholder')}
+          descriptionPlaceholder={t('automations.whatIsIt')}
+          cancelLabel={t('automations.cancel')}
+          saveLabel={t('automations.save')}
+          emptyLabel={t('automations.noSpecialities')}
+          singularCountLabel="speciality"
+          pluralCountLabel="specialities"
+          onClose={() => { setShowEspecialidades(false); setShowCreateEspForm(false); setEditingEspId(null); }}
+          onStartCreate={() => { setEditingEspId(null); setEspForm({ nombre: "", descripcion: "" }); setShowCreateEspForm(true); }}
+          onCancelForm={() => { setShowCreateEspForm(false); setEditingEspId(null); }}
+          onSave={saveEspecialidad}
+          onEdit={startEditEsp}
+          onDelete={deleteEsp}
+          onFormChange={setEspForm}
+        />
 
         {showConsultas && (
           <Modal title={t('automations.frequentQueries')} onClose={() => setShowConsultas(false)}>
@@ -3151,42 +3140,30 @@ const Automations = () => {
           </Modal>
         )}
 
-        {showEspecialidades && (
-          <Modal title={t('automations.specialities')} onClose={() => { setShowEspecialidades(false); setShowCreateEspForm(false); setEditingEspId(null); }}>
-            <div className="flex items-center justify-between mb-5">
-              <span className="text-xs text-muted-foreground">{autoData.especialidades.length} {autoData.especialidades.length !== 1 ? "specialities" : "speciality"}</span>
-              <button onClick={() => { setEditingEspId(null); setEspForm({ nombre: "", descripcion: "" }); setShowCreateEspForm(true); }} className="flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium rounded-md bg-foreground text-background hover:opacity-90">
-                <Plus className="h-3.5 w-3.5" />{t('automations.create')}
-              </button>
-            </div>
-            {showCreateEspForm && (
-              <div className="mb-5 p-4 border border-border rounded-lg bg-muted/20 space-y-3">
-                <p className="text-xs font-medium text-foreground mb-1">{editingEspId ? t('automations.editSpeciality') : t('automations.create')}</p>
-                <input placeholder={t('automations.namePlaceholder')} value={espForm.nombre} onChange={(e) => setEspForm({ ...espForm, nombre: e.target.value })}
-                  className="w-full px-3 py-2 text-sm rounded-md border border-border bg-card text-foreground placeholder:text-muted-foreground focus:outline-none focus:ring-1 focus:ring-ring" />
-                <textarea placeholder={t('automations.whatIsIt')} value={espForm.descripcion} onChange={(e) => setEspForm({ ...espForm, descripcion: e.target.value })} rows={3}
-                  className="w-full px-3 py-2 text-sm rounded-md border border-border bg-card text-foreground placeholder:text-muted-foreground focus:outline-none focus:ring-1 focus:ring-ring resize-none" />
-                <div className="flex gap-2 justify-end">
-                  <button onClick={() => { setShowCreateEspForm(false); setEditingEspId(null); }} className="px-3 py-1.5 text-xs rounded-md border border-border hover:bg-accent text-muted-foreground">{t('automations.cancel')}</button>
-                  <button onClick={saveEspecialidad} className="px-3 py-1.5 text-xs rounded-md bg-foreground text-background hover:opacity-90">{t('automations.save')}</button>
-                </div>
-              </div>
-            )}
-            {autoData.especialidades.length === 0
-              ? <p className="text-sm text-muted-foreground text-center py-6">{t('automations.noSpecialities')}</p>
-              : <div className="space-y-3">
-                  {autoData.especialidades.map((e) => (
-                    <div key={e.id} className="flex items-start justify-between p-4 border border-border rounded-lg bg-muted/20">
-                      <div><p className="text-sm font-medium text-foreground">{e.nombre}</p>{e.descripcion && <p className="text-xs text-muted-foreground mt-0.5">{e.descripcion}</p>}</div>
-                      <div className="flex gap-1">
-                        <button onClick={() => startEditEsp(e)} className="p-1.5 rounded-md hover:bg-accent text-muted-foreground hover:text-foreground"><Pencil className="h-3.5 w-3.5" /></button>
-                        <button onClick={() => deleteEsp(e.id)} className="p-1.5 rounded-md hover:bg-destructive/10 text-muted-foreground hover:text-destructive"><Trash2 className="h-3.5 w-3.5" /></button>
-                      </div>
-                    </div>
-                  ))}
-                </div>}
-          </Modal>
-        )}
+        <SpecialtiesManagerModal
+          open={showEspecialidades}
+          title={t('automations.specialities')}
+          specialities={autoData.especialidades}
+          showCreateForm={showCreateEspForm}
+          editingId={editingEspId}
+          form={espForm}
+          createLabel={t('automations.create')}
+          editLabel={t('automations.editSpeciality')}
+          namePlaceholder={t('automations.namePlaceholder')}
+          descriptionPlaceholder={t('automations.whatIsIt')}
+          cancelLabel={t('automations.cancel')}
+          saveLabel={t('automations.save')}
+          emptyLabel={t('automations.noSpecialities')}
+          singularCountLabel="speciality"
+          pluralCountLabel="specialities"
+          onClose={() => { setShowEspecialidades(false); setShowCreateEspForm(false); setEditingEspId(null); }}
+          onStartCreate={() => { setEditingEspId(null); setEspForm({ nombre: "", descripcion: "" }); setShowCreateEspForm(true); }}
+          onCancelForm={() => { setShowCreateEspForm(false); setEditingEspId(null); }}
+          onSave={saveEspecialidad}
+          onEdit={startEditEsp}
+          onDelete={deleteEsp}
+          onFormChange={setEspForm}
+        />
 
         {showConsultas && (
           <Modal title={t('automations.frequentQueries')} onClose={() => setShowConsultas(false)}>
