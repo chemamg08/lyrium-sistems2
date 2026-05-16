@@ -6,6 +6,7 @@ import { getCountryName } from './legalKnowledgeService.js';
 import { promises as fs } from 'fs';
 import { join, dirname } from 'path';
 import { fileURLToPath } from 'url';
+import { resolveTaxRatesFile } from '../utils/taxRatesPath.js';
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = dirname(__filename);
@@ -579,7 +580,8 @@ async function needsTaxCalculation(messages: Message[]): Promise<boolean> {
  */
 async function loadTaxRates(countryCode: string): Promise<string | null> {
   try {
-    const filePath = join(__dirname, '..', 'config', 'taxRates', `${countryCode.toLowerCase()}.json`);
+    const filePath = resolveTaxRatesFile(countryCode);
+    if (!filePath) return null;
     const data = await fs.readFile(filePath, 'utf-8');
     const taxRates = JSON.parse(data);
     return `DATOS OFICIALES DE TIPOS IMPOSITIVOS (${taxRates.country} ${taxRates.year}):\n\`\`\`json\n${JSON.stringify(taxRates, null, 2)}\n\`\`\`\nUsa estos datos como referencia principal para los cálculos. Si la búsqueda web muestra datos más recientes que contradigan estos valores, prioriza los datos más actualizados e indícalo al usuario.`;

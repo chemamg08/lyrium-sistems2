@@ -40,10 +40,18 @@ interface Message {
   reasoning?: string;
 }
 
+interface CounterReplica {
+  opponentArguments: string[];
+  rebuttals: string[];
+  strengthScore: number;
+}
+
 interface SavedStrategy {
   id: string;
   title: string;
   date: string;
+  content?: string;
+  counterReplica?: CounterReplica;
   sections: {
     lineasDefensa: string[];
     argumentosJuridicos: string[];
@@ -114,11 +122,22 @@ const DefensePrep = () => {
   const [isUploadingEvidence, setIsUploadingEvidence] = useState(false);
   // Counter-replica states
   const [simulatingCounter, setSimulatingCounter] = useState(false);
-  const [counterReplicaResult, setCounterReplicaResult] = useState<any>(null);
+  const [counterReplicaResult, setCounterReplicaResult] = useState<CounterReplica | null>(null);
   const [savingCounter, setSavingCounter] = useState(false);
   const [counterSaved, setCounterSaved] = useState(false);
   const [showProvisionalStrategy, setShowProvisionalStrategy] = useState(false);
   const [isDraggingEvidenceFile, setIsDraggingEvidenceFile] = useState(false);
+
+  const getSavedCounterReplica = (strategies: SavedStrategy[]): CounterReplica | null => {
+    for (let index = strategies.length - 1; index >= 0; index -= 1) {
+      if (strategies[index].counterReplica) {
+        return strategies[index].counterReplica || null;
+      }
+    }
+    return null;
+  };
+
+  const visibleCounterReplica = counterReplicaResult || getSavedCounterReplica(savedStrategies);
 
   // Mantener ref sincronizado con el estado para evitar stale closures
   useEffect(() => { activeChatIdRef.current = activeChatId; }, [activeChatId]);
@@ -303,6 +322,8 @@ const DefensePrep = () => {
       if (response.ok) {
         const data = await response.json();
         setMessages(data.messages || []);
+        setCounterReplicaResult(data.latestCounterReplica || null);
+        setCounterSaved(false);
         if (data.id && !activeChatId) {
           setActiveChatId(data.id);
         }
@@ -452,7 +473,7 @@ const DefensePrep = () => {
       const res = await authFetch(`${import.meta.env.VITE_API_URL}/defense-chat/${activeChatId}/simulate-counter-replica`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ accountId, strategyId: savedStrategies[0]?.id || null }),
+        body: JSON.stringify({ accountId }),
       });
       if (res.ok) {
         const data = await res.json();
@@ -469,14 +490,16 @@ const DefensePrep = () => {
     if (!accountId) return;
     setSavingCounter(true);
     try {
-      const res = await authFetch(`${import.meta.env.VITE_API_URL}/defense-chat/${activeChatId}/simulate-counter-replica`, {
+      const res = await authFetch(`${import.meta.env.VITE_API_URL}/defense-chat/${activeChatId}/save-counter-replica`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ accountId, strategyId: savedStrategies[0]?.id || null }),
+        body: JSON.stringify({ accountId, strategyId: savedStrategies[savedStrategies.length - 1]?.id || null }),
       });
       if (res.ok) {
-        loadSavedStrategies(activeChatId);
+        await loadSavedStrategies(activeChatId);
         setCounterSaved(true);
+      } else {
+        setCounterSaved(false);
       }
     } catch (err) { console.error(err); }
     setSavingCounter(false);
@@ -1127,12 +1150,12 @@ const DefensePrep = () => {
           >
             {t('defense.evidence') || 'Pruebas'} {evidenceList.length > 0 && <span className="ml-1 text-xs opacity-60">({evidenceList.length})</span>}
           </button>
-          {counterReplicaResult && (
+          {visibleCounterReplica && (
             <button
               onClick={() => setShowProvisionalStrategy(true)}
               className="ml-auto px-4 py-2.5 text-sm font-medium text-muted-foreground hover:text-foreground transition-colors"
             >
-              Estrategia provisional
+              Contrarréplica
             </button>
           )}
         </div>
@@ -1631,6 +1654,32 @@ const DefensePrep = () => {
                         </ul>
                       </div>
                     )}
+
+                    {strategy.counterReplica && (
+                      <div className="border-t border-border pt-3">
+                        <p className="font-medium text-foreground mb-2">Contrarréplica guardada</p>
+                        {(strategy.counterReplica.opponentArguments?.length ?? 0) > 0 && (
+                          <div className="mb-2">
+                            <p className="font-medium text-muted-foreground mb-1">Argumentos de la contraparte</p>
+                            <ul className="list-disc list-inside space-y-0.5 text-muted-foreground">
+                              {strategy.counterReplica.opponentArguments.map((arg, idx) => (
+                                <li key={idx}>{arg}</li>
+                              ))}
+                            </ul>
+                          </div>
+                        )}
+                        {(strategy.counterReplica.rebuttals?.length ?? 0) > 0 && (
+                          <div>
+                            <p className="font-medium text-muted-foreground mb-1">Cómo rebatirlos</p>
+                            <ul className="list-disc list-inside space-y-0.5 text-muted-foreground">
+                              {strategy.counterReplica.rebuttals.map((rebuttal, idx) => (
+                                <li key={idx}>{rebuttal}</li>
+                              ))}
+                            </ul>
+                          </div>
+                        )}
+                      </div>
+                    )}
                   </div>
                 </div>
               ))}
@@ -1878,13 +1927,13 @@ const DefensePrep = () => {
         </div>
       )}
 
-      {showProvisionalStrategy && counterReplicaResult && (
+      {showProvisionalStrategy && visibleCounterReplica && (
         <div className="fixed inset-0 bg-black/60 z-[85] flex items-center justify-center p-4" onClick={() => setShowProvisionalStrategy(false)}>
           <div className="bg-card border border-border rounded-xl w-full max-w-3xl max-h-[85vh] overflow-y-auto p-6 shadow-2xl" onClick={(e) => e.stopPropagation()}>
             <div className="flex items-center justify-between mb-5">
               <h4 className="font-semibold text-foreground flex items-center gap-2">
                 <Shield size={18} className="text-purple-400" />
-                Estrategia provisional
+                {counterReplicaResult ? 'Contrarréplica provisional' : 'Contrarréplica guardada'}
               </h4>
               <button onClick={() => setShowProvisionalStrategy(false)} className="p-1 hover:bg-accent rounded">
                 <X className="h-4 w-4" />
@@ -1895,7 +1944,7 @@ const DefensePrep = () => {
               <div>
                 <p className="text-xs font-medium text-muted-foreground mb-2">{t('defense.opponentArgs') || 'Argumentos de la contraparte'}</p>
                 <ul className="space-y-2">
-                  {counterReplicaResult.opponentArguments?.map((arg: string, i: number) => (
+                  {visibleCounterReplica.opponentArguments?.map((arg: string, i: number) => (
                     <li key={i} className="text-sm text-muted-foreground flex gap-2">
                       <span className="text-purple-400">•</span>
                       <span>{arg}</span>
@@ -1907,7 +1956,7 @@ const DefensePrep = () => {
               <div>
                 <p className="text-xs font-medium text-muted-foreground mb-2">{t('defense.rebuttals') || 'Como rebatirlos'}</p>
                 <ul className="space-y-2">
-                  {counterReplicaResult.rebuttals?.map((rebuttal: string, i: number) => (
+                  {visibleCounterReplica.rebuttals?.map((rebuttal: string, i: number) => (
                     <li key={i} className="text-sm text-muted-foreground flex gap-2">
                       <span className="text-green-400">•</span>
                       <span>{rebuttal}</span>
@@ -1919,10 +1968,10 @@ const DefensePrep = () => {
               <div>
                 <div className="flex items-center justify-between mb-1">
                   <p className="text-xs font-medium text-muted-foreground">{t('defense.strength') || 'Fortaleza de la defensa'}</p>
-                  <span className="text-sm font-bold text-purple-400">{counterReplicaResult.strengthScore}/100</span>
+                  <span className="text-sm font-bold text-purple-400">{visibleCounterReplica.strengthScore}/100</span>
                 </div>
                 <div className="h-2 bg-muted rounded-full overflow-hidden">
-                  <div className="h-full bg-gradient-to-r from-purple-500 to-purple-400 rounded-full transition-all" style={{ width: `${counterReplicaResult.strengthScore}%` }} />
+                  <div className="h-full bg-gradient-to-r from-purple-500 to-purple-400 rounded-full transition-all" style={{ width: `${visibleCounterReplica.strengthScore}%` }} />
                 </div>
               </div>
             </div>
@@ -1930,11 +1979,12 @@ const DefensePrep = () => {
             <div className="flex gap-2 pt-6">
               <button
                 onClick={handleSaveCounterReplica}
-                disabled={savingCounter || counterSaved}
+                disabled={savingCounter || counterSaved || !counterReplicaResult || savedStrategies.length === 0}
                 className="flex items-center gap-2 px-3 py-2 rounded-lg bg-green-500/20 text-green-400 text-sm font-medium hover:bg-green-500/30 transition-colors disabled:opacity-50"
+                title={savedStrategies.length === 0 ? 'Guarda primero una estrategia para asociar esta contrarréplica' : ''}
               >
                 <CheckCircle2 size={14} />
-                {savingCounter ? 'Guardando' : counterSaved ? 'Guardado' : (t('defense.saveToStrategy') || 'Guardar en estrategia')}
+                {savingCounter ? 'Guardando' : counterSaved ? 'Guardado' : 'Guardar contrarréplica'}
               </button>
               <button onClick={() => setShowProvisionalStrategy(false)} className="px-3 py-2 rounded-lg border text-sm hover:bg-muted">
                 {t('cases.cancel') || 'Cerrar'}

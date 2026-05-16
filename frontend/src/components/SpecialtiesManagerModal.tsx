@@ -11,6 +11,12 @@ interface SpecialityFormState {
   descripcion: string;
 }
 
+interface SubaccountItem {
+  id: string;
+  name: string;
+  email: string;
+}
+
 interface SpecialtiesManagerModalProps {
   open: boolean;
   title: string;
@@ -27,6 +33,10 @@ interface SpecialtiesManagerModalProps {
   emptyLabel: string;
   singularCountLabel: string;
   pluralCountLabel: string;
+  assignmentsTitle?: string;
+  unassignedLabel?: string;
+  subaccounts?: SubaccountItem[];
+  subaccountAssignments?: Record<string, string>;
   onClose: () => void;
   onStartCreate: () => void;
   onCancelForm: () => void;
@@ -34,9 +44,8 @@ interface SpecialtiesManagerModalProps {
   onEdit: (speciality: SpecialityItem) => void;
   onDelete: (id: string) => void;
   onFormChange: (nextForm: SpecialityFormState) => void;
+  onAssignSpeciality?: (subaccountId: string, specialityId: string) => void;
 }
-
-const modalWidthClass = "w-[95vw] md:w-[520px]";
 
 export default function SpecialtiesManagerModal({
   open,
@@ -54,6 +63,10 @@ export default function SpecialtiesManagerModal({
   emptyLabel,
   singularCountLabel,
   pluralCountLabel,
+  assignmentsTitle = "Asignacion automatica por subcuenta",
+  unassignedLabel = "Sin especialidad",
+  subaccounts = [],
+  subaccountAssignments = {},
   onClose,
   onStartCreate,
   onCancelForm,
@@ -61,10 +74,12 @@ export default function SpecialtiesManagerModal({
   onEdit,
   onDelete,
   onFormChange,
+  onAssignSpeciality,
 }: SpecialtiesManagerModalProps) {
   if (!open) return null;
 
   const countLabel = specialities.length === 1 ? singularCountLabel : pluralCountLabel;
+  const modalWidthClass = subaccounts.length > 0 ? "w-[95vw] md:w-[620px]" : "w-[95vw] md:w-[520px]";
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50">
@@ -157,6 +172,37 @@ export default function SpecialtiesManagerModal({
                   </div>
                 </div>
               ))}
+            </div>
+          )}
+
+          {subaccounts.length > 0 && onAssignSpeciality && (
+            <div className="mt-6 pt-5 border-t border-border">
+              <p className="text-xs font-medium text-foreground mb-3">{assignmentsTitle}</p>
+              <div className="space-y-2">
+                {subaccounts.map((subaccount) => (
+                  <div
+                    key={subaccount.id}
+                    className="flex flex-col gap-3 rounded-lg border border-border bg-muted/20 px-4 py-3 md:flex-row md:items-center md:justify-between"
+                  >
+                    <div className="min-w-0">
+                      <p className="text-sm font-medium text-foreground truncate">{subaccount.name}</p>
+                      <p className="text-xs text-muted-foreground truncate">{subaccount.email}</p>
+                    </div>
+                    <select
+                      value={subaccountAssignments[subaccount.id] || ""}
+                      onChange={(e) => onAssignSpeciality(subaccount.id, e.target.value)}
+                      className="w-full md:w-[240px] rounded-md border border-border bg-card px-3 py-2 text-sm text-foreground focus:outline-none focus:ring-1 focus:ring-ring"
+                    >
+                      <option value="">{unassignedLabel}</option>
+                      {specialities.map((speciality) => (
+                        <option key={speciality.id} value={speciality.id}>
+                          {speciality.nombre}
+                        </option>
+                      ))}
+                    </select>
+                  </div>
+                ))}
+              </div>
             </div>
           )}
         </div>

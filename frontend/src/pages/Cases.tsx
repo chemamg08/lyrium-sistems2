@@ -89,6 +89,7 @@ export default function Cases() {
   });
   const [subaccounts, setSubaccounts] = useState<any[]>([]);
   const [especialidades, setEspecialidades] = useState<SpecialityItem[]>([]);
+  const [subaccountSpecialities, setSubaccountSpecialities] = useState<Record<string, string>>({});
   const [clients, setClients] = useState<any[]>([]);
   const [selectedCase, setSelectedCase] = useState<ICase | null>(null);
   const [detailOpen, setDetailOpen] = useState(false);
@@ -152,6 +153,7 @@ export default function Cases() {
       if (res.ok) {
         const data = await res.json();
         setEspecialidades(data.especialidades || []);
+        setSubaccountSpecialities(data.subcuentaEspecialidades || {});
       }
     } catch (err) {
       console.error(err);
@@ -204,6 +206,26 @@ export default function Cases() {
         `${import.meta.env.VITE_API_URL}/automatizaciones/especialidades/${specialityId}?accountId=${accountId}`,
         { method: 'DELETE' }
       );
+      if (!response.ok) return;
+      await loadEspecialidades();
+    } catch (err) {
+      console.error(err);
+    }
+  };
+
+  const assignSubaccountSpeciality = async (subaccountId: string, specialityId: string) => {
+    if (!accountId) return;
+
+    try {
+      const response = await authFetch(`${import.meta.env.VITE_API_URL}/automatizaciones/subcuenta-especialidad`, {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          accountId,
+          subcuentaId: subaccountId,
+          especialidadId: specialityId,
+        }),
+      });
       if (!response.ok) return;
       await loadEspecialidades();
     } catch (err) {
@@ -647,6 +669,8 @@ export default function Cases() {
         open={showSpecialities}
         title="Especialidades"
         specialities={especialidades}
+        subaccounts={subaccounts}
+        subaccountAssignments={subaccountSpecialities}
         showCreateForm={showSpecialityForm}
         editingId={editingSpecialityId}
         form={specialityForm}
@@ -659,6 +683,8 @@ export default function Cases() {
         emptyLabel={t('automations.noSpecialities') || 'No hay especialidades'}
         singularCountLabel="especialidad"
         pluralCountLabel="especialidades"
+        assignmentsTitle="Asignacion automatica por subcuenta"
+        unassignedLabel="Sin especialidad"
         onClose={() => {
           setShowSpecialities(false);
           setShowSpecialityForm(false);
@@ -677,6 +703,7 @@ export default function Cases() {
         onEdit={startEditSpeciality}
         onDelete={deleteSpeciality}
         onFormChange={setSpecialityForm}
+        onAssignSpeciality={assignSubaccountSpeciality}
       />
 
       {/* Detail Modal */}

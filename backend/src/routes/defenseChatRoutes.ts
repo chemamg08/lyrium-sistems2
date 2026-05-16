@@ -19,6 +19,7 @@ import {
   updateEvidence,
   deleteEvidence,
   simulateCounterReplica,
+  saveCounterReplica,
   uploadEvidence,
   getEvidenceLibrary,
   getEvidenceTrash,
@@ -66,5 +67,6 @@ router.get('/evidence/quota', getEvidenceQuota);
 
 // Counter-replica simulation
 router.post('/:chatId/simulate-counter-replica', simulateCounterReplica);
+router.post('/:chatId/save-counter-replica', saveCounterReplica);
 
 export default router;

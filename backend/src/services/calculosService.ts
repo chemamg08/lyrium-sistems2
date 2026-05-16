@@ -1,6 +1,7 @@
 import fs from 'fs';
 import path from 'path';
 import { fileURLToPath } from 'url';
+import { resolveTaxRatesFile } from '../utils/taxRatesPath.js';
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
@@ -50,7 +51,10 @@ interface TaxRatesES {
 // ── Helpers ───────────────────────────────────────────────────────────────────
 
 function loadTaxRates(): TaxRatesES {
-  const filePath = path.join(__dirname, '../config/taxRates/es.json');
+  const filePath = resolveTaxRatesFile('es');
+  if (!filePath) {
+    throw new Error('No tax config for country: es');
+  }
   return JSON.parse(fs.readFileSync(filePath, 'utf-8')) as TaxRatesES;
 }
 
@@ -380,7 +384,8 @@ interface TaxRatesGeneric {
 function loadTaxRatesGeneric(country: string): TaxRatesGeneric | null {
   try {
     const code = (country || 'es').toLowerCase().substring(0, 2);
-    const filePath = path.join(__dirname, '../config/taxRates', `${code}.json`);
+    const filePath = resolveTaxRatesFile(code);
+    if (!filePath) return null;
     return JSON.parse(fs.readFileSync(filePath, 'utf-8')) as TaxRatesGeneric;
   } catch {
     return null;

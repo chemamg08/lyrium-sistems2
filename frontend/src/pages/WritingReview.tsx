@@ -153,6 +153,31 @@ const WritingReview = () => {
     },
   });
 
+  const clearSuggestionHighlights = () => {
+    if (!editor || editor.isDestroyed) return;
+    const docSize = editor.state.doc.content.size;
+    const currentSelection = editor.state.selection;
+
+    editor.chain()
+      .setTextSelection({ from: 1, to: Math.max(docSize, 1) })
+      .unsetHighlight()
+      .setTextSelection({ from: currentSelection.from, to: currentSelection.to })
+      .run();
+  };
+
+  const applySuggestionHighlights = (nextSuggestions: SuggestionWithPosition[]) => {
+    if (!editor || editor.isDestroyed) return;
+
+    clearSuggestionHighlights();
+
+    nextSuggestions.forEach((suggestion) => {
+      editor.chain()
+        .setTextSelection({ from: suggestion.start, to: suggestion.end })
+        .setHighlight({ color: "#fef08a" })
+        .run();
+    });
+  };
+
   useEffect(() => {
     // Validar que el usuario esté autenticado
     const accountId = sessionStorage.getItem("accountId");
@@ -192,7 +217,7 @@ const WritingReview = () => {
   useEffect(() => {
     if (editor && suggestions.length === 0) {
       // Limpiar highlights cuando no hay sugerencias
-      editor.commands.unsetHighlight();
+      clearSuggestionHighlights();
     }
   }, [suggestions, editor]);
 
@@ -238,13 +263,7 @@ const WritingReview = () => {
           }));
         if (cancelled) return;
         setSuggestions(withPos);
-        withPos.forEach((sug) => {
-          editor.chain()
-            .focus()
-            .setTextSelection({ from: sug.start, to: sug.end })
-            .setHighlight({ color: "#fef08a" })
-            .run();
-        });
+        applySuggestionHighlights(withPos);
         setIsReviewing(false);
       }
     };
@@ -543,17 +562,10 @@ const WritingReview = () => {
               reason: s.reason,
               start: s.from,
               end: s.to,
-            }));
+          }));
 
           setSuggestions(suggestionsWithPos);
-
-          suggestionsWithPos.forEach((sug) => {
-            editor.chain()
-              .focus()
-              .setTextSelection({ from: sug.start, to: sug.end })
-              .setHighlight({ color: "#fef08a" })
-              .run();
-          });
+          applySuggestionHighlights(suggestionsWithPos);
 
           toast({
             title: t('writing.reviewComplete'),
@@ -587,10 +599,12 @@ const WritingReview = () => {
   const applySuggestion = (suggestion: SuggestionWithPosition) => {
     if (!editor) return;
 
-    // start/end son posiciones PM directas, sin +1
+    const clearStart = Math.max(1, suggestion.start - 1);
+    const clearEnd = suggestion.end + 1;
+
     editor.chain()
       .focus()
-      .setTextSelection({ from: suggestion.start, to: suggestion.end })
+      .setTextSelection({ from: clearStart, to: clearEnd })
       .unsetHighlight()
       .run();
 
@@ -602,17 +616,17 @@ const WritingReview = () => {
       .unsetHighlight()
       .run();
 
-    // Recalcular posiciones PM del resto de sugerencias (el doc ha cambiado)
-    setSuggestions((prev) => {
-      const remaining = prev.filter((s) => s !== suggestion);
-      return remaining
-        .map((s) => {
-          const range = findPmRange(s.original);
-          if (!range) return null;
-          return { ...s, start: range.from, end: range.to };
-        })
-        .filter((s): s is SuggestionWithPosition => s !== null);
-    });
+    const remainingSuggestions = suggestions
+      .filter((s) => s !== suggestion)
+      .map((s) => {
+        const range = findPmRange(s.original);
+        if (!range) return null;
+        return { ...s, start: range.from, end: range.to };
+      })
+      .filter((s): s is SuggestionWithPosition => s !== null);
+
+    setSuggestions(remainingSuggestions);
+    applySuggestionHighlights(remainingSuggestions);
     setSelectedSuggestion(null);
     setShowSuggestionDialog(false);
 

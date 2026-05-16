@@ -444,10 +444,13 @@ export async function generateContractFromText(
       // H1  # Title
       if (/^# /.test(line)) {
         const text = line.replace(/^# /, '').trim();
-        checkNewPage(lhH1 + 14);
         y -= 8;
-        currentPage.drawText(text, { x: marginX, y, size: h1Size, font: boldFont, color: rgb(0.06, 0.06, 0.06) });
-        y -= lhH1;
+        const wrappedTitle = wrapInline([{ text, bold: true }], maxWidth, h1Size);
+        for (const titleLine of wrappedTitle) {
+          checkNewPage(lhH1 + 14);
+          drawInlineLine(titleLine, marginX, y, h1Size);
+          y -= lhH1;
+        }
         drawSep(y + 5, 0.25, 0.25, 0.25, 1);
         y -= 8;
         continue;

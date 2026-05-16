@@ -10,7 +10,7 @@ import { hasLegalIntent } from '../services/legalIntentService.js';
 import { streamAIResponse, AI_MODEL, buildContextMessages, stripThinkTags } from '../services/aiService.js';
 import { DocumentSummariesChat } from '../models/DocumentSummariesChat.js';
 import { sanitizeFilename } from '../utils/sanitizeFilename.js';
-import { verifyOwnership } from '../middleware/auth.js';
+import { isInternalJobRequest, verifyOwnership } from '../middleware/auth.js';
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
@@ -65,6 +65,16 @@ interface StagedUploadFile {
   originalName: string;
   fileName: string;
   size: number;
+}
+
+function canAccessSummaryChat(req: Request, chat: any): boolean {
+  if (isInternalJobRequest(req)) {
+    return verifyOwnership(req, chat.accountId);
+  }
+
+  const user = (req as any).user;
+  if (chat.createdBy !== user?.userId) return false;
+  return verifyOwnership(req, chat.accountId);
 }
 
 // System prompt para análisis de documentos
@@ -197,9 +207,7 @@ export const getSummaryChat = async (req: Request, res: Response) => {
     if (!chat) {
       return res.status(404).json({ error: 'Chat no encontrado' });
     }
-    const user = (req as any).user;
-    if (chat.createdBy !== user?.userId) return res.status(403).json({ error: 'Acceso denegado' });
-    if (!verifyOwnership(req, chat.accountId)) return res.status(403).json({ error: 'Acceso denegado' });
+    if (!canAccessSummaryChat(req, chat)) return res.status(403).json({ error: 'Acceso denegado' });
     
     res.json(chat.toJSON());
   } catch (error) {
@@ -243,9 +251,7 @@ export const updateChatTitle = async (req: Request, res: Response) => {
     if (!chat) {
       return res.status(404).json({ error: 'Chat no encontrado' });
     }
-    const user = (req as any).user;
-    if (chat.createdBy !== user?.userId) return res.status(403).json({ error: 'Acceso denegado' });
-    if (!verifyOwnership(req, chat.accountId)) return res.status(403).json({ error: 'Acceso denegado' });
+    if (!canAccessSummaryChat(req, chat)) return res.status(403).json({ error: 'Acceso denegado' });
     
     chat.title = title.trim();
     chat.lastModified = new Date().toISOString();
@@ -267,9 +273,7 @@ export const deleteSummaryChat = async (req: Request, res: Response) => {
     if (!chat) {
       return res.status(404).json({ error: 'Chat no encontrado' });
     }
-    const user = (req as any).user;
-    if (chat.createdBy !== user?.userId) return res.status(403).json({ error: 'Acceso denegado' });
-    if (!verifyOwnership(req, chat.accountId)) return res.status(403).json({ error: 'Acceso denegado' });
+    if (!canAccessSummaryChat(req, chat)) return res.status(403).json({ error: 'Acceso denegado' });
     
     // Eliminar archivos físicos del chat
     for (const file of chat.uploadedFiles) {
@@ -299,9 +303,7 @@ export const duplicateSummaryChat = async (req: Request, res: Response) => {
     if (!chat) {
       return res.status(404).json({ error: 'Chat no encontrado' });
     }
-    const user = (req as any).user;
-    if (chat.createdBy !== user?.userId) return res.status(403).json({ error: 'Acceso denegado' });
-    if (!verifyOwnership(req, chat.accountId)) return res.status(403).json({ error: 'Acceso denegado' });
+    if (!canAccessSummaryChat(req, chat)) return res.status(403).json({ error: 'Acceso denegado' });
     
     const now = new Date();
     
@@ -313,7 +315,7 @@ export const duplicateSummaryChat = async (req: Request, res: Response) => {
       messages: [...chat.messages],
       lastModified: now.toISOString(),
       accountId: chat.accountId,
-      createdBy: chat.createdBy || user?.userId || ''
+      createdBy: chat.createdBy || (req as any).user?.userId || ''
     });
     
     res.status(201).json(duplicatedChat.toJSON());
@@ -347,13 +349,7 @@ export const stageUploadFiles = async (req: Request, res: Response) => {
       return res.status(404).json({ error: 'Chat no encontrado' });
     }
 
-    const user = (req as any).user;
-    if (chat.createdBy !== user?.userId) {
-      for (const f of files) await fs.unlink(f.path).catch(() => {});
-      return res.status(403).json({ error: 'Acceso denegado' });
-    }
-
-    if (!verifyOwnership(req, chat.accountId)) {
+    if (!canAccessSummaryChat(req, chat)) {
       for (const f of files) await fs.unlink(f.path).catch(() => {});
       return res.status(403).json({ error: 'Acceso denegado' });
     }
@@ -456,9 +452,7 @@ export const processStagedUploadFiles = async (req: Request, res: Response) => {
     if (!chat) {
       return res.status(404).json({ error: 'Chat no encontrado' });
     }
-    const user = (req as any).user;
-    if (chat.createdBy !== user?.userId) return res.status(403).json({ error: 'Acceso denegado' });
-    if (!verifyOwnership(req, chat.accountId)) return res.status(403).json({ error: 'Acceso denegado' });
+    if (!canAccessSummaryChat(req, chat)) return res.status(403).json({ error: 'Acceso denegado' });
 
     if (chat.uploadedFiles.length + stagedFiles.length > 4) {
       return res.status(400).json({
@@ -501,9 +495,7 @@ export const uploadFiles = async (req: Request, res: Response) => {
     if (!chat) {
       return res.status(404).json({ error: 'Chat no encontrado' });
     }
-    const user = (req as any).user;
-    if (chat.createdBy !== user?.userId) return res.status(403).json({ error: 'Acceso denegado' });
-    if (!verifyOwnership(req, chat.accountId)) return res.status(403).json({ error: 'Acceso denegado' });
+    if (!canAccessSummaryChat(req, chat)) return res.status(403).json({ error: 'Acceso denegado' });
     
     // Verificar límite total de archivos en el chat
     if (chat.uploadedFiles.length + files.length > 4) {
@@ -548,9 +540,7 @@ export const deleteFile = async (req: Request, res: Response) => {
     if (!chat) {
       return res.status(404).json({ error: 'Chat no encontrado' });
     }
-    const user = (req as any).user;
-    if (chat.createdBy !== user?.userId) return res.status(403).json({ error: 'Acceso denegado' });
-    if (!verifyOwnership(req, chat.accountId)) return res.status(403).json({ error: 'Acceso denegado' });
+    if (!canAccessSummaryChat(req, chat)) return res.status(403).json({ error: 'Acceso denegado' });
     
     const fileIndex = chat.uploadedFiles.findIndex((f: any) => f.id === fileId);
     
@@ -605,9 +595,7 @@ export const sendMessage = async (req: Request, res: Response) => {
     if (!chat) {
       return res.status(404).json({ error: 'Chat no encontrado' });
     }
-    const user = (req as any).user;
-    if (chat.createdBy !== user?.userId) return res.status(403).json({ error: 'Acceso denegado' });
-    if (!verifyOwnership(req, chat.accountId)) return res.status(403).json({ error: 'Acceso denegado' });
+    if (!canAccessSummaryChat(req, chat)) return res.status(403).json({ error: 'Acceso denegado' });
     
     // Crear mensaje del usuario
     const userMessage: Message = {
@@ -716,9 +704,7 @@ export const streamMessage = async (req: Request, res: Response) => {
 
     const chat = await DocumentSummariesChat.findById(chatId);
     if (!chat) return res.status(404).json({ error: 'Chat no encontrado' });
-    const user = (req as any).user;
-    if (chat.createdBy !== user?.userId) return res.status(403).json({ error: 'Acceso denegado' });
-    if (!verifyOwnership(req, chat.accountId)) return res.status(403).json({ error: 'Acceso denegado' });
+    if (!canAccessSummaryChat(req, chat)) return res.status(403).json({ error: 'Acceso denegado' });
 
     const userMessage: Message = { id: Date.now().toString(), role: 'user', content: content.trim() };
     chat.messages.push(userMessage as any);

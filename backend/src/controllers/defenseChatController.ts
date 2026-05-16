@@ -27,9 +27,16 @@ interface Message {
   content: string;
 }
 
+interface CounterReplica {
+  opponentArguments: string[];
+  rebuttals: string[];
+  strengthScore: number;
+}
+
 interface SavedStrategy {
   id: string;
   title: string;
+  content?: string;
   date: string;
   sections: {
     lineasDefensa: string[];
@@ -39,6 +46,7 @@ interface SavedStrategy {
     contraArgumentos: string[];
     recomendaciones: string[];
   };
+  counterReplica?: CounterReplica;
 }
 
 // GET /api/defense-chat/chats - Listar todos los chats de defensa de una cuenta
@@ -97,6 +105,7 @@ export const createDefenseChat = async (req: Request, res: Response) => {
       lastModified: new Date().toISOString(),
       messages: [],
       savedStrategies: [],
+      latestCounterReplica: null,
       awaitingStrategyConfirmation: false
     });
 
@@ -192,14 +201,15 @@ export const getDefenseChat = async (req: Request, res: Response) => {
     }
     
     if (!chat) {
-      return res.json({ id: null, messages: [], savedStrategies: [] });
+      return res.json({ id: null, messages: [], savedStrategies: [], latestCounterReplica: null });
     }
     
     res.json({ 
       id: chat._id,
       title: chat.title,
       messages: chat.messages,
-      savedStrategies: chat.savedStrategies || []
+      savedStrategies: chat.savedStrategies || [],
+      latestCounterReplica: (chat as any).latestCounterReplica || null
     });
   } catch (error) {
     console.error('Error al obtener chat de defensa:', error);
@@ -242,6 +252,7 @@ export const sendDefenseMessage = async (req: Request, res: Response) => {
         lastModified: new Date().toISOString(),
         messages: [],
         savedStrategies: [],
+        latestCounterReplica: null,
         awaitingStrategyConfirmation: false
       });
     }
@@ -294,7 +305,8 @@ export const sendDefenseMessage = async (req: Request, res: Response) => {
             puntosDebiles: extraction.puntosDebiles,
             contraArgumentos: extraction.contraArgumentos,
             recomendaciones: extraction.recomendaciones
-          }
+          },
+          counterReplica: (chat as any).latestCounterReplica || undefined
         };
 
         chat.savedStrategies = [newStrategy as any];
@@ -441,6 +453,7 @@ export const streamDefenseMessage = async (req: Request, res: Response) => {
         lastModified: new Date().toISOString(),
         messages: [],
         savedStrategies: [],
+        latestCounterReplica: null,
         awaitingStrategyConfirmation: false
       });
     }
@@ -514,7 +527,8 @@ export const streamDefenseMessage = async (req: Request, res: Response) => {
             puntosDebiles: extraction.puntosDebiles,
             contraArgumentos: extraction.contraArgumentos,
             recomendaciones: extraction.recomendaciones
-          }
+          },
+          counterReplica: (chat as any).latestCounterReplica || undefined
         };
         chat.savedStrategies = [newStrategy as any];
         chat.awaitingStrategyConfirmation = false;
@@ -783,11 +797,13 @@ export const importDefenseChat = async (req: Request, res: Response) => {
         lastModified: new Date().toISOString(),
         messages: [...chatToImport.messages],
         savedStrategies: [],
+        latestCounterReplica: null,
         awaitingStrategyConfirmation: false
       });
     } else {
       defenseChat.messages = [...chatToImport.messages] as any;
       defenseChat.savedStrategies = [];
+      (defenseChat as any).latestCounterReplica = null;
       defenseChat.title = `Importado: ${chatToImport.title}`;
       defenseChat.lastModified = new Date().toISOString();
     }
@@ -1016,7 +1032,7 @@ export const deleteEvidence = async (req: Request, res: Response) => {
 export const simulateCounterReplica = async (req: Request, res: Response) => {
   try {
     const { chatId } = req.params;
-    const { accountId, strategyId } = req.body;
+    const { accountId } = req.body;
     if (!accountId) return res.status(400).json({ error: 'accountId requerido' });
     if (!verifyOwnership(req, accountId)) return res.status(403).json({ error: 'Acceso denegado' });
     const user = (req as any).user;
@@ -1026,24 +1042,55 @@ export const simulateCounterReplica = async (req: Request, res: Response) => {
     const { simulateCounterReplicaAI } = await import('../services/aiService.js');
     const result = await simulateCounterReplicaAI(chat);
 
-    if (strategyId) {
-      const strategy = chat.savedStrategies.find((s: any) => s.id === strategyId);
-      if (strategy) {
-        strategy.counterReplica = result;
-        chat.markModified('savedStrategies');
-        await chat.save();
-      }
-    } else if (chat.savedStrategies.length > 0) {
-      const lastStrategy = chat.savedStrategies[chat.savedStrategies.length - 1];
-      lastStrategy.counterReplica = result;
-      chat.markModified('savedStrategies');
-      await chat.save();
-    }
+    (chat as any).latestCounterReplica = result;
+    chat.lastModified = new Date().toISOString();
+    chat.markModified('latestCounterReplica');
+    await chat.save();
 
     res.json({ success: true, counterReplica: result });
   } catch (error: any) {
     console.error('Error al simular contrarréplica:', error);
     res.status(500).json({ error: error.message || 'Error al simular contrarréplica' });
+  }
+};
+
+// POST /api/defense-chat/:chatId/save-counter-replica
+export const saveCounterReplica = async (req: Request, res: Response) => {
+  try {
+    const { chatId } = req.params;
+    const { accountId, strategyId } = req.body;
+    if (!accountId) return res.status(400).json({ error: 'accountId requerido' });
+    if (!verifyOwnership(req, accountId)) return res.status(403).json({ error: 'Acceso denegado' });
+    const user = (req as any).user;
+    const chat = await DefenseChat.findOne({ _id: chatId, accountId, createdBy: user?.userId || '' });
+    if (!chat || chat.accountId !== accountId) return res.status(403).json({ error: 'Acceso denegado' });
+
+    const latestCounterReplica = (chat as any).latestCounterReplica as CounterReplica | null | undefined;
+    if (!latestCounterReplica) {
+      return res.status(400).json({ error: 'No hay contrarréplica simulada para guardar' });
+    }
+
+    let strategy = strategyId
+      ? chat.savedStrategies.find((s: any) => s.id === strategyId)
+      : null;
+
+    if (!strategy && chat.savedStrategies.length > 0) {
+      strategy = chat.savedStrategies[chat.savedStrategies.length - 1];
+    }
+
+    if (!strategy) {
+      return res.status(400).json({ error: 'No hay estrategia guardada donde asociar la contrarréplica' });
+    }
+
+    strategy.counterReplica = latestCounterReplica;
+    chat.lastModified = new Date().toISOString();
+    chat.markModified('savedStrategies');
+    await chat.save();
+
+    res.json({ success: true, counterReplica: latestCounterReplica, strategyId: strategy.id });
+  } catch (error: any) {
+    console.error('Error al guardar contrarréplica:', error);
+    res.status(500).json({ error: error.message || 'Error al guardar contrarréplica' });
   }
 };
 

@@ -34,6 +34,12 @@ export interface ISavedStrategy {
   };
 }
 
+export interface ICounterReplica {
+  opponentArguments: string[];
+  rebuttals: string[];
+  strengthScore: number;
+}
+
 export interface IDefenseChat {
   _id: string;
   accountId: string;
@@ -43,6 +49,7 @@ export interface IDefenseChat {
   lastModified: string;
   messages: IDefenseMessage[];
   savedStrategies: ISavedStrategy[];
+  latestCounterReplica?: ICounterReplica | null;
   awaitingStrategyConfirmation: boolean;
   summary?: string;
 }
@@ -74,6 +81,12 @@ const savedStrategySchema = new Schema({
   },
 }, { _id: false });
 
+const counterReplicaSchema = new Schema({
+  opponentArguments: { type: [String], default: [] },
+  rebuttals: { type: [String], default: [] },
+  strengthScore: { type: Number, default: 0 },
+}, { _id: false });
+
 const defenseChatSchema = new Schema<IDefenseChat>({
   _id: { type: String, required: true },
   accountId: { type: String, required: true, index: true },
@@ -83,6 +96,7 @@ const defenseChatSchema = new Schema<IDefenseChat>({
   lastModified: { type: String, default: () => new Date().toISOString() },
   messages: { type: [defenseMessageSchema], default: [] },
   savedStrategies: { type: [savedStrategySchema], default: [] },
+  latestCounterReplica: { type: counterReplicaSchema, default: null },
   awaitingStrategyConfirmation: { type: Boolean, default: false },
   summary: { type: String, default: null },
 }, { _id: false, versionKey: false });

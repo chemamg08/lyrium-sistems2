@@ -1,6 +1,7 @@
 import fs from 'fs';
 import path from 'path';
 import { fileURLToPath } from 'url';
+import { resolveTaxRatesFile } from '../utils/taxRatesPath.js';
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
@@ -78,7 +79,8 @@ function countryCode(input?: string): string {
 }
 
 function localTaxFile(code: string): LocalTaxFile | null {
-  const filePath = path.join(__dirname, '../config/taxRates', `${code.toLowerCase()}.json`);
+  const filePath = resolveTaxRatesFile(code);
+  if (!filePath) return null;
   if (!fs.existsSync(filePath)) return null;
   try {
     return JSON.parse(fs.readFileSync(filePath, 'utf-8')) as LocalTaxFile;

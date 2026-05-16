@@ -375,6 +375,7 @@ const Clients = () => {
   const [globalRemindersSubFilter, setGlobalRemindersSubFilter] = useState<string>('all');
   const [reminderToDelete, setReminderToDelete] = useState<string | null>(null);
   const [specialities, setSpecialities] = useState<SpecialityItem[]>([]);
+  const [subaccountSpecialities, setSubaccountSpecialities] = useState<Record<string, string>>({});
   const [showSpecialities, setShowSpecialities] = useState(false);
   const [showSpecialityForm, setShowSpecialityForm] = useState(false);
   const [editingSpecialityId, setEditingSpecialityId] = useState<string | null>(null);
@@ -466,6 +467,7 @@ const Clients = () => {
       if (!response.ok) return;
       const data = await response.json();
       setSpecialities(data.especialidades || []);
+      setSubaccountSpecialities(data.subcuentaEspecialidades || {});
     } catch (error) {
       console.error('Error al cargar especialidades:', error);
     }
@@ -1737,6 +1739,27 @@ const Clients = () => {
       await loadSpecialities();
     } catch (error) {
       console.error('Error al eliminar especialidad:', error);
+    }
+  };
+
+  const assignSubaccountSpeciality = async (subaccountId: string, specialityId: string) => {
+    const accId = sessionStorage.getItem('accountId');
+    if (!accId) return;
+
+    try {
+      const response = await authFetch(`${API_URL}/automatizaciones/subcuenta-especialidad`, {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          accountId: accId,
+          subcuentaId: subaccountId,
+          especialidadId: specialityId,
+        }),
+      });
+      if (!response.ok) return;
+      await loadSpecialities();
+    } catch (error) {
+      console.error('Error al asignar especialidad a subcuenta:', error);
     }
   };
 
@@ -4035,6 +4058,8 @@ const Clients = () => {
         open={showSpecialities}
         title="Especialidades"
         specialities={specialities}
+        subaccounts={subaccounts}
+        subaccountAssignments={subaccountSpecialities}
         showCreateForm={showSpecialityForm}
         editingId={editingSpecialityId}
         form={specialityForm}
@@ -4047,6 +4072,8 @@ const Clients = () => {
         emptyLabel="No hay especialidades creadas"
         singularCountLabel="especialidad"
         pluralCountLabel="especialidades"
+        assignmentsTitle="Asignacion automatica por subcuenta"
+        unassignedLabel="Sin especialidad"
         onClose={() => {
           setShowSpecialities(false);
           setShowSpecialityForm(false);
@@ -4065,6 +4092,7 @@ const Clients = () => {
         onEdit={startEditSpeciality}
         onDelete={deleteSpeciality}
         onFormChange={setSpecialityForm}
+        onAssignSpeciality={assignSubaccountSpeciality}
       />
 
       {/* Global Reminders Modal */}

@@ -5,6 +5,7 @@ import { fileURLToPath } from 'url';
 import { calcular, DesgloseLine } from '../services/calculosService.js';
 import { Calculation } from '../models/Calculation.js';
 import { verifyOwnership } from '../middleware/auth.js';
+import { resolveTaxRatesFile } from '../utils/taxRatesPath.js';
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
@@ -95,8 +96,8 @@ export const calculateCalculo = (req: Request, res: Response) => {
 export const getCountryConfig = (req: Request, res: Response) => {
   const country = ((req.query.country as string) || 'ES').toLowerCase().substring(0, 2);
   try {
-    const filePath = path.join(__dirname, '../config/taxRates', `${country}.json`);
-    if (!fs.existsSync(filePath)) {
+    const filePath = resolveTaxRatesFile(country);
+    if (!filePath) {
       return res.status(404).json({ error: `No tax config for country: ${country}` });
     }
     const data = JSON.parse(fs.readFileSync(filePath, 'utf-8'));

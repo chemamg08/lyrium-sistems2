@@ -112,10 +112,14 @@ export function clearAuthCookie(res: Response) {
   clearAuthCookies(res);
 }
 
+export function isInternalJobRequest(req: Request): boolean {
+  const internalSecret = process.env.INTERNAL_JOB_SECRET;
+  return Boolean(internalSecret && req.headers['x-internal-job'] === internalSecret);
+}
+
 export function authMiddleware(req: AuthRequest, res: Response, next: NextFunction) {
   // Allow internal job requests (from jobsService polling endpoints)
-  const internalSecret = process.env.INTERNAL_JOB_SECRET;
-  if (internalSecret && req.headers['x-internal-job'] === internalSecret) {
+  if (isInternalJobRequest(req)) {
     return next();
   }
 
@@ -241,8 +245,7 @@ export async function adminMiddleware(req: AuthRequest, res: Response, next: Nex
  */
 export function verifyOwnership(req: Request, accountId: string): boolean {
   // Allow internal job requests (no user context, but already authenticated via INTERNAL_JOB_SECRET)
-  const internalSecret = process.env.INTERNAL_JOB_SECRET;
-  if (internalSecret && req.headers['x-internal-job'] === internalSecret) return true;
+  if (isInternalJobRequest(req)) return true;
 
   const user = (req as any).user as AuthPayload | undefined;
   if (!user) return false;
