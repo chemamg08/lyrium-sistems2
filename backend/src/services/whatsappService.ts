@@ -255,6 +255,195 @@ async function inspectMetaToken(accessToken: string): Promise<{ tokenExpiresAt?:
   }
 }
 
+type WhatsAppConnectionStatus = 'ok' | 'warning' | 'expired' | 'error' | 'disconnected';
+
+interface WhatsAppValidationResult {
+  connected: boolean;
+  connectionStatus: WhatsAppConnectionStatus;
+  phoneNumber?: string;
+  tokenExpiresAt?: string;
+  expiryKnown: boolean;
+  lastValidationError?: string;
+}
+
+function isValidEmailAddress(value: string): boolean {
+  return /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(String(value || '').trim());
+}
+
+function getDaysRemaining(expiresAt?: string): number | null {
+  if (!expiresAt) return null;
+  const expires = new Date(expiresAt).getTime();
+  if (!Number.isFinite(expires)) return null;
+  return Math.floor((expires - Date.now()) / (1000 * 60 * 60 * 24));
+}
+
+function deriveConnectionStatus(expiresAt?: string, expiryKnown = false): WhatsAppConnectionStatus {
+  if (!expiryKnown || !expiresAt) return 'ok';
+  const daysRemaining = getDaysRemaining(expiresAt);
+  if (daysRemaining === null) return 'ok';
+  if (daysRemaining < 0) return 'expired';
+  if (daysRemaining <= 7) return 'warning';
+  return 'ok';
+}
+
+function ensureWhatsAppSessions(account: any): any[] {
+  if (!Array.isArray(account.whatsappSessions)) {
+    account.whatsappSessions = [];
+  }
+  return account.whatsappSessions;
+}
+
+function syncLegacyWhatsAppSession(account: any): void {
+  const sessions = ensureWhatsAppSessions(account);
+  const connectedSession = sessions.find((session: any) => session.connected);
+  account.whatsappSession = connectedSession || null;
+}
+
+function upsertWhatsAppSession(account: any, phoneNumberId: string, patch: Record<string, any>): any {
+  const sessions = ensureWhatsAppSessions(account);
+  const existingSession = sessions.find((session: any) => session.phoneNumberId === phoneNumberId);
+
+  if (existingSession) {
+    Object.assign(existingSession, patch);
+    syncLegacyWhatsAppSession(account);
+    return existingSession;
+  }
+
+  const nextSession = {
+    provider: 'meta',
+    connected: false,
+    expiryKnown: false,
+    connectionStatus: 'disconnected',
+    ...patch,
+  };
+  sessions.push(nextSession);
+  syncLegacyWhatsAppSession(account);
+  return nextSession;
+}
+
+async function exchangeForLongLivedUserToken(shortLivedToken: string): Promise<string> {
+  const appId = getMetaAppId();
+  const appSecret = getMetaAppSecret();
+  const llUrl = new URL(`${META_GRAPH_BASE}/oauth/access_token`);
+  llUrl.searchParams.set('grant_type', 'fb_exchange_token');
+  llUrl.searchParams.set('client_id', appId);
+  llUrl.searchParams.set('client_secret', appSecret);
+  llUrl.searchParams.set('fb_exchange_token', shortLivedToken);
+
+  const llRes = await fetch(llUrl.toString());
+  const llData = await llRes.json().catch(() => ({}));
+  if (!llRes.ok || !llData?.access_token) {
+    const details = llData?.error?.message || JSON.stringify(llData || {});
+    throw new Error(`No se pudo intercambiar el token temporal por uno long-lived: ${details}`);
+  }
+
+  return String(llData.access_token);
+}
+
+function normalizeTokenMetadata(
+  tokenMetadata: { tokenExpiresAt?: string; tokenType?: 'short' | 'long' },
+  fallbackTokenType: string,
+): { tokenExpiresAt?: string; expiryKnown: boolean; tokenType: string } {
+  return {
+    tokenExpiresAt: tokenMetadata.tokenExpiresAt,
+    expiryKnown: !!tokenMetadata.tokenExpiresAt,
+    tokenType: tokenMetadata.tokenType || fallbackTokenType,
+  };
+}
+
+export async function validateWhatsAppSession(accountId: string, phoneNumberId: string): Promise<WhatsAppValidationResult> {
+  const account = await Automation.findById(accountId);
+  if (!account) {
+    return {
+      connected: false,
+      connectionStatus: 'disconnected',
+      expiryKnown: false,
+      lastValidationError: 'Cuenta no encontrada',
+    };
+  }
+
+  const session = resolveWhatsAppSession(account, phoneNumberId);
+  if (!session?.phoneNumberId) {
+    return {
+      connected: false,
+      connectionStatus: 'disconnected',
+      expiryKnown: false,
+      lastValidationError: 'Sesion no encontrada',
+    };
+  }
+
+  const token = getSessionToken(account, session);
+  if (!token) {
+    return {
+      connected: false,
+      connectionStatus: 'error',
+      expiryKnown: !!session.tokenExpiresAt,
+      tokenExpiresAt: session.tokenExpiresAt,
+      lastValidationError: 'Token Meta invalido',
+    };
+  }
+
+  try {
+    const [tokenMetadata, phoneData] = await Promise.all([
+      inspectMetaToken(token),
+      graphFetchJson<any>(`/${session.phoneNumberId}?fields=id,display_phone_number,whatsapp_business_account`, token),
+    ]);
+
+    const phoneNumber = phoneData?.display_phone_number || session.phoneNumber || '';
+    const tokenInfo = normalizeTokenMetadata(tokenMetadata, session.tokenType || 'unknown');
+    const connectionStatus = deriveConnectionStatus(tokenInfo.tokenExpiresAt || session.tokenExpiresAt, tokenInfo.expiryKnown || !!session.expiryKnown);
+
+    return {
+      connected: true,
+      connectionStatus,
+      phoneNumber,
+      tokenExpiresAt: tokenInfo.tokenExpiresAt,
+      expiryKnown: tokenInfo.expiryKnown || !!session.expiryKnown,
+    };
+  } catch (err: any) {
+    const message = String(err?.message || 'Error validando la sesion de WhatsApp');
+    const lower = message.toLowerCase();
+    const disconnected = /invalid|expired|revoked|permission|unauthor|phone number|unsupported|get \(400\)|get \(401\)|get \(403\)/i.test(message);
+    return {
+      connected: false,
+      connectionStatus: disconnected ? 'error' : 'disconnected',
+      tokenExpiresAt: session.tokenExpiresAt,
+      expiryKnown: !!session.expiryKnown,
+      lastValidationError: lower.includes('expired') ? 'Token expirado o invalido' : message,
+    };
+  }
+}
+
+export async function syncWhatsAppSessionValidation(accountId: string, phoneNumberId: string): Promise<WhatsAppValidationResult | null> {
+  const account = await Automation.findById(accountId);
+  if (!account) return null;
+
+  const session = resolveWhatsAppSession(account, phoneNumberId);
+  if (!session?.phoneNumberId) return null;
+
+  const validation = await validateWhatsAppSession(accountId, phoneNumberId);
+  const nowIso = new Date().toISOString();
+
+  Object.assign(session, {
+    connected: validation.connected,
+    connectionStatus: validation.connectionStatus,
+    phoneNumber: validation.phoneNumber || session.phoneNumber || '',
+    lastValidatedAt: nowIso,
+    lastValidationError: validation.lastValidationError || '',
+    expiryKnown: validation.expiryKnown,
+  });
+
+  if (validation.tokenExpiresAt) {
+    session.tokenExpiresAt = validation.tokenExpiresAt;
+  } else if (!validation.expiryKnown) {
+    session.tokenExpiresAt = undefined;
+  }
+
+  syncLegacyWhatsAppSession(account);
+  await account.save();
+  return validation;
+}
+
 function getMediaTypeLabelByType(type: string): string {
   if (type === 'audio') return '🔊 Audio';
   if (type === 'image') return '📷 Imagen';
@@ -1026,9 +1215,11 @@ export async function createInstance(accountId: string, redirectUriOverride?: st
         accountId,
         whatsappOAuthState: state,
         whatsappOAuthStateExpires: expires,
-        'whatsappSession.provider': 'meta',
-        'whatsappSession.instanceName': instanceName,
-        'whatsappSession.connected': false,
+        whatsappSession: {
+          provider: 'meta',
+          instanceName,
+          connected: false,
+        },
       },
     },
     { upsert: true },
@@ -1055,6 +1246,10 @@ async function connectMetaWithCodeInternal(
   alertEmail?: string,
 ): Promise<{ connected: boolean; phoneNumber?: string; phoneNumberId?: string }> {
   if (!account) throw new Error('Cuenta no encontrada');
+  const normalizedAlertEmail = String(alertEmail || '').trim();
+  if (!isValidEmailAddress(normalizedAlertEmail)) {
+    throw new Error('El email de alerta es obligatorio y debe ser valido');
+  }
 
   const expectedState = account.whatsappOAuthState || '';
   const expectedExp = account.whatsappOAuthStateExpires || '';
@@ -1078,30 +1273,12 @@ async function connectMetaWithCodeInternal(
     const txt = await tokenRes.text().catch(() => '');
     throw new Error(`No se pudo canjear código OAuth (${tokenRes.status}): ${txt}`);
   }
-  const tokenData = await tokenRes.json();
+  const tokenData = await tokenRes.json().catch(() => ({}));
   let accessToken = tokenData?.access_token as string;
   if (!accessToken) throw new Error('Meta no devolvió access_token');
 
-  let tokenExchanged = false;
-
-  // Try to exchange for long-lived token
-  try {
-    const llUrl = new URL(`${META_GRAPH_BASE}/oauth/access_token`);
-    llUrl.searchParams.set('grant_type', 'fb_exchange_token');
-    llUrl.searchParams.set('client_id', appId);
-    llUrl.searchParams.set('client_secret', appSecret);
-    llUrl.searchParams.set('fb_exchange_token', accessToken);
-    const llRes = await fetch(llUrl.toString());
-    if (llRes.ok) {
-      const llData = await llRes.json();
-      if (llData?.access_token) {
-        accessToken = llData.access_token;
-        tokenExchanged = true;
-      }
-    }
-  } catch {
-    // Keep short-lived token if long-lived exchange fails.
-  }
+  accessToken = await exchangeForLongLivedUserToken(accessToken);
+  const tokenExchanged = true;
 
   const waba = await resolveSingleMetaWaba(accessToken);
   const phone = await resolveSingleMetaPhone(accessToken, waba.id);
@@ -1129,7 +1306,7 @@ async function connectMetaWithCodeInternal(
         : new Date(Date.now() + 60 * 60 * 1000).toISOString(),
       tokenType: tokenExchanged ? 'long' : 'short',
       name: existingSession.name || `WhatsApp ${phone.display_phone_number || ''}`,
-      alertEmail: alertEmail || existingSession.alertEmail || '',
+      alertEmail: normalizedAlertEmail,
     });
   } else {
     // Añadir nueva sesión
@@ -1147,12 +1324,28 @@ async function connectMetaWithCodeInternal(
         : new Date(Date.now() + 60 * 60 * 1000).toISOString(),
       tokenType: tokenExchanged ? 'long' : 'short',
       name: `WhatsApp ${phone.display_phone_number || ''}`,
-      alertEmail: alertEmail || '',
+      alertEmail: normalizedAlertEmail,
     });
   }
 
   // Mantener compatibilidad: actualizar también whatsappSession con la última sesión conectada
   account.whatsappSession = account.whatsappSessions[account.whatsappSessions.length - 1];
+  const quickSession = resolveWhatsAppSession(account, phone.id);
+  const quickTokenMetadata = await inspectMetaToken(accessToken);
+  const quickTokenInfo = normalizeTokenMetadata(quickTokenMetadata, 'business_integration');
+  Object.assign(quickSession || {}, {
+    connected: true,
+    connectionStatus: deriveConnectionStatus(quickTokenInfo.tokenExpiresAt, quickTokenInfo.expiryKnown),
+    expiryKnown: quickTokenInfo.expiryKnown,
+    tokenExpiresAt: quickTokenInfo.tokenExpiresAt,
+    tokenType: 'business_integration',
+    credentialMode: 'quick_official',
+    alertEmail: alertEmail || quickSession?.alertEmail || '',
+    lastValidatedAt: new Date().toISOString(),
+    lastValidationError: '',
+    failureAlertOpen: false,
+  });
+  syncLegacyWhatsAppSession(account);
   account.whatsappOAuthState = '';
   account.whatsappOAuthStateExpires = '';
   await account.save();
@@ -1184,37 +1377,20 @@ export async function connectMetaWithToken(
 ): Promise<{ connected: boolean; phoneNumber?: string; phoneNumberId?: string }> {
   const account = await Automation.findById(accountId);
   if (!account) throw new Error('Cuenta no encontrada');
+  const normalizedAlertEmail = String(alertEmail || '').trim();
+  if (!isValidEmailAddress(normalizedAlertEmail)) {
+    throw new Error('El email de alerta es obligatorio y debe ser valido');
+  }
 
   const expectedState = account.whatsappOAuthState || '';
   const expectedExp = account.whatsappOAuthStateExpires || '';
   if (!expectedState || expectedState !== state) throw new Error('State OAuth inválido');
   if (!expectedExp || new Date(expectedExp).getTime() < Date.now()) throw new Error('State OAuth expirado');
 
-  const appId = getMetaAppId();
-  const appSecret = getMetaAppSecret();
-
-  let accessToken = shortLivedToken;
-
-  let tokenExchanged = false;
-
-  // Exchange short-lived token for long-lived token
-  try {
-    const llUrl = new URL(`${META_GRAPH_BASE}/oauth/access_token`);
-    llUrl.searchParams.set('grant_type', 'fb_exchange_token');
-    llUrl.searchParams.set('client_id', appId);
-    llUrl.searchParams.set('client_secret', appSecret);
-    llUrl.searchParams.set('fb_exchange_token', shortLivedToken);
-    const llRes = await fetch(llUrl.toString());
-    if (llRes.ok) {
-      const llData = await llRes.json();
-      if (llData?.access_token) {
-        accessToken = llData.access_token;
-        tokenExchanged = true;
-      }
-    }
-  } catch {
-    // Keep short-lived token if exchange fails
-  }
+  void getMetaAppId();
+  void getMetaAppSecret();
+  let accessToken = await exchangeForLongLivedUserToken(shortLivedToken);
+  const tokenExchanged = true;
 
   const waba = await resolveSingleMetaWaba(accessToken);
   const phone = await resolveSingleMetaPhone(accessToken, waba.id);
@@ -1242,7 +1418,7 @@ export async function connectMetaWithToken(
         : new Date(Date.now() + 60 * 60 * 1000).toISOString(),
       tokenType: tokenExchanged ? 'long' : 'short',
       name: name || (existingSession as any).name || `WhatsApp ${phone.display_phone_number || ''}`,
-      alertEmail: alertEmail || (existingSession as any).alertEmail || '',
+      alertEmail: normalizedAlertEmail,
     });
   } else {
     // Añadir nueva sesión
@@ -1260,7 +1436,7 @@ export async function connectMetaWithToken(
         : new Date(Date.now() + 60 * 60 * 1000).toISOString(),
       tokenType: tokenExchanged ? 'long' : 'short',
       name: name || `WhatsApp ${phone.display_phone_number || ''}`,
-      alertEmail: alertEmail || '',
+      alertEmail: normalizedAlertEmail,
     });
   }
 
@@ -1287,17 +1463,22 @@ export async function connectMetaManual(
 ): Promise<{ connected: boolean; phoneNumber?: string; phoneNumberId?: string }> {
   const account = await Automation.findById(accountId);
   if (!account) throw new Error('Cuenta no encontrada');
+  const normalizedAlertEmail = String(alertEmail || '').trim();
+  if (!isValidEmailAddress(normalizedAlertEmail)) {
+    throw new Error('El email de alerta es obligatorio y debe ser valido');
+  }
+  const longLivedToken = await exchangeForLongLivedUserToken(accessToken);
 
   // Verify token works and get phone number display
-  const phoneData = await graphFetchJson<any>(`/${phoneNumberId}?fields=id,display_phone_number,verified_name`, accessToken);
+  const phoneData = await graphFetchJson<any>(`/${phoneNumberId}?fields=id,display_phone_number,verified_name`, longLivedToken);
   if (!phoneData?.id) throw new Error('No se pudo verificar el número con el token proporcionado');
-  const tokenMetadata = await inspectMetaToken(accessToken);
+  const tokenMetadata = await inspectMetaToken(longLivedToken);
 
   // Discover WABA ID if not provided
   let resolvedWabaId = wabaId || '';
   if (!resolvedWabaId) {
     try {
-      const wabaData = await graphFetchJson<any>(`/${phoneNumberId}?fields=whatsapp_business_account`, accessToken);
+      const wabaData = await graphFetchJson<any>(`/${phoneNumberId}?fields=whatsapp_business_account`, longLivedToken);
       resolvedWabaId = wabaData?.whatsapp_business_account?.id || '';
     } catch {
       // Not critical — store without WABA ID
@@ -1325,7 +1506,7 @@ export async function connectMetaManual(
       tokenExpiresAt: tokenMetadata.tokenExpiresAt,
       tokenType: tokenMetadata.tokenType,
       name: name || existingSession.name || `WhatsApp ${phoneData.display_phone_number || ''}`,
-      alertEmail: alertEmail || existingSession.alertEmail || '',
+      alertEmail: normalizedAlertEmail,
     });
   } else {
     // Añadir nueva sesión
@@ -1336,17 +1517,31 @@ export async function connectMetaManual(
       phoneNumber: phoneData.display_phone_number || '',
       businessAccountId: resolvedWabaId,
       phoneNumberId: phoneData.id,
-      accessToken: encryptPassword(accessToken),
+      accessToken: encryptPassword(longLivedToken),
       connectedAt: new Date().toISOString(),
       tokenExpiresAt: tokenMetadata.tokenExpiresAt,
       tokenType: tokenMetadata.tokenType,
       name: name || `WhatsApp ${phoneData.display_phone_number || ''}`,
-      alertEmail: alertEmail || '',
+      alertEmail: normalizedAlertEmail,
     });
   }
 
   // Mantener compatibilidad: actualizar también whatsappSession con la última sesión conectada
   account.whatsappSession = account.whatsappSessions[account.whatsappSessions.length - 1];
+  const manualSession = resolveWhatsAppSession(account, phoneData.id);
+  Object.assign(manualSession || {}, {
+    connected: true,
+    connectionStatus: deriveConnectionStatus(tokenMetadata.tokenExpiresAt, !!tokenMetadata.tokenExpiresAt),
+    expiryKnown: !!tokenMetadata.tokenExpiresAt,
+    tokenExpiresAt: tokenMetadata.tokenExpiresAt,
+    tokenType: 'long',
+    credentialMode: 'manual_long_lived',
+    alertEmail: normalizedAlertEmail,
+    lastValidatedAt: new Date().toISOString(),
+    lastValidationError: '',
+    failureAlertOpen: false,
+  });
+  syncLegacyWhatsAppSession(account);
   await account.save();
 
   return {
@@ -1388,9 +1583,11 @@ export async function initMetaEmbeddedSignup(accountId: string): Promise<{ insta
         accountId,
         whatsappOAuthState: state,
         whatsappOAuthStateExpires: expires,
-        'whatsappSession.provider': 'meta',
-        'whatsappSession.instanceName': instanceName,
-        'whatsappSession.connected': false,
+        whatsappSession: {
+          provider: 'meta',
+          instanceName,
+          connected: false,
+        },
       },
     },
     { upsert: true },
@@ -1716,8 +1913,12 @@ export async function getTokenStatus(
   tokenType: string;
   expiresAt: string;
   daysRemaining: number;
-  status: 'ok' | 'warning' | 'critical' | 'expired';
+  status: 'ok' | 'warning' | 'critical' | 'expired' | 'unknown';
   alertEmail?: string;
+  expiryKnown?: boolean;
+  connectionStatus?: string;
+  lastValidatedAt?: string;
+  lastValidationError?: string;
 } | null> {
   const account = await Automation.findById(accountId);
   if (!account) return null;
@@ -1729,9 +1930,9 @@ export async function getTokenStatus(
   if (!session) return null;
 
   let daysRemaining = 999;
-  let status: 'ok' | 'warning' | 'critical' | 'expired' = 'ok';
+  let status: 'ok' | 'warning' | 'critical' | 'expired' | 'unknown' = session.expiryKnown ? 'ok' : 'unknown';
 
-  if (session.tokenExpiresAt) {
+  if (session.expiryKnown && session.tokenExpiresAt) {
     const expiresAt = new Date(session.tokenExpiresAt).getTime();
     const now = Date.now();
     daysRemaining = Math.floor((expiresAt - now) / (1000 * 60 * 60 * 24));
@@ -1750,6 +1951,10 @@ export async function getTokenStatus(
     daysRemaining,
     status,
     alertEmail: session.alertEmail,
+    expiryKnown: session.expiryKnown === true,
+    connectionStatus: session.connectionStatus || 'disconnected',
+    lastValidatedAt: session.lastValidatedAt || '',
+    lastValidationError: session.lastValidationError || '',
   };
 }
 

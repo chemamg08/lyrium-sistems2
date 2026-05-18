@@ -17,6 +17,8 @@ import ModuleGuide from "@/components/ModuleGuide";
 
 const API = `${import.meta.env.VITE_API_URL}/automatizaciones`;
 const CALENDAR_API = `${import.meta.env.VITE_API_URL}/calendar`;
+const WA_QUICK_CONNECT_MAINTENANCE = true;
+const WA_HELP_IMAGE_URL = '/ayudanum.png';
 
 interface Especialidad { id: string; nombre: string; descripcion: string; createdAt: string; }
 interface CuentaCorreo {
@@ -78,6 +80,10 @@ interface IWhatsAppSession {
   tokenType?: string;
   alertEmail?: string;
   hasAccessToken?: boolean;
+  expiryKnown?: boolean;
+  connectionStatus?: string;
+  lastValidatedAt?: string;
+  lastValidationError?: string;
 }
 
 interface CalendarApiEvent {
@@ -224,6 +230,8 @@ const Automations = () => {
   const [showWaConnectModal, setShowWaConnectModal] = useState(false);
   const [waConnectError, setWaConnectError] = useState('');
   const [waManualMode, setWaManualMode] = useState(false);
+  const [showWaManualInstructions, setShowWaManualInstructions] = useState(false);
+  const [waQuickAlertEmail, setWaQuickAlertEmail] = useState('');
   const [waManualToken, setWaManualToken] = useState('');
   const [waManualPhoneId, setWaManualPhoneId] = useState('');
   const [waManualWabaId, setWaManualWabaId] = useState('');
@@ -476,6 +484,11 @@ const Automations = () => {
   };
 
   const connectWa = async () => {
+    if (!waQuickAlertEmail.trim()) {
+      setWaConnectError(t('automations.waMetaAlertEmailRequired'));
+      setShowWaConnectModal(true);
+      return;
+    }
     if (!accountId) {
       setWaConnectError('No se pudo identificar la cuenta actual. Recarga la pagina e intentalo de nuevo.');
       setShowWaConnectModal(true);
@@ -527,7 +540,7 @@ const Automations = () => {
             const connectRes = await authFetch(`${WA_API}/meta/connect-token`, {
               method: 'POST',
               headers: { 'Content-Type': 'application/json' },
-              body: JSON.stringify({ accountId, state: oauthState, accessToken }),
+              body: JSON.stringify({ accountId, state: oauthState, accessToken, alertEmail: waQuickAlertEmail.trim() }),
             });
             if (connectRes.ok) {
               await refreshWhatsAppSessionState();
@@ -566,7 +579,7 @@ const Automations = () => {
               const connectRes = await authFetch(`${WA_API}/meta/connect-token`, {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ accountId, state: oauthState, accessToken }),
+                body: JSON.stringify({ accountId, state: oauthState, accessToken, alertEmail: waQuickAlertEmail.trim() }),
               });
               if (connectRes.ok) {
                 await refreshWhatsAppSessionState();
@@ -614,6 +627,10 @@ const Automations = () => {
     if (!accountId) return;
     if (!waManualToken.trim() || !waManualPhoneId.trim()) {
       setWaConnectError('El token y el Phone Number ID son obligatorios.');
+      return;
+    }
+    if (!waManualAlertEmail.trim()) {
+      setWaConnectError(t('automations.waMetaAlertEmailRequired'));
       return;
     }
     setWaOAuthProcessing(true);
@@ -813,7 +830,7 @@ const Automations = () => {
   };
 
   const saveWaSession = async () => {
-    if (!waSessionForm.accessToken.trim() || !waSessionForm.phoneNumberId.trim()) return;
+    if (!waSessionForm.accessToken.trim() || !waSessionForm.phoneNumberId.trim() || !waSessionForm.alertEmail.trim()) return;
     try {
       const res = await authFetch(`${WA_API}/meta/connect-manual`, {
         method: 'POST',
@@ -857,15 +874,24 @@ const Automations = () => {
     } catch { /* offline */ }
   };
 
-  const getTokenStatus = (expiresAt?: string): { color: string; label: string; days: number } => {
-    if (!expiresAt) return { color: 'text-muted-foreground', label: 'Sin info', days: 999 };
-    const expires = new Date(expiresAt).getTime();
+  const getTokenStatus = (session?: IWhatsAppSession): { color: string; label: string; days: number } => {
+    if (!session) return { color: 'text-muted-foreground', label: t('automations.waTokenStatusUnknown'), days: 999 };
+    if (session.connectionStatus === 'error' || session.connectionStatus === 'disconnected') {
+      return { color: 'text-red-400', label: t('automations.waTokenStatusDisconnected'), days: -1 };
+    }
+    if (session.connectionStatus === 'expired') {
+      return { color: 'text-red-400', label: t('automations.waTokenStatusExpired'), days: -1 };
+    }
+    if (!session.expiryKnown || !session.tokenExpiresAt) {
+      return { color: 'text-muted-foreground', label: t('automations.waTokenStatusUnknown'), days: 999 };
+    }
+    const expires = new Date(session.tokenExpiresAt).getTime();
     const now = Date.now();
     const days = Math.floor((expires - now) / (1000 * 60 * 60 * 24));
-    if (days < 0) return { color: 'text-red-400', label: 'Expirado', days };
-    if (days <= 7) return { color: 'text-red-400', label: `${days} días`, days };
-    if (days <= 14) return { color: 'text-yellow-400', label: `${days} días`, days };
-    return { color: 'text-green-400', label: `${days} días`, days };
+    if (days < 0) return { color: 'text-red-400', label: t('automations.waTokenStatusExpired'), days };
+    if (days <= 7) return { color: 'text-red-400', label: t('automations.waTokenStatusDays', { count: days }), days };
+    if (days <= 14) return { color: 'text-yellow-400', label: t('automations.waTokenStatusDays', { count: days }), days };
+    return { color: 'text-green-400', label: t('automations.waTokenStatusDays', { count: days }), days };
   };
 
   async function loadAutoData() {
@@ -2488,26 +2514,43 @@ const Automations = () => {
       <>
       {showWaConnectModal && !waConnected && (
         <Modal
-          title="Conectar WhatsApp con Meta"
+          title={t('automations.waMetaConnectTitle')}
           onClose={() => {
             if (waOAuthProcessing || qrLoading) return;
             setShowWaConnectModal(false);
             setWaManualMode(false);
             setWaConnectError('');
+            setShowWaManualInstructions(false);
           }}
         >
           <div className="space-y-4">
             {!waManualMode ? (
               <>
                 <p className="text-xs text-muted-foreground">
-                  Conecta tu cuenta de WhatsApp Business a través de Meta. Necesitas tener una cuenta de WhatsApp Business registrada en Meta Business Manager.
+                  {t('automations.waMetaQuickIntro')}
                 </p>
 
                 <div className="p-3 rounded-lg border border-border bg-muted/20 text-xs text-foreground space-y-2">
-                  <p className="font-medium">Pasos</p>
-                  <p>1. Pulsa "Continuar con Meta".</p>
-                  <p>2. Inicia sesion en Meta y selecciona tu negocio y numero de WhatsApp.</p>
-                  <p>3. Al terminar, volveras a esta pantalla y se completara la conexion.</p>
+                  <p className="font-medium">{t('automations.waMetaQuickStepsTitle')}</p>
+                  <p>{t('automations.waMetaQuickStep1')}</p>
+                  <p>{t('automations.waMetaQuickStep2')}</p>
+                  <p>{t('automations.waMetaQuickStep3')}</p>
+                </div>
+
+                <div>
+                  <label className="block text-xs font-medium text-foreground mb-1">{t('automations.waMetaAlertEmailLabel')}</label>
+                  <input
+                    type="email"
+                    value={waQuickAlertEmail}
+                    onChange={e => setWaQuickAlertEmail(e.target.value)}
+                    placeholder={t('automations.waMetaAlertEmailPlaceholder')}
+                    className="w-full px-3 py-1.5 text-xs rounded-md border border-border bg-background text-foreground placeholder:text-muted-foreground focus:outline-none focus:ring-1 focus:ring-ring"
+                  />
+                  <p className="text-[10px] text-muted-foreground mt-0.5">{t('automations.waMetaAlertEmailHint')}</p>
+                </div>
+
+                <div className="p-3 rounded-lg border border-border bg-muted/20 text-xs text-muted-foreground">
+                  {t('automations.waMetaQuickMaintenance')}
                 </div>
 
                 {waConnectError && (
@@ -2522,22 +2565,26 @@ const Automations = () => {
                     disabled={waOAuthProcessing || qrLoading}
                     className="text-xs text-muted-foreground underline underline-offset-2 hover:text-foreground disabled:opacity-50"
                   >
-                    Configurar con credenciales manuales
+                    {t('automations.waMetaManualLink')}
                   </button>
                   <div className="flex gap-2">
                     <button
-                      onClick={() => setShowWaConnectModal(false)}
+                      onClick={() => {
+                        setShowWaConnectModal(false);
+                        setWaConnectError('');
+                        setShowWaManualInstructions(false);
+                      }}
                       disabled={waOAuthProcessing || qrLoading}
                       className="px-3 py-1.5 text-xs rounded-md border border-border hover:bg-accent text-muted-foreground disabled:opacity-50"
                     >
-                      Cerrar
+                      {t('automations.close')}
                     </button>
                     <button
-                      onClick={connectWa}
-                      disabled={qrLoading || waOAuthProcessing}
-                      className="px-3 py-1.5 text-xs rounded-md bg-foreground text-background hover:opacity-90 disabled:opacity-50"
+                      onClick={() => {}}
+                      disabled
+                      className="px-3 py-1.5 text-xs rounded-md bg-muted text-muted-foreground cursor-not-allowed opacity-70"
                     >
-                      {waOAuthProcessing ? 'Finalizando conexion...' : qrLoading ? 'Abriendo Meta...' : 'Continuar con Meta'}
+                      {t('automations.waMetaContinueMetaMaintenance')}
                     </button>
                   </div>
                 </div>
@@ -2545,12 +2592,12 @@ const Automations = () => {
             ) : (
               <>
                 <p className="text-xs text-muted-foreground">
-                  Introduce las credenciales de tu número de WhatsApp Business desde el panel de Meta Developers → WhatsApp → Configuración de API.
+                  {t('automations.waMetaManualIntro')}
                 </p>
 
                 <div className="space-y-3">
                   <div>
-                    <label className="block text-xs font-medium text-foreground mb-1">Token de acceso *</label>
+                    <label className="block text-xs font-medium text-foreground mb-1">{t('automations.waMetaTokenLabel')}</label>
                     <input
                       type="password"
                       value={waManualToken}
@@ -2558,10 +2605,10 @@ const Automations = () => {
                       placeholder="EAAxxxxxxx..."
                       className="w-full px-3 py-1.5 text-xs rounded-md border border-border bg-background text-foreground placeholder:text-muted-foreground focus:outline-none focus:ring-1 focus:ring-ring"
                     />
-                    <p className="text-[10px] text-muted-foreground mt-0.5">Token temporal o permanente de la sección "Configuración de API" en Meta Developers.</p>
+                    <p className="text-[10px] text-muted-foreground mt-0.5">{t('automations.waMetaTokenHint')}</p>
                   </div>
                   <div>
-                    <label className="block text-xs font-medium text-foreground mb-1">Phone Number ID *</label>
+                    <label className="block text-xs font-medium text-foreground mb-1">{t('automations.waMetaPhoneIdLabel')}</label>
                     <input
                       type="text"
                       value={waManualPhoneId}
@@ -2569,10 +2616,10 @@ const Automations = () => {
                       placeholder="1234567890"
                       className="w-full px-3 py-1.5 text-xs rounded-md border border-border bg-background text-foreground placeholder:text-muted-foreground focus:outline-none focus:ring-1 focus:ring-ring"
                     />
-                    <p className="text-[10px] text-muted-foreground mt-0.5">Lo encuentras en Meta Developers → WhatsApp → Configuración de API, junto al número de teléfono.</p>
+                    <p className="text-[10px] text-muted-foreground mt-0.5">{t('automations.waMetaPhoneIdHint')}</p>
                   </div>
                   <div>
-                    <label className="block text-xs font-medium text-foreground mb-1">WABA ID (opcional)</label>
+                    <label className="block text-xs font-medium text-foreground mb-1">{t('automations.waMetaWabaIdLabel')}</label>
                     <input
                       type="text"
                       value={waManualWabaId}
@@ -2580,17 +2627,18 @@ const Automations = () => {
                       placeholder="9876543210"
                       className="w-full px-3 py-1.5 text-xs rounded-md border border-border bg-background text-foreground placeholder:text-muted-foreground focus:outline-none focus:ring-1 focus:ring-ring"
                     />
-                    <p className="text-[10px] text-muted-foreground mt-0.5">ID de la cuenta de WhatsApp Business. Se detecta automáticamente si se deja vacío.</p>
+                    <p className="text-[10px] text-muted-foreground mt-0.5">{t('automations.waMetaWabaIdHint')}</p>
                   </div>
                   <div>
-                    <label className="block text-xs font-medium text-foreground mb-1">Email de alerta (opcional)</label>
+                    <label className="block text-xs font-medium text-foreground mb-1">{t('automations.waMetaAlertEmailLabel')}</label>
                     <input
                       type="email"
                       value={waManualAlertEmail}
                       onChange={e => setWaManualAlertEmail(e.target.value)}
-                      placeholder="Email de alerta (opcional)"
+                      placeholder={t('automations.waMetaAlertEmailPlaceholder')}
                       className="w-full px-3 py-1.5 text-xs rounded-md border border-border bg-background text-foreground placeholder:text-muted-foreground focus:outline-none focus:ring-1 focus:ring-ring"
                     />
+                    <p className="text-[10px] text-muted-foreground mt-0.5">{t('automations.waMetaAlertEmailHint')}</p>
                   </div>
                 </div>
 
@@ -2601,32 +2649,75 @@ const Automations = () => {
                 )}
 
                 <div className="flex justify-between items-center pt-1">
-                  <button
-                    onClick={() => { setWaManualMode(false); setWaConnectError(''); }}
-                    disabled={waOAuthProcessing}
-                    className="text-xs text-muted-foreground underline underline-offset-2 hover:text-foreground disabled:opacity-50"
-                  >
-                    ← Volver a conexión con Meta
-                  </button>
+                  <div className="flex items-center gap-3">
+                    <button
+                      onClick={() => { setWaManualMode(false); setWaConnectError(''); }}
+                      disabled={waOAuthProcessing}
+                      className="text-xs text-muted-foreground underline underline-offset-2 hover:text-foreground disabled:opacity-50"
+                    >
+                      {t('automations.waMetaManualBack')}
+                    </button>
+                    <button
+                      onClick={() => setShowWaManualInstructions(true)}
+                      type="button"
+                      className="text-xs text-muted-foreground underline underline-offset-2 hover:text-foreground"
+                    >
+                      {t('automations.waMetaInstructionsButton')}
+                    </button>
+                  </div>
                   <div className="flex gap-2">
                     <button
                       onClick={() => { setShowWaConnectModal(false); setWaManualMode(false); setWaConnectError(''); }}
                       disabled={waOAuthProcessing}
                       className="px-3 py-1.5 text-xs rounded-md border border-border hover:bg-accent text-muted-foreground disabled:opacity-50"
                     >
-                      Cerrar
+                      {t('automations.close')}
                     </button>
                     <button
                       onClick={connectWaManual}
-                      disabled={waOAuthProcessing || !waManualToken.trim() || !waManualPhoneId.trim()}
+                      disabled={waOAuthProcessing || !waManualToken.trim() || !waManualPhoneId.trim() || !waManualAlertEmail.trim()}
                       className="px-3 py-1.5 text-xs rounded-md bg-foreground text-background hover:opacity-90 disabled:opacity-50"
                     >
-                      {waOAuthProcessing ? 'Conectando...' : 'Conectar'}
+                      {waOAuthProcessing ? t('automations.connecting') : t('automations.connect')}
                     </button>
                   </div>
                 </div>
               </>
             )}
+          </div>
+        </Modal>
+      )}
+
+      {showWaManualInstructions && (
+        <Modal title={t('automations.waMetaInstructionsTitle')} onClose={() => setShowWaManualInstructions(false)} wide>
+          <div className="space-y-4 text-xs text-foreground">
+            <p>
+              1. {t('automations.waMetaInstructionsStep1Before')}{' '}
+              <a
+                href="https://developers.facebook.com/apps/"
+                target="_blank"
+                rel="noreferrer"
+                className="underline underline-offset-2"
+              >
+                Meta Developers &gt; Apps
+              </a>{' '}
+              {t('automations.waMetaInstructionsStep1After')}
+            </p>
+            <p>2. {t('automations.waMetaInstructionsStep2')}</p>
+            <p>3. {t('automations.waMetaInstructionsStep3')}</p>
+            <div className="space-y-2">
+              <p>4. {t('automations.waMetaInstructionsStep4')}</p>
+              <p>- {t('automations.waMetaInstructionsStep4ItemToken')}</p>
+              <p>- {t('automations.waMetaInstructionsStep4ItemPhone')}</p>
+              <p>- {t('automations.waMetaInstructionsStep4ItemWaba')}</p>
+              <p className="font-medium text-red-600">- {t('automations.waMetaInstructionsStep4Rule1')}</p>
+              <p className="font-medium text-red-600">- {t('automations.waMetaInstructionsStep4Rule2')}</p>
+              <p className="font-medium text-red-600">- {t('automations.waMetaInstructionsStep4Rule3')}</p>
+              <img src={WA_HELP_IMAGE_URL} alt={t('automations.waMetaInstructionsImageAlt')} className="w-full rounded-lg border border-border" />
+            </div>
+            <p>5. {t('automations.waMetaInstructionsStep5')}</p>
+            <p>6. {t('automations.waMetaInstructionsStep6')}</p>
+            <p>7. {t('automations.waMetaInstructionsStep7')}</p>
           </div>
         </Modal>
       )}
@@ -3241,40 +3332,56 @@ const Automations = () => {
             </div>
             {showAddWaSession && (
               <div className="mb-5 p-4 border border-border rounded-lg bg-muted/20 space-y-3">
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
+                  <button
+                    type="button"
+                    disabled
+                    className="p-3 rounded-lg border border-border bg-muted text-left text-xs text-muted-foreground cursor-not-allowed opacity-70"
+                  >
+                    <span className="block font-medium text-foreground">{t('automations.waMetaQuickOptionTitle')}</span>
+                    <span className="block mt-1">{t('automations.waMetaQuickOptionMaintenance')}</span>
+                  </button>
+                  <div className="p-3 rounded-lg border border-border bg-background text-xs">
+                    <span className="block font-medium text-foreground">{t('automations.waMetaManualOptionTitle')}</span>
+                    <span className="block mt-1 text-muted-foreground">{t('automations.waMetaManualOptionHint')}</span>
+                  </div>
+                </div>
                 <input
-                  placeholder="Nombre (ej: WhatsApp Penal)"
+                  placeholder={t('automations.waMetaManualNamePlaceholder')}
                   value={waSessionForm.name}
                   onChange={(e) => setWaSessionForm({ ...waSessionForm, name: e.target.value })}
                   className="w-full px-3 py-2 text-sm rounded-md border border-border bg-card text-foreground placeholder:text-muted-foreground focus:outline-none focus:ring-1 focus:ring-ring"
                 />
                 <input
-                  placeholder="Access Token de Meta"
+                  placeholder={t('automations.waMetaTokenLabel')}
                   value={waSessionForm.accessToken}
                   onChange={(e) => setWaSessionForm({ ...waSessionForm, accessToken: e.target.value })}
                   className="w-full px-3 py-2 text-sm rounded-md border border-border bg-card text-foreground placeholder:text-muted-foreground focus:outline-none focus:ring-1 focus:ring-ring"
                 />
                 <input
-                  placeholder="Phone Number ID"
+                  placeholder={t('automations.waMetaPhoneIdLabel')}
                   value={waSessionForm.phoneNumberId}
                   onChange={(e) => setWaSessionForm({ ...waSessionForm, phoneNumberId: e.target.value })}
                   className="w-full px-3 py-2 text-sm rounded-md border border-border bg-card text-foreground placeholder:text-muted-foreground focus:outline-none focus:ring-1 focus:ring-ring"
                 />
                 <input
-                  placeholder="WABA ID (opcional)"
+                  placeholder={t('automations.waMetaWabaIdLabel')}
                   value={waSessionForm.wabaId}
                   onChange={(e) => setWaSessionForm({ ...waSessionForm, wabaId: e.target.value })}
                   className="w-full px-3 py-2 text-sm rounded-md border border-border bg-card text-foreground placeholder:text-muted-foreground focus:outline-none focus:ring-1 focus:ring-ring"
                 />
                 <input
-                  placeholder="Email de alerta (opcional)"
+                  placeholder={t('automations.waMetaAlertEmailPlaceholder')}
                   type="email"
                   value={waSessionForm.alertEmail}
                   onChange={(e) => setWaSessionForm({ ...waSessionForm, alertEmail: e.target.value })}
                   className="w-full px-3 py-2 text-sm rounded-md border border-border bg-card text-foreground placeholder:text-muted-foreground focus:outline-none focus:ring-1 focus:ring-ring"
                 />
+                <p className="text-[11px] text-muted-foreground">{t('automations.waMetaAlertEmailHint')}</p>
                 <div className="flex gap-2 justify-end">
+                  <button onClick={() => setShowWaManualInstructions(true)} className="px-3 py-1.5 text-xs rounded-md border border-border hover:bg-accent text-muted-foreground">{t('automations.waMetaInstructionsButton')}</button>
                   <button onClick={() => setShowAddWaSession(false)} className="px-3 py-1.5 text-xs rounded-md border border-border hover:bg-accent text-muted-foreground">{t('automations.cancel') || 'Cancelar'}</button>
-                  <button onClick={saveWaSession} className="px-3 py-1.5 text-xs rounded-md bg-foreground text-background hover:opacity-90">{t('automations.save') || 'Guardar'}</button>
+                  <button onClick={saveWaSession} disabled={!waSessionForm.accessToken.trim() || !waSessionForm.phoneNumberId.trim() || !waSessionForm.alertEmail.trim()} className="px-3 py-1.5 text-xs rounded-md bg-foreground text-background hover:opacity-90 disabled:opacity-50">{t('automations.save') || 'Guardar'}</button>
                 </div>
               </div>
             )}
@@ -3282,7 +3389,7 @@ const Automations = () => {
               ? <p className="text-sm text-muted-foreground text-center py-6">{t('automations.noWhatsAppNumbers') || 'No hay números configurados'}</p>
               : <div className="space-y-3">
                   {(autoData.whatsappSessions || []).map((s: any) => {
-                    const status = getTokenStatus(s.tokenExpiresAt);
+                    const status = getTokenStatus(s);
                     return (
                       <div key={s.phoneNumberId || s.id} className="flex items-center justify-between p-4 border border-border rounded-lg bg-muted/20">
                         <div className="flex-1">
@@ -3293,9 +3400,9 @@ const Automations = () => {
                           <p className="text-xs text-muted-foreground">{s.phoneNumber || s.phoneNumberId}</p>
                           <div className="flex items-center gap-3 mt-1">
                             <p className="text-xs text-muted-foreground">
-                              {s.connected ? <span className="text-green-400">Conectado</span> : <span className="text-red-400">Desconectado</span>}
+                              {s.connected ? <span className="text-green-400">{t('automations.waConnected')}</span> : <span className="text-red-400">{t('automations.waDisconnected')}</span>}
                             </p>
-                            {s.alertEmail && <p className="text-xs text-muted-foreground">Alerta: {s.alertEmail}</p>}
+                            {s.alertEmail && <p className="text-xs text-muted-foreground">{t('automations.waAlertEmailPrefix')}: {s.alertEmail}</p>}
                           </div>
                         </div>
                         <div className="flex items-center gap-2">
@@ -3303,9 +3410,9 @@ const Automations = () => {
                             <button
                               onClick={() => refreshWaToken(s.phoneNumberId)}
                               className="px-2 py-1 text-xs rounded-md border border-border hover:bg-accent text-muted-foreground"
-                              title="Renovar token"
+                              title={t('automations.refreshToken')}
                             >
-                              Renovar
+                              {t('automations.refreshToken')}
                             </button>
                           )}
                           <button onClick={() => deleteWaSession(s.phoneNumberId)} className="p-1.5 rounded-md hover:bg-destructive/10 text-muted-foreground hover:text-destructive"><Trash2 className="h-3.5 w-3.5" /></button>

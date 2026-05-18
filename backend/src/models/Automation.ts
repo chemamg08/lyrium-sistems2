@@ -162,6 +162,19 @@ export interface IWhatsAppSession {
   tokenExpiresAt?: string;
   tokenType?: string;
   alertEmail?: string;
+  credentialMode?: 'quick_official' | 'manual_long_lived';
+  expiryKnown?: boolean;
+  connectionStatus?: 'ok' | 'warning' | 'expired' | 'error' | 'disconnected';
+  lastValidatedAt?: string;
+  lastValidationError?: string;
+  lastExpiryReminder7dAt?: string;
+  lastExpiryReminder3dAt?: string;
+  lastExpiryReminder1dAt?: string;
+  lastExpiryReminder0dAt?: string;
+  lastFailureAlertAt?: string;
+  failureAlertOpen?: boolean;
+  failureFirstDetectedAt?: string;
+  failureResolvedAt?: string;
 }
 
 export interface IAutomation {
@@ -328,9 +341,26 @@ const whatsappSessionSchema = new Schema({
   phoneNumberId: String,
   accessToken: String,
   tokenExpiresAt: String,
-  tokenType: { type: String, enum: ['short', 'long'] },
+  tokenType: { type: String, enum: ['short', 'long', 'business_integration', 'unknown'] },
   name: String,
   alertEmail: String,
+  credentialMode: { type: String, enum: ['quick_official', 'manual_long_lived'] },
+  expiryKnown: { type: Boolean, default: false },
+  connectionStatus: {
+    type: String,
+    enum: ['ok', 'warning', 'expired', 'error', 'disconnected'],
+    default: 'disconnected',
+  },
+  lastValidatedAt: String,
+  lastValidationError: String,
+  lastExpiryReminder7dAt: String,
+  lastExpiryReminder3dAt: String,
+  lastExpiryReminder1dAt: String,
+  lastExpiryReminder0dAt: String,
+  lastFailureAlertAt: String,
+  failureAlertOpen: { type: Boolean, default: false },
+  failureFirstDetectedAt: String,
+  failureResolvedAt: String,
 }, { _id: false });
 
 // @deprecated Kept for backward compatibility, use whatsappSessionSchema

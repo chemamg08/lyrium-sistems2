@@ -302,6 +302,11 @@ export const getWhatsAppStatus: RequestHandler = async (req, res) => {
         tokenType: s.tokenType,
         tokenExpiresAt: s.tokenExpiresAt,
         alertEmail: s.alertEmail || '',
+        credentialMode: s.credentialMode || '',
+        expiryKnown: s.expiryKnown === true,
+        connectionStatus: s.connectionStatus || 'disconnected',
+        lastValidatedAt: s.lastValidatedAt || '',
+        lastValidationError: s.lastValidationError || '',
       })),
       legacySession: legacySession ? {
         phoneNumber: legacySession.phoneNumber || '',

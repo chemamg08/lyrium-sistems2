@@ -396,3 +396,37 @@ export async function sendEmail(
     return false;
   }
 }
+
+export async function sendSystemEmail(
+  options: { to: string | string[]; subject: string; text: string; html?: string },
+): Promise<boolean> {
+  try {
+    const port = Number(process.env.SYSTEM_EMAIL_PORT) || 587;
+    const secure = port === 465;
+    const transporter = nodemailer.createTransport({
+      host: process.env.SYSTEM_EMAIL_HOST || 'smtp-relay.brevo.com',
+      port,
+      secure,
+      auth: {
+        user: process.env.SYSTEM_EMAIL_LOGIN || process.env.SYSTEM_EMAIL_USER,
+        pass: process.env.SYSTEM_EMAIL_PASS,
+      },
+    });
+
+    try {
+      await transporter.sendMail({
+        from: `"Lyrium Systems" <${process.env.SYSTEM_EMAIL_USER || process.env.SYSTEM_EMAIL_LOGIN}>`,
+        to: Array.isArray(options.to) ? options.to.join(', ') : options.to,
+        subject: options.subject,
+        text: options.text,
+        html: options.html,
+      });
+      return true;
+    } finally {
+      transporter.close();
+    }
+  } catch (error) {
+    console.error('Error sending system email:', error);
+    return false;
+  }
+}
