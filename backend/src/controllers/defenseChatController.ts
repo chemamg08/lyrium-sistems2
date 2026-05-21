@@ -14,7 +14,7 @@ import { Chat } from '../models/Chat.js';
 import { Client } from '../models/Client.js';
 import { Stat } from '../models/Stat.js';
 import { sanitizeFilename } from '../utils/sanitizeFilename.js';
-import { verifyOwnership } from '../middleware/auth.js';
+import { isInternalJobRequest, verifyOwnership } from '../middleware/auth.js';
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
@@ -1041,7 +1041,11 @@ export const simulateCounterReplica = async (req: Request, res: Response) => {
     if (!accountId) return res.status(400).json({ error: 'accountId requerido' });
     if (!verifyOwnership(req, accountId)) return res.status(403).json({ error: 'Acceso denegado' });
     const user = (req as any).user;
-    const chat = await DefenseChat.findOne({ _id: chatId, accountId, createdBy: user?.userId || '' });
+    const chatFilter: any = { _id: chatId, accountId };
+    if (!isInternalJobRequest(req)) {
+      chatFilter.createdBy = user?.userId || '';
+    }
+    const chat = await DefenseChat.findOne(chatFilter);
     if (!chat || chat.accountId !== accountId) return res.status(403).json({ error: 'Acceso denegado' });
 
     const { simulateCounterReplicaAI } = await import('../services/aiService.js');
