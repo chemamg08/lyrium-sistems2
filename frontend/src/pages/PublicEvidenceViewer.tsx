@@ -9,7 +9,10 @@ interface EvidenceMeta {
   description: string;
 }
 
-const API_URL = import.meta.env.VITE_API_URL || '';
+const PUBLIC_EVIDENCE_API_BASE = '/api/public/evidence';
+
+const getPublicEvidenceApiUrl = (token?: string) => token ? `${PUBLIC_EVIDENCE_API_BASE}/${token}` : '';
+const getPublicEvidenceMetadataUrl = (token?: string) => token ? `${PUBLIC_EVIDENCE_API_BASE}/${token}/metadata` : '';
 
 export default function PublicEvidenceViewer() {
   const { token } = useParams<{ token: string }>();
@@ -21,7 +24,7 @@ export default function PublicEvidenceViewer() {
 
   useEffect(() => {
     if (!token) return;
-    fetch(`${API_URL}/public/evidence/${token}/metadata`)
+    fetch(getPublicEvidenceMetadataUrl(token))
       .then(r => {
         if (!r.ok) throw new Error('No encontrado');
         return r.json();
@@ -35,6 +38,11 @@ export default function PublicEvidenceViewer() {
         setLoading(false);
       });
   }, [token]);
+
+  useEffect(() => {
+    if (!token || meta?.mimeType !== 'application/pdf') return;
+    window.location.replace(getPublicEvidenceApiUrl(token));
+  }, [meta, token]);
 
   const toggleFullscreen = async () => {
     const el = containerRef.current;
@@ -75,7 +83,7 @@ export default function PublicEvidenceViewer() {
     };
   }, []);
 
-  const fileUrl = `${API_URL}/public/evidence/${token}`;
+  const fileUrl = getPublicEvidenceApiUrl(token);
 
   if (loading) {
     return (
@@ -100,6 +108,14 @@ export default function PublicEvidenceViewer() {
   const isVideo = meta.mimeType?.startsWith('video/');
   const isAudio = meta.mimeType?.startsWith('audio/');
   const isPdf = meta.mimeType === 'application/pdf';
+
+  if (isPdf) {
+    return (
+      <div className="min-h-screen bg-black flex items-center justify-center">
+        <div className="text-white text-sm animate-pulse">Abriendo PDF...</div>
+      </div>
+    );
+  }
 
   return (
     <div className="min-h-screen bg-black flex flex-col" ref={containerRef}>
@@ -155,14 +171,6 @@ export default function PublicEvidenceViewer() {
             </div>
             <audio src={fileUrl} controls className="w-72 max-w-full" />
           </div>
-        )}
-        {isPdf && (
-          <iframe
-            src={fileUrl}
-            className="w-full h-full border-0"
-            style={{ height: isFullscreen ? '100vh' : 'calc(100vh - 60px)' }}
-            title={meta.fileName}
-          />
         )}
         {!isImage && !isVideo && !isAudio && !isPdf && (
           <div className="text-center p-6">

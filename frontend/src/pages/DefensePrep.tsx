@@ -63,6 +63,9 @@ interface SavedStrategy {
 }
 
 const API_URL = import.meta.env.VITE_API_URL;
+const PUBLIC_EVIDENCE_API_BASE = '/api/public/evidence';
+const getPublicEvidenceApiUrl = (token?: string) => token ? `${PUBLIC_EVIDENCE_API_BASE}/${token}` : '';
+const getPublicEvidenceViewerUrl = (token?: string) => token ? `/public/evidence/${token}` : '';
 const ACTIVE_DEFENSE_CHAT_KEY = 'activeDefenseChatId';
 
 const DefensePrep = () => {
@@ -630,6 +633,10 @@ const DefensePrep = () => {
 
   const openEvidenceViewer = (ev: any) => {
     if (!ev.filePath && !ev.publicToken) return;
+    if (ev.mimeType === 'application/pdf') {
+      window.open(getPublicEvidenceViewerUrl(ev.publicToken), '_blank', 'noopener,noreferrer');
+      return;
+    }
     setEvidenceViewerItem(ev);
   };
 
@@ -1909,17 +1916,20 @@ const DefensePrep = () => {
             </div>
             <div className="flex-1 overflow-auto p-4 flex items-center justify-center bg-black/50">
               {evidenceViewerItem.mimeType?.startsWith('image/') ? (
-                <img src={`${import.meta.env.VITE_API_URL}/public/evidence/${evidenceViewerItem.publicToken}`} alt={evidenceViewerItem.fileName} className="max-w-full max-h-[70vh] object-contain rounded" />
+                <img src={getPublicEvidenceApiUrl(evidenceViewerItem.publicToken)} alt={evidenceViewerItem.fileName} className="max-w-full max-h-[70vh] object-contain rounded" />
               ) : evidenceViewerItem.mimeType?.startsWith('video/') ? (
-                <video src={`${import.meta.env.VITE_API_URL}/public/evidence/${evidenceViewerItem.publicToken}`} controls className="max-w-full max-h-[70vh] rounded" />
+                <video src={getPublicEvidenceApiUrl(evidenceViewerItem.publicToken)} controls className="max-w-full max-h-[70vh] rounded" />
               ) : evidenceViewerItem.mimeType?.startsWith('audio/') ? (
-                <audio src={`${import.meta.env.VITE_API_URL}/public/evidence/${evidenceViewerItem.publicToken}`} controls className="w-full max-w-md" />
+                <audio src={getPublicEvidenceApiUrl(evidenceViewerItem.publicToken)} controls className="w-full max-w-md" />
               ) : evidenceViewerItem.mimeType === 'application/pdf' ? (
-                <iframe src={`/public/evidence/${evidenceViewerItem.publicToken}`} className="w-full h-[70vh] rounded" />
+                <div className="text-center">
+                  <p className="text-muted-foreground mb-4">El PDF se abre en una pestana nueva del navegador.</p>
+                  <a href={getPublicEvidenceViewerUrl(evidenceViewerItem.publicToken)} target="_blank" rel="noreferrer" className="px-4 py-2 rounded-lg bg-primary text-primary-foreground text-sm font-medium hover:opacity-90">Abrir PDF</a>
+                </div>
               ) : (
                 <div className="text-center">
                   <p className="text-muted-foreground mb-4">Vista previa no disponible</p>
-                  <a href={`${import.meta.env.VITE_API_URL}/public/evidence/${evidenceViewerItem.publicToken}`} download className="px-4 py-2 rounded-lg bg-primary text-primary-foreground text-sm font-medium hover:opacity-90">Descargar archivo</a>
+                  <a href={getPublicEvidenceApiUrl(evidenceViewerItem.publicToken)} download className="px-4 py-2 rounded-lg bg-primary text-primary-foreground text-sm font-medium hover:opacity-90">Descargar archivo</a>
                 </div>
               )}
             </div>
