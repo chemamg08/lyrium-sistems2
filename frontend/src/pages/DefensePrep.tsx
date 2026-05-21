@@ -112,6 +112,8 @@ const DefensePrep = () => {
   // Evidence states
   const [activeTab, setActiveTab] = useState<'chat' | 'evidence'>('chat');
   const [evidenceList, setEvidenceList] = useState<any[]>([]);
+  const [evidenceLibraryList, setEvidenceLibraryList] = useState<any[]>([]);
+  const [evidenceTrashList, setEvidenceTrashList] = useState<any[]>([]);
   const [loadingEvidence, setLoadingEvidence] = useState(false);
   const [showEvidenceForm, setShowEvidenceForm] = useState(false);
   const [editingEvidence, setEditingEvidence] = useState<any>(null);
@@ -448,6 +450,9 @@ const DefensePrep = () => {
       if (res.ok) {
         setEvidenceToDelete(null);
         loadEvidence();
+        loadEvidenceLibrary();
+        loadEvidenceTrash();
+        loadEvidenceQuota();
       }
     } catch (err) { console.error(err); }
   };
@@ -538,7 +543,7 @@ const DefensePrep = () => {
     if (!accountId) return;
     try {
       const res = await authFetch(`${import.meta.env.VITE_API_URL}/defense-chat/evidence/library?accountId=${accountId}`);
-      if (res.ok) setEvidenceList(await res.json());
+      if (res.ok) setEvidenceLibraryList(await res.json());
     } catch (err) { console.error(err); }
   };
 
@@ -547,7 +552,7 @@ const DefensePrep = () => {
     if (!accountId) return;
     try {
       const res = await authFetch(`${import.meta.env.VITE_API_URL}/defense-chat/evidence/trash?accountId=${accountId}`);
-      if (res.ok) setEvidenceList(await res.json());
+      if (res.ok) setEvidenceTrashList(await res.json());
     } catch (err) { console.error(err); }
   };
 
@@ -571,6 +576,7 @@ const DefensePrep = () => {
       if (res.ok) {
         toast({ title: 'Archivo subido correctamente' });
         loadEvidenceLibrary();
+        loadEvidenceTrash();
         loadEvidenceQuota();
         if (activeTab === 'evidence') loadEvidence();
       } else {
@@ -595,6 +601,7 @@ const DefensePrep = () => {
       });
       if (res.ok) {
         loadEvidenceLibrary();
+        loadEvidenceTrash();
         loadEvidenceQuota();
         if (activeTab === 'evidence') loadEvidence();
       }
@@ -611,8 +618,10 @@ const DefensePrep = () => {
         body: JSON.stringify({ accountId }),
       });
       if (res.ok) {
+        loadEvidenceLibrary();
         loadEvidenceTrash();
         loadEvidenceQuota();
+        if (activeTab === 'evidence') loadEvidence();
       }
     } catch (err) { console.error(err); }
   };
@@ -625,16 +634,21 @@ const DefensePrep = () => {
         method: 'DELETE',
       });
       if (res.ok) {
+        loadEvidenceLibrary();
         loadEvidenceTrash();
         loadEvidenceQuota();
+        if (activeTab === 'evidence') loadEvidence();
       }
     } catch (err) { console.error(err); }
   };
 
   const openEvidenceViewer = (ev: any) => {
-    if (!ev.filePath && !ev.publicToken) return;
+    if (!ev.publicToken) {
+      toast({ title: 'Esta prueba no tiene enlace publico disponible', variant: 'destructive' });
+      return;
+    }
     if (ev.mimeType === 'application/pdf') {
-      window.open(getPublicEvidenceViewerUrl(ev.publicToken), '_blank', 'noopener,noreferrer');
+      window.open(getPublicEvidenceApiUrl(ev.publicToken), '_blank', 'noopener,noreferrer');
       return;
     }
     setEvidenceViewerItem(ev);
@@ -1852,10 +1866,10 @@ const DefensePrep = () => {
               <p className="text-sm text-muted-foreground text-center py-4">Subiendo archivo...</p>
             )}
             <div className="space-y-2">
-              {evidenceList.length === 0 ? (
+              {evidenceLibraryList.length === 0 ? (
                 <p className="text-sm text-muted-foreground text-center py-8">No hay pruebas en la biblioteca</p>
               ) : (
-                evidenceList.map((ev) => (
+                evidenceLibraryList.map((ev) => (
                   <div key={ev._id || ev.id} className="flex items-center justify-between bg-accent/30 rounded-md px-4 py-3">
                     <div className="min-w-0">
                       <p className="text-sm font-medium truncate">{ev.description || ev.fileName}</p>
@@ -1885,10 +1899,10 @@ const DefensePrep = () => {
               </div>
             </div>
             <div className="space-y-2">
-              {evidenceList.length === 0 ? (
+              {evidenceTrashList.length === 0 ? (
                 <p className="text-sm text-muted-foreground text-center py-8">La papelera está vacía</p>
               ) : (
-                evidenceList.map((ev) => (
+                evidenceTrashList.map((ev) => (
                   <div key={ev._id || ev.id} className="flex items-center justify-between bg-accent/30 rounded-md px-4 py-3">
                     <div className="min-w-0">
                       <p className="text-sm font-medium truncate">{ev.description || ev.fileName}</p>

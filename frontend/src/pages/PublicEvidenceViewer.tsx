@@ -24,7 +24,7 @@ export default function PublicEvidenceViewer() {
 
   useEffect(() => {
     if (!token) return;
-    fetch(getPublicEvidenceMetadataUrl(token))
+    fetch(getPublicEvidenceMetadataUrl(token), { credentials: 'include' })
       .then(r => {
         if (!r.ok) throw new Error('No encontrado');
         return r.json();
@@ -34,6 +34,7 @@ export default function PublicEvidenceViewer() {
         setLoading(false);
       })
       .catch(() => {
+        window.location.replace(getPublicEvidenceApiUrl(token));
         setError('Esta prueba no está disponible o ha sido eliminada.');
         setLoading(false);
       });

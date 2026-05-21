@@ -945,7 +945,12 @@ export const getEvidence = async (req: Request, res: Response) => {
     const user = (req as any).user;
     const chat = await DefenseChat.findOne({ _id: chatId, accountId: accountId as string, createdBy: user?.userId || '' });
     if (!chat || chat.accountId !== accountId) return res.status(403).json({ error: 'Acceso denegado' });
-    const evidence = await DefenseEvidence.find({ chatId }).sort({ exhibitNumber: 1 });
+    const evidence = await DefenseEvidence.find({
+      chatId,
+      accountId: accountId as string,
+      createdBy: user?.userId || '',
+      isDeleted: false,
+    }).sort({ exhibitNumber: 1 });
     res.json(evidence);
   } catch (error) {
     console.error('Error al obtener pruebas:', error);

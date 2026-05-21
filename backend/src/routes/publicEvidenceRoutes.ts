@@ -3,6 +3,14 @@ import { DefenseEvidence } from '../models/DefenseEvidence.js';
 
 const router = Router();
 
+router.use((_req, res, next) => {
+  // Estas evidencias se consumen desde el frontend público y no deben heredar
+  // políticas que las bloqueen al pasar por proxy/dominio.
+  res.setHeader('Cross-Origin-Resource-Policy', 'cross-origin');
+  res.removeHeader('X-Frame-Options');
+  next();
+});
+
 router.get('/evidence/:token/metadata', async (req, res) => {
   try {
     const evidence = await DefenseEvidence.findOne({ publicToken: req.params.token, isDeleted: false });
@@ -37,6 +45,8 @@ router.get('/evidence/:token', async (req, res) => {
     }
 
     const mime = evidence.mimeType || 'application/octet-stream';
+    res.setHeader('Cross-Origin-Resource-Policy', 'cross-origin');
+    res.setHeader('Cache-Control', 'private, max-age=300');
 
     if (mime.startsWith('video/')) {
       res.setHeader('Content-Type', mime);
