@@ -25,7 +25,7 @@ const SignDocument = () => {
   useEffect(() => {
     if (!token) {
       setStatus('error');
-      setErrorMsg('Enlace no valido');
+      setErrorMsg('Enlace no válido');
       return;
     }
     fetchSigningInfo();
@@ -76,7 +76,7 @@ const SignDocument = () => {
       setStatus('ready');
     } catch {
       setStatus('error');
-      setErrorMsg('Error de conexion');
+      setErrorMsg('Error de conexión');
     }
   };
 
@@ -197,7 +197,7 @@ const SignDocument = () => {
       setSignedAt(data.signedAt);
     } catch {
       setStatus('ready');
-      setErrorMsg('Error de conexion al enviar la firma');
+      setErrorMsg('Error de conexión al enviar la firma');
     }
   };
 
@@ -252,7 +252,7 @@ const SignDocument = () => {
           </h1>
           <p className="text-gray-600 mb-2">
             {status === 'done'
-              ? 'La firma se ha registrado correctamente. Recibira una copia del documento firmado por email.'
+              ? 'La firma se ha registrado correctamente. Recibirá una copia del documento firmado por email.'
               : `Este documento fue firmado por ${signerName}.`}
           </p>
           {signedAt && (
@@ -277,7 +277,7 @@ const SignDocument = () => {
               <h1 className="text-lg font-semibold text-gray-900">{contractName}</h1>
               <p className="text-sm text-gray-500">Documento pendiente de firma</p>
               <p className="text-xs text-gray-400">
-                Firmara como {signerName}{signerEmail ? ` · ${signerEmail}` : ''}
+                Firmará como {signerName}{signerEmail ? ` · ${signerEmail}` : ''}
               </p>
             </div>
           </div>
@@ -314,7 +314,7 @@ const SignDocument = () => {
         <div className="fixed inset-0 bg-black/50 backdrop-blur-sm z-50 flex items-center justify-center p-4">
           <div className="bg-white rounded-2xl shadow-xl w-full max-w-lg">
             <div className="flex items-center justify-between p-5 border-b border-gray-200">
-              <h2 className="text-lg font-semibold text-gray-900">Firme aqui</h2>
+              <h2 className="text-lg font-semibold text-gray-900">Firme aquí</h2>
               <button onClick={() => setShowSignPad(false)} className="p-1 hover:bg-gray-100 rounded-lg">
                 <X className="h-5 w-5 text-gray-500" />
               </button>
@@ -326,7 +326,7 @@ const SignDocument = () => {
                 {signerEmail && <p>{signerEmail}</p>}
               </div>
               <p className="text-sm text-gray-600 mb-4">
-                Dibuje su firma con el raton o con el dedo en el recuadro inferior.
+                Dibuje su firma con el ratón o con el dedo en el recuadro inferior.
               </p>
 
               <div className="border-2 border-dashed border-gray-300 rounded-xl bg-gray-50 relative" style={{ touchAction: 'none' }}>
@@ -359,7 +359,7 @@ const SignDocument = () => {
                   className="mt-0.5 h-4 w-4 rounded border-gray-300 text-indigo-600 focus:ring-indigo-500"
                 />
                 <span>
-                  Confirmo que he revisado el documento, que firmo con mi nombre y email identificados en esta sesion y que acepto el registro de la evidencia tecnica de firma por Lyrium.
+                  Confirmo que he revisado el documento, que firmo con mi nombre y email identificados en esta sesión y que acepto el registro de la evidencia técnica de firma por Lyrium.
                 </span>
               </label>
 
