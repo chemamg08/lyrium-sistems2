@@ -41,6 +41,7 @@ export async function createSignatureRequest(params: {
 }): Promise<ISignatureRequestResult> {
   const contract = await GeneratedContract.findById(params.generatedContractId);
   if (!contract) throw new Error('Contrato no encontrado');
+  const originalFileBuffer = await fs.readFile(contract.filePath);
 
   const token = crypto.randomBytes(32).toString('hex');
   const now = new Date();
@@ -58,6 +59,8 @@ export async function createSignatureRequest(params: {
     status: 'sent',
     message: params.message || '',
     originalFilePath: contract.filePath,
+    documentHashOriginal: sha256Hex(originalFileBuffer),
+    auditTrail: [buildAuditEntry('sent', { details: `Documento enviado a ${params.signerEmail}` })],
     sentAt: now.toISOString(),
     expiresAt: expiresAt.toISOString(),
   });
@@ -109,6 +112,7 @@ export async function createSignatureRequestFromUpload(params: {
   fileName: string;
   description?: string;
 }): Promise<ISignatureRequestResult> {
+  const originalFileBuffer = await fs.readFile(params.originalFilePath);
   const token = crypto.randomBytes(32).toString('hex');
   const now = new Date();
   const expiresAt = new Date(now.getTime() + SIGNATURE_EXPIRY_DAYS * 24 * 60 * 60 * 1000);
@@ -125,6 +129,8 @@ export async function createSignatureRequestFromUpload(params: {
     status: 'sent',
     message: params.description || '',
     originalFilePath: params.originalFilePath,
+    documentHashOriginal: sha256Hex(originalFileBuffer),
+    auditTrail: [buildAuditEntry('sent', { details: `Documento enviado a ${params.signerEmail}` })],
     sentAt: now.toISOString(),
     expiresAt: expiresAt.toISOString(),
   });
@@ -169,6 +175,22 @@ interface ISignatureRequestResult {
   status: string;
   sentAt: string;
   expiresAt: string;
+}
+
+const CONSENT_TEXT_VERSION = 'lyrium-signature-consent-v1';
+
+function buildAuditEntry(type: string, options?: { ip?: string; userAgent?: string; details?: string }) {
+  return {
+    type,
+    timestamp: new Date().toISOString(),
+    ip: options?.ip || '',
+    userAgent: options?.userAgent || '',
+    details: options?.details || '',
+  };
+}
+
+function sha256Hex(input: Buffer | string) {
+  return crypto.createHash('sha256').update(input).digest('hex');
 }
 
 async function sendSignatureEmail(params: {
@@ -243,18 +265,31 @@ export async function markAsOpened(token: string) {
   if (sigReq.status === 'sent') {
     sigReq.status = 'pending';
     sigReq.openedAt = new Date().toISOString();
+    sigReq.auditTrail = [
+      ...(sigReq.auditTrail || []),
+      buildAuditEntry('opened'),
+    ];
     await sigReq.save();
   }
 
   return sigReq;
 }
 
-export async function submitSignature(token: string, signatureDataUrl: string, signerIp: string) {
+export async function submitSignature(
+  token: string,
+  signatureDataUrl: string,
+  signerIp: string,
+  signerUserAgent: string,
+  consentAccepted: boolean
+) {
   const sigReq = await SignatureRequest.findOne({ token });
   if (!sigReq) throw new Error('Solicitud no encontrada');
   if (sigReq.status === 'signed') throw new Error('Este documento ya ha sido firmado');
   if (sigReq.status === 'expired' || new Date(sigReq.expiresAt) < new Date()) {
     throw new Error('Este enlace de firma ha expirado');
+  }
+  if (!consentAccepted) {
+    throw new Error('Debe aceptar el consentimiento antes de firmar');
   }
 
   // Embed signature into PDF
@@ -270,8 +305,21 @@ export async function submitSignature(token: string, signatureDataUrl: string, s
   sigReq.status = 'signed';
   sigReq.signedFilePath = signedFilePath;
   sigReq.signatureData = signatureDataUrl.substring(0, 100) + '...'; // Store truncated for audit
+  sigReq.signatureDataFull = signatureDataUrl;
   sigReq.signerIp = signerIp;
+  sigReq.signerUserAgent = signerUserAgent;
   sigReq.signedAt = new Date().toISOString();
+  sigReq.consentAcceptedAt = sigReq.signedAt;
+  sigReq.consentTextVersion = CONSENT_TEXT_VERSION;
+  sigReq.documentHashSigned = sha256Hex(await fs.readFile(signedFilePath));
+  sigReq.auditTrail = [
+    ...(sigReq.auditTrail || []),
+    buildAuditEntry('signed', {
+      ip: signerIp,
+      userAgent: signerUserAgent,
+      details: `Consentimiento aceptado (${CONSENT_TEXT_VERSION})`,
+    }),
+  ];
   await sigReq.save();
 
   // Update client's file entry with signed path
@@ -441,6 +489,10 @@ export async function resendSignatureEmail(signatureRequestId: string) {
   sigReq.expiresAt = new Date(now.getTime() + SIGNATURE_EXPIRY_DAYS * 24 * 60 * 60 * 1000).toISOString();
   sigReq.status = 'sent';
   sigReq.sentAt = now.toISOString();
+  sigReq.auditTrail = [
+    ...(sigReq.auditTrail || []),
+    buildAuditEntry('resent', { details: `Reenvío a ${sigReq.signerEmail}` }),
+  ];
   await sigReq.save();
 
   let contractName = 'Documento';

@@ -225,6 +225,7 @@
       "title": "Resumen del Cliente",
       "placeholder": "Escribe el resumen del cliente...",
       "save": "Guardar",
+      "edit": "Editar",
       "noSummary": "No hay resumen disponible"
     },
     "lyraModal": {

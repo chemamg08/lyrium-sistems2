@@ -144,6 +144,61 @@ export const downloadSignedPdf = async (req: Request, res: Response) => {
   }
 };
 
+// GET /api/signatures/:id/view-signed — View signed PDF inline (protected)
+export const viewSignedPdf = async (req: Request, res: Response) => {
+  try {
+    const { id } = req.params;
+    const sigReq = await getSignatureRequestById(id);
+    if (!sigReq || !verifyOwnership(req, sigReq.accountId)) {
+      return res.status(403).json({ error: 'Acceso denegado' });
+    }
+
+    if (sigReq.status !== 'signed' || !sigReq.signedFilePath) {
+      return res.status(400).json({ error: 'El documento aún no ha sido firmado' });
+    }
+
+    const pdfBuffer = await fs.readFile(sigReq.signedFilePath);
+    res.setHeader('Content-Type', 'application/pdf');
+    res.setHeader('Content-Disposition', 'inline');
+    res.send(pdfBuffer);
+  } catch (error) {
+    console.error('Error viewing signed PDF:', error);
+    res.status(500).json({ error: 'Error al visualizar documento firmado' });
+  }
+};
+
+// GET /api/signatures/:id/audit — Get signature audit detail (protected)
+export const getSignatureAudit = async (req: Request, res: Response) => {
+  try {
+    const { id } = req.params;
+    const sigReq = await getSignatureRequestById(id);
+    if (!sigReq || !verifyOwnership(req, sigReq.accountId)) {
+      return res.status(403).json({ error: 'Acceso denegado' });
+    }
+
+    res.json({
+      id: sigReq._id,
+      status: sigReq.status,
+      signerName: sigReq.signerName,
+      signerEmail: sigReq.signerEmail,
+      sentAt: sigReq.sentAt,
+      openedAt: sigReq.openedAt,
+      signedAt: sigReq.signedAt,
+      signerIp: sigReq.signerIp,
+      signerUserAgent: sigReq.signerUserAgent,
+      documentHashOriginal: sigReq.documentHashOriginal,
+      documentHashSigned: sigReq.documentHashSigned,
+      consentAcceptedAt: sigReq.consentAcceptedAt,
+      consentTextVersion: sigReq.consentTextVersion,
+      signatureDataFull: sigReq.signatureDataFull,
+      auditTrail: sigReq.auditTrail || [],
+    });
+  } catch (error) {
+    console.error('Error getting signature audit:', error);
+    res.status(500).json({ error: 'Error al obtener auditoría de firma' });
+  }
+};
+
 // POST /api/signatures/upload-sign — Upload PDF and send for signature (protected)
 export const uploadAndSign = async (req: Request, res: Response) => {
   try {
@@ -270,7 +325,7 @@ export const getSigningPdf = async (req: Request, res: Response) => {
 export const submitSignatureHandler = async (req: Request, res: Response) => {
   try {
     const { token } = req.params;
-    const { signatureDataUrl } = req.body;
+    const { signatureDataUrl, consentAccepted } = req.body;
 
     if (!signatureDataUrl) {
       return res.status(400).json({ error: 'Firma requerida' });
@@ -282,8 +337,9 @@ export const submitSignatureHandler = async (req: Request, res: Response) => {
     }
 
     const signerIp = req.headers['x-forwarded-for'] as string || req.socket.remoteAddress || 'unknown';
+    const signerUserAgent = String(req.headers['user-agent'] || '');
 
-    const result = await submitSignature(token, signatureDataUrl, signerIp);
+    const result = await submitSignature(token, signatureDataUrl, signerIp, signerUserAgent, Boolean(consentAccepted));
 
     res.json({
       status: 'signed',

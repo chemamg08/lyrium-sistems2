@@ -10,42 +10,63 @@ const SignDocument = () => {
 
   const [status, setStatus] = useState<SigningStatus>('loading');
   const [signerName, setSignerName] = useState('');
+  const [signerEmail, setSignerEmail] = useState('');
   const [contractName, setContractName] = useState('');
   const [errorMsg, setErrorMsg] = useState('');
   const [signedAt, setSignedAt] = useState('');
   const [pdfUrl, setPdfUrl] = useState<string | null>(null);
   const [showSignPad, setShowSignPad] = useState(false);
+  const [consentAccepted, setConsentAccepted] = useState(false);
 
-  // Canvas refs
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const isDrawingRef = useRef(false);
   const lastPosRef = useRef({ x: 0, y: 0 });
 
   useEffect(() => {
-    if (!token) { setStatus('error'); setErrorMsg('Enlace no válido'); return; }
+    if (!token) {
+      setStatus('error');
+      setErrorMsg('Enlace no valido');
+      return;
+    }
     fetchSigningInfo();
   }, []);
+
+  useEffect(() => {
+    return () => {
+      if (pdfUrl) {
+        URL.revokeObjectURL(pdfUrl);
+      }
+    };
+  }, [pdfUrl]);
 
   const fetchSigningInfo = async () => {
     try {
       const res = await fetch(`${API_URL}/sign/${token}`);
       const data = await res.json();
 
-      if (!res.ok) { setStatus('error'); setErrorMsg(data.error || 'Error'); return; }
+      if (!res.ok) {
+        setStatus('error');
+        setErrorMsg(data.error || 'Error');
+        return;
+      }
 
       if (data.status === 'signed') {
         setStatus('signed');
         setSignerName(data.signerName);
+        setSignerEmail(data.signerEmail || '');
         setSignedAt(data.signedAt);
         return;
       }
 
-      if (data.status === 'expired') { setStatus('expired'); return; }
+      if (data.status === 'expired') {
+        setStatus('expired');
+        return;
+      }
 
-      setSignerName(data.signerName);
-      setContractName(data.contractName);
+      setSignerName(data.signerName || '');
+      setSignerEmail(data.signerEmail || '');
+      setContractName(data.contractName || 'Documento');
 
-      // Load PDF
       const pdfRes = await fetch(`${API_URL}/sign/${token}/pdf`);
       if (pdfRes.ok) {
         const blob = await pdfRes.blob();
@@ -55,11 +76,10 @@ const SignDocument = () => {
       setStatus('ready');
     } catch {
       setStatus('error');
-      setErrorMsg('Error de conexión');
+      setErrorMsg('Error de conexion');
     }
   };
 
-  // Canvas drawing logic
   const initCanvas = useCallback(() => {
     const canvas = canvasRef.current;
     if (!canvas) return;
@@ -138,14 +158,17 @@ const SignDocument = () => {
 
   const handleSubmit = async () => {
     if (isCanvasEmpty()) return;
+    if (!consentAccepted) {
+      setErrorMsg('Debe aceptar el consentimiento antes de firmar');
+      return;
+    }
+
     const canvas = canvasRef.current;
     if (!canvas) return;
 
     setStatus('submitting');
 
     try {
-      const dpr = window.devicePixelRatio || 1;
-      // Create a clean canvas at 1x for the signature data
       const exportCanvas = document.createElement('canvas');
       const rect = canvas.getBoundingClientRect();
       exportCanvas.width = rect.width;
@@ -159,7 +182,7 @@ const SignDocument = () => {
       const res = await fetch(`${API_URL}/sign/${token}/submit`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ signatureDataUrl }),
+        body: JSON.stringify({ signatureDataUrl, consentAccepted: true }),
       });
 
       const data = await res.json();
@@ -174,11 +197,10 @@ const SignDocument = () => {
       setSignedAt(data.signedAt);
     } catch {
       setStatus('ready');
-      setErrorMsg('Error de conexión al enviar la firma');
+      setErrorMsg('Error de conexion al enviar la firma');
     }
   };
 
-  // Render different states
   if (status === 'loading') {
     return (
       <div className="min-h-screen bg-gray-50 flex items-center justify-center">
@@ -226,13 +248,12 @@ const SignDocument = () => {
             <Check className="h-8 w-8 text-green-600" />
           </div>
           <h1 className="text-xl font-semibold text-gray-900 mb-2">
-            {status === 'done' ? '¡Documento firmado!' : 'Documento ya firmado'}
+            {status === 'done' ? 'Documento firmado' : 'Documento ya firmado'}
           </h1>
           <p className="text-gray-600 mb-2">
             {status === 'done'
-              ? 'Su firma se ha registrado correctamente. Recibirá una copia del documento firmado por email.'
-              : `Este documento fue firmado por ${signerName}.`
-            }
+              ? 'La firma se ha registrado correctamente. Recibira una copia del documento firmado por email.'
+              : `Este documento fue firmado por ${signerName}.`}
           </p>
           {signedAt && (
             <p className="text-sm text-gray-400">
@@ -244,10 +265,8 @@ const SignDocument = () => {
     );
   }
 
-  // status === 'ready' or 'submitting'
   return (
     <div className="min-h-screen bg-gray-50">
-      {/* Header */}
       <div className="bg-white border-b border-gray-200 sticky top-0 z-10">
         <div className="max-w-4xl mx-auto px-4 py-4 flex items-center justify-between">
           <div className="flex items-center gap-3">
@@ -257,6 +276,9 @@ const SignDocument = () => {
             <div>
               <h1 className="text-lg font-semibold text-gray-900">{contractName}</h1>
               <p className="text-sm text-gray-500">Documento pendiente de firma</p>
+              <p className="text-xs text-gray-400">
+                Firmara como {signerName}{signerEmail ? ` · ${signerEmail}` : ''}
+              </p>
             </div>
           </div>
           <button
@@ -270,7 +292,6 @@ const SignDocument = () => {
         </div>
       </div>
 
-      {/* PDF Viewer */}
       <div className="max-w-4xl mx-auto p-4">
         <div className="bg-white rounded-xl shadow-sm border border-gray-200 overflow-hidden">
           {pdfUrl ? (
@@ -289,23 +310,25 @@ const SignDocument = () => {
         </div>
       </div>
 
-      {/* Signature Pad Modal */}
       {showSignPad && (
         <div className="fixed inset-0 bg-black/50 backdrop-blur-sm z-50 flex items-center justify-center p-4">
           <div className="bg-white rounded-2xl shadow-xl w-full max-w-lg">
             <div className="flex items-center justify-between p-5 border-b border-gray-200">
-              <h2 className="text-lg font-semibold text-gray-900">Firme aquí</h2>
+              <h2 className="text-lg font-semibold text-gray-900">Firme aqui</h2>
               <button onClick={() => setShowSignPad(false)} className="p-1 hover:bg-gray-100 rounded-lg">
                 <X className="h-5 w-5 text-gray-500" />
               </button>
             </div>
 
             <div className="p-5">
+              <div className="mb-4 rounded-xl border border-gray-200 bg-gray-50 px-4 py-3 text-sm text-gray-600">
+                <p className="font-medium text-gray-900">{signerName}</p>
+                {signerEmail && <p>{signerEmail}</p>}
+              </div>
               <p className="text-sm text-gray-600 mb-4">
-                Dibuje su firma con el ratón o con el dedo en el recuadro inferior.
+                Dibuje su firma con el raton o con el dedo en el recuadro inferior.
               </p>
 
-              {/* Signature canvas */}
               <div className="border-2 border-dashed border-gray-300 rounded-xl bg-gray-50 relative" style={{ touchAction: 'none' }}>
                 <canvas
                   ref={canvasRef}
@@ -328,9 +351,17 @@ const SignDocument = () => {
                 </button>
               </div>
 
-              <p className="text-xs text-gray-400 mt-3 text-center">
-                Al firmar, acepta que esta firma electrónica tiene la misma validez que una firma manuscrita.
-              </p>
+              <label className="mt-4 flex items-start gap-3 rounded-xl border border-gray-200 bg-gray-50 px-4 py-3 text-sm text-gray-600">
+                <input
+                  type="checkbox"
+                  checked={consentAccepted}
+                  onChange={(e) => setConsentAccepted(e.target.checked)}
+                  className="mt-0.5 h-4 w-4 rounded border-gray-300 text-indigo-600 focus:ring-indigo-500"
+                />
+                <span>
+                  Confirmo que he revisado el documento, que firmo con mi nombre y email identificados en esta sesion y que acepto el registro de la evidencia tecnica de firma por Lyrium.
+                </span>
+              </label>
 
               {errorMsg && status === 'ready' && (
                 <p className="text-sm text-red-600 mt-2 text-center">{errorMsg}</p>

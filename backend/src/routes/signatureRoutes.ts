@@ -9,6 +9,8 @@ import {
   getSignaturesForClient,
   resendSignature,
   downloadSignedPdf,
+  viewSignedPdf,
+  getSignatureAudit,
   uploadAndSign,
 } from '../controllers/signatureController.js';
 
@@ -38,5 +40,7 @@ router.get('/chat/:chatId', getSignaturesForChat);
 router.get('/client/:clientId', getSignaturesForClient);
 router.post('/:id/resend', resendSignature);
 router.get('/:id/download-signed', downloadSignedPdf);
+router.get('/:id/view-signed', viewSignedPdf);
+router.get('/:id/audit', getSignatureAudit);
 
 export default router;

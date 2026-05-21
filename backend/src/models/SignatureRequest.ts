@@ -14,7 +14,20 @@ export interface ISignatureRequest {
   originalFilePath: string;
   signedFilePath?: string;
   signatureData?: string;
+  signatureDataFull?: string;
   signerIp?: string;
+  signerUserAgent?: string;
+  documentHashOriginal?: string;
+  documentHashSigned?: string;
+  consentAcceptedAt?: string;
+  consentTextVersion?: string;
+  auditTrail?: Array<{
+    type: string;
+    timestamp: string;
+    ip?: string;
+    userAgent?: string;
+    details?: string;
+  }>;
   sentAt: string;
   openedAt?: string;
   signedAt?: string;
@@ -35,7 +48,20 @@ const signatureRequestSchema = new Schema<ISignatureRequest>({
   originalFilePath: { type: String, required: true },
   signedFilePath: { type: String, default: '' },
   signatureData: { type: String, default: '' },
+  signatureDataFull: { type: String, default: '' },
   signerIp: { type: String, default: '' },
+  signerUserAgent: { type: String, default: '' },
+  documentHashOriginal: { type: String, default: '' },
+  documentHashSigned: { type: String, default: '' },
+  consentAcceptedAt: { type: String, default: '' },
+  consentTextVersion: { type: String, default: '' },
+  auditTrail: { type: [{
+    type: { type: String, required: true },
+    timestamp: { type: String, required: true },
+    ip: { type: String, default: '' },
+    userAgent: { type: String, default: '' },
+    details: { type: String, default: '' },
+  }], default: [] },
   sentAt: { type: String, default: () => new Date().toISOString() },
   openedAt: { type: String, default: '' },
   signedAt: { type: String, default: '' },

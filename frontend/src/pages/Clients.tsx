@@ -88,6 +88,32 @@ interface ClientFile {
   signatureRequestId?: string;
 }
 
+interface SignatureAuditEvent {
+  type: string;
+  timestamp: string;
+  ip?: string;
+  userAgent?: string;
+  details?: string;
+}
+
+interface SignatureAuditDetail {
+  id: string;
+  status: string;
+  signerName: string;
+  signerEmail: string;
+  sentAt?: string;
+  openedAt?: string;
+  signedAt?: string;
+  signerIp?: string;
+  signerUserAgent?: string;
+  documentHashOriginal?: string;
+  documentHashSigned?: string;
+  consentAcceptedAt?: string;
+  consentTextVersion?: string;
+  signatureDataFull?: string;
+  auditTrail?: SignatureAuditEvent[];
+}
+
 interface FiscalInfo {
   nif: string;
   comunidadAutonoma: string;
@@ -311,6 +337,11 @@ const Clients = () => {
   const modalFileRef = useRef<HTMLInputElement>(null);
   const [isDraggingFiles, setIsDraggingFiles] = useState(false);
   const [clientSignatureRequests, setClientSignatureRequests] = useState<Record<string, any>>({});
+  const [signedViewerFileName, setSignedViewerFileName] = useState('');
+  const [signedViewerPdfUrl, setSignedViewerPdfUrl] = useState<string | null>(null);
+  const [signedViewerAudit, setSignedViewerAudit] = useState<SignatureAuditDetail | null>(null);
+  const [signedViewerLoading, setSignedViewerLoading] = useState(false);
+  const [signedViewerError, setSignedViewerError] = useState('');
   const [showSignUploadForm, setShowSignUploadForm] = useState(false);
   const [signFile, setSignFile] = useState<File | null>(null);
   const [signFileName, setSignFileName] = useState('');
@@ -487,6 +518,14 @@ const Clients = () => {
     lyriEndRef.current?.scrollIntoView({ behavior: "smooth" });
   }, [lyriChats, activeLyriChatId, lyriStreamingText]);
 
+  useEffect(() => {
+    return () => {
+      if (signedViewerPdfUrl) {
+        URL.revokeObjectURL(signedViewerPdfUrl);
+      }
+    };
+  }, [signedViewerPdfUrl]);
+
   // Auto-refresh files list while modal is open
   useEffect(() => {
     if (!filesClientId) return;
@@ -502,6 +541,13 @@ const Clients = () => {
             setCurrentClientFiles(updated.files);
             setClients(data);
           }
+        }
+        const sigRes = await authFetch(`${API_URL}/signatures/client/${filesClientId}`);
+        if (sigRes.ok) {
+          const sigReqs = await sigRes.json();
+          const map: Record<string, any> = {};
+          sigReqs.forEach((s: any) => { map[s._id || s.id] = s; });
+          setClientSignatureRequests(map);
         }
       } catch { /* ignore */ }
     }, 10000);
@@ -1036,6 +1082,49 @@ const Clients = () => {
       window.open(url, '_blank');
     } catch {
       toast({ title: t('common.error'), variant: 'destructive' });
+    }
+  };
+
+  const closeSignedViewer = () => {
+    if (signedViewerPdfUrl) {
+      URL.revokeObjectURL(signedViewerPdfUrl);
+    }
+    setSignedViewerPdfUrl(null);
+    setSignedViewerAudit(null);
+    setSignedViewerFileName('');
+    setSignedViewerError('');
+    setSignedViewerLoading(false);
+  };
+
+  const openSignedViewer = async (signatureRequestId: string, fileName: string) => {
+    setSignedViewerLoading(true);
+    setSignedViewerError('');
+    setSignedViewerFileName(fileName);
+    setSignedViewerAudit(null);
+
+    if (signedViewerPdfUrl) {
+      URL.revokeObjectURL(signedViewerPdfUrl);
+      setSignedViewerPdfUrl(null);
+    }
+
+    try {
+      const [auditRes, pdfRes] = await Promise.all([
+        authFetch(`${API_URL}/signatures/${signatureRequestId}/audit`),
+        authFetch(`${API_URL}/signatures/${signatureRequestId}/view-signed`),
+      ]);
+
+      if (!auditRes.ok || !pdfRes.ok) {
+        throw new Error('Error');
+      }
+
+      const auditData = await auditRes.json();
+      const pdfBlob = await pdfRes.blob();
+      setSignedViewerAudit(auditData);
+      setSignedViewerPdfUrl(URL.createObjectURL(pdfBlob));
+    } catch {
+      setSignedViewerError(t('common.error'));
+    } finally {
+      setSignedViewerLoading(false);
     }
   };
 
@@ -2688,10 +2777,22 @@ const Clients = () => {
                       <div className="flex items-center gap-2">
                         <p className="text-sm font-medium text-foreground truncate">{file.name}</p>
                         {badge && BadgeIcon && (
-                          <span className={`inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-medium ${badge.bg} ${badge.color}`}>
-                            <BadgeIcon className="h-3 w-3" />
-                            {badge.label}
-                          </span>
+                          sigStatus === 'signed' ? (
+                            <button
+                              type="button"
+                              onClick={() => openSignedViewer(file.signatureRequestId!, file.name)}
+                              className={`inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-medium transition-opacity hover:opacity-80 ${badge.bg} ${badge.color}`}
+                              title="Ver documento firmado"
+                            >
+                              <BadgeIcon className="h-3 w-3" />
+                              {badge.label}
+                            </button>
+                          ) : (
+                            <span className={`inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-medium ${badge.bg} ${badge.color}`}>
+                              <BadgeIcon className="h-3 w-3" />
+                              {badge.label}
+                            </span>
+                          )
                         )}
                       </div>
                       <p className="text-xs text-muted-foreground">{file.date}</p>
@@ -2707,6 +2808,98 @@ const Clients = () => {
                   </div>
                   );
                 })
+              )}
+            </div>
+          </div>
+        </div>
+      )}
+
+      {signedViewerFileName && (
+        <div className="fixed inset-0 bg-foreground/20 backdrop-blur-sm z-50 flex items-center justify-center p-4" onClick={closeSignedViewer}>
+          <div className="bg-card border border-border rounded-lg w-[95vw] max-w-5xl max-h-[90vh] overflow-hidden shadow-lg" onClick={(e) => e.stopPropagation()}>
+            <div className="flex items-center justify-between px-4 py-3 border-b border-border">
+              <div>
+                <h3 className="text-base font-semibold text-foreground">{signedViewerFileName}</h3>
+                <p className="text-xs text-muted-foreground">Documento firmado y auditoria de firma</p>
+              </div>
+              <button onClick={closeSignedViewer} className="p-1 rounded hover:bg-accent">
+                <X className="h-4 w-4" />
+              </button>
+            </div>
+
+            <div className="p-4 overflow-y-auto max-h-[calc(90vh-64px)] space-y-4">
+              {signedViewerLoading ? (
+                <div className="py-16 text-center text-sm text-muted-foreground">Cargando documento firmado...</div>
+              ) : signedViewerError ? (
+                <div className="py-16 text-center text-sm text-destructive">{signedViewerError}</div>
+              ) : (
+                <>
+                  <div className="border border-border rounded-lg overflow-hidden bg-white">
+                    {signedViewerPdfUrl ? (
+                      <iframe
+                        src={signedViewerPdfUrl}
+                        className="w-full border-0"
+                        style={{ height: '60vh' }}
+                        title="Documento firmado"
+                      />
+                    ) : (
+                      <div className="py-16 text-center text-sm text-muted-foreground">No se pudo cargar el PDF firmado.</div>
+                    )}
+                  </div>
+
+                  <div className="grid gap-4 md:grid-cols-2">
+                    <div className="border border-border rounded-lg p-4 bg-accent/30">
+                      <h4 className="text-sm font-semibold text-foreground mb-3">Firma realizada</h4>
+                      {signedViewerAudit?.signatureDataFull ? (
+                        <div className="rounded-md border border-border bg-white p-4">
+                          <img
+                            src={signedViewerAudit.signatureDataFull}
+                            alt="Firma"
+                            className="max-h-40 w-auto mx-auto object-contain"
+                          />
+                        </div>
+                      ) : (
+                        <div className="rounded-md border border-border bg-white p-4 text-sm text-muted-foreground">
+                          No hay imagen de firma disponible para este documento.
+                        </div>
+                      )}
+                    </div>
+
+                    <div className="border border-border rounded-lg p-4 bg-accent/30">
+                      <h4 className="text-sm font-semibold text-foreground mb-3">Auditoria</h4>
+                      <div className="space-y-2 text-sm">
+                        <p><span className="text-muted-foreground">Firmante:</span> {signedViewerAudit?.signerName || '-'}</p>
+                        <p><span className="text-muted-foreground">Email:</span> {signedViewerAudit?.signerEmail || '-'}</p>
+                        <p><span className="text-muted-foreground">Enviado:</span> {signedViewerAudit?.sentAt ? new Date(signedViewerAudit.sentAt).toLocaleString('es-ES') : '-'}</p>
+                        <p><span className="text-muted-foreground">Abierto:</span> {signedViewerAudit?.openedAt ? new Date(signedViewerAudit.openedAt).toLocaleString('es-ES') : '-'}</p>
+                        <p><span className="text-muted-foreground">Firmado:</span> {signedViewerAudit?.signedAt ? new Date(signedViewerAudit.signedAt).toLocaleString('es-ES') : '-'}</p>
+                        <p><span className="text-muted-foreground">IP:</span> {signedViewerAudit?.signerIp || '-'}</p>
+                        <p><span className="text-muted-foreground">Dispositivo:</span> {signedViewerAudit?.signerUserAgent || '-'}</p>
+                        <p><span className="text-muted-foreground">Consentimiento:</span> {signedViewerAudit?.consentAcceptedAt ? new Date(signedViewerAudit.consentAcceptedAt).toLocaleString('es-ES') : '-'}</p>
+                        <p><span className="text-muted-foreground">Version consentimiento:</span> {signedViewerAudit?.consentTextVersion || '-'}</p>
+                        <p className="break-all"><span className="text-muted-foreground">Hash original:</span> {signedViewerAudit?.documentHashOriginal || '-'}</p>
+                        <p className="break-all"><span className="text-muted-foreground">Hash firmado:</span> {signedViewerAudit?.documentHashSigned || '-'}</p>
+                      </div>
+                    </div>
+                  </div>
+
+                  <div className="border border-border rounded-lg p-4 bg-accent/30">
+                    <h4 className="text-sm font-semibold text-foreground mb-3">Trazabilidad</h4>
+                    {signedViewerAudit?.auditTrail?.length ? (
+                      <div className="space-y-2">
+                        {signedViewerAudit.auditTrail.map((event, index) => (
+                          <div key={`${event.type}-${event.timestamp}-${index}`} className="rounded-md border border-border bg-white px-3 py-2 text-sm">
+                            <p className="font-medium text-foreground">{event.type}</p>
+                            <p className="text-muted-foreground">{new Date(event.timestamp).toLocaleString('es-ES')}</p>
+                            {event.details ? <p className="text-muted-foreground">{event.details}</p> : null}
+                          </div>
+                        ))}
+                      </div>
+                    ) : (
+                      <p className="text-sm text-muted-foreground">No hay eventos de auditoria disponibles.</p>
+                    )}
+                  </div>
+                </>
               )}
             </div>
           </div>
