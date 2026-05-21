@@ -8,13 +8,17 @@ import { stripThinkTags } from './aiService.js';
 import { Automation } from '../models/Automation.js';
 import { sendEmail, sendEmailViaCuenta, type CuentaCorreoConfig } from './emailService.js';
 import { getAutomationMessage, resolveAutomationLanguage } from './automationMessages.js';
+import { runCustomerAutomationEngine } from './customerAutomationEngine.js';
+import { listAssignableCandidates } from './automationWorkspaceService.js';
 import {
   assignWhatsAppCase,
+  assignWhatsAppCaseToCandidateId,
   decryptPassword,
   detectExplicitAssignmentRequest,
   encryptPassword,
   hasMatchingSpecialist,
   interpretClientConfirmation,
+  upsertPendingAssignmentConfirmation,
 } from './emailProcessorService.js';
 import { createCaseFromWhatsApp } from './casesService.js';
 
@@ -594,6 +598,87 @@ function getKBContext(account: any): string {
   return context;
 }
 
+function getWhatsAppFolderDescriptions(account: any): Array<{ id: string; nombre: string; descripcion: string }> {
+  const folderIdsToRules = new Map<string, string[]>();
+  for (const rule of account.whatsappClassifyRules || []) {
+    for (const folderId of rule.folderIds || []) {
+      const current = folderIdsToRules.get(folderId) || [];
+      current.push(rule.description || rule.name || '');
+      folderIdsToRules.set(folderId, current);
+    }
+  }
+
+  return (account.whatsappFolders || []).map((folder: any) => ({
+    id: folder.id,
+    nombre: folder.name,
+    descripcion: (folderIdsToRules.get(folder.id) || []).filter(Boolean).join(' | ') || `Carpeta ${folder.name}`,
+  }));
+}
+
+function buildWhatsAppEngineMessages(messages: any[]): Array<{
+  fechaHora: string;
+  autor: 'cliente' | 'asistente' | 'humano';
+  canal: 'whatsapp';
+  texto: string;
+}> {
+  return (messages || []).slice(-20).map((message: any) => ({
+    fechaHora: message.time || new Date().toISOString(),
+    autor: message.sent ? 'asistente' : 'cliente',
+    canal: 'whatsapp',
+    texto: String(message.text || ''),
+  }));
+}
+
+async function assignWhatsAppConversationToFolders(
+  account: any,
+  conversationId: string,
+  folderIds: string[],
+): Promise<void> {
+  if (!conversationId || !Array.isArray(folderIds) || folderIds.length === 0) return;
+  let modified = false;
+  const valid = new Set(folderIds);
+  for (const folder of account.whatsappFolders || []) {
+    if (!valid.has(folder.id)) continue;
+    if (!folder.conversationIds.includes(conversationId)) {
+      folder.conversationIds.push(conversationId);
+      modified = true;
+    }
+  }
+  if (modified) {
+    await account.save();
+  }
+}
+
+async function ensurePendingWhatsAppCase(
+  accountId: string,
+  account: any,
+  contactName: string,
+  contactPhone: string,
+  conversationId: string,
+  originalText: string,
+  especialidadId?: string,
+): Promise<void> {
+  const CaseModel = (await import('../models/Case.js')).default;
+  const existing = await CaseModel.findOne({ accountId, source: 'whatsapp', sourceId: conversationId }).select('_id').lean();
+  if (existing) return;
+
+  const { client } = await findOrCreateClient(accountId, undefined, contactPhone, contactName);
+  await createCaseFromWhatsApp(
+    accountId,
+    account,
+    contactName,
+    contactPhone,
+    conversationId,
+    originalText,
+    especialidadId,
+    'solicitud_servicio',
+    'pending',
+    undefined,
+    undefined,
+    client._id,
+  );
+}
+
 async function classifyWhatsAppMessage(
   body: string,
   especialidades: Array<{ id: string; nombre: string; descripcion: string }> = [],
@@ -769,6 +854,7 @@ async function forwardWhatsAppToConsultas(
   messageText: string,
   type: 'consulta_general' | 'solicitud_sin_especialista' = 'consulta_general',
   mediaAttachment?: { filename: string; originalName: string; mimeType: string },
+  customMessage?: string,
 ): Promise<boolean> {
   const consultaEmails: string[] = account.whatsappCorreosConsultas || [];
   if (consultaEmails.length === 0) return false;
@@ -779,7 +865,9 @@ async function forwardWhatsAppToConsultas(
   const consultaId = Date.now().toString();
   const subject = `[Consulta pendiente] [CP-${consultaId}] WhatsApp: ${contactName} (+${contactPhone})`;
 
-  let body = `Se ha recibido una consulta por WhatsApp que requiere respuesta manual.\n\n`;
+  let body = customMessage?.trim()
+    ? `${customMessage.trim()}\n\n`
+    : `Se ha recibido una consulta por WhatsApp que requiere respuesta manual.\n\n`;
   body += `CONTACTO: ${contactName} (+${contactPhone})\n`;
   body += `MENSAJE:\n${messageText}\n\n`;
 
@@ -1196,6 +1284,234 @@ async function processOneIncomingMetaMessage(
         await forwardWhatsAppToConsultas(account, conversation.id, contactPhone, contactName, text, 'solicitud_sin_especialista');
         return;
       }
+    }
+  });
+}
+
+async function processOneIncomingMetaMessageUnified(
+  accountId: string,
+  phoneNumberId: string,
+  value: any,
+  msg: any,
+): Promise<void> {
+  await withAccountLock(accountId, async () => {
+    const account = await Automation.findById(accountId);
+    if (!account) return;
+
+    const contactPhone = sanitizePhone(msg?.from || '');
+    if (!contactPhone) return;
+
+    const contacts = Array.isArray(value?.contacts) ? value.contacts : [];
+    const contactInfo = contacts.find((c: any) => sanitizePhone(c?.wa_id || '') === contactPhone);
+    const contactName = contactInfo?.profile?.name || contactPhone;
+    const text = msg?.text?.body || msg?.image?.caption || msg?.video?.caption || msg?.document?.caption || '';
+    const hasMedia = isMediaMessage(msg);
+    if (!text && !hasMedia) return;
+
+    let conv = account.whatsappConversations.find(
+      (conversation: any) => conversation.contactPhone === contactPhone && (!conversation.phoneNumberId || conversation.phoneNumberId === phoneNumberId),
+    );
+    if (!conv) {
+      conv = {
+        id: createWAId('waconv'),
+        contactName,
+        contactPhone,
+        messages: [],
+        lastMessageTime: new Date().toISOString(),
+        unread: 0,
+        autoReplyPaused: false,
+        phoneNumberId,
+      } as any;
+      account.whatsappConversations.push(conv as any);
+    }
+
+    const conversation = conv as any;
+    if (conversation.messages.some((message: any) => message.id === msg.id)) return;
+
+    let savedAttachment: { id: string; filename: string; originalName: string; mimeType: string; size: number } | undefined;
+    if (hasMedia) {
+      const mediaId = msg?.image?.id || msg?.video?.id || msg?.audio?.id || msg?.document?.id;
+      if (mediaId) {
+        const mediaData = await downloadMetaMedia(phoneNumberId, mediaId);
+        if (mediaData) {
+          const originalName = msg?.document?.filename || getMediaFileNameFromMessage(msg);
+          const diskFilename = `${Date.now()}_${crypto.randomBytes(4).toString('hex')}_${originalName.replace(/[^a-zA-Z0-9._-]/g, '_')}`;
+          const filePath = path.join(WA_ATTACHMENTS_DIR, diskFilename);
+          fs.writeFileSync(filePath, mediaData.buffer);
+          savedAttachment = {
+            id: `wa_att_${Date.now()}_${crypto.randomBytes(3).toString('hex')}`,
+            filename: diskFilename,
+            originalName,
+            mimeType: mediaData.mimeType,
+            size: mediaData.buffer.length,
+          };
+        }
+      }
+    }
+
+    const incomingText = text || `[${getMediaTypeLabelByType(msg.type)}]`;
+    const incomingMsg: any = {
+      id: msg.id,
+      from: contactPhone,
+      text: incomingText,
+      time: new Date().toISOString(),
+      sent: false,
+    };
+    if (savedAttachment) incomingMsg.attachments = [savedAttachment];
+
+    conversation.messages.push(incomingMsg);
+    conversation.unread = (conversation.unread || 0) + 1;
+    conversation.lastMessageTime = new Date().toISOString();
+    if (contactName && contactName !== contactPhone) conversation.contactName = contactName;
+    await account.save();
+
+    if (!account.whatsappSwitchActivo || conversation.autoReplyPaused) {
+      await applyWhatsAppClassifyRules(account, conversation.id, incomingText);
+      return;
+    }
+
+    const session = resolveWhatsAppSession(account, phoneNumberId);
+    if (!session?.connected || !session.phoneNumberId) {
+      console.warn('[WA] No hay una sesion conectada para la conversacion entrante:', phoneNumberId);
+      return;
+    }
+
+    const outside24h = isWhatsAppConversationOutside24h(conversation);
+    const contactoConocido = (Array.isArray(conversation.messages) && conversation.messages.length > 1)
+      || (account.whatsappConversations || []).some(
+        (item: any) => sanitizePhone(item.contactPhone || '') === contactPhone && item.id !== conversation.id,
+      );
+    const assignableCandidates = await listAssignableCandidates(accountId);
+    const decision = await runCustomerAutomationEngine({
+      workspaceId: accountId,
+      canalEntrada: 'whatsapp',
+      contactoConocido,
+      responseAutomaticaActiva: account.whatsappSwitchActivo === true,
+      toggles: {
+        respondConsultasGenerales: account.whatsappRespondConsultasGenerales !== false,
+        respondSolicitudesServicio: account.whatsappRespondSolicitudesServicio !== false,
+        soloContactosConocidos: account.whatsappSoloContactosConocidos === true,
+        autoAssignEnabled: account.autoAssignEnabled === true,
+        sortByCarga: account.sortByCarga === true,
+      },
+      restricciones: {
+        soloResponderMismoCanal: true,
+        whatsappVentana24hAbierta: !outside24h,
+      },
+      especialidades: (account.especialidades || []).map((item: any) => ({
+        id: item.id,
+        nombre: item.nombre,
+        descripcion: item.descripcion || '',
+      })),
+      cuentasCandidatas: assignableCandidates.map((candidate) => ({
+        id: candidate.id,
+        nombre: candidate.name,
+        email: candidate.email,
+        cargaActual: candidate.load,
+      })),
+      carpetas: getWhatsAppFolderDescriptions(account),
+      reglasOrganizacion: (account.whatsappClassifyRules || []).map((rule: any) => ({
+        id: rule.id,
+        nombre: rule.name,
+        descripcion: rule.description || '',
+        folderIds: rule.folderIds || [],
+      })),
+      correoConsultas: {
+        destino: account.whatsappCorreosConsultas || [],
+        cuentaOperativa: (account.cuentasCorreo || []).map((item: any) => item.correo).filter(Boolean),
+      },
+      documentos: (account.documentos || []).map((doc: any) => ({
+        nombre: doc.nombre,
+        texto: doc.extractedText || '',
+      })),
+      ultimos20Mensajes: buildWhatsAppEngineMessages(conversation.messages || []),
+    });
+
+    await assignWhatsAppConversationToFolders(account, conversation.id, decision.folderIds);
+
+    if (decision.clasificacion.tipo === 'solicitud_servicio') {
+      await ensurePendingWhatsAppCase(
+        accountId,
+        account,
+        contactName,
+        contactPhone,
+        conversation.id,
+        incomingText,
+        decision.clasificacion.especialidadId,
+      );
+    }
+
+    if (decision.accion === 'preguntar_consultas') {
+      await forwardWhatsAppToConsultas(
+        account,
+        conversation.id,
+        contactPhone,
+        contactName,
+        incomingText,
+        decision.clasificacion.tipo === 'solicitud_servicio' ? 'solicitud_sin_especialista' : 'consulta_general',
+        savedAttachment ? { filename: savedAttachment.filename, originalName: savedAttachment.originalName, mimeType: savedAttachment.mimeType } : undefined,
+        decision.mensajeConsultas,
+      );
+      return;
+    }
+
+    if (decision.accion === 'pause_auto_reply') {
+      conversation.autoReplyPaused = true;
+      await account.save();
+    }
+
+    if (decision.accion === 'assign_case') {
+      const assigned = decision.asignarA
+        ? await assignWhatsAppCaseToCandidateId(accountId, account, decision.asignarA, {
+          contactName,
+          contactPhone,
+          conversationId: conversation.id,
+          originalText: incomingText,
+          especialidadId: decision.clasificacion.especialidadId,
+        })
+        : await assignWhatsAppCase(accountId, account, {
+          contactName,
+          contactPhone,
+          conversationId: conversation.id,
+          originalText: incomingText,
+          especialidadId: decision.clasificacion.especialidadId,
+        });
+      if (!assigned) {
+        return;
+      }
+    }
+
+    if (decision.accion === 'ask_assignment') {
+      if (!decision.mensajeCliente || outside24h) {
+        return;
+      }
+
+      const instanceName = session.instanceName || `lyrium_${accountId}`;
+      if (await sendAssistantText(instanceName, contactPhone, conversation, decision.mensajeCliente, session.phoneNumberId)) {
+        upsertPendingAssignmentConfirmation(account, {
+          originalFrom: contactPhone,
+          originalFromName: contactName,
+          originalSubject: `WhatsApp ${contactName}`,
+          originalBody: incomingText,
+          cuentaCorreoId: '',
+          conversationId: conversation.id,
+          especialidadId: decision.clasificacion.especialidadId,
+          channel: 'whatsapp',
+          waContactPhone: contactPhone,
+          waConversationId: conversation.id,
+        });
+        await account.save();
+      }
+      return;
+    }
+
+    if (!decision.mensajeCliente || decision.accion === 'no_responder' || outside24h) {
+      return;
+    }
+
+    const instanceName = session.instanceName || `lyrium_${accountId}`;
+    if (await sendAssistantText(instanceName, contactPhone, conversation, decision.mensajeCliente, session.phoneNumberId)) {
+      await account.save();
     }
   });
 }
@@ -1972,7 +2288,7 @@ export async function processIncomingMessage(phoneNumberId: string, data: any): 
 
   for (const msg of messages) {
     try {
-      await processOneIncomingMetaMessage(account._id, phoneNumberId, value, msg);
+      await processOneIncomingMetaMessageUnified(account._id, phoneNumberId, value, msg);
     } catch (err) {
       console.error('[WA] Error processing incoming message', err);
     }

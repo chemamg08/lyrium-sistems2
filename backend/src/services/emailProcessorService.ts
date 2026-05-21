@@ -16,12 +16,20 @@ import {
   type IncomingEmailAttachment,
 } from './emailService.js';
 import { Automation } from '../models/Automation.js';
+import { Account } from '../models/Account.js';
 import { Client } from '../models/Client.js';
 import { Subaccount } from '../models/Subaccount.js';
 import { sanitizeFilename } from '../utils/sanitizeFilename.js';
 import { buildAssignedSubaccountFields, hasAssignedSubaccount, readAssignedSubaccountIds } from '../utils/clientAssignments.js';
 import { getAutomationMessage, resolveAutomationLanguage } from './automationMessages.js';
 import { createCaseFromEmail } from './casesService.js';
+import {
+  findAssignableCandidate,
+  listAssignableCandidates,
+  selectBestAssignableCandidate,
+  type AutomationAssignableCandidate,
+} from './automationWorkspaceService.js';
+import { runCustomerAutomationEngine, type AutomationEngineMessage } from './customerAutomationEngine.js';
 import { runWithDistributedLock } from './distributedLockService.js';
 
 const __filename = fileURLToPath(import.meta.url);
@@ -42,6 +50,10 @@ function createAutomationClientId(): string {
 interface FindOrCreateClientResult {
   client: any;
   created: boolean;
+}
+
+interface ResolvedAssignmentCandidate extends AutomationAssignableCandidate {
+  record: any;
 }
 
 async function findOrCreateClient(
@@ -98,6 +110,30 @@ async function addSubaccountToClient(clientId: string, subaccountId: string): Pr
 
   const fields = buildAssignedSubaccountFields(readAssignedSubaccountIds(client), subaccountId);
   await Client.findByIdAndUpdate(clientId, fields);
+}
+
+async function resolveAssignmentCandidateRecord(
+  workspaceId: string,
+  candidateId: string,
+): Promise<ResolvedAssignmentCandidate | null> {
+  const candidate = await findAssignableCandidate(workspaceId, candidateId);
+  if (!candidate) return null;
+
+  let record: any = null;
+  if (candidate.kind === 'main') {
+    record = await Account.findById(candidateId).lean();
+  } else {
+    record = await Subaccount.findById(candidateId).lean();
+  }
+
+  if (!record) return null;
+  return { ...candidate, record };
+}
+
+async function listAssignmentCandidatesWithRecords(workspaceId: string): Promise<ResolvedAssignmentCandidate[]> {
+  const candidates = await listAssignableCandidates(workspaceId);
+  const resolved = await Promise.all(candidates.map((candidate) => resolveAssignmentCandidateRecord(workspaceId, candidate.id)));
+  return resolved.filter((candidate): candidate is ResolvedAssignmentCandidate => !!candidate);
 }
 
 const UPLOADS_DIR = path.join(__dirname, '../../uploads/automatizaciones');
@@ -430,6 +466,111 @@ function getKBContext(account: any): string {
   return context;
 }
 
+function getEmailFolderDescriptions(account: any): Array<{ id: string; nombre: string; descripcion: string }> {
+  const folderIdsToRules = new Map<string, string[]>();
+  for (const rule of account.emailClassifyRules || []) {
+    for (const folderId of rule.folderIds || []) {
+      const current = folderIdsToRules.get(folderId) || [];
+      current.push(rule.description || rule.name || '');
+      folderIdsToRules.set(folderId, current);
+    }
+  }
+
+  return (account.emailFolders || []).map((folder: any) => ({
+    id: folder.id,
+    nombre: folder.name,
+    descripcion: (folderIdsToRules.get(folder.id) || []).filter(Boolean).join(' | ') || `Carpeta ${folder.name}`,
+  }));
+}
+
+function getWhatsAppFolderDescriptions(account: any): Array<{ id: string; nombre: string; descripcion: string }> {
+  const folderIdsToRules = new Map<string, string[]>();
+  for (const rule of account.whatsappClassifyRules || []) {
+    for (const folderId of rule.folderIds || []) {
+      const current = folderIdsToRules.get(folderId) || [];
+      current.push(rule.description || rule.name || '');
+      folderIdsToRules.set(folderId, current);
+    }
+  }
+
+  return (account.whatsappFolders || []).map((folder: any) => ({
+    id: folder.id,
+    nombre: folder.name,
+    descripcion: (folderIdsToRules.get(folder.id) || []).filter(Boolean).join(' | ') || `Carpeta ${folder.name}`,
+  }));
+}
+
+function buildEmailEngineMessages(
+  existingMessages: any[],
+  contactName: string,
+  incomingEmail: IncomingEmail,
+): AutomationEngineMessage[] {
+  const prior = (existingMessages || []).map((message: any) => ({
+    fechaHora: message.time || new Date().toISOString(),
+    autor: message.sent ? 'asistente' as const : 'cliente' as const,
+    canal: 'email' as const,
+    texto: String(message.text || ''),
+  }));
+
+  prior.push({
+    fechaHora: incomingEmail.date?.toISOString?.() || new Date().toISOString(),
+    autor: 'cliente',
+    canal: 'email',
+    texto: String(incomingEmail.body || ''),
+  });
+
+  return prior.slice(-20);
+}
+
+function buildWhatsAppEngineMessages(messages: any[]): AutomationEngineMessage[] {
+  return (messages || []).slice(-20).map((message: any) => ({
+    fechaHora: message.time || new Date().toISOString(),
+    autor: message.sent ? 'asistente' as const : 'cliente' as const,
+    canal: 'whatsapp' as const,
+    texto: String(message.text || ''),
+  }));
+}
+
+async function assignEmailConversationToFolders(
+  account: any,
+  conversationId: string,
+  folderIds: string[],
+): Promise<void> {
+  if (!conversationId || !Array.isArray(folderIds) || folderIds.length === 0) return;
+  let modified = false;
+  const valid = new Set(folderIds);
+  for (const folder of account.emailFolders || []) {
+    if (!valid.has(folder.id)) continue;
+    if (!folder.conversationIds.includes(conversationId)) {
+      folder.conversationIds.push(conversationId);
+      modified = true;
+    }
+  }
+  if (modified) {
+    await saveAccount(account);
+  }
+}
+
+async function assignWhatsAppConversationToFolders(
+  account: any,
+  conversationId: string,
+  folderIds: string[],
+): Promise<void> {
+  if (!conversationId || !Array.isArray(folderIds) || folderIds.length === 0) return;
+  let modified = false;
+  const valid = new Set(folderIds);
+  for (const folder of account.whatsappFolders || []) {
+    if (!valid.has(folder.id)) continue;
+    if (!folder.conversationIds.includes(conversationId)) {
+      folder.conversationIds.push(conversationId);
+      modified = true;
+    }
+  }
+  if (modified) {
+    await saveAccount(account);
+  }
+}
+
 // ── Extract text from PDF (for new knowledge docs) ───────────────────
 async function extractPdfText(pdfPath: string): Promise<string> {
   try {
@@ -628,6 +769,7 @@ async function forwardToConsultas(
   type: 'consulta_general' | 'solicitud_sin_especialista' | 'confirmacion_asignacion' = 'consulta_general',
   especialidadNombre?: string,
   especialidadId?: string,
+  customMessage?: string,
 ): Promise<void> {
   if (correosConsultas.length === 0) return;
 
@@ -667,7 +809,14 @@ async function forwardToConsultas(
   }
 
   let forwardBody: string;
-  if (type === 'solicitud_sin_especialista') {
+  if (customMessage?.trim()) {
+    forwardBody = `${customMessage.trim()}
+
+DE: ${email.fromName} <${email.from}>
+ASUNTO: ${email.subject}
+MENSAJE:
+${cleanBody}${contextSummary}`;
+  } else if (type === 'solicitud_sin_especialista') {
     forwardBody = `Se ha recibido una solicitud de servicio de "${especialidadNombre || 'especialidad desconocida'}" pero no hay ningún abogado asignado a esa especialidad.
 
 DE: ${email.fromName} <${email.from}>
@@ -1091,15 +1240,31 @@ async function processConsultaReply(
           originalText: pending.originalBody,
           especialidadId: pending.especialidadId,
         });
-        const clientLanguage = await resolveAutomationLanguage(
-          accountId,
-          pending.originalSubject,
-          pending.originalBody,
-          cleanReply,
-        );
+        const waHistoryContext = (waConv?.messages?.length ?? 0) > 0
+          ? `HISTORIAL:\n${waConv!.messages.slice(-20).map((m: any) => `${m.sent ? 'Asistente' : (waConv?.contactName || pending.originalFromName)}: ${m.text}`).join('\n')}`
+          : '';
         const ackMsg = assigned
-          ? getAutomationMessage(clientLanguage, 'assignedSpecializedProfessional')
-          : getAutomationMessage(clientLanguage, 'couldNotAssignRightNow');
+          ? await generateOperationalClientReply({
+            channel: 'whatsapp',
+            scenario: 'assigned_case',
+            originalSubject: pending.originalSubject,
+            originalBody: pending.originalBody,
+            latestCustomerText: cleanReply,
+            historyContext: waHistoryContext,
+          })
+          : await generateOperationalClientReply({
+            channel: 'whatsapp',
+            scenario: 'under_review',
+            originalSubject: pending.originalSubject,
+            originalBody: pending.originalBody,
+            latestCustomerText: cleanReply,
+            historyContext: waHistoryContext,
+          });
+        if (!ackMsg) {
+          console.warn(`[processConsultaReply] No se pudo redactar respuesta IA de asignacion WhatsApp, se mantiene pendiente: ${pending.id}`);
+          await saveAccount(account);
+          return true;
+        }
         try {
           await sendWhatsAppReplyFromPending(account, waTargetPhone, ackMsg, {
             waConversationId: pending.waConversationId || pending.conversationId,
@@ -1117,16 +1282,11 @@ async function processConsultaReply(
           waConv.lastMessageTime = new Date().toISOString();
         }
       } else {
-        const clientLanguage = await resolveAutomationLanguage(
-          accountId,
-          pending.originalSubject,
-          pending.originalBody,
-          cleanReply,
-        );
-        const defaultMsg = interpretation.action === 'reject'
-          ? getAutomationMessage(clientLanguage, 'serviceNotOffered')
-          : getAutomationMessage(clientLanguage, 'consultaReviewedMoreInfo');
-        const msg = interpretation.message || defaultMsg;
+        const msg = interpretation.message?.trim();
+        if (!msg) {
+          await saveAccount(account);
+          return true;
+        }
         try {
           await sendWhatsAppReplyFromPending(account, waTargetPhone, msg, {
             waConversationId: pending.waConversationId || pending.conversationId,
@@ -1233,12 +1393,9 @@ async function processConsultaReply(
     }
 
     const isAffirmative = await interpretClientConfirmation(cleanReply);
-    const clientLanguage = await resolveAutomationLanguage(
-      accountId,
-      pending.originalSubject,
-      pending.originalBody,
-      cleanReply,
-    );
+    const emailHistoryContext = conv
+      ? await buildEmailHistoryText(conv.messages, conv.contactName || pending.originalFromName)
+      : '';
 
     if (isAffirmative && cuentaConfig && cuentaCorreo) {
       const origEmail: IncomingEmail = {
@@ -1251,16 +1408,42 @@ async function processConsultaReply(
         messageId: '',
         references: '',
       };
-      await assignCase(origEmail, accountId, account, pending.especialidadId, cuentaCorreo, pending.conversationId);
+      const assigned = await assignCaseUnified(origEmail, accountId, account, pending.especialidadId, cuentaCorreo, pending.conversationId);
+      if (!assigned) {
+        await saveAccount(account);
+        return true;
+      }
 
-      const confirmMsg = getAutomationMessage(clientLanguage, 'assignedSpecializedLawyer');
+      const confirmMsg = await generateOperationalClientReply({
+        channel: 'email',
+        scenario: 'assigned_case',
+        originalSubject: pending.originalSubject,
+        originalBody: pending.originalBody,
+        latestCustomerText: cleanReply,
+        historyContext: emailHistoryContext,
+      });
+      if (!confirmMsg) {
+        await saveAccount(account);
+        return true;
+      }
       await replyToEmail(cuentaConfig, pending.originalFrom, pending.originalSubject, confirmMsg);
       if (conv) {
         conv.messages.push({ id: Date.now().toString(), from: 'Asistente', text: confirmMsg, time: timeStr, sent: true });
         conv.lastMessageTime = new Date().toISOString();
       }
     } else if (cuentaConfig) {
-      const declineMsg = getAutomationMessage(clientLanguage, 'futureNeedServices');
+      const declineMsg = await generateOperationalClientReply({
+        channel: 'email',
+        scenario: 'assignment_declined',
+        originalSubject: pending.originalSubject,
+        originalBody: pending.originalBody,
+        latestCustomerText: cleanReply,
+        historyContext: emailHistoryContext,
+      });
+      if (!declineMsg) {
+        await saveAccount(account);
+        return true;
+      }
       await replyToEmail(cuentaConfig, pending.originalFrom, pending.originalSubject, declineMsg);
       if (conv) {
         conv.messages.push({ id: Date.now().toString(), from: 'Asistente', text: declineMsg, time: timeStr, sent: true });
@@ -1294,13 +1477,7 @@ async function processConsultaReply(
     const timeStr = new Date().toISOString();
 
     if (interpretation.action === 'assign' && interpretation.assignToName) {
-      const targetName = interpretation.assignToName.toLowerCase();
-      const targetSub = subaccounts.find((s: any) =>
-        (s.name || '').toLowerCase().includes(targetName)
-        || (s.email || '').toLowerCase().includes(targetName)
-      );
-
-      if (targetSub && cuentaConfig && cuentaCorreo) {
+      if (cuentaConfig && cuentaCorreo) {
         const origEmail: IncomingEmail = {
           from: pending.originalFrom,
           fromName: pending.originalFromName,
@@ -1311,15 +1488,36 @@ async function processConsultaReply(
           messageId: '',
           references: '',
         };
-        await assignCaseToSubaccount(origEmail, accountId, account, targetSub, cuentaCorreo, pending.conversationId, pending.especialidadId);
-
-        const clientLanguage = await resolveAutomationLanguage(
+        const assignedOk = await assignCaseToNamedCandidate(
+          origEmail,
           accountId,
-          pending.originalSubject,
-          pending.originalBody,
-          cleanReply,
+          account,
+          interpretation.assignToName,
+          cuentaCorreo,
+          pending.conversationId,
+          pending.especialidadId,
         );
-        const ackMsg = getAutomationMessage(clientLanguage, 'assignedSpecializedProfessional');
+        if (!assignedOk) {
+          console.warn(`[processConsultaReply] No se encontro candidata de asignacion por email, se mantiene pendiente: ${pending.id}`);
+          await saveAccount(account);
+          return true;
+        }
+
+        const historyContext = conv
+          ? await buildEmailHistoryText(conv.messages, conv.contactName || pending.originalFromName)
+          : '';
+        const ackMsg = await generateOperationalClientReply({
+          channel: 'email',
+          scenario: 'assigned_case',
+          originalSubject: pending.originalSubject,
+          originalBody: pending.originalBody,
+          latestCustomerText: cleanReply,
+          historyContext,
+        });
+        if (!ackMsg) {
+          await saveAccount(account);
+          return true;
+        }
         await replyToEmail(cuentaConfig, pending.originalFrom, pending.originalSubject, ackMsg);
         if (conv) {
           conv.messages.push({ id: Date.now().toString(), from: 'Asistente', text: ackMsg, time: timeStr, sent: true });
@@ -1336,16 +1534,11 @@ async function processConsultaReply(
         conv.lastMessageTime = new Date().toISOString();
       }
     } else if (cuentaConfig) {
-      const clientLanguage = await resolveAutomationLanguage(
-        accountId,
-        pending.originalSubject,
-        pending.originalBody,
-        cleanReply,
-      );
-      const defaultMsg = interpretation.action === 'reject'
-        ? getAutomationMessage(clientLanguage, 'serviceNotOffered')
-        : getAutomationMessage(clientLanguage, 'consultaReviewedMoreInfo');
-      const msg = interpretation.message || defaultMsg;
+      const msg = interpretation.message?.trim();
+      if (!msg) {
+        await saveAccount(account);
+        return true;
+      }
       await replyToEmail(cuentaConfig, pending.originalFrom, pending.originalSubject, msg);
       if (conv) {
         conv.messages.push({ id: Date.now().toString(), from: 'Asistente', text: msg, time: timeStr, sent: true });
@@ -1431,9 +1624,10 @@ async function processConsultaReply(
 
 // ── 4b. Check if a matching specialist exists ───────────────────────
 export async function hasMatchingSpecialist(accountId: string, account: any, especialidadId?: string): Promise<boolean> {
-  const subaccounts = await Subaccount.find({ parentAccountId: accountId });
-  const subs = account.subcuentaEspecialidades || {};
-  return subaccounts.some((s: any) => subs[s._id] === especialidadId);
+  const candidates = await listAssignableCandidates(accountId);
+  const specialties = account.subcuentaEspecialidades || {};
+  if (!especialidadId) return candidates.length > 0;
+  return candidates.some((candidate) => specialties[candidate.id] === especialidadId);
 }
 
 // ── 4c. Generate AI summary for client + lawyer ─────────────────────
@@ -1632,48 +1826,40 @@ export async function assignWhatsAppCase(
     especialidadId?: string;
   },
 ): Promise<{ subaccountId: string; subaccountName: string; email: string } | null> {
-  const subaccounts = await Subaccount.find({ parentAccountId: accountId });
-  if (subaccounts.length === 0) {
-    console.warn(`[assignWhatsAppCase] No subaccounts available for account ${accountId} — case for ${options.contactPhone} not assigned`);
+  const bestCandidate = await selectBestAssignableCandidate(
+    accountId,
+    account.subcuentaEspecialidades || {},
+    options.especialidadId,
+  );
+  if (!bestCandidate) {
+    console.warn(`[assignWhatsAppCase] No assignable candidates available for workspace ${accountId} - case for ${options.contactPhone} not assigned`);
     return null;
   }
 
-  let bestSubaccount: any = null;
+  const resolvedCandidate = await resolveAssignmentCandidateRecord(accountId, bestCandidate.id);
+  if (!resolvedCandidate) return null;
 
-  if (account.sortByCarga) {
-    const clients = await Client.find({ accountId, status: 'abierto' });
-    let minLoad = Infinity;
-    for (const sub of subaccounts) {
-      const load = clients.filter((c: any) => hasAssignedSubaccount(c, sub._id)).length;
-      if (load < minLoad) {
-        minLoad = load;
-        bestSubaccount = sub;
-      }
-    }
-  } else {
-    const subs = account.subcuentaEspecialidades || {};
-    const candidates = options.especialidadId
-      ? subaccounts.filter((s: any) => subs[s._id] === options.especialidadId)
-      : subaccounts;
-
-    const pool = candidates.length > 0 ? candidates : subaccounts;
-    const clients = await Client.find({ accountId, status: 'abierto' });
-    let minLoad = Infinity;
-    for (const sub of pool) {
-      const load = clients.filter((c: any) => hasAssignedSubaccount(c, sub._id)).length;
-      if (load < minLoad) {
-        minLoad = load;
-        bestSubaccount = sub;
-      }
-    }
-  }
-
-  if (!bestSubaccount) return null;
-
-  return assignWhatsAppCaseToSubaccount(accountId, account, bestSubaccount, options);
+  return assignWhatsAppCaseToSubaccount(accountId, account, resolvedCandidate.record, options);
 }
 
 // ── 4d. Assign case to a specific subaccount ─────────────────────────
+export async function assignWhatsAppCaseToCandidateId(
+  accountId: string,
+  account: any,
+  candidateId: string,
+  options: {
+    contactName: string;
+    contactPhone: string;
+    conversationId: string;
+    originalText: string;
+    especialidadId?: string;
+  },
+): Promise<{ subaccountId: string; subaccountName: string; email: string } | null> {
+  const candidate = await resolveAssignmentCandidateRecord(accountId, candidateId);
+  if (!candidate?.record) return null;
+  return assignWhatsAppCaseToSubaccount(accountId, account, candidate.record, options);
+}
+
 async function assignCaseToSubaccount(
   email: IncomingEmail,
   accountId: string,
@@ -1729,6 +1915,212 @@ async function assignCaseToSubaccount(
 }
 
 // ── 5. Assign case — create client + notify lawyer ──────────────────
+async function findAssignmentCandidateByName(
+  accountId: string,
+  candidateNameOrEmail: string,
+): Promise<ResolvedAssignmentCandidate | null> {
+  const needle = String(candidateNameOrEmail || '').trim().toLowerCase();
+  if (!needle) return null;
+
+  const candidates = await listAssignmentCandidatesWithRecords(accountId);
+  return candidates.find((candidate) =>
+    (candidate.name || '').toLowerCase().includes(needle)
+    || (candidate.email || '').toLowerCase().includes(needle)
+  ) || null;
+}
+
+async function assignCaseToNamedCandidate(
+  email: IncomingEmail,
+  accountId: string,
+  account: any,
+  candidateNameOrEmail: string,
+  cuentaCorreo: CuentaCorreo,
+  conversationId: string,
+  especialidadId?: string,
+): Promise<boolean> {
+  const candidate = await findAssignmentCandidateByName(accountId, candidateNameOrEmail);
+  if (!candidate?.record) return false;
+  await assignCaseToSubaccount(email, accountId, account, candidate.record, cuentaCorreo, conversationId, especialidadId);
+  return true;
+}
+
+async function assignCaseUnified(
+  email: IncomingEmail,
+  accountId: string,
+  account: any,
+  especialidadId: string | undefined,
+  cuentaCorreo: CuentaCorreo,
+  conversationId: string,
+): Promise<boolean> {
+  const bestCandidate = await selectBestAssignableCandidate(
+    accountId,
+    account.subcuentaEspecialidades || {},
+    especialidadId,
+  );
+  if (!bestCandidate) return false;
+
+  const resolvedCandidate = await resolveAssignmentCandidateRecord(accountId, bestCandidate.id);
+  if (!resolvedCandidate?.record) return false;
+
+  await assignCaseToSubaccount(
+    email,
+    accountId,
+    account,
+    resolvedCandidate.record,
+    cuentaCorreo,
+    conversationId,
+    especialidadId,
+  );
+  return true;
+}
+
+async function assignCaseToCandidateId(
+  email: IncomingEmail,
+  accountId: string,
+  account: any,
+  candidateId: string,
+  cuentaCorreo: CuentaCorreo,
+  conversationId: string,
+  especialidadId?: string,
+): Promise<boolean> {
+  const candidate = await resolveAssignmentCandidateRecord(accountId, candidateId);
+  if (!candidate?.record) return false;
+  await assignCaseToSubaccount(email, accountId, account, candidate.record, cuentaCorreo, conversationId, especialidadId);
+  return true;
+}
+
+async function hasExistingCase(accountId: string, source: 'email' | 'whatsapp', sourceId: string): Promise<boolean> {
+  try {
+    const CaseModel = (await import('../models/Case.js')).default;
+    const found = await CaseModel.findOne({ accountId, source, sourceId }).select('_id').lean();
+    return !!found;
+  } catch (err) {
+    console.error('[hasExistingCase] error:', err);
+    return false;
+  }
+}
+
+export async function generateOperationalClientReply(options: {
+  channel: 'email' | 'whatsapp';
+  scenario: 'assigned_case' | 'assignment_declined' | 'under_review';
+  originalSubject: string;
+  originalBody: string;
+  latestCustomerText?: string;
+  historyContext?: string;
+}): Promise<string | null> {
+  const scenarioInstruction =
+    options.scenario === 'assigned_case'
+      ? 'Ya se ha asignado un abogado o profesional adecuado al cliente y el mensaje debe comunicarlo claramente.'
+      : options.scenario === 'assignment_declined'
+        ? 'El cliente ha indicado que no desea que se le asigne abogado en este momento.'
+        : 'El asunto sigue en revision interna y no debes inventar detalles ni prometer nada concreto.';
+
+  try {
+    const response = await getQwen().chat.completions.create({
+      model: AI_AUTOMATION_MODEL,
+      messages: [
+        {
+          role: 'system',
+          content: `Eres la recepcionista IA de un despacho de abogados.
+
+Redacta un unico mensaje breve, cercano y profesional para enviar al cliente.
+
+Reglas obligatorias:
+- Usa solo la informacion recibida.
+- No uses plantillas ni frases mecanicas.
+- No inventes datos.
+- No incluyas firmas, nombres, telefonos, correos ni placeholders.
+- Si el canal es email, puedes incluir un saludo breve y un cierre corto.
+- Si el canal es whatsapp, ve mas directo y natural.
+- Responde en el mismo idioma del cliente.
+- Devuelve solo el texto final para el cliente.
+/no_think`,
+        },
+        {
+          role: 'user',
+          content: `${options.historyContext ? `${options.historyContext}\n\n` : ''}CANAL: ${options.channel}
+ASUNTO ORIGINAL: ${options.originalSubject}
+MENSAJE ORIGINAL DEL CLIENTE:
+${options.originalBody.substring(0, 2500)}
+
+ULTIMO MENSAJE DEL CLIENTE:
+${(options.latestCustomerText || '').substring(0, 1000)}
+
+INSTRUCCION INTERNA:
+${scenarioInstruction}`,
+        },
+      ],
+      max_tokens: 400,
+      temperature: 0.25,
+    });
+
+    const text = stripThinkTags(response.choices?.[0]?.message?.content || '').trim();
+    return text || null;
+  } catch (err) {
+    console.error('[generateOperationalClientReply] Error:', err);
+    return null;
+  }
+}
+
+async function ensurePendingEmailCase(
+  accountId: string,
+  account: any,
+  email: IncomingEmail,
+  conversationId: string,
+  especialidadId: string | undefined,
+): Promise<void> {
+  if (await hasExistingCase(accountId, 'email', conversationId)) return;
+  const { client } = await findOrCreateClient(accountId, email.from, '', email.fromName || email.from);
+  await createCaseFromEmail(accountId, account, email, conversationId, especialidadId, 'solicitud_servicio', 'pending', undefined, undefined, client._id);
+}
+
+export function upsertPendingAssignmentConfirmation(
+  account: any,
+  entry: {
+    originalFrom: string;
+    originalFromName: string;
+    originalSubject: string;
+    originalBody: string;
+    cuentaCorreoId: string;
+    conversationId: string;
+    especialidadId?: string;
+    channel: 'email' | 'whatsapp';
+    waContactPhone?: string;
+    waConversationId?: string;
+  },
+): void {
+  const pendingList = Array.isArray(account.pendingConsultas) ? account.pendingConsultas : [];
+  const existingIndex = pendingList.findIndex((pending: any) =>
+    pending.type === 'confirmacion_asignacion'
+    && pending.channel === entry.channel
+    && pending.conversationId === entry.conversationId
+    && (entry.channel !== 'email' || pending.cuentaCorreoId === entry.cuentaCorreoId)
+  );
+
+  const pendingEntry = {
+    id: existingIndex >= 0 ? pendingList[existingIndex].id : Date.now().toString(),
+    originalFrom: entry.originalFrom,
+    originalFromName: entry.originalFromName,
+    originalSubject: entry.originalSubject,
+    originalBody: entry.originalBody,
+    cuentaCorreoId: entry.cuentaCorreoId,
+    conversationId: entry.conversationId,
+    forwardedAt: new Date().toISOString(),
+    type: 'confirmacion_asignacion',
+    especialidadId: entry.especialidadId,
+    channel: entry.channel,
+    waContactPhone: entry.waContactPhone,
+    waConversationId: entry.waConversationId,
+  };
+
+  if (existingIndex >= 0) {
+    pendingList[existingIndex] = pendingEntry;
+  } else {
+    pendingList.push(pendingEntry);
+  }
+  account.pendingConsultas = pendingList;
+}
+
 async function assignCase(
   email: IncomingEmail,
   accountId: string,
@@ -2267,7 +2659,7 @@ async function processOneEmail(
         const convId = addToConversation(account, email, cuentaCorreo, false);
         await saveAccount(account);
         await applyClassifyRules(account, convId, email.subject, email.body);
-        await assignCase(email, accountId, account, classification.especialidadId, cuentaCorreo, convId);
+        await assignCaseUnified(email, accountId, account, classification.especialidadId, cuentaCorreo, convId);
 
         const confirmMsg = getAutomationMessage(clientLanguage, 'assignedSpecializedLawyer');
         await scheduleReply(email.from, email.subject, confirmMsg, email.messageId, email.references, accountId, convId, cuentaCorreo.id);
@@ -2309,6 +2701,193 @@ async function processOneEmail(
     }
     return;
   }
+}
+
+async function processOneEmailUnified(
+  email: IncomingEmail,
+  accountId: string,
+  cuentaCorreo: CuentaCorreo,
+): Promise<void> {
+  const account = await getAccount(accountId);
+  const cuentaConfig = toCuentaConfig(cuentaCorreo);
+  const fromLower = email.from.toLowerCase();
+  const isConsulta = account.correosConsultas.some((c: any) => c.toLowerCase() === fromLower)
+    || (account.whatsappCorreosConsultas || []).some((c: any) => c.toLowerCase() === fromLower)
+    || email.subject.includes('[Consulta pendiente]');
+  if (isConsulta) {
+    const handled = await processConsultaReply(email, accountId, cuentaCorreo);
+    if (handled) return;
+  }
+
+  const existingConv = findEmailConversation(account, email.from, cuentaCorreo.id);
+  const contactoConocido = (account.emailConversations || []).some((conversation: any) =>
+    normalizeEmailAddress(conversation.contactEmail) === fromLower,
+  );
+  const pendingConfirmationCandidates = (account.pendingConsultas || []).filter(
+    (pending: any) => pending.type === 'confirmacion_asignacion'
+      && pending.channel !== 'whatsapp'
+      && pending.cuentaCorreoId === cuentaCorreo.id
+      && normalizeEmailAddress(pending.originalFrom) === fromLower,
+  );
+  const pendingConfirmation = existingConv
+    ? pendingConfirmationCandidates.find((pending: any) => pending.conversationId === existingConv.id)
+    : (pendingConfirmationCandidates.length === 1 ? pendingConfirmationCandidates[0] : null);
+  if (pendingConfirmation) {
+    const handled = await processConsultaReply(email, accountId, cuentaCorreo);
+    if (handled) return;
+  }
+
+  if (existingConv?.autoReplyPaused) {
+    const convIdPaused = addToConversation(account, email, cuentaCorreo, false);
+    await saveAccount(account);
+    await applyClassifyRules(account, convIdPaused, email.subject, email.body);
+    return;
+  }
+
+  if (email.attachments && email.attachments.length > 0 && account.switchActivo) {
+    const convIdWithAttachments = addToConversation(account, email, cuentaCorreo, false);
+    await saveAccount(account);
+    await applyClassifyRules(account, convIdWithAttachments, email.subject, email.body);
+    if (account.correosConsultas.length > 0) {
+      await forwardToConsultas(cuentaConfig, account.correosConsultas, email, account, cuentaCorreo.id, convIdWithAttachments);
+    }
+    return;
+  }
+
+  const convId = addToConversation(account, email, cuentaCorreo, false);
+  await saveAccount(account);
+
+  const latestConv = account.emailConversations.find((conversation: any) => conversation.id === convId) || existingConv;
+  const assignableCandidates = await listAssignableCandidates(accountId);
+  const decision = await runCustomerAutomationEngine({
+    workspaceId: accountId,
+    canalEntrada: 'email',
+    contactoConocido,
+    responseAutomaticaActiva: account.switchActivo === true,
+    toggles: {
+      respondConsultasGenerales: account.respondConsultasGenerales !== false,
+      respondSolicitudesServicio: account.respondSolicitudesServicio !== false,
+      soloContactosConocidos: account.soloContactosConocidos === true,
+      autoAssignEnabled: account.autoAssignEnabled === true,
+      sortByCarga: account.sortByCarga === true,
+    },
+    restricciones: {
+      soloResponderMismoCanal: true,
+    },
+    especialidades: (account.especialidades || []).map((item: any) => ({
+      id: item.id,
+      nombre: item.nombre,
+      descripcion: item.descripcion || '',
+    })),
+    cuentasCandidatas: assignableCandidates.map((candidate) => ({
+      id: candidate.id,
+      nombre: candidate.name,
+      email: candidate.email,
+      cargaActual: candidate.load,
+    })),
+    carpetas: getEmailFolderDescriptions(account),
+    reglasOrganizacion: (account.emailClassifyRules || []).map((rule: any) => ({
+      id: rule.id,
+      nombre: rule.name,
+      descripcion: rule.description || '',
+      folderIds: rule.folderIds || [],
+    })),
+    correoConsultas: {
+      destino: account.correosConsultas || [],
+      cuentaOperativa: (account.cuentasCorreo || []).map((item: any) => item.correo).filter(Boolean),
+    },
+    documentos: (account.documentos || []).map((doc: any) => ({
+      nombre: doc.nombre,
+      texto: doc.extractedText || '',
+    })),
+    ultimos20Mensajes: buildEmailEngineMessages(
+      (latestConv?.messages || []).slice(0, -1),
+      latestConv?.contactName || email.from,
+      email,
+    ),
+  });
+
+  await assignEmailConversationToFolders(account, convId, decision.folderIds);
+
+  if (decision.clasificacion.tipo === 'solicitud_servicio') {
+    await ensurePendingEmailCase(accountId, account, email, convId, decision.clasificacion.especialidadId);
+  }
+
+  if (decision.accion === 'preguntar_consultas') {
+    await forwardToConsultas(
+      cuentaConfig,
+      account.correosConsultas,
+      email,
+      account,
+      cuentaCorreo.id,
+      convId,
+      decision.clasificacion.tipo === 'solicitud_servicio' ? 'solicitud_sin_especialista' : 'consulta_general',
+      undefined,
+      decision.clasificacion.especialidadId,
+      decision.mensajeConsultas,
+    );
+    return;
+  }
+
+  if (decision.accion === 'pause_auto_reply') {
+    const conversation = account.emailConversations.find((item: any) => item.id === convId);
+    if (conversation) {
+      conversation.autoReplyPaused = true;
+      await saveAccount(account);
+    }
+  }
+
+  if (decision.accion === 'assign_case') {
+    const assigned = decision.asignarA
+      ? await assignCaseToCandidateId(email, accountId, account, decision.asignarA, cuentaCorreo, convId, decision.clasificacion.especialidadId)
+      : await assignCaseUnified(email, accountId, account, decision.clasificacion.especialidadId, cuentaCorreo, convId);
+    if (!assigned) {
+      return;
+    }
+  }
+
+  if (decision.accion === 'ask_assignment') {
+    if (!decision.mensajeCliente) {
+      return;
+    }
+    await scheduleReply(
+      email.from,
+      email.subject,
+      decision.mensajeCliente,
+      email.messageId,
+      email.references,
+      accountId,
+      convId,
+      cuentaCorreo.id,
+    );
+    upsertPendingAssignmentConfirmation(account, {
+      originalFrom: email.from,
+      originalFromName: email.fromName,
+      originalSubject: email.subject,
+      originalBody: stripQuotedText(email.body),
+      cuentaCorreoId: cuentaCorreo.id,
+      conversationId: convId,
+      especialidadId: decision.clasificacion.especialidadId,
+      channel: 'email',
+    });
+    await saveAccount(account);
+    return;
+  }
+
+  if (!decision.mensajeCliente || decision.accion === 'no_responder') {
+    return;
+  }
+
+  await scheduleReply(
+    email.from,
+    email.subject,
+    decision.mensajeCliente,
+    email.messageId,
+    email.references,
+    accountId,
+    convId,
+    cuentaCorreo.id,
+  );
 }
 
 // ── Polling management ───────────────────────────────────────────────
@@ -2357,7 +2936,7 @@ export async function processIncomingEmails(accountId: string): Promise<number> 
 
             if (senderEmails.length === 1) {
               // Single email — process normally
-              await processOneEmail(senderEmails[0], accountId, cuentaCorreo);
+              await processOneEmailUnified(senderEmails[0], accountId, cuentaCorreo);
               if (senderEmails[0].uid) {
                 await markEmailsAsSeen(cuentaConfig, [senderEmails[0].uid]);
               }
@@ -2385,7 +2964,7 @@ export async function processIncomingEmails(accountId: string): Promise<number> 
                 // Merge attachments from all emails
                 attachments: senderEmails.flatMap(e => e.attachments || []),
               };
-              await processOneEmail(mergedEmail, accountId, cuentaCorreo);
+              await processOneEmailUnified(mergedEmail, accountId, cuentaCorreo);
               if (lastEmail.uid) {
                 await markEmailsAsSeen(cuentaConfig, [lastEmail.uid]);
               }

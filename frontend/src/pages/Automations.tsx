@@ -34,7 +34,7 @@ interface CuentaCorreo {
   customImapPort?: number;
 }
 interface Documento { id: string; nombre: string; filename: string; uploadedAt: string; }
-interface Subcuenta { id: string; name: string; email: string; }
+interface Subcuenta { id: string; name: string; email: string; kind?: 'main' | 'subaccount' | 'self'; }
 interface EmailAttachment { id: string; filename: string; originalName: string; mimeType: string; size: number; }
 interface EmailMessage { id: string; from: string; text: string; time: string; sent: boolean; attachments?: EmailAttachment[]; }
 interface EmailConversation {
@@ -180,7 +180,7 @@ function SwitchBox({ active, onChange, label }: { active: boolean; onChange: (v:
   );
 }
 
-type View = "main" | "email" | "whatsapp" | "calendar";
+type View = "main" | "messages" | "email" | "whatsapp" | "calendar";
 const WA_WINDOW_MS = 24 * 60 * 60 * 1000;
 
 // Format ISO or legacy time strings to local HH:MM
@@ -289,6 +289,11 @@ const Automations = () => {
   const [showSeleccion, setShowSeleccion] = useState(false);
   const [emailFilter, setEmailFilter] = useState<'all' | 'manual' | 'auto'>('all');
   const [emailSearch, setEmailSearch] = useState('');
+  const [unifiedChannelFilter, setUnifiedChannelFilter] = useState<'all' | 'email' | 'whatsapp'>('all');
+  const [unifiedStatusFilter, setUnifiedStatusFilter] = useState<'all' | 'pending' | 'paused'>('all');
+  const [unifiedSearch, setUnifiedSearch] = useState('');
+  const [unifiedFolderFilter, setUnifiedFolderFilter] = useState('');
+  const [activeAutomationChannel, setActiveAutomationChannel] = useState<'email' | 'whatsapp'>('email');
   const [showFolderPanel, setShowFolderPanel] = useState(false);
   const [newFolderName, setNewFolderName] = useState('');
   const [folderFilter, setFolderFilter] = useState('');
@@ -314,9 +319,9 @@ const Automations = () => {
   const [whatsappNumberFilter, setWhatsappNumberFilter] = useState<string>('all');
 
   useEffect(() => {
-    const accId = sessionStorage.getItem("accountId") || "";
-    setAccountId(accId);
-    setCalendarUserId(sessionStorage.getItem("userId") || accId);
+    const workspaceId = sessionStorage.getItem("userId") || sessionStorage.getItem("accountId") || "";
+    setAccountId(workspaceId);
+    setCalendarUserId(workspaceId);
     setUserEmail(sessionStorage.getItem("userEmail") || "");
   }, []);
 
@@ -917,7 +922,7 @@ const Automations = () => {
   useEffect(() => { if (accountId) { loadWaData(); checkWaStatus(); } }, [accountId]);
   useEffect(() => { if (accountId) loadWaClassifyRules(); }, [accountId]);
   useEffect(() => {
-    if (!accountId || view !== 'whatsapp') return;
+    if (!accountId || (view !== 'whatsapp' && view !== 'messages')) return;
     loadWaData();
     loadWaClassifyRules();
     checkWaStatus();
@@ -935,6 +940,12 @@ const Automations = () => {
       clearInterval(statusInterval);
     };
   }, [accountId, view]);
+
+  useEffect(() => {
+    if (unifiedChannelFilter === 'email' || unifiedChannelFilter === 'whatsapp') {
+      setActiveAutomationChannel(unifiedChannelFilter);
+    }
+  }, [unifiedChannelFilter]);
 
   // Finalize WhatsApp Meta OAuth when returning from Meta
   useEffect(() => {
@@ -1397,6 +1408,1166 @@ const Automations = () => {
 
   const stats = { emailMessages: autoData.emailConversations.reduce((a, c) => a + c.messages.length, 0), emailConversations: autoData.emailConversations.length, emailUnread: autoData.emailConversations.reduce((a, c) => a + c.unread, 0), whatsappMessages: waConversations.reduce((a, c) => a + c.messages.length, 0), whatsappConversations: waConversations.length, whatsappUnread: waConversations.reduce((a, c) => a + c.unread, 0) };
 
+  const renderUnifiedInboxContent = () => {
+    const now = Date.now();
+    const pendingEmailIds = new Set(
+      (autoData.pendingConsultas || [])
+        .filter((pending: any) => pending.channel !== 'whatsapp')
+        .map((pending: any) => String(pending.conversationId || ''))
+        .filter(Boolean),
+    );
+    const pendingWhatsAppIds = new Set(
+      (autoData.pendingConsultas || [])
+        .filter((pending: any) => pending.channel === 'whatsapp')
+        .map((pending: any) => String(pending.waConversationId || pending.conversationId || ''))
+        .filter(Boolean),
+    );
+
+    const unifiedFolderOptions = [
+      ...autoData.emailFolders.map(folder => ({ key: `email:${folder.id}`, channel: 'email' as const, id: folder.id, name: folder.name })),
+      ...waFolders.map(folder => ({ key: `whatsapp:${folder.id}`, channel: 'whatsapp' as const, id: folder.id, name: folder.name })),
+    ];
+
+    const unifiedConversations = [
+      ...autoData.emailConversations.map(conv => ({
+        key: `email:${conv.id}`,
+        id: conv.id,
+        channel: 'email' as const,
+        contactName: conv.contactName,
+        contactDetail: conv.contactEmail,
+        preview: conv.messages[conv.messages.length - 1]?.text || conv.subject,
+        lastMessageTime: conv.messages[conv.messages.length - 1]?.time || conv.lastMessageTime,
+        unread: conv.unread,
+        autoReplyPaused: !!conv.autoReplyPaused,
+        pending: pendingEmailIds.has(conv.id),
+        outside24h: false,
+        folderKeys: autoData.emailFolders.filter(folder => folder.conversationIds.includes(conv.id)).map(folder => `email:${folder.id}`),
+      })),
+      ...waConversations.map(conv => ({
+        key: `whatsapp:${conv.id}`,
+        id: conv.id,
+        channel: 'whatsapp' as const,
+        contactName: conv.contactName,
+        contactDetail: conv.contactPhone,
+        preview: conv.messages[conv.messages.length - 1]?.text || '',
+        lastMessageTime: conv.lastMessageTime,
+        unread: conv.unread,
+        autoReplyPaused: !!conv.autoReplyPaused,
+        pending: pendingWhatsAppIds.has(conv.id),
+        outside24h: isWAConversationOutside24h(conv, now),
+        folderKeys: waFolders.filter(folder => folder.conversationIds.includes(conv.id)).map(folder => `whatsapp:${folder.id}`),
+      })),
+    ]
+      .filter(conv => {
+        if (unifiedChannelFilter !== 'all' && conv.channel !== unifiedChannelFilter) return false;
+        if (unifiedStatusFilter === 'pending' && !conv.pending) return false;
+        if (unifiedStatusFilter === 'paused' && !conv.autoReplyPaused) return false;
+        if (unifiedFolderFilter && !conv.folderKeys.includes(unifiedFolderFilter)) return false;
+        if (unifiedSearch) {
+          const q = unifiedSearch.toLowerCase();
+          if (!conv.contactName.toLowerCase().includes(q) && !conv.contactDetail.toLowerCase().includes(q) && !conv.preview.toLowerCase().includes(q)) return false;
+        }
+        return true;
+      })
+      .sort((a, b) => new Date(b.lastMessageTime || 0).getTime() - new Date(a.lastMessageTime || 0).getTime());
+
+    const currentUnified = unifiedConversations.find((item) =>
+      item.channel === 'email' ? item.id === selectedEmailConv : item.id === selectedWAContact,
+    ) || null;
+    const effectiveChannel = currentUnified?.channel || (unifiedChannelFilter !== 'all' ? unifiedChannelFilter : activeAutomationChannel);
+    const currentEmailConv = currentUnified?.channel === 'email'
+      ? autoData.emailConversations.find(conv => conv.id === currentUnified.id) || null
+      : null;
+    const currentWAConv = currentUnified?.channel === 'whatsapp'
+      ? waConversations.find(conv => conv.id === currentUnified.id) || null
+      : null;
+    const currentMessages = currentEmailConv?.messages || currentWAConv?.messages || [];
+    const waManualSendBlocked = currentWAConv ? isWAConversationOutside24h(currentWAConv, now) : false;
+    const currentAutoReplyEnabled = effectiveChannel === 'email' ? autoData.switchActivo : waSwitchActivo;
+    const activeFolderPanel = effectiveChannel === 'whatsapp' ? showWaFolderPanel : showFolderPanel;
+    const currentConversationId = currentEmailConv?.id || currentWAConv?.id || '';
+    const activeFolders = effectiveChannel === 'whatsapp' ? waFolders : autoData.emailFolders;
+
+    return (
+      <>
+      <div className="h-[calc(100vh-0px)] flex flex-col">
+        <div className="flex items-center justify-between p-3 md:p-4 border-b border-border bg-card flex-wrap gap-2">
+          <div className="flex items-center gap-3">
+            <button onClick={() => setView("main")} className="flex items-center gap-2 text-sm text-muted-foreground hover:text-foreground transition-colors">
+              <ArrowLeft className="h-4 w-4" />{t('common.back')}
+            </button>
+            <div className="h-4 w-px bg-border" />
+            <div className="flex items-center gap-2">
+              <MessageCircle className="h-4 w-4 text-foreground" />
+              <span className="text-sm font-semibold text-foreground">Email + WhatsApp</span>
+              <span className="text-[10px] px-2 py-0.5 rounded-full border border-border text-muted-foreground uppercase">{effectiveChannel}</span>
+            </div>
+          </div>
+          <div className="flex items-center gap-2 md:gap-3 flex-wrap">
+              <button
+                onClick={() => {
+                  if (effectiveChannel === 'whatsapp') {
+                    setShowWaSelection(true);
+                  } else {
+                    setShowSeleccion(true);
+                  }
+                }}
+              className="flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium rounded-md border border-border bg-card hover:bg-accent text-foreground transition-colors"
+            >
+              <Settings2 className="h-3.5 w-3.5" />Selección
+            </button>
+            <button
+              onClick={() => {
+                if (effectiveChannel === 'whatsapp') {
+                  setShowFolderPanel(false);
+                  setShowWaFolderPanel(prev => !prev);
+                } else {
+                  setShowWaFolderPanel(false);
+                  setShowFolderPanel(prev => !prev);
+                }
+              }}
+              className={`flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium rounded-md border border-border bg-card hover:bg-accent text-foreground transition-colors ${activeFolderPanel ? 'ring-1 ring-ring' : ''}`}
+            >
+              <FolderOpen className="h-3.5 w-3.5" />Organizar
+            </button>
+            <button
+              onClick={() => {
+                if (effectiveChannel === 'whatsapp') {
+                  setShowWaClassifyModal(true);
+                } else {
+                  setShowClassifyModal(true);
+                }
+              }}
+              className="flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium rounded-md border border-border bg-card hover:bg-accent text-foreground transition-colors"
+            >
+              <Settings className="h-3.5 w-3.5" />
+            </button>
+            <button onClick={() => setShowAsignacion(true)} className="flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium rounded-md border border-border bg-card hover:bg-accent text-foreground transition-colors">
+              <Users className="h-3.5 w-3.5" />{t('automations.autoAssign')}
+            </button>
+            <button
+              onClick={() => {
+                if (effectiveChannel === 'whatsapp') {
+                  setShowConsultas(true);
+                }
+                setShowConsultas(true);
+              }}
+              className="flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium rounded-md border border-border bg-card hover:bg-accent text-foreground transition-colors"
+            >
+              <HelpCircle className="h-3.5 w-3.5" />Consultas frecuentes
+            </button>
+            <SwitchBox active={currentAutoReplyEnabled} onChange={() => { effectiveChannel === 'whatsapp' ? toggleWaSwitch() : toggleSwitch(); }} label={t('automations.autoReply')} />
+            <button onClick={() => { setShowWhatsAppSessions(true); void refreshWhatsAppSessionState(); }} className="flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium rounded-md border border-border bg-card hover:bg-accent text-foreground transition-colors">
+              <Phone className="h-3.5 w-3.5" />Números de WhatsApp
+            </button>
+          </div>
+        </div>
+
+        <div className="flex flex-1 min-h-0 relative">
+          {isMobile && showConvPanel && (
+            <div className="fixed inset-0 z-30 bg-black/50" onClick={() => setShowConvPanel(false)} />
+          )}
+
+          <div className={`${isMobile ? `fixed left-0 top-0 z-40 h-full w-72 transition-transform duration-300 ${showConvPanel ? 'translate-x-0' : '-translate-x-full'}` : 'w-80'} border-r border-border bg-card flex flex-col`}>
+            <div className="p-3 border-b border-border space-y-2">
+              <div className="relative">
+                <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-3.5 w-3.5 text-muted-foreground" />
+                <input className="w-full pl-9 pr-3 py-2 text-sm bg-muted/50 border-none rounded-md text-foreground placeholder:text-muted-foreground focus:outline-none focus:ring-1 focus:ring-ring"
+                  placeholder={t('automations.searchConversation')} value={unifiedSearch} onChange={e => setUnifiedSearch(e.target.value)} />
+              </div>
+              <div className="grid grid-cols-3 gap-1">
+                {(['all', 'email', 'whatsapp'] as const).map(f => (
+                  <button key={f} onClick={() => setUnifiedChannelFilter(f)}
+                    className={`px-2 py-1 text-[10px] font-medium rounded-md transition-colors ${unifiedChannelFilter === f ? 'bg-foreground text-background' : 'bg-muted text-muted-foreground hover:bg-accent'}`}>
+                    {f === 'all' ? t('automations.all') : f === 'email' ? 'Email' : 'WhatsApp'}
+                  </button>
+                ))}
+              </div>
+              <div className="grid grid-cols-3 gap-1">
+                {(['all', 'pending', 'paused'] as const).map(f => (
+                  <button key={f} onClick={() => setUnifiedStatusFilter(f)}
+                    className={`px-2 py-1 text-[10px] font-medium rounded-md transition-colors ${unifiedStatusFilter === f ? 'bg-foreground text-background' : 'bg-muted text-muted-foreground hover:bg-accent'}`}>
+                    {f === 'all' ? 'Todas' : f === 'pending' ? 'Pendientes' : 'Pausadas'}
+                  </button>
+                ))}
+              </div>
+              {unifiedFolderOptions.length > 0 && (
+                <select value={unifiedFolderFilter} onChange={e => setUnifiedFolderFilter(e.target.value)}
+                  className="w-full px-2 py-1 text-xs bg-muted/50 border border-border rounded-md text-foreground">
+                  <option value="">{t('automations.allFolders')}</option>
+                  {unifiedFolderOptions.map(folder => (
+                    <option key={folder.key} value={folder.key}>
+                      {unifiedChannelFilter === 'all'
+                        ? (folder.channel === 'email' ? `Email · ${folder.name}` : `WhatsApp · ${folder.name}`)
+                        : folder.name}
+                    </option>
+                  ))}
+                </select>
+              )}
+            </div>
+
+            <div className="flex-1 overflow-y-auto">
+              {unifiedConversations.length === 0 ? (
+                <div className="p-4 text-center">
+                  <p className="text-sm text-muted-foreground">{t('automations.noConversation')}</p>
+                </div>
+              ) : unifiedConversations.map((conv) => (
+                <button
+                  key={conv.key}
+                  onClick={() => {
+                    setActiveAutomationChannel(conv.channel);
+                    if (conv.channel === 'email') {
+                      setSelectedEmailConv(conv.id);
+                      authFetch(`${API}/conversations/${conv.id}/read`, { method: 'PUT', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ accountId, conversationId: conv.id }) })
+                        .then(() => setAutoData(prev => ({
+                          ...prev,
+                          emailConversations: prev.emailConversations.map(c => c.id === conv.id ? { ...c, unread: 0 } : c),
+                        })))
+                        .catch(() => {});
+                    } else {
+                      setSelectedWAContact(conv.id);
+                      void markWaRead(conv.id);
+                    }
+                    if (isMobile) setShowConvPanel(false);
+                  }}
+                  className={`group w-full text-left p-3 border-b border-border/50 hover:bg-accent/50 transition-colors ${currentUnified?.key === conv.key ? "bg-accent" : ""}`}
+                >
+                  <div className="flex items-start justify-between gap-2">
+                    <div className="flex items-center gap-3 min-w-0">
+                      <div className="h-9 w-9 rounded-full bg-muted flex items-center justify-center shrink-0">
+                        <span className="text-xs font-semibold text-foreground">{conv.contactName.split(" ").map((n: string) => n[0]).join("").substring(0, 2)}</span>
+                      </div>
+                      <div className="min-w-0">
+                        <p className="text-sm font-medium text-foreground truncate">{conv.contactName}</p>
+                        <p className="text-xs text-muted-foreground truncate">{conv.preview}</p>
+                      </div>
+                    </div>
+                    <div className="flex flex-col items-end gap-1 shrink-0">
+                      <span className="text-[10px] text-muted-foreground">{formatTime(conv.lastMessageTime || "")}</span>
+                      <div className="flex items-center gap-1">
+                        <span className={`text-[10px] px-1.5 py-0.5 rounded-full border ${conv.channel === 'email' ? 'border-sky-300 text-sky-700' : 'border-emerald-300 text-emerald-700'}`}>{conv.channel === 'email' ? 'Email' : 'WhatsApp'}</span>
+                        {conv.unread > 0 && (
+                          <span className="h-4 min-w-4 px-1 rounded-full bg-foreground text-background text-[10px] font-bold flex items-center justify-center">{conv.unread}</span>
+                        )}
+                        {conv.pending && <span className="text-[10px] px-1.5 py-0.5 rounded-full bg-muted text-muted-foreground">Pendiente</span>}
+                        {conv.autoReplyPaused && <PauseCircle className="h-3.5 w-3.5 text-amber-500" />}
+                        {conv.channel === 'whatsapp' && conv.outside24h && <AlertTriangle className="h-3.5 w-3.5 text-amber-500" />}
+                      </div>
+                    </div>
+                  </div>
+                </button>
+              ))}
+            </div>
+          </div>
+
+          <div className="flex-1 flex flex-col bg-background">
+            {currentUnified ? (
+              <>
+                <div className="flex flex-wrap items-center justify-between gap-2 p-3 md:p-4 border-b border-border bg-card">
+                  <div className="flex items-center gap-3 min-w-0">
+                    {isMobile && (
+                      <button onClick={() => setShowConvPanel(true)} className="p-1.5 rounded-md hover:bg-accent transition-colors">
+                        <PanelLeft className="h-4 w-4 text-muted-foreground" />
+                      </button>
+                    )}
+                    <div className="h-8 w-8 rounded-full bg-muted flex items-center justify-center shrink-0">
+                      <span className="text-xs font-semibold text-foreground">{currentUnified.contactName.split(" ").map((n) => n[0]).join("").substring(0, 2)}</span>
+                    </div>
+                    <div className="min-w-0">
+                      <p className="text-sm font-medium text-foreground truncate">{currentUnified.contactName}</p>
+                      <p className="text-[11px] text-muted-foreground truncate">{currentUnified.contactDetail}</p>
+                    </div>
+                  </div>
+                  <div className="flex items-center gap-2 shrink-0">
+                    {currentUnified.channel === 'email' && currentEmailConv && (
+                      <SwitchBox active={!currentEmailConv.autoReplyPaused} onChange={() => toggleConvAutoReply(currentEmailConv.id, !currentEmailConv.autoReplyPaused)} label="Auto-reply" />
+                    )}
+                    {currentUnified.channel === 'whatsapp' && currentWAConv && (
+                      <button onClick={() => toggleWaAutoReply(currentWAConv.id)} title={currentWAConv.autoReplyPaused ? t('automations.enableAutoReply') : t('automations.pauseAutoReply')}
+                        className={`p-2 rounded-md hover:bg-accent transition-colors ${currentWAConv.autoReplyPaused ? 'text-yellow-500' : 'text-muted-foreground'}`}>
+                        <PauseCircle className="h-4 w-4" />
+                      </button>
+                    )}
+                  </div>
+                </div>
+
+                <div className={`flex-1 overflow-y-auto p-4 space-y-3 transition-colors ${chatDragOver ? 'bg-primary/5 ring-2 ring-primary/30 ring-inset' : ''}`}>
+                  {currentMessages.map((msg: any) => (
+                    <div key={msg.id} className={`group/msg flex ${msg.sent ? "justify-end" : "justify-start"}`}>
+                      <div className={`max-w-[70%] px-3 py-2 rounded-lg text-sm ${msg.sent ? "bg-foreground text-background rounded-br-sm" : "bg-muted text-foreground rounded-bl-sm"}`}>
+                        {msg.text && <p className="whitespace-pre-wrap break-words">{msg.text}</p>}
+                        {msg.attachments && msg.attachments.length > 0 && (
+                          <div className={`${msg.text ? 'mt-2 pt-2 border-t' : ''} ${msg.sent ? 'border-background/20' : 'border-border'} space-y-1`}>
+                            {msg.attachments.map((att: any) => {
+                              if (currentUnified.channel === 'whatsapp') {
+                                const fileUrl = `${WA_API}/wa-attachments/${encodeURIComponent(att.filename)}?accountId=${accountId}`;
+                                const isAudio = att.mimeType?.startsWith('audio/');
+                                const isImage = att.mimeType?.startsWith('image/');
+                                if (isAudio) {
+                                  return (
+                                    <div key={att.id}>
+                                      <audio controls className="max-w-full" style={{ height: 36 }}>
+                                        <source src={fileUrl} type={att.mimeType} />
+                                      </audio>
+                                    </div>
+                                  );
+                                }
+                                if (isImage) {
+                                  return (
+                                    <a key={att.id} href={fileUrl} target="_blank" rel="noopener noreferrer">
+                                      <img src={fileUrl} alt={att.originalName} className="max-w-[240px] max-h-[200px] rounded-md object-cover" loading="lazy" />
+                                    </a>
+                                  );
+                                }
+                                const IconComp = getFileIcon(att.mimeType);
+                                return (
+                                  <a
+                                    key={att.id}
+                                    href={fileUrl}
+                                    target="_blank"
+                                    rel="noopener noreferrer"
+                                    className={`flex items-center gap-2 px-2 py-1.5 rounded-md text-xs transition-colors ${msg.sent ? 'bg-background/10 hover:bg-background/20 text-background' : 'bg-accent/50 hover:bg-accent text-foreground'}`}
+                                  >
+                                    <IconComp className="h-3.5 w-3.5 shrink-0" />
+                                    <span className="truncate flex-1">{att.originalName}</span>
+                                    <span className="shrink-0 text-[10px] opacity-60">{formatFileSize(att.size)}</span>
+                                    <Download className="h-3 w-3 shrink-0 opacity-60" />
+                                  </a>
+                                );
+                              }
+
+                              const IconComp = getFileIcon(att.mimeType);
+                              return (
+                                <a
+                                  key={att.id}
+                                  href={`${API}/email-attachments/${encodeURIComponent(att.filename)}?accountId=${accountId}`}
+                                  target="_blank"
+                                  rel="noopener noreferrer"
+                                  className={`flex items-center gap-2 px-2 py-1.5 rounded-md text-xs transition-colors ${msg.sent ? 'bg-background/10 hover:bg-background/20 text-background' : 'bg-accent/50 hover:bg-accent text-foreground'}`}
+                                >
+                                  <IconComp className="h-3.5 w-3.5 shrink-0" />
+                                  <span className="truncate flex-1">{att.originalName}</span>
+                                  <span className="shrink-0 text-[10px] opacity-60">{formatFileSize(att.size)}</span>
+                                  <Download className="h-3 w-3 shrink-0 opacity-60" />
+                                </a>
+                              );
+                            })}
+                          </div>
+                        )}
+                        <div className={`flex items-center justify-between mt-1 gap-2`}>
+                          <p className={`text-[10px] ${msg.sent ? "text-background/60" : "text-muted-foreground"}`}>{formatTime(msg.time)}</p>
+                          <button
+                            onClick={() => copyMessage(msg.id, msg.text)}
+                            className={`p-0.5 rounded hover:bg-black/10 dark:hover:bg-white/10 opacity-0 group-hover/msg:opacity-100 transition-opacity ${msg.sent ? "text-background/60 hover:text-background" : "text-muted-foreground hover:text-foreground"}`}
+                            title={t('automations.copyMessage')}
+                          >
+                            {copiedMsgId === msg.id ? <Check className="h-3 w-3 text-green-500" /> : <Copy className="h-3 w-3" />}
+                          </button>
+                        </div>
+                      </div>
+                    </div>
+                  ))}
+                  <div ref={messagesEndRef} />
+                </div>
+
+                <div className="p-3 border-t border-border bg-card">
+                  {currentUnified.channel === 'whatsapp' && waManualSendBlocked && (
+                    <div className="mb-2 rounded-md border border-amber-300 bg-amber-50 px-3 py-2 text-xs text-amber-700">
+                      Meta bloquea los mensajes manuales libres cuando han pasado más de 24 horas desde el último mensaje del cliente. El cliente debe volver a escribir para reabrir la ventana.
+                    </div>
+                  )}
+                  {pendingFiles.length > 0 && (
+                    <div className="flex flex-wrap gap-2 mb-2 px-1">
+                      {pendingFiles.map((file, i) => {
+                        const IconComp = getFileIcon(file.type);
+                        return (
+                          <div key={i} className="flex items-center gap-1.5 px-2 py-1 rounded-md bg-muted text-xs text-foreground max-w-[200px]">
+                            <IconComp className="h-3 w-3 shrink-0 text-muted-foreground" />
+                            <span className="truncate">{file.name}</span>
+                            <span className="shrink-0 text-[10px] text-muted-foreground">{formatFileSize(file.size)}</span>
+                            <button onClick={() => removePendingFile(i)} className="p-0.5 rounded hover:bg-destructive/10 text-muted-foreground hover:text-destructive shrink-0">
+                              <X className="h-2.5 w-2.5" />
+                            </button>
+                          </div>
+                        );
+                      })}
+                    </div>
+                  )}
+                  <input type="file" ref={emailFileInputRef} className="hidden" multiple onChange={(e) => { handleEmailFileSelect(e.target.files); e.target.value = ''; }} />
+                  <div className="flex items-center gap-2">
+                    <button
+                      onClick={() => {
+                        if (currentUnified.channel === 'email') {
+                          emailFileInputRef.current?.click();
+                        } else {
+                          const input = document.createElement('input');
+                          input.type = 'file';
+                          input.multiple = true;
+                          input.onchange = (e) => {
+                            const files = (e.target as HTMLInputElement).files;
+                            if (files) setPendingFiles(prev => [...prev, ...Array.from(files)]);
+                          };
+                          input.click();
+                        }
+                      }}
+                      disabled={currentUnified.channel === 'email' ? !currentEmailConv?.autoReplyPaused : !waConnected || waManualSendBlocked}
+                      className="p-2 rounded-md hover:bg-accent text-muted-foreground disabled:opacity-50 disabled:cursor-not-allowed"
+                    ><Paperclip className="h-4 w-4" /></button>
+                    <input className="flex-1 px-3 py-2 text-sm bg-muted/50 border-none rounded-md text-foreground placeholder:text-muted-foreground focus:outline-none focus:ring-1 focus:ring-ring disabled:opacity-50 disabled:cursor-not-allowed"
+                      placeholder={currentUnified.channel === 'email'
+                        ? (currentEmailConv?.autoReplyPaused ? t('automations.writeMessage') : t('automations.pauseToSend'))
+                        : (waManualSendBlocked ? 'Bloqueado por Meta hasta que el cliente vuelva a escribir' : t('automations.writeMessage'))}
+                      value={messageInput}
+                      onChange={(e) => setMessageInput(e.target.value)}
+                      onKeyDown={(e) => {
+                        if (e.key === "Enter") {
+                          e.preventDefault();
+                          currentUnified.channel === 'email' ? sendManualMessage() : sendWaMessage();
+                        }
+                      }}
+                      disabled={currentUnified.channel === 'email' ? !currentEmailConv?.autoReplyPaused : !waConnected || waManualSendBlocked}
+                    />
+                    <button
+                      onClick={() => currentUnified.channel === 'email' ? sendManualMessage() : sendWaMessage()}
+                      disabled={currentUnified.channel === 'email'
+                        ? !currentEmailConv?.autoReplyPaused || isSending
+                        : !waConnected || waManualSendBlocked || (!messageInput.trim() && pendingFiles.length === 0)}
+                      className="p-2 rounded-md bg-foreground text-background hover:opacity-90 transition-opacity disabled:opacity-50 disabled:cursor-not-allowed"
+                    ><Send className="h-4 w-4" /></button>
+                  </div>
+                </div>
+              </>
+            ) : (
+              <div className="flex-1 flex flex-col items-center justify-center text-muted-foreground text-sm gap-3">
+                {isMobile && (
+                  <button onClick={() => setShowConvPanel(true)} className="px-3 py-1.5 rounded-md bg-accent text-foreground text-xs font-medium hover:bg-accent/80 transition-colors">
+                    <PanelLeft className="h-4 w-4 inline mr-1.5" />{t('automations.searchConversation')}
+                  </button>
+                )}
+                {unifiedConversations.length === 0 ? t('automations.activateToStart') : t('automations.selectConversation')}
+              </div>
+            )}
+          </div>
+
+          <div className={`border-l border-border bg-card flex flex-col overflow-hidden transition-all duration-300 ease-in-out ${activeFolderPanel ? 'w-56 opacity-100' : 'w-0 opacity-0 border-l-0'}`}>
+            {activeFolderPanel && (
+              <>
+                <div className="p-3 border-b border-border">
+                  <div className="flex items-center justify-between mb-2">
+                    <p className="text-xs font-semibold text-foreground">{t('automations.folders')}</p>
+                    <button
+                      onClick={() => effectiveChannel === 'whatsapp' ? createWaFolder() : createFolder()}
+                      className="p-1.5 rounded-md bg-foreground text-background hover:opacity-90 transition-opacity"
+                      title={t('automations.createFolder')}
+                    >
+                      <Plus className="h-3 w-3" />
+                    </button>
+                  </div>
+                  <input
+                    ref={folderInputRef}
+                    value={effectiveChannel === 'whatsapp' ? newWaFolderName : newFolderName}
+                    onChange={(e) => effectiveChannel === 'whatsapp' ? setNewWaFolderName(e.target.value) : setNewFolderName(e.target.value)}
+                    onKeyDown={(e) => { if (e.key === 'Enter') { effectiveChannel === 'whatsapp' ? createWaFolder() : createFolder(); } }}
+                    placeholder={t('automations.newFolder')}
+                    className="w-full px-2 py-1.5 text-xs bg-muted/50 border-none rounded-md text-foreground placeholder:text-muted-foreground focus:outline-none focus:ring-1 focus:ring-ring"
+                  />
+                </div>
+                <div className="flex-1 overflow-y-auto p-2 space-y-1">
+                  {activeFolders.length === 0 && (
+                    <p className="text-[11px] text-muted-foreground text-center py-4">{t('automations.noFolders')}</p>
+                  )}
+                  {activeFolders.map((folder: any) => {
+                    const isAssigned = currentConversationId ? folder.conversationIds.includes(currentConversationId) : false;
+                    return (
+                      <div key={folder.id} className="flex items-center justify-between gap-1 px-2 py-1.5 rounded-md hover:bg-accent">
+                        <button
+                          onClick={() => setUnifiedFolderFilter(unifiedFolderFilter === `${effectiveChannel}:${folder.id}` ? '' : `${effectiveChannel}:${folder.id}`)}
+                          className="flex items-center gap-2 text-xs flex-1 text-left"
+                        >
+                          <FolderOpen className="h-3.5 w-3.5 text-muted-foreground" />
+                          <span className="truncate">{folder.name}</span>
+                        </button>
+                        {currentConversationId ? (
+                          isAssigned ? (
+                            <button onClick={() => effectiveChannel === 'whatsapp' ? removeWaFolder(folder.id, currentConversationId) : removeFromFolder(folder.id, currentConversationId)} className="p-1 rounded hover:bg-destructive/10 text-muted-foreground hover:text-destructive" title={t('automations.removeFromFolder')}>
+                              <Trash2 className="h-3 w-3" />
+                            </button>
+                          ) : (
+                            <button onClick={() => effectiveChannel === 'whatsapp' ? assignWaFolder(folder.id, currentConversationId) : assignToFolder(folder.id, currentConversationId)} className="p-1 rounded hover:bg-accent text-muted-foreground hover:text-foreground" title={t('automations.addToFolder')}>
+                              <Plus className="h-3 w-3" />
+                            </button>
+                          )
+                        ) : (
+                          <button onClick={() => effectiveChannel === 'whatsapp' ? deleteWaFolder(folder.id) : deleteFolder(folder.id)} className="p-1 rounded hover:bg-destructive/10 text-muted-foreground hover:text-destructive" title={t('automations.deleteFolder')}>
+                            <Trash2 className="h-3 w-3" />
+                          </button>
+                        )}
+                      </div>
+                    );
+                  })}
+                </div>
+              </>
+            )}
+          </div>
+        </div>
+      </div>
+
+      {showSeleccion && (
+        <Modal title={t('automations.emailSelection')} onClose={() => setShowSeleccion(false)}>
+          <div className="space-y-4">
+            <p className="text-xs text-muted-foreground mb-4">{t('automations.emailSelectionDesc')}</p>
+            <div className="flex items-center justify-between p-3 rounded-lg border border-border bg-background">
+              <div className="flex-1 mr-3">
+                <p className="text-sm font-medium text-foreground">{t('automations.respondConsultas')}</p>
+                <p className="text-xs text-muted-foreground mt-0.5">{t('automations.respondConsultasDesc')}</p>
+              </div>
+              <SwitchBox active={autoData.respondConsultasGenerales !== false} onChange={() => toggleSeleccion('respondConsultasGenerales')} label="" />
+            </div>
+            <div className="flex items-center justify-between p-3 rounded-lg border border-border bg-background">
+              <div className="flex-1 mr-3">
+                <p className="text-sm font-medium text-foreground">{t('automations.respondSolicitudes')}</p>
+                <p className="text-xs text-muted-foreground mt-0.5">{t('automations.respondSolicitudesDesc')}</p>
+              </div>
+              <SwitchBox active={autoData.respondSolicitudesServicio !== false} onChange={() => toggleSeleccion('respondSolicitudesServicio')} label="" />
+            </div>
+            <div className="flex items-center justify-between p-3 rounded-lg border border-border bg-background">
+              <div className="flex-1 mr-3">
+                <p className="text-sm font-medium text-foreground">{t('automations.onlyKnownContacts')}</p>
+                <p className="text-xs text-muted-foreground mt-0.5">{t('automations.onlyKnownContactsDesc')}</p>
+              </div>
+              <SwitchBox active={autoData.soloContactosConocidos === true} onChange={() => toggleSeleccion('soloContactosConocidos')} label="" />
+            </div>
+          </div>
+        </Modal>
+      )}
+
+      {showWaSelection && (
+        <Modal title="Seleccion de WhatsApp" onClose={() => setShowWaSelection(false)}>
+          <div className="space-y-4">
+            <p className="text-xs text-muted-foreground mb-4">Define que mensajes de WhatsApp puede responder automaticamente la IA.</p>
+            <div className="flex items-center justify-between p-3 rounded-lg border border-border bg-background">
+              <div className="flex-1 mr-3">
+                <p className="text-sm font-medium text-foreground">{t('automations.respondConsultas')}</p>
+                <p className="text-xs text-muted-foreground mt-0.5">{t('automations.respondConsultasDesc')}</p>
+              </div>
+              <SwitchBox active={waSelection.respondConsultasGenerales !== false} onChange={() => toggleWaSeleccion('respondConsultasGenerales')} label="" />
+            </div>
+            <div className="flex items-center justify-between p-3 rounded-lg border border-border bg-background">
+              <div className="flex-1 mr-3">
+                <p className="text-sm font-medium text-foreground">{t('automations.respondSolicitudes')}</p>
+                <p className="text-xs text-muted-foreground mt-0.5">{t('automations.respondSolicitudesDesc')}</p>
+              </div>
+              <SwitchBox active={waSelection.respondSolicitudesServicio !== false} onChange={() => toggleWaSeleccion('respondSolicitudesServicio')} label="" />
+            </div>
+            <div className="flex items-center justify-between p-3 rounded-lg border border-border bg-background">
+              <div className="flex-1 mr-3">
+                <p className="text-sm font-medium text-foreground">{t('automations.onlyKnownContacts')}</p>
+                <p className="text-xs text-muted-foreground mt-0.5">{t('automations.onlyKnownContactsDesc')}</p>
+              </div>
+              <SwitchBox active={waSelection.soloContactosConocidos === true} onChange={() => toggleWaSeleccion('soloContactosConocidos')} label="" />
+            </div>
+          </div>
+        </Modal>
+      )}
+
+      {showClassifyModal && (
+        <Modal title={t('automations.classifyRules') || 'Reglas de clasificación'} onClose={() => setShowClassifyModal(false)}>
+          <div className="space-y-4">
+            <p className="text-xs text-muted-foreground">{t('automations.classifyRulesDesc') || 'Las reglas ayudan a decidir a qué carpetas enviar automáticamente las conversaciones de email.'}</p>
+            <div className="space-y-2 p-3 border border-border rounded-lg bg-muted/20">
+              <input
+                placeholder={t('automations.classifyRuleNamePlaceholder') || 'Ej: Facturas recibidas'}
+                value={classifyForm.name}
+                onChange={(e) => setClassifyForm(prev => ({ ...prev, name: e.target.value }))}
+                className="w-full px-3 py-2 text-sm rounded-md border border-border bg-card text-foreground placeholder:text-muted-foreground focus:outline-none focus:ring-1 focus:ring-ring"
+              />
+              <textarea
+                placeholder={t('automations.classifyRuleDescPlaceholder') || 'Describe qué tipo de emails deben clasificarse aquí.'}
+                value={classifyForm.description}
+                onChange={(e) => setClassifyForm(prev => ({ ...prev, description: e.target.value }))}
+                rows={3}
+                className="w-full px-3 py-2 text-sm rounded-md border border-border bg-card text-foreground placeholder:text-muted-foreground focus:outline-none focus:ring-1 focus:ring-ring resize-none"
+              />
+              <div className="space-y-2">
+                <p className="text-xs text-muted-foreground">{t('automations.classifyRuleFolders') || 'Carpetas de destino'}</p>
+                {autoData.emailFolders.length === 0 ? (
+                  <p className="text-xs text-muted-foreground">{t('automations.noFolders') || 'No hay carpetas creadas'}</p>
+                ) : (
+                  <div className="grid grid-cols-2 gap-2">
+                    {autoData.emailFolders.map(folder => (
+                      <label key={folder.id} className="flex items-center gap-2 text-xs p-2 rounded-md border border-border bg-card cursor-pointer">
+                        <input
+                          type="checkbox"
+                          checked={classifyForm.folderIds.includes(folder.id)}
+                          onChange={() => toggleClassifyFolder(folder.id)}
+                        />
+                        <span className="text-foreground truncate">{folder.name}</span>
+                      </label>
+                    ))}
+                  </div>
+                )}
+              </div>
+              <div className="flex justify-end">
+                <button
+                  onClick={saveClassifyRule}
+                  disabled={classifyLoading || autoData.emailFolders.length === 0}
+                  className="px-3 py-1.5 text-xs rounded-md bg-foreground text-background hover:opacity-90 disabled:opacity-50"
+                >
+                  {classifyLoading ? (t('automations.saving') || 'Guardando...') : (t('automations.saveClassifyRule') || 'Guardar regla')}
+                </button>
+              </div>
+            </div>
+            {classifyRules.length === 0 ? (
+              <p className="text-sm text-muted-foreground text-center py-2">No hay reglas de clasificación.</p>
+            ) : (
+              <div className="space-y-2 max-h-56 overflow-y-auto">
+                {classifyRules.map(rule => (
+                  <div key={rule.id} className="p-3 border border-border rounded-lg bg-muted/20">
+                    <div className="flex items-start justify-between gap-2">
+                      <div className="min-w-0">
+                        <p className="text-sm font-medium text-foreground truncate">{rule.name}</p>
+                        <p className="text-xs text-muted-foreground mt-0.5 whitespace-pre-wrap">{rule.description}</p>
+                        <div className="mt-2 flex flex-wrap gap-1">
+                          {rule.folderIds.map(fid => {
+                            const folder = autoData.emailFolders.find(f => f.id === fid);
+                            return (
+                              <span key={fid} className="px-2 py-0.5 text-[10px] rounded-full border border-border bg-card text-muted-foreground">
+                                {folder?.name || 'Carpeta'}
+                              </span>
+                            );
+                          })}
+                        </div>
+                      </div>
+                      <button onClick={() => deleteClassifyRule(rule.id)} className="p-1.5 rounded-md hover:bg-destructive/10 text-muted-foreground hover:text-destructive">
+                        <Trash2 className="h-3.5 w-3.5" />
+                      </button>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            )}
+          </div>
+        </Modal>
+      )}
+
+      {showWaClassifyModal && (
+        <Modal title="Reglas de clasificacion de WhatsApp" onClose={() => setShowWaClassifyModal(false)}>
+          <div className="space-y-4">
+            <p className="text-xs text-muted-foreground">Las reglas ayudan a decidir a que carpeta enviar conversaciones automaticamente.</p>
+            <div className="space-y-2 p-3 border border-border rounded-lg bg-muted/20">
+              <input
+                placeholder="Nombre de la regla"
+                value={waClassifyForm.name}
+                onChange={(e) => setWaClassifyForm(prev => ({ ...prev, name: e.target.value }))}
+                className="w-full px-3 py-2 text-sm rounded-md border border-border bg-card text-foreground placeholder:text-muted-foreground focus:outline-none focus:ring-1 focus:ring-ring"
+              />
+              <textarea
+                placeholder="Describe cuando aplicar esta regla"
+                value={waClassifyForm.description}
+                onChange={(e) => setWaClassifyForm(prev => ({ ...prev, description: e.target.value }))}
+                rows={3}
+                className="w-full px-3 py-2 text-sm rounded-md border border-border bg-card text-foreground placeholder:text-muted-foreground focus:outline-none focus:ring-1 focus:ring-ring resize-none"
+              />
+              <div className="space-y-2">
+                <p className="text-xs text-muted-foreground">Carpetas de destino</p>
+                {waFolders.length === 0 ? (
+                  <p className="text-xs text-muted-foreground">Crea al menos una carpeta para usar reglas de clasificacion.</p>
+                ) : (
+                  <div className="grid grid-cols-2 gap-2">
+                    {waFolders.map(folder => (
+                      <label key={folder.id} className="flex items-center gap-2 text-xs p-2 rounded-md border border-border bg-card cursor-pointer">
+                        <input
+                          type="checkbox"
+                          checked={waClassifyForm.folderIds.includes(folder.id)}
+                          onChange={() => toggleWaClassifyFolder(folder.id)}
+                        />
+                        <span className="text-foreground truncate">{folder.name}</span>
+                      </label>
+                    ))}
+                  </div>
+                )}
+              </div>
+              <div className="flex justify-end">
+                <button
+                  onClick={saveWaClassifyRule}
+                  disabled={waClassifyLoading || waFolders.length === 0}
+                  className="px-3 py-1.5 text-xs rounded-md bg-foreground text-background hover:opacity-90 disabled:opacity-50"
+                >
+                  {waClassifyLoading ? 'Guardando...' : 'Guardar regla'}
+                </button>
+              </div>
+            </div>
+
+            {waClassifyRules.length === 0 ? (
+              <p className="text-sm text-muted-foreground text-center py-2">No hay reglas de clasificacion.</p>
+            ) : (
+              <div className="space-y-2 max-h-56 overflow-y-auto">
+                {waClassifyRules.map(rule => (
+                  <div key={rule.id} className="p-3 border border-border rounded-lg bg-muted/20">
+                    <div className="flex items-start justify-between gap-2">
+                      <div className="min-w-0">
+                        <p className="text-sm font-medium text-foreground truncate">{rule.name}</p>
+                        <p className="text-xs text-muted-foreground mt-0.5 whitespace-pre-wrap">{rule.description}</p>
+                        <div className="mt-2 flex flex-wrap gap-1">
+                          {rule.folderIds.map(fid => {
+                            const folder = waFolders.find(f => f.id === fid);
+                            return (
+                              <span key={fid} className="px-2 py-0.5 text-[10px] rounded-full border border-border bg-card text-muted-foreground">
+                                {folder?.name || 'Carpeta'}
+                              </span>
+                            );
+                          })}
+                        </div>
+                      </div>
+                      <button onClick={() => deleteWaClassifyRule(rule.id)} className="p-1.5 rounded-md hover:bg-destructive/10 text-muted-foreground hover:text-destructive">
+                        <Trash2 className="h-3.5 w-3.5" />
+                      </button>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            )}
+          </div>
+        </Modal>
+      )}
+
+      {showAsignacion && (
+        <Modal title={t('automations.autoAssign')} onClose={() => setShowAsignacion(false)} wide>
+          <div className="flex items-center justify-between mb-5">
+            <SwitchBox active={autoData.autoAssignEnabled} onChange={toggleAutoAssign} label={t('automations.enableAutoAssign') || 'Activar asignación automática'} />
+          </div>
+          <div className={`${!autoData.autoAssignEnabled ? 'opacity-50 pointer-events-none' : ''}`}>
+            <div className="flex items-center justify-between mb-5">
+              <SwitchBox active={autoData.sortByCarga} onChange={toggleSortByCarga} label={t('automations.sortByWorkload')} />
+              <button onClick={() => setShowEspecialidades(true)} className="flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium rounded-md bg-foreground text-background hover:opacity-90">
+                <Plus className="h-3.5 w-3.5" />{t('automations.createSpeciality')}
+              </button>
+            </div>
+            {subcuentas.length === 0
+              ? <p className="text-sm text-muted-foreground text-center py-8">{t('automations.noSubaccounts')}</p>
+              : <div className="space-y-3">
+                  {subcuentas.map((sc) => (
+                    <div key={sc.id} className="flex items-center justify-between p-4 border border-border rounded-lg bg-muted/30">
+                      <div>
+                        <p className="text-sm font-medium text-foreground">{sc.name}</p>
+                        <p className="text-xs text-muted-foreground">
+                          {sc.email}
+                          {sc.kind === 'main' ? ' · Cuenta principal' : sc.kind === 'self' ? ' · Mi cuenta' : ''}
+                        </p>
+                      </div>
+                      <select value={autoData.subcuentaEspecialidades[sc.id] || ""} onChange={(e) => setSubcuentaEsp(sc.id, e.target.value)}
+                        className="text-xs px-2 py-1.5 rounded-md border border-border bg-card text-foreground focus:outline-none focus:ring-1 focus:ring-ring">
+                        <option value="">{t('automations.noSpeciality')}</option>
+                        {autoData.especialidades.map((e) => <option key={e.id} value={e.id}>{e.nombre}</option>)}
+                      </select>
+                    </div>
+                  ))}
+                </div>}
+          </div>
+        </Modal>
+      )}
+
+      <SpecialtiesManagerModal
+        open={showEspecialidades}
+        title={t('automations.specialities')}
+        specialities={autoData.especialidades}
+        showCreateForm={showCreateEspForm}
+        editingId={editingEspId}
+        form={espForm}
+        createLabel={t('automations.create')}
+        editLabel={t('automations.editSpeciality')}
+        namePlaceholder={t('automations.namePlaceholder')}
+        descriptionPlaceholder={t('automations.whatIsIt')}
+        cancelLabel={t('automations.cancel')}
+        saveLabel={t('automations.save')}
+        emptyLabel={t('automations.noSpecialities')}
+        singularCountLabel="speciality"
+        pluralCountLabel="specialities"
+        onClose={() => { setShowEspecialidades(false); setShowCreateEspForm(false); setEditingEspId(null); }}
+        onStartCreate={() => { setEditingEspId(null); setEspForm({ nombre: "", descripcion: "" }); setShowCreateEspForm(true); }}
+        onCancelForm={() => { setShowCreateEspForm(false); setEditingEspId(null); }}
+        onSave={saveEspecialidad}
+        onEdit={startEditEsp}
+        onDelete={deleteEsp}
+        onFormChange={setEspForm}
+      />
+
+      {showConsultas && (
+        <Modal title={t('automations.frequentQueries')} onClose={() => setShowConsultas(false)}>
+          {effectiveChannel === 'whatsapp' ? (
+            <>
+              <div className="flex items-center justify-end gap-2 mb-5">
+                <button onClick={() => { setShowSubirInfo(true); setShowConsultas(false); }} className="flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium rounded-md border border-border bg-card hover:bg-accent text-foreground">
+                  <Upload className="h-3.5 w-3.5" />{t('automations.uploadInfo')}
+                </button>
+                <button onClick={() => { setShowWaCorreosConsultas(true); setShowConsultas(false); }} className="flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium rounded-md bg-foreground text-background hover:opacity-90">
+                  <Phone className="h-3.5 w-3.5" />Correos de consulta WA
+                </button>
+                <button onClick={() => { setShowWaClassifyModal(true); setShowConsultas(false); }} className="flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium rounded-md border border-border bg-card hover:bg-accent text-foreground">
+                  <Sparkles className="h-3.5 w-3.5" />Reglas de clasificacion
+                </button>
+              </div>
+              <p className="text-sm text-muted-foreground text-center py-6">{t('automations.selectOption')}</p>
+            </>
+          ) : (
+            <>
+              <div className="flex items-center justify-end gap-2 mb-5">
+                <button onClick={() => { setShowSubirInfo(true); setShowConsultas(false); }} className="flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium rounded-md border border-border bg-card hover:bg-accent text-foreground">
+                  <Upload className="h-3.5 w-3.5" />{t('automations.uploadInfo')}
+                </button>
+                <button onClick={() => { setShowCorreosConsultas(true); setShowConsultas(false); }} className="flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium rounded-md border border-border bg-card hover:bg-accent text-foreground">
+                  <Mail className="h-3.5 w-3.5" />{t('automations.queryEmail')}
+                </button>
+                <button onClick={() => { setShowCuentasCorreo(true); setShowConsultas(false); }} className="flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium rounded-md bg-foreground text-background hover:opacity-90">
+                  <Plus className="h-3.5 w-3.5" />{t('automations.emailAccounts')}
+                </button>
+              </div>
+              <p className="text-sm text-muted-foreground text-center py-6">{t('automations.selectOption')}</p>
+            </>
+          )}
+        </Modal>
+      )}
+
+      {showCuentasCorreo && (
+        <Modal title={t('automations.emailAccountsTitle')} onClose={() => setShowCuentasCorreo(false)}>
+          <div className="flex items-center justify-between mb-5">
+            <span className="text-xs text-muted-foreground">{autoData.cuentasCorreo.length} {autoData.cuentasCorreo.length !== 1 ? "accounts" : "account"}</span>
+            <button onClick={() => setShowAddCuenta(true)} className="flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium rounded-md bg-foreground text-background hover:opacity-90">
+              <Plus className="h-3.5 w-3.5" />{t('automations.add')}
+            </button>
+          </div>
+          {showAddCuenta && (
+            <div className="mb-5 p-4 border border-border rounded-lg bg-muted/20 space-y-3">
+              <select value={cuentaForm.plataforma} onChange={(e) => setCuentaForm({ ...cuentaForm, plataforma: e.target.value })}
+                className="w-full px-3 py-2 text-sm rounded-md border border-border bg-card text-foreground focus:outline-none focus:ring-1 focus:ring-ring">
+                {PLATFORMS.map((p) => <option key={p.value} value={p.value}>{p.label}</option>)}
+              </select>
+              <input placeholder={t('automations.emailPlaceholder')} value={cuentaForm.correo} onChange={(e) => setCuentaForm({ ...cuentaForm, correo: e.target.value })}
+                className="w-full px-3 py-2 text-sm rounded-md border border-border bg-card text-foreground placeholder:text-muted-foreground focus:outline-none focus:ring-1 focus:ring-ring" />
+              <input type="password" placeholder={t('automations.appPassword')} value={cuentaForm.password} onChange={(e) => setCuentaForm({ ...cuentaForm, password: e.target.value })}
+                className="w-full px-3 py-2 text-sm rounded-md border border-border bg-card text-foreground placeholder:text-muted-foreground focus:outline-none focus:ring-1 focus:ring-ring" />
+              {(() => {
+                const platformGuides: Record<string, { text: string; link?: string }> = {
+                  gmail: { text: "Para Gmail, usa una contraseña de aplicación.", link: "https://support.google.com/accounts/answer/185833" },
+                  outlook: { text: "Para Outlook/Hotmail, usa una contraseña de aplicación.", link: "https://support.microsoft.com/account-billing/usar-contrase%C3%B1as-de-aplicaci%C3%B3n-con-el-correo-de-Outlook-como-autenticaci%C3%B3n-de-dos-factores-b8c22536-7b10-4e06-8f9b-3d8c5c8d8a0e" },
+                  yahoo: { text: "Para Yahoo, usa una contraseña de aplicación.", link: "https://help.yahoo.com/kb/SLN15241.html" },
+                  icloud: { text: "Para iCloud, usa una contraseña de aplicación.", link: "https://support.apple.com/es-es/102654" },
+                  "office365": { text: "Para Office 365, usa una contraseña de aplicación.", link: "https://support.microsoft.com/account-billing/usar-contrase%C3%B1as-de-aplicaci%C3%B3n-con-el-correo-de-Outlook-como-autenticaci%C3%B3n-de-dos-factores-b8c22536-7b10-4e06-8f9b-3d8c5c8d8a0e" },
+                  hostinger: { text: "Para Hostinger, usa la contraseña normal de tu panel de hosting." },
+                  ionos: { text: "Para IONOS, usa la contraseña normal de tu panel de hosting." },
+                  ovh: { text: "Para OVH, usa la contraseña normal de tu panel de hosting." },
+                  godaddy: { text: "Para GoDaddy, usa la contraseña normal de tu panel de hosting." },
+                  custom: { text: "Para servidores personalizados, usa la contraseña de tu panel de hosting." },
+                  zoho: { text: "Para Zoho, se recomienda usar una contraseña de aplicación.", link: "https://help.zoho.com/portal/en/kb/bigin/settings/security/articles/generate-an-app-specific-password" },
+                };
+                const guide = platformGuides[cuentaForm.plataforma];
+                if (!guide) return null;
+                return (
+                  <div className="rounded-md border border-amber-500/20 bg-amber-500/10 p-2.5">
+                    <p className="text-xs text-amber-600 dark:text-amber-400 font-medium">
+                      {guide.text}
+                      {guide.link && (
+                        <a
+                          href={guide.link}
+                          target="_blank"
+                          rel="noopener noreferrer"
+                          className="ml-1 underline hover:text-amber-700 dark:hover:text-amber-300"
+                        >
+                          ¿Cómo obtenerla?
+                        </a>
+                      )}
+                    </p>
+                  </div>
+                );
+              })()}
+              {cuentaForm.plataforma === 'custom' && (
+                <div className="grid grid-cols-2 gap-3">
+                  <input placeholder="SMTP Host" value={cuentaForm.customSmtpHost} onChange={(e) => setCuentaForm({ ...cuentaForm, customSmtpHost: e.target.value })}
+                    className="px-3 py-2 text-sm rounded-md border border-border bg-card text-foreground placeholder:text-muted-foreground focus:outline-none focus:ring-1 focus:ring-ring" />
+                  <input type="number" placeholder="SMTP Port (587)" value={cuentaForm.customSmtpPort} onChange={(e) => setCuentaForm({ ...cuentaForm, customSmtpPort: parseInt(e.target.value) || 587 })}
+                    className="px-3 py-2 text-sm rounded-md border border-border bg-card text-foreground placeholder:text-muted-foreground focus:outline-none focus:ring-1 focus:ring-ring" />
+                  <input placeholder="IMAP Host" value={cuentaForm.customImapHost} onChange={(e) => setCuentaForm({ ...cuentaForm, customImapHost: e.target.value })}
+                    className="px-3 py-2 text-sm rounded-md border border-border bg-card text-foreground placeholder:text-muted-foreground focus:outline-none focus:ring-1 focus:ring-ring" />
+                  <input type="number" placeholder="IMAP Port (993)" value={cuentaForm.customImapPort} onChange={(e) => setCuentaForm({ ...cuentaForm, customImapPort: parseInt(e.target.value) || 993 })}
+                    className="px-3 py-2 text-sm rounded-md border border-border bg-card text-foreground placeholder:text-muted-foreground focus:outline-none focus:ring-1 focus:ring-ring" />
+                </div>
+              )}
+              <div className="flex gap-2 justify-end">
+                <button onClick={() => setShowAddCuenta(false)} className="px-3 py-1.5 text-xs rounded-md border border-border hover:bg-accent text-muted-foreground">{t('automations.cancel')}</button>
+                <button onClick={saveCuenta} className="px-3 py-1.5 text-xs rounded-md bg-foreground text-background hover:opacity-90">{t('automations.save')}</button>
+              </div>
+            </div>
+          )}
+          {autoData.cuentasCorreo.length === 0
+            ? <p className="text-sm text-muted-foreground text-center py-6">{t('automations.noAccounts')}</p>
+            : <div className="space-y-3">
+                {autoData.cuentasCorreo.map((c) => (
+                  <div key={c.id} className="flex items-center justify-between p-4 border border-border rounded-lg bg-muted/20">
+                    <div>
+                      <p className="text-xs text-muted-foreground">{PLATFORMS.find(p => p.value === c.plataforma)?.label || c.plataforma}</p>
+                      <p className="text-sm font-medium text-foreground">{c.correo}</p>
+                    </div>
+                    <button onClick={() => deleteCuenta(c.id)} className="p-1.5 rounded-md hover:bg-destructive/10 text-muted-foreground hover:text-destructive"><Trash2 className="h-3.5 w-3.5" /></button>
+                  </div>
+                ))}
+              </div>}
+        </Modal>
+      )}
+
+      {showCorreosConsultas && (
+        <Modal title={t('automations.queryEmailTitle')} onClose={() => setShowCorreosConsultas(false)}>
+          <div className="flex items-center justify-between mb-5">
+            <span className="text-xs text-muted-foreground">{autoData.correosConsultas.length} {autoData.correosConsultas.length !== 1 ? "emails" : "email"}</span>
+            <button onClick={() => setShowAddCorreo(true)} className="flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium rounded-md bg-foreground text-background hover:opacity-90">
+              <Plus className="h-3.5 w-3.5" />{t('automations.add')}
+            </button>
+          </div>
+          {showAddCorreo && (
+            <div className="mb-5 p-4 border border-border rounded-lg bg-muted/20 space-y-3">
+              <input placeholder="Email" value={correoInput} onChange={(e) => setCorreoInput(e.target.value)}
+                className="w-full px-3 py-2 text-sm rounded-md border border-border bg-card text-foreground placeholder:text-muted-foreground focus:outline-none focus:ring-1 focus:ring-ring" />
+              <div className="flex gap-2 justify-end">
+                <button onClick={() => setShowAddCorreo(false)} className="px-3 py-1.5 text-xs rounded-md border border-border hover:bg-accent text-muted-foreground">{t('automations.cancel')}</button>
+                <button onClick={saveCorreo} className="px-3 py-1.5 text-xs rounded-md bg-foreground text-background hover:opacity-90">{t('automations.save')}</button>
+              </div>
+            </div>
+          )}
+          {autoData.correosConsultas.length === 0
+            ? <p className="text-sm text-muted-foreground text-center py-6">{t('automations.noEmails')}</p>
+            : <div className="space-y-3">
+                {autoData.correosConsultas.map((email) => (
+                  <div key={email} className="flex items-center justify-between p-4 border border-border rounded-lg bg-muted/20">
+                    <p className="text-sm font-medium text-foreground">{email}</p>
+                    <button onClick={() => deleteCorreo(email)} className="p-1.5 rounded-md hover:bg-destructive/10 text-muted-foreground hover:text-destructive"><Trash2 className="h-3.5 w-3.5" /></button>
+                  </div>
+                ))}
+              </div>}
+        </Modal>
+      )}
+
+      {showWaCorreosConsultas && (
+        <Modal title="Correos de consulta de WhatsApp" onClose={() => { setShowWaCorreosConsultas(false); setWaCorreoInput(''); }}>
+          <div className="space-y-4">
+            <p className="text-xs text-muted-foreground">Estos correos reciben consultas no resueltas por IA desde WhatsApp.</p>
+            <div className="flex items-center gap-2">
+              <input
+                placeholder="correo@empresa.com"
+                value={waCorreoInput}
+                onChange={(e) => setWaCorreoInput(e.target.value)}
+                className="flex-1 px-3 py-2 text-sm rounded-md border border-border bg-card text-foreground placeholder:text-muted-foreground focus:outline-none focus:ring-1 focus:ring-ring"
+              />
+              <button onClick={saveWaCorreoConsulta} className="px-3 py-2 text-xs rounded-md bg-foreground text-background hover:opacity-90">Agregar</button>
+            </div>
+            {waCorreosConsultas.length === 0 ? (
+              <p className="text-sm text-muted-foreground text-center py-4">No hay correos configurados.</p>
+            ) : (
+              <div className="space-y-2">
+                {waCorreosConsultas.map((email) => (
+                  <div key={email} className="flex items-center justify-between p-3 border border-border rounded-lg bg-muted/20">
+                    <p className="text-sm font-medium text-foreground">{email}</p>
+                    <button onClick={() => deleteWaCorreoConsulta(email)} className="p-1.5 rounded-md hover:bg-destructive/10 text-muted-foreground hover:text-destructive">
+                      <Trash2 className="h-3.5 w-3.5" />
+                    </button>
+                  </div>
+                ))}
+              </div>
+            )}
+          </div>
+        </Modal>
+      )}
+
+      {showSubirInfo && (
+        <Modal title={t('automations.uploadInfo')} onClose={() => setShowSubirInfo(false)}>
+          <div className="flex items-center justify-between mb-5">
+            <span className="text-xs text-muted-foreground">{autoData.documentos.length} documento{autoData.documentos.length !== 1 ? "s" : ""}</span>
+            <button onClick={() => fileInputRef.current?.click()} className="flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium rounded-md bg-foreground text-background hover:opacity-90">
+              <Upload className="h-3.5 w-3.5" />{t('automations.upload')}
+            </button>
+          </div>
+          <input ref={fileInputRef} type="file" accept="application/pdf" className="hidden" onChange={handleFileInput} />
+          <div onDragOver={(e) => { e.preventDefault(); setDragOver(true); }} onDragLeave={() => setDragOver(false)} onDrop={handleFileDrop}
+            className={`mb-5 border-2 border-dashed rounded-lg p-10 text-center transition-colors cursor-pointer ${dragOver ? "border-green-500 bg-green-500/5" : "border-border hover:border-muted-foreground/50"}`}
+            onClick={() => fileInputRef.current?.click()}>
+            <Upload className="h-8 w-8 text-muted-foreground mx-auto mb-3" />
+            <p className="text-sm font-medium text-foreground">{t('automations.dragPdf')}</p>
+            <p className="text-xs text-muted-foreground mt-1">{t('automations.orClickToSelect')}</p>
+          </div>
+          {autoData.documentos.length === 0
+            ? <p className="text-sm text-muted-foreground text-center py-4">{t('automations.noDocs')}</p>
+            : <div className="space-y-3">
+                {autoData.documentos.map((doc) => (
+                  <div key={doc.id} className="flex items-center justify-between p-4 border border-border rounded-lg bg-muted/20">
+                    <p className="text-sm font-medium text-foreground truncate max-w-[280px]">{doc.nombre}</p>
+                    <div className="flex items-center gap-1 shrink-0">
+                      <button onClick={async () => {
+                        try {
+                          const res = await authFetch(`${API}/documentos/${doc.id}/view?accountId=${accountId}`);
+                          if (res.ok) {
+                            const blob = await res.blob();
+                            const url = URL.createObjectURL(blob);
+                            window.open(url, '_blank');
+                          }
+                        } catch { /* ignore */ }
+                      }}
+                        className="p-1.5 rounded-md hover:bg-accent text-muted-foreground hover:text-foreground" title="Ver">
+                        <Eye className="h-3.5 w-3.5" />
+                      </button>
+                      <button onClick={() => deleteDoc(doc.id)} className="p-1.5 rounded-md hover:bg-destructive/10 text-muted-foreground hover:text-destructive"><Trash2 className="h-3.5 w-3.5" /></button>
+                    </div>
+                  </div>
+                ))}
+              </div>}
+        </Modal>
+      )}
+
+      {showWhatsAppSessions && (
+        <Modal title={t('automations.whatsappNumbersTitle') || 'Números de WhatsApp'} onClose={() => setShowWhatsAppSessions(false)}>
+          <div className="flex items-center justify-between mb-5">
+            <span className="text-xs text-muted-foreground">
+              {(autoData.whatsappSessions || []).length} {(autoData.whatsappSessions || []).length !== 1 ? "números" : "número"}
+            </span>
+            <button
+              onClick={() => setShowAddWaSession(true)}
+              className="flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium rounded-md bg-foreground text-background hover:opacity-90"
+            >
+              <Plus className="h-3.5 w-3.5" />{t('automations.add') || 'Añadir'}
+            </button>
+          </div>
+          {showAddWaSession && (
+            <div className="mb-5 p-4 border border-border rounded-lg bg-muted/20 space-y-3">
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
+                <button
+                  type="button"
+                  disabled
+                  className="p-3 rounded-lg border border-border bg-muted text-left text-xs text-muted-foreground cursor-not-allowed opacity-70"
+                >
+                  <span className="block font-medium text-foreground">{t('automations.waMetaQuickOptionTitle')}</span>
+                  <span className="block mt-1">{t('automations.waMetaQuickOptionMaintenance')}</span>
+                </button>
+                <div className="p-3 rounded-lg border border-border bg-background text-xs">
+                  <span className="block font-medium text-foreground">{t('automations.waMetaManualOptionTitle')}</span>
+                  <span className="block mt-1 text-muted-foreground">{t('automations.waMetaManualOptionHint')}</span>
+                </div>
+              </div>
+              <input
+                placeholder={t('automations.waMetaManualNamePlaceholder')}
+                value={waSessionForm.name}
+                onChange={(e) => setWaSessionForm({ ...waSessionForm, name: e.target.value })}
+                className="w-full px-3 py-2 text-sm rounded-md border border-border bg-card text-foreground placeholder:text-muted-foreground focus:outline-none focus:ring-1 focus:ring-ring"
+              />
+              <input
+                placeholder={t('automations.waMetaTokenLabel')}
+                value={waSessionForm.accessToken}
+                onChange={(e) => setWaSessionForm({ ...waSessionForm, accessToken: e.target.value })}
+                className="w-full px-3 py-2 text-sm rounded-md border border-border bg-card text-foreground placeholder:text-muted-foreground focus:outline-none focus:ring-1 focus:ring-ring"
+              />
+              <input
+                placeholder={t('automations.waMetaPhoneIdLabel')}
+                value={waSessionForm.phoneNumberId}
+                onChange={(e) => setWaSessionForm({ ...waSessionForm, phoneNumberId: e.target.value })}
+                className="w-full px-3 py-2 text-sm rounded-md border border-border bg-card text-foreground placeholder:text-muted-foreground focus:outline-none focus:ring-1 focus:ring-ring"
+              />
+              <input
+                placeholder={t('automations.waMetaWabaIdLabel')}
+                value={waSessionForm.wabaId}
+                onChange={(e) => setWaSessionForm({ ...waSessionForm, wabaId: e.target.value })}
+                className="w-full px-3 py-2 text-sm rounded-md border border-border bg-card text-foreground placeholder:text-muted-foreground focus:outline-none focus:ring-1 focus:ring-ring"
+              />
+              <input
+                type="email"
+                placeholder={t('automations.waMetaAlertEmailPlaceholder')}
+                value={waSessionForm.alertEmail}
+                onChange={(e) => setWaSessionForm({ ...waSessionForm, alertEmail: e.target.value })}
+                className="w-full px-3 py-2 text-sm rounded-md border border-border bg-card text-foreground placeholder:text-muted-foreground focus:outline-none focus:ring-1 focus:ring-ring"
+              />
+              <div className="flex justify-between items-center gap-2">
+                <button
+                  onClick={() => setShowWaManualInstructions(true)}
+                  type="button"
+                  className="text-xs text-muted-foreground underline underline-offset-2 hover:text-foreground"
+                >
+                  {t('automations.waMetaInstructionsButton')}
+                </button>
+                <div className="flex gap-2">
+                  <button onClick={() => setShowAddWaSession(false)} className="px-3 py-1.5 text-xs rounded-md border border-border hover:bg-accent text-muted-foreground">{t('automations.cancel')}</button>
+                  <button onClick={saveWaSession} className="px-3 py-1.5 text-xs rounded-md bg-foreground text-background hover:opacity-90">{t('automations.save')}</button>
+                </div>
+              </div>
+            </div>
+          )}
+          {(autoData.whatsappSessions || []).length === 0 ? (
+            <p className="text-sm text-muted-foreground text-center py-6">{t('automations.waNoNumbersConfigured') || 'No hay números configurados.'}</p>
+          ) : (
+            <div className="space-y-3 max-h-[60vh] overflow-y-auto">
+              {(autoData.whatsappSessions || []).map((session: any) => (
+                <div key={session.id} className="p-4 border border-border rounded-lg bg-muted/20 space-y-3">
+                  <div className="flex items-start justify-between gap-3">
+                    <div className="min-w-0">
+                      <p className="text-sm font-medium text-foreground truncate">{session.name || session.phoneNumber || session.phoneNumberId}</p>
+                      <p className="text-xs text-muted-foreground truncate">{session.phoneNumber || session.phoneNumberId}</p>
+                    </div>
+                    <div className="flex items-center gap-2 shrink-0">
+                      <span className={`text-[10px] px-2 py-0.5 rounded-full border ${session.connected ? 'border-green-300 text-green-700' : 'border-amber-300 text-amber-700'}`}>
+                        {session.connected ? 'Conectado' : 'Desconectado'}
+                      </span>
+                      <button onClick={() => deleteWaSession(session.id)} className="p-1.5 rounded-md hover:bg-destructive/10 text-muted-foreground hover:text-destructive">
+                        <Trash2 className="h-3.5 w-3.5" />
+                      </button>
+                    </div>
+                  </div>
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 text-xs text-muted-foreground">
+                    <p><span className="text-foreground font-medium">Caducidad:</span> {session.expiresAt ? new Date(session.expiresAt).toLocaleString() : 'Desconocida'}</p>
+                    <p><span className="text-foreground font-medium">Email alerta:</span> {session.alertEmail || '-'}</p>
+                  </div>
+                  <div className="flex justify-end">
+                    <button onClick={() => refreshWaToken(session.id)} className="px-3 py-1.5 text-xs rounded-md border border-border hover:bg-accent text-foreground">
+                      {t('automations.refreshToken') || 'Refrescar token'}
+                    </button>
+                  </div>
+                </div>
+              ))}
+            </div>
+          )}
+        </Modal>
+      )}
+
+      {showWaManualInstructions && (
+        <Modal title={t('automations.waMetaInstructionsTitle')} onClose={() => setShowWaManualInstructions(false)} wide>
+          <div className="space-y-4 text-xs text-foreground">
+            <p>
+              1. {t('automations.waMetaInstructionsStep1Before')}{' '}
+              <a
+                href="https://developers.facebook.com/apps/"
+                target="_blank"
+                rel="noreferrer"
+                className="underline underline-offset-2"
+              >
+                Meta Developers &gt; Apps
+              </a>{' '}
+              {t('automations.waMetaInstructionsStep1After')}
+            </p>
+            <p>2. {t('automations.waMetaInstructionsStep2')}</p>
+            <p>3. {t('automations.waMetaInstructionsStep3')}</p>
+            <div className="space-y-2">
+              <p>4. {t('automations.waMetaInstructionsStep4')}</p>
+              <p>- {t('automations.waMetaInstructionsStep4ItemToken')}</p>
+              <p>- {t('automations.waMetaInstructionsStep4ItemPhone')}</p>
+              <p>- {t('automations.waMetaInstructionsStep4ItemWaba')}</p>
+              <p className="font-medium text-red-600">- {t('automations.waMetaInstructionsStep4Rule1')}</p>
+              <p className="font-medium text-red-600">- {t('automations.waMetaInstructionsStep4Rule2')}</p>
+              <p className="font-medium text-red-600">- {t('automations.waMetaInstructionsStep4Rule3')}</p>
+              <img src={WA_HELP_IMAGE_URL} alt={t('automations.waMetaInstructionsImageAlt')} className="w-full rounded-lg border border-border" />
+            </div>
+            <p>5. {t('automations.waMetaInstructionsStep5')}</p>
+            <p>6. {t('automations.waMetaInstructionsStep6')}</p>
+            <p>7. {t('automations.waMetaInstructionsStep7')}</p>
+          </div>
+        </Modal>
+      )}
+      </>
+    );
+  };
+
   if (view === "calendar") {
     return (
       <div className="h-[calc(100vh-0px)] flex flex-col">
@@ -1719,6 +2890,10 @@ const Automations = () => {
         )}
       </div>
     );
+  }
+
+  if (view === "messages") {
+    return renderUnifiedInboxContent();
   }
 
   if (view === "email") {
@@ -2268,7 +3443,13 @@ const Automations = () => {
               : <div className="space-y-3">
                   {subcuentas.map((sc) => (
                     <div key={sc.id} className="flex items-center justify-between p-4 border border-border rounded-lg bg-muted/30">
-                      <div><p className="text-sm font-medium text-foreground">{sc.name}</p><p className="text-xs text-muted-foreground">{sc.email}</p></div>
+                      <div>
+                        <p className="text-sm font-medium text-foreground">{sc.name}</p>
+                        <p className="text-xs text-muted-foreground">
+                          {sc.email}
+                          {sc.kind === 'main' ? ' · Cuenta principal' : sc.kind === 'self' ? ' · Mi cuenta' : ''}
+                        </p>
+                      </div>
                       <select value={autoData.subcuentaEspecialidades[sc.id] || ""} onChange={(e) => setSubcuentaEsp(sc.id, e.target.value)}
                         className="text-xs px-2 py-1.5 rounded-md border border-border bg-card text-foreground focus:outline-none focus:ring-1 focus:ring-ring">
                         <option value="">{t('automations.noSpeciality')}</option>
@@ -3218,7 +4399,13 @@ const Automations = () => {
               : <div className="space-y-3">
                   {subcuentas.map((sc) => (
                     <div key={sc.id} className="flex items-center justify-between p-4 border border-border rounded-lg bg-muted/30">
-                      <div><p className="text-sm font-medium text-foreground">{sc.name}</p><p className="text-xs text-muted-foreground">{sc.email}</p></div>
+                      <div>
+                        <p className="text-sm font-medium text-foreground">{sc.name}</p>
+                        <p className="text-xs text-muted-foreground">
+                          {sc.email}
+                          {sc.kind === 'main' ? ' · Cuenta principal' : sc.kind === 'self' ? ' · Mi cuenta' : ''}
+                        </p>
+                      </div>
                       <select value={autoData.subcuentaEspecialidades[sc.id] || ""} onChange={(e) => setSubcuentaEsp(sc.id, e.target.value)}
                         className="text-xs px-2 py-1.5 rounded-md border border-border bg-card text-foreground focus:outline-none focus:ring-1 focus:ring-ring">
                         <option value="">{t('automations.noSpeciality')}</option>
@@ -3439,56 +4626,40 @@ const Automations = () => {
         <div className="space-y-3">
           <div className="border border-border rounded-lg p-6 bg-card">
             <div className="flex items-center gap-3 mb-4">
-              <div className="h-10 w-10 rounded-lg bg-muted flex items-center justify-center"><Mail className="h-5 w-5 text-foreground" /></div>
-              <div><h3 className="text-sm font-semibold text-foreground">Email</h3><p className="text-xs text-muted-foreground">{t('automations.emailManagement')}</p></div>
-            </div>
-            <button onClick={() => { setView("email"); }} className="w-full px-4 py-2 bg-foreground text-background rounded-md text-sm font-medium hover:opacity-90 transition-opacity">{t('automations.access')}</button>
-          </div>
-          <div className="grid grid-cols-3 gap-2">
-            <div className="border border-border rounded-md p-3 bg-card text-center"><p className="text-lg font-semibold text-foreground font-mono">{stats.emailMessages}</p><p className="text-[10px] text-muted-foreground mt-0.5">{t('automations.messages')}</p></div>
-            <div className="border border-border rounded-md p-3 bg-card text-center"><p className="text-lg font-semibold text-foreground font-mono">{stats.emailConversations}</p><p className="text-[10px] text-muted-foreground mt-0.5">{t('automations.conversations')}</p></div>
-            <div className="border border-border rounded-md p-3 bg-card text-center"><p className="text-lg font-semibold text-foreground font-mono">{stats.emailUnread}</p><p className="text-[10px] text-muted-foreground mt-0.5">{t('automations.unread')}</p></div>
-          </div>
-          <div className="border border-border rounded-lg p-6 bg-card">
-            <div className="flex items-center gap-3 mb-3">
-              <div className="h-10 w-10 rounded-lg bg-muted flex items-center justify-center"><Sparkles className="h-5 w-5 text-foreground" /></div>
-              <div>
-                <h3 className="text-sm font-semibold text-foreground">{t('automations.customAutomation')}</h3>
-                <p className="text-xs text-muted-foreground">{t('automations.customAutomationDesc')}</p>
-              </div>
-            </div>
-            <p className="text-xs text-muted-foreground mb-3">{t('automations.customAutomationInfo')}</p>
-            <div className="mb-3 rounded-md border border-amber-200 bg-amber-50 px-3 py-2 text-xs text-amber-800">
-              {t('automations.customAutomationExtraNotice')}
-            </div>
-            <div className="flex items-center justify-between mb-3">
-              <span className="inline-flex items-center gap-1 px-2 py-1 rounded-md bg-muted text-xs font-semibold text-foreground">{t('automations.customAutomationPrice')}</span>
-            </div>
-            <a href="mailto:support@lyrium.io" className="w-full px-4 py-2 bg-foreground text-background rounded-md text-sm font-medium hover:opacity-90 transition-opacity text-center block">{t('automations.contactSpecialist')}</a>
-          </div>
-        </div>
-        <div className="space-y-3">
-          <div className="border border-border rounded-lg p-6 bg-card">
-            <div className="flex items-center gap-3 mb-4">
               <div className="h-10 w-10 rounded-lg bg-muted flex items-center justify-center"><MessageCircle className="h-5 w-5 text-foreground" /></div>
-              <div><h3 className="text-sm font-semibold text-foreground">WhatsApp</h3><p className="text-xs text-muted-foreground">{t('automations.instantMsg')}</p></div>
+              <div><h3 className="text-sm font-semibold text-foreground">Email + WhatsApp</h3><p className="text-xs text-muted-foreground">{t('automations.manageChannels')}</p></div>
             </div>
-            <button onClick={() => { setView("whatsapp"); loadWaData(); }} className="w-full px-4 py-2 bg-foreground text-background rounded-md text-sm font-medium hover:opacity-90 transition-opacity">{t('automations.access')}</button>
+            <button onClick={() => { setView("messages"); void loadWaData(); }} className="w-full px-4 py-2 bg-foreground text-background rounded-md text-sm font-medium hover:opacity-90 transition-opacity">{t('automations.access')}</button>
           </div>
           <div className="grid grid-cols-3 gap-2">
-            <div className="border border-border rounded-md p-3 bg-card text-center"><p className="text-lg font-semibold text-foreground font-mono">{stats.whatsappMessages}</p><p className="text-[10px] text-muted-foreground mt-0.5">{t('automations.messages')}</p></div>
-            <div className="border border-border rounded-md p-3 bg-card text-center"><p className="text-lg font-semibold text-foreground font-mono">{stats.whatsappConversations}</p><p className="text-[10px] text-muted-foreground mt-0.5">{t('automations.conversations')}</p></div>
-            <div className="border border-border rounded-md p-3 bg-card text-center"><p className="text-lg font-semibold text-foreground font-mono">{stats.whatsappUnread}</p><p className="text-[10px] text-muted-foreground mt-0.5">{t('automations.unread')}</p></div>
+            <div className="border border-border rounded-md p-3 bg-card text-center"><p className="text-lg font-semibold text-foreground font-mono">{stats.emailMessages + stats.whatsappMessages}</p><p className="text-[10px] text-muted-foreground mt-0.5">{t('automations.messages')}</p></div>
+            <div className="border border-border rounded-md p-3 bg-card text-center"><p className="text-lg font-semibold text-foreground font-mono">{stats.emailConversations + stats.whatsappConversations}</p><p className="text-[10px] text-muted-foreground mt-0.5">{t('automations.conversations')}</p></div>
+            <div className="border border-border rounded-md p-3 bg-card text-center"><p className="text-lg font-semibold text-foreground font-mono">{stats.emailUnread + stats.whatsappUnread}</p><p className="text-[10px] text-muted-foreground mt-0.5">{t('automations.unread')}</p></div>
           </div>
         </div>
-        <div className="space-y-3">
-          <div className="border border-border rounded-lg p-6 bg-card">
-            <div className="flex items-center gap-3 mb-4">
-              <div className="h-10 w-10 rounded-lg bg-muted flex items-center justify-center"><Calendar className="h-5 w-5 text-foreground" /></div>
-              <div><h3 className="text-sm font-semibold text-foreground">{t('automations.calendar')}</h3><p className="text-xs text-muted-foreground">{t('automations.calendarEvents')}</p></div>
+        <div className="border border-border rounded-lg p-6 bg-card">
+          <div className="flex items-center gap-3 mb-3">
+            <div className="h-10 w-10 rounded-lg bg-muted flex items-center justify-center"><Sparkles className="h-5 w-5 text-foreground" /></div>
+            <div>
+              <h3 className="text-sm font-semibold text-foreground">{t('automations.customAutomation')}</h3>
+              <p className="text-xs text-muted-foreground">{t('automations.customAutomationDesc')}</p>
             </div>
-            <button onClick={() => setView("calendar")} className="w-full px-4 py-2 bg-foreground text-background rounded-md text-sm font-medium hover:opacity-90 transition-opacity">{t('automations.access')}</button>
           </div>
+          <p className="text-xs text-muted-foreground mb-3">{t('automations.customAutomationInfo')}</p>
+          <div className="mb-3 rounded-md border border-amber-200 bg-amber-50 px-3 py-2 text-xs text-amber-800">
+            {t('automations.customAutomationExtraNotice')}
+          </div>
+          <div className="flex items-center justify-between mb-3">
+            <span className="inline-flex items-center gap-1 px-2 py-1 rounded-md bg-muted text-xs font-semibold text-foreground">{t('automations.customAutomationPrice')}</span>
+          </div>
+          <a href="mailto:support@lyrium.io" className="w-full px-4 py-2 bg-foreground text-background rounded-md text-sm font-medium hover:opacity-90 transition-opacity text-center block">{t('automations.contactSpecialist')}</a>
+        </div>
+        <div className="border border-border rounded-lg p-6 bg-card">
+          <div className="flex items-center gap-3 mb-4">
+            <div className="h-10 w-10 rounded-lg bg-muted flex items-center justify-center"><Calendar className="h-5 w-5 text-foreground" /></div>
+            <div><h3 className="text-sm font-semibold text-foreground">{t('automations.calendar')}</h3><p className="text-xs text-muted-foreground">{t('automations.calendarEvents')}</p></div>
+          </div>
+          <button onClick={() => setView("calendar")} className="w-full px-4 py-2 bg-foreground text-background rounded-md text-sm font-medium hover:opacity-90 transition-opacity">{t('automations.access')}</button>
         </div>
       </div>
     </div>

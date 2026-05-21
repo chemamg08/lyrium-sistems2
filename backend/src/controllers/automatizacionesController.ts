@@ -19,6 +19,7 @@ import {
 } from '../services/emailProcessorService.js';
 import { Automation } from '../models/Automation.js';
 import { Subaccount } from '../models/Subaccount.js';
+import { resolveWorkspaceOwner, listAssignableCandidates } from '../services/automationWorkspaceService.js';
 import { sanitizeFilename } from '../utils/sanitizeFilename.js';
 import { verifyOwnership, type AuthRequest } from '../middleware/auth.js';
 
@@ -155,8 +156,18 @@ export const getSubcuentas: RequestHandler = async (req, res) => {
       return;
     }
     if (!verifyOwnership(req as AuthRequest, accountId)) { res.status(403).json({ error: 'Acceso denegado' }); return; }
-    const subs = await Subaccount.find({ parentAccountId: accountId });
-    res.json(subs.map(s => s.toJSON()));
+    if (!await resolveWorkspaceOwner(accountId)) {
+      res.json([]);
+      return;
+    }
+
+    const candidates = await listAssignableCandidates(accountId);
+    res.json(candidates.map((candidate) => ({
+      id: candidate.id,
+      name: candidate.name,
+      email: candidate.email,
+      kind: candidate.kind,
+    })));
   } catch (err: any) {
     res.status(500).json({ error: err.message || 'Error interno' });
   }

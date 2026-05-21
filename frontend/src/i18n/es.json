@@ -1014,7 +1014,7 @@
   "automations": {
     "access": "Acceso",
     "accountCount": "{{count}} cuenta",
-    "activateToStart": "Activa la respuesta automática y configura una cuenta de correo para empezar",
+    "activateToStart": "Activa la respuesta automática y configura Email o WhatsApp para empezar",
     "add": "Añadir",
     "appPassword": "Contraseña de aplicación",
     "autoAssign": "Asignación automática de casos",
@@ -1112,6 +1112,7 @@
     "waDisconnect": "Desconectar WhatsApp",
     "waConnect": "Conectar WhatsApp",
     "waNoConversations": "No hay conversaciones aún.",
+    "waNoNumbersConfigured": "No hay números configurados.",
     "waNotConnectedHint": "Conecta tu WhatsApp para empezar a recibir mensajes.",
     "waSelectConversation": "Selecciona una conversación",
     "enableAutoReply": "Activar respuesta automática",
