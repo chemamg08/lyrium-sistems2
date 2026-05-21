@@ -16,7 +16,7 @@ import {
   DialogTitle,
   DialogDescription,
 } from "@/components/ui/dialog";
-import { persistUserSession } from "@/lib/authFetch";
+import { persistUserSession, setQuickAccessPreference } from "@/lib/authFetch";
 
 const API_URL = import.meta.env.VITE_API_URL;
 
@@ -74,6 +74,7 @@ const Login = () => {
   const [view, setView] = useState<'login' | 'forgot'>('login');
   const [forgotEmail, setForgotEmail] = useState("");
   const [forgotSent, setForgotSent] = useState(false);
+  const [quickAccess, setQuickAccess] = useState(false);
   const [emailNotVerified, setEmailNotVerified] = useState(false);
   const [resendingSent, setResendingSent] = useState(false);
   const [subscriptionError, setSubscriptionError] = useState<{
@@ -96,7 +97,7 @@ const Login = () => {
     setSubscriptionError(null);
     
     try {
-      const body: any = { email, password };
+      const body: any = { email, password, rememberMe: quickAccess };
       if (useRecoveryCode && recoveryCode) {
         body.recoveryCode = recoveryCode;
       } else if (totpCode) {
@@ -113,6 +114,7 @@ const Login = () => {
       const data = await response.json();
 
       if (response.ok && data.success) {
+        setQuickAccessPreference(quickAccess);
         persistUserSession(data.user);
         const userCountry = data.user.country || 'ES';
 
@@ -320,6 +322,15 @@ const Login = () => {
                   required
                 />
               </div>
+              <label className="flex items-center gap-3 rounded-md border border-border/60 px-3 py-2 text-sm text-muted-foreground">
+                <input
+                  type="checkbox"
+                  checked={quickAccess}
+                  onChange={(e) => setQuickAccess(e.target.checked)}
+                  className="h-4 w-4 rounded border-border"
+                />
+                <span>{t('auth.quickAccess14Days')}</span>
+              </label>
               {/* 2FA Code Field */}
               <div className="space-y-2">
                 <label htmlFor="totpCode" className="text-sm font-medium">

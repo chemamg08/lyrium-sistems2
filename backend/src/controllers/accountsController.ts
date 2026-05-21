@@ -298,7 +298,8 @@ export const verify2FASetup = async (req: Request, res: Response) => {
 
 export const login = async (req: Request, res: Response) => {
   try {
-    const { email, password, totpCode, recoveryCode } = req.body;
+    const { email, password, totpCode, recoveryCode, rememberMe } = req.body;
+    const quickAccessDays = rememberMe ? 14 : 0;
 
     // Find user in both collections
     let user: any = await Account.findOne({ email });
@@ -352,8 +353,8 @@ export const login = async (req: Request, res: Response) => {
       };
 
       const token = generateToken(tokenPayload);
-      const refreshToken = generateRefreshToken(tokenPayload);
-      setAuthCookies(res, token, refreshToken);
+      const refreshToken = generateRefreshToken(tokenPayload, rememberMe ? 14 : 7);
+      setAuthCookies(res, token, refreshToken, { persistentDays: quickAccessDays });
 
       return res.json({
         success: true,
@@ -443,8 +444,8 @@ export const login = async (req: Request, res: Response) => {
         tokenPayload.parentAccountId = user.parentAccountId;
       }
       const token = generateToken(tokenPayload);
-      const refreshToken = generateRefreshToken(tokenPayload);
-      setAuthCookies(res, token, refreshToken);
+      const refreshToken = generateRefreshToken(tokenPayload, rememberMe ? 14 : 7);
+      setAuthCookies(res, token, refreshToken, { persistentDays: quickAccessDays });
 
       // Check if user can switch to free plan
       const canAccessFree = userType === 'main';
@@ -475,10 +476,10 @@ export const login = async (req: Request, res: Response) => {
     }
 
     const token = generateToken(tokenPayload);
-    const refreshToken = generateRefreshToken(tokenPayload);
+    const refreshToken = generateRefreshToken(tokenPayload, rememberMe ? 14 : 7);
 
     // Set httpOnly cookies
-    setAuthCookies(res, token, refreshToken);
+    setAuthCookies(res, token, refreshToken, { persistentDays: quickAccessDays });
 
     const parentAccount = userType === 'subaccount'
       ? await Account.findById(user.parentAccountId)

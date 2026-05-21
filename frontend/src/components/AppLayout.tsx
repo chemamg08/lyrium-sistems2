@@ -2,7 +2,7 @@ import { Outlet, Navigate } from "react-router-dom";
 import { useEffect, useState } from "react";
 import { Menu, Scale } from "lucide-react";
 import { useIsMobile } from "@/hooks/use-mobile";
-import { authFetch, persistUserSession } from "@/lib/authFetch";
+import { authFetch, hasQuickAccessPreference, persistUserSession } from "@/lib/authFetch";
 import AppSidebar from "./AppSidebar";
 import ProfileModal from "./ProfileModal";
 
@@ -19,6 +19,14 @@ const AppLayout = () => {
     let cancelled = false;
 
     const restoreSession = async () => {
+      const hasSessionSnapshot = Boolean(sessionStorage.getItem('userId'));
+      const canRestoreQuickAccess = hasQuickAccessPreference();
+
+      if (!hasSessionSnapshot && !canRestoreQuickAccess) {
+        if (!cancelled) setAuthState('unauthenticated');
+        return;
+      }
+
       try {
         const res = await authFetch(`${API_URL}/accounts/me`);
         if (!res.ok) {

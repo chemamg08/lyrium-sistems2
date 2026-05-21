@@ -107,6 +107,7 @@
     "useAuthenticator": "Use authenticator app instead",
     "useRecoveryCode": "Use recovery code instead",
     "forgotPassword": "I forgot my password",
+    "quickAccess14Days": "Quick access for 14 days",
     "forgotPasswordDesc": "Enter your email to receive a reset link",
     "forgotPasswordSent": "If the email is registered, you will receive a reset link. Check your inbox.",
     "sendResetLink": "Send reset link",

@@ -109,6 +109,7 @@
     "useAuthenticator": "Usar app autenticadora",
     "useRecoveryCode": "Usar código de recuperación",
     "forgotPassword": "He olvidado mi contraseña",
+    "quickAccess14Days": "Acceso rápido durante 14 días",
     "forgotPasswordDesc": "Ingresa tu email para recibir un enlace de restablecimiento",
     "forgotPasswordSent": "Si el email está registrado, recibirás un enlace de restablecimiento. Revisa tu bandeja de entrada.",
     "sendResetLink": "Enviar enlace",

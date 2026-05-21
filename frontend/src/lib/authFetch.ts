@@ -1,4 +1,5 @@
 const API_URL = import.meta.env.VITE_API_URL;
+const QUICK_ACCESS_KEY = 'lyrium_quick_access_until';
 
 let isRefreshing = false;
 let refreshPromise: Promise<boolean> | null = null;
@@ -13,6 +14,29 @@ export interface SessionUser {
   parentAccountId?: string;
   plan?: string;
   planDowngradedAt?: string | null;
+}
+
+export function setQuickAccessPreference(enabled: boolean): void {
+  if (!enabled) {
+    localStorage.removeItem(QUICK_ACCESS_KEY);
+    return;
+  }
+
+  const expiresAt = Date.now() + 14 * 24 * 60 * 60 * 1000;
+  localStorage.setItem(QUICK_ACCESS_KEY, String(expiresAt));
+}
+
+export function hasQuickAccessPreference(): boolean {
+  const raw = localStorage.getItem(QUICK_ACCESS_KEY);
+  if (!raw) return false;
+
+  const expiresAt = Number(raw);
+  if (!Number.isFinite(expiresAt) || expiresAt <= Date.now()) {
+    localStorage.removeItem(QUICK_ACCESS_KEY);
+    return false;
+  }
+
+  return true;
 }
 
 async function tryRefreshToken(): Promise<boolean> {
@@ -115,6 +139,7 @@ export function logout(): void {
     method: 'POST',
     credentials: 'include',
   }).finally(() => {
+    localStorage.removeItem(QUICK_ACCESS_KEY);
     sessionStorage.clear();
     window.location.href = '/login';
   });

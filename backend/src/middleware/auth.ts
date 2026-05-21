@@ -33,9 +33,9 @@ export function generateToken(payload: AuthPayload): string {
   return jwt.sign(payload, getJwtSecret(), { expiresIn: '30m' });
 }
 
-// Refresh token: long-lived (7 days)
-export function generateRefreshToken(payload: AuthPayload): string {
-  return jwt.sign({ ...payload, tokenType: 'refresh' }, getJwtSecret(), { expiresIn: '7d' });
+// Refresh token: session-based by default, or persistent when quick access is enabled
+export function generateRefreshToken(payload: AuthPayload, persistentDays = 7): string {
+  return jwt.sign({ ...payload, tokenType: 'refresh' }, getJwtSecret(), { expiresIn: `${persistentDays}d` });
 }
 
 export function generate2FASetupToken(userId: string, type: 'main' | 'subaccount'): string {
@@ -62,7 +62,12 @@ export function verify2FASetupToken(token: string): TwoFactorSetupPayload {
   return decoded;
 }
 
-export function setAuthCookies(res: Response, accessToken: string, refreshToken: string) {
+export function setAuthCookies(
+  res: Response,
+  accessToken: string,
+  refreshToken: string,
+  options?: { persistentDays?: number }
+) {
   const isProduction = process.env.NODE_ENV === 'production';
   const cookieBase = {
     httpOnly: true,
@@ -71,15 +76,22 @@ export function setAuthCookies(res: Response, accessToken: string, refreshToken:
     path: '/',
   };
 
+  const persistentDays = options?.persistentDays ?? 0;
+
   res.cookie('authToken', accessToken, {
     ...cookieBase,
     maxAge: 30 * 60 * 1000, // 30 minutes
   });
 
-  res.cookie('refreshToken', refreshToken, {
-    ...cookieBase,
-    maxAge: 7 * 24 * 60 * 60 * 1000, // 7 days
-  });
+  if (persistentDays > 0) {
+    res.cookie('refreshToken', refreshToken, {
+      ...cookieBase,
+      maxAge: persistentDays * 24 * 60 * 60 * 1000,
+    });
+    return;
+  }
+
+  res.cookie('refreshToken', refreshToken, cookieBase);
 }
 
 // Keep backward compatibility

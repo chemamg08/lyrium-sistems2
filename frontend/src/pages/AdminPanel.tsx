@@ -4,7 +4,7 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { useToast } from '@/components/ui/use-toast';
-import { authFetch, persistUserSession, logout as logoutUser } from '@/lib/authFetch';
+import { authFetch, hasQuickAccessPreference, persistUserSession, logout as logoutUser } from '@/lib/authFetch';
 import {
   Users, TrendingUp, Clock, XCircle, AlertTriangle,
   Search, ChevronLeft, ChevronRight, Eye, UserPlus,
@@ -145,6 +145,14 @@ const AdminPanel = () => {
     let cancelled = false;
 
     const ensureAdminSession = async () => {
+      const hasSessionSnapshot = Boolean(sessionStorage.getItem('userId'));
+      const canRestoreQuickAccess = hasQuickAccessPreference();
+
+      if (!hasSessionSnapshot && !canRestoreQuickAccess) {
+        navigate('/login');
+        return;
+      }
+
       try {
         const res = await authFetch(`${API_URL}/accounts/me`);
         if (!res.ok) {
