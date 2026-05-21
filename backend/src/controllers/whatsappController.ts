@@ -143,6 +143,10 @@ async function getAccount(accountId: string) {
   return Automation.findById(accountId);
 }
 
+function getWhatsAppConversationFolderKey(conversationId: string) {
+  return `whatsapp:${conversationId}`;
+}
+
 // ── Meta connect flow ────────────────────────────────────────────────
 export const connectWhatsApp: RequestHandler = async (req, res) => {
   try {
@@ -401,7 +405,7 @@ export const getWhatsAppConversations: RequestHandler = async (req, res) => {
 
     res.json({
       conversations,
-      folders: account?.whatsappFolders || [],
+      folders: account?.emailFolders || [],
       switchActivo: account?.whatsappSwitchActivo || false,
       connected: account?.whatsappSession?.connected || false,
       correosConsultas: account?.correosConsultas || account?.whatsappCorreosConsultas || [],
@@ -564,11 +568,11 @@ export const createWhatsAppFolder: RequestHandler = async (req, res) => {
     if (!accountId) { res.status(400).json({ error: 'accountId required' }); return; }
     if (!verifyOwnership(req as AuthRequest, accountId)) { res.status(403).json({ error: 'Acceso denegado' }); return; }
 
-    const folder = { id: `wafolder_${Date.now()}`, name, color: color || '#6366f1', conversationIds: [] };
+    const folder = { id: `folder_${Date.now()}`, name, color: color || '#6366f1', conversationIds: [] };
 
     await Automation.findByIdAndUpdate(accountId, {
-      $push: { whatsappFolders: folder },
-      $set: { accountId },
+      $push: { emailFolders: folder },
+      $set: { accountId, whatsappFolders: [] },
     }, { upsert: true });
 
     res.json({ ok: true, folder });
@@ -585,7 +589,8 @@ export const deleteWhatsAppFolder: RequestHandler = async (req, res) => {
     if (!verifyOwnership(req as AuthRequest, accountId)) { res.status(403).json({ error: 'Acceso denegado' }); return; }
 
     await Automation.findByIdAndUpdate(accountId, {
-      $pull: { whatsappFolders: { id: folderId } } as any,
+      $pull: { emailFolders: { id: folderId } } as any,
+      $set: { whatsappFolders: [] },
     });
 
     res.json({ ok: true });
@@ -603,9 +608,12 @@ export const assignConversationToWAFolder: RequestHandler = async (req, res) => 
     const account = await getAccount(accountId);
     if (!account) { res.status(404).json({ error: 'Not found' }); return; }
 
-    const folder = account.whatsappFolders.find((f: any) => f.id === folderId);
-    if (folder && !folder.conversationIds.includes(conversationId)) {
-      folder.conversationIds.push(conversationId);
+    const folderKey = getWhatsAppConversationFolderKey(conversationId);
+    const folder = (account.emailFolders || []).find((f: any) => f.id === folderId);
+    if (folder && !folder.conversationIds.includes(folderKey)) {
+      folder.conversationIds = (folder.conversationIds || []).filter((id: string) => id !== conversationId);
+      folder.conversationIds.push(folderKey);
+      account.whatsappFolders = [];
       await account.save();
     }
 
@@ -624,9 +632,11 @@ export const removeConversationFromWAFolder: RequestHandler = async (req, res) =
     const account = await getAccount(accountId);
     if (!account) { res.status(404).json({ error: 'Not found' }); return; }
 
-    const folder = account.whatsappFolders.find((f: any) => f.id === folderId);
+    const folderKey = getWhatsAppConversationFolderKey(conversationId);
+    const folder = (account.emailFolders || []).find((f: any) => f.id === folderId);
     if (folder) {
-      folder.conversationIds = folder.conversationIds.filter((id: string) => id !== conversationId);
+      folder.conversationIds = (folder.conversationIds || []).filter((id: string) => id !== conversationId && id !== folderKey);
+      account.whatsappFolders = [];
       await account.save();
     }
 

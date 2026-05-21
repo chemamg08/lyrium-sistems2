@@ -532,11 +532,19 @@ function getWhatsAppFolderDescriptions(account: any): Array<{ id: string; nombre
     }
   }
 
-  return (account.whatsappFolders || []).map((folder: any) => ({
+  return (account.emailFolders || []).map((folder: any) => ({
     id: folder.id,
     nombre: folder.name,
     descripcion: (folderIdsToRules.get(folder.id) || []).filter(Boolean).join(' | ') || `Carpeta ${folder.name}`,
   }));
+}
+
+function getEmailConversationFolderKey(conversationId: string): string {
+  return `email:${conversationId}`;
+}
+
+function getWhatsAppConversationFolderKey(conversationId: string): string {
+  return `whatsapp:${conversationId}`;
 }
 
 function buildEmailEngineMessages(
@@ -578,10 +586,12 @@ async function assignEmailConversationToFolders(
   if (!conversationId || !Array.isArray(folderIds) || folderIds.length === 0) return;
   let modified = false;
   const valid = new Set(folderIds);
+  const folderKey = getEmailConversationFolderKey(conversationId);
   for (const folder of account.emailFolders || []) {
     if (!valid.has(folder.id)) continue;
-    if (!folder.conversationIds.includes(conversationId)) {
-      folder.conversationIds.push(conversationId);
+    folder.conversationIds = (folder.conversationIds || []).filter((cid: string) => cid !== conversationId);
+    if (!folder.conversationIds.includes(folderKey)) {
+      folder.conversationIds.push(folderKey);
       modified = true;
     }
   }
@@ -598,10 +608,12 @@ async function assignWhatsAppConversationToFolders(
   if (!conversationId || !Array.isArray(folderIds) || folderIds.length === 0) return;
   let modified = false;
   const valid = new Set(folderIds);
-  for (const folder of account.whatsappFolders || []) {
+  const folderKey = getWhatsAppConversationFolderKey(conversationId);
+  for (const folder of account.emailFolders || []) {
     if (!valid.has(folder.id)) continue;
-    if (!folder.conversationIds.includes(conversationId)) {
-      folder.conversationIds.push(conversationId);
+    folder.conversationIds = (folder.conversationIds || []).filter((cid: string) => cid !== conversationId);
+    if (!folder.conversationIds.includes(folderKey)) {
+      folder.conversationIds.push(folderKey);
       modified = true;
     }
   }
@@ -2542,8 +2554,10 @@ async function applyClassifyRules(
     }
     for (const folderId of targetFolderIds) {
       const folder = account.emailFolders.find((f: any) => f.id === folderId);
-      if (folder && !folder.conversationIds.includes(conversationId)) {
-        folder.conversationIds.push(conversationId);
+      const folderKey = getEmailConversationFolderKey(conversationId);
+      if (folder && !folder.conversationIds.includes(folderKey)) {
+        folder.conversationIds = (folder.conversationIds || []).filter((cid: string) => cid !== conversationId);
+        folder.conversationIds.push(folderKey);
         modified = true;
       }
     }

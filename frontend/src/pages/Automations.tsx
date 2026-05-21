@@ -152,6 +152,17 @@ interface WAMessage { id: string; from: string; text: string; time: string; sent
 interface WAConversation { id: string; contactName: string; contactPhone: string; messages: WAMessage[]; lastMessageTime: string; unread: number; autoReplyPaused?: boolean; }
 interface WAFolder { id: string; name: string; color: string; conversationIds: string[]; }
 
+const getFolderConversationKey = (channel: 'email' | 'whatsapp', conversationId: string) => `${channel}:${conversationId}`;
+
+const folderContainsConversation = (
+  folder: { conversationIds?: string[] },
+  channel: 'email' | 'whatsapp',
+  conversationId: string,
+) => {
+  const conversationIds = folder.conversationIds || [];
+  return conversationIds.includes(getFolderConversationKey(channel, conversationId)) || conversationIds.includes(conversationId);
+};
+
 function Modal({ title, onClose, children, wide }: { title: string; onClose: () => void; children: React.ReactNode; wide?: boolean }) {
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50">
@@ -292,6 +303,7 @@ const Automations = () => {
   const [emailSearch, setEmailSearch] = useState('');
   const [unifiedChannelFilter, setUnifiedChannelFilter] = useState<'all' | 'email' | 'whatsapp'>('all');
   const [unifiedStatusFilter, setUnifiedStatusFilter] = useState<'all' | 'pending' | 'paused'>('all');
+  const [unifiedTypeFilter, setUnifiedTypeFilter] = useState<'all' | 'others'>('all');
   const [unifiedSearch, setUnifiedSearch] = useState('');
   const [unifiedFolderFilter, setUnifiedFolderFilter] = useState('');
   const [activeAutomationChannel, setActiveAutomationChannel] = useState<'email' | 'whatsapp'>('email');
@@ -1372,6 +1384,7 @@ const Automations = () => {
       if (res.ok) {
         const { folder } = await res.json();
         setAutoData(prev => ({ ...prev, emailFolders: [...prev.emailFolders, folder] }));
+        setWaFolders(prev => [...prev, folder]);
         setNewFolderName('');
       }
     } catch { /* error */ }
@@ -1381,7 +1394,9 @@ const Automations = () => {
       const res = await authFetch(`${API}/email-folders/${folderId}?accountId=${accountId}`, { method: 'DELETE' });
       if (!res.ok) return;
       setAutoData(prev => ({ ...prev, emailFolders: prev.emailFolders.filter(f => f.id !== folderId) }));
+      setWaFolders(prev => prev.filter(f => f.id !== folderId));
       if (folderFilter === folderId) setFolderFilter('');
+      if (unifiedFolderFilter === folderId) setUnifiedFolderFilter('');
     } catch { /* error */ }
   };
   const assignToFolder = async (folderId: string, conversationId: string) => {
@@ -1392,13 +1407,14 @@ const Automations = () => {
         body: JSON.stringify({ accountId, folderId, conversationId }),
       });
       if (!res.ok) return;
+      const folderKey = getFolderConversationKey('email', conversationId);
       setAutoData(prev => ({
         ...prev,
         emailFolders: prev.emailFolders.map(f => ({
           ...f,
           conversationIds: f.id === folderId
-            ? [...f.conversationIds.filter(id => id !== conversationId), conversationId]
-            : f.conversationIds.filter(id => id !== conversationId),
+            ? [...f.conversationIds.filter(id => id !== conversationId && id !== folderKey), folderKey]
+            : f.conversationIds,
         })),
       }));
     } catch { /* error */ }
@@ -1411,10 +1427,11 @@ const Automations = () => {
         body: JSON.stringify({ accountId, folderId, conversationId }),
       });
       if (!res.ok) return;
+      const folderKey = getFolderConversationKey('email', conversationId);
       setAutoData(prev => ({
         ...prev,
         emailFolders: prev.emailFolders.map(f =>
-          f.id === folderId ? { ...f, conversationIds: f.conversationIds.filter(id => id !== conversationId) } : f
+          f.id === folderId ? { ...f, conversationIds: f.conversationIds.filter(id => id !== conversationId && id !== folderKey) } : f
         ),
       }));
     } catch { /* error */ }
@@ -1460,10 +1477,7 @@ const Automations = () => {
         .filter(Boolean),
     );
 
-    const unifiedFolderOptions = [
-      ...autoData.emailFolders.map(folder => ({ key: `email:${folder.id}`, channel: 'email' as const, id: folder.id, name: folder.name })),
-      ...waFolders.map(folder => ({ key: `whatsapp:${folder.id}`, channel: 'whatsapp' as const, id: folder.id, name: folder.name })),
-    ];
+    const unifiedFolderOptions = autoData.emailFolders.map(folder => ({ id: folder.id, name: folder.name }));
 
     const unifiedConversations = [
       ...autoData.emailConversations.map(conv => ({
@@ -1478,7 +1492,7 @@ const Automations = () => {
         autoReplyPaused: !!conv.autoReplyPaused,
         pending: pendingEmailIds.has(conv.id),
         outside24h: false,
-        folderKeys: autoData.emailFolders.filter(folder => folder.conversationIds.includes(conv.id)).map(folder => `email:${folder.id}`),
+        folderKeys: autoData.emailFolders.filter(folder => folderContainsConversation(folder, 'email', conv.id)).map(folder => folder.id),
         classificationType: conv.classificationType,
       })),
       ...waConversations.map(conv => ({
@@ -1493,15 +1507,15 @@ const Automations = () => {
         autoReplyPaused: !!conv.autoReplyPaused,
         pending: pendingWhatsAppIds.has(conv.id),
         outside24h: isWAConversationOutside24h(conv, now),
-        folderKeys: waFolders.filter(folder => folder.conversationIds.includes(conv.id)).map(folder => `whatsapp:${folder.id}`),
+        folderKeys: autoData.emailFolders.filter(folder => folderContainsConversation(folder, 'whatsapp', conv.id)).map(folder => folder.id),
       })),
     ]
       .filter(conv => {
         if (unifiedChannelFilter !== 'all' && conv.channel !== unifiedChannelFilter) return false;
         if (unifiedStatusFilter === 'pending' && !conv.pending) return false;
         if (unifiedStatusFilter === 'paused' && !conv.autoReplyPaused) return false;
-        if (conv.channel === 'email' && conv.classificationType === 'otro' && unifiedFolderFilter !== '__others__') return false;
-        if (unifiedFolderFilter === '__others__') return conv.channel === 'email' && conv.classificationType === 'otro';
+        if (conv.channel === 'email' && conv.classificationType === 'otro' && unifiedTypeFilter !== 'others') return false;
+        if (unifiedTypeFilter === 'others') return conv.channel === 'email' && conv.classificationType === 'otro';
         if (unifiedFolderFilter && !conv.folderKeys.includes(unifiedFolderFilter)) return false;
         if (unifiedSearch) {
           const q = unifiedSearch.toLowerCase();
@@ -1524,9 +1538,9 @@ const Automations = () => {
     const currentMessages = currentEmailConv?.messages || currentWAConv?.messages || [];
     const waManualSendBlocked = currentWAConv ? isWAConversationOutside24h(currentWAConv, now) : false;
     const currentAutoReplyEnabled = effectiveChannel === 'email' ? autoData.switchActivo : waSwitchActivo;
-    const activeFolderPanel = effectiveChannel === 'whatsapp' ? showWaFolderPanel : showFolderPanel;
+    const activeFolderPanel = showFolderPanel;
     const currentConversationId = currentEmailConv?.id || currentWAConv?.id || '';
-    const activeFolders = effectiveChannel === 'whatsapp' ? waFolders : autoData.emailFolders;
+    const activeFolders = autoData.emailFolders;
 
     return (
       <>
@@ -1558,13 +1572,8 @@ const Automations = () => {
             </button>
             <button
               onClick={() => {
-                if (effectiveChannel === 'whatsapp') {
-                  setShowFolderPanel(false);
-                  setShowWaFolderPanel(prev => !prev);
-                } else {
-                  setShowWaFolderPanel(false);
-                  setShowFolderPanel(prev => !prev);
-                }
+                setShowWaFolderPanel(false);
+                setShowFolderPanel(prev => !prev);
               }}
               className={`flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium rounded-md border border-border bg-card hover:bg-accent text-foreground transition-colors ${activeFolderPanel ? 'ring-1 ring-ring' : ''}`}
             >
@@ -1631,16 +1640,27 @@ const Automations = () => {
                   </button>
                 ))}
               </div>
+              <div className="grid grid-cols-2 gap-1">
+                {(['all', 'others'] as const).map(f => (
+                  <button
+                    key={f}
+                    onClick={() => {
+                      setUnifiedTypeFilter(f);
+                      if (f === 'others') setUnifiedFolderFilter('');
+                    }}
+                    className={`px-2 py-1 text-[10px] font-medium rounded-md transition-colors ${unifiedTypeFilter === f ? 'bg-foreground text-background' : 'bg-muted text-muted-foreground hover:bg-accent'}`}
+                  >
+                    {f === 'all' ? t('automations.all') : t('automations.others')}
+                  </button>
+                ))}
+              </div>
               {unifiedFolderOptions.length > 0 && (
                 <select value={unifiedFolderFilter} onChange={e => setUnifiedFolderFilter(e.target.value)}
                   className="w-full px-2 py-1 text-xs bg-muted/50 border border-border rounded-md text-foreground">
                   <option value="">{t('automations.allFolders')}</option>
-                  <option value="__others__">Others</option>
                   {unifiedFolderOptions.map(folder => (
-                    <option key={folder.key} value={folder.key}>
-                      {unifiedChannelFilter === 'all'
-                        ? (folder.channel === 'email' ? `Email · ${folder.name}` : `WhatsApp · ${folder.name}`)
-                        : folder.name}
+                    <option key={folder.id} value={folder.id}>
+                      {folder.name}
                     </option>
                   ))}
                 </select>
@@ -1907,7 +1927,7 @@ const Automations = () => {
                   <div className="flex items-center justify-between mb-2">
                     <p className="text-xs font-semibold text-foreground">{t('automations.folders')}</p>
                     <button
-                      onClick={() => effectiveChannel === 'whatsapp' ? createWaFolder() : createFolder()}
+                      onClick={createFolder}
                       className="p-1.5 rounded-md bg-foreground text-background hover:opacity-90 transition-opacity"
                       title={t('automations.createFolder')}
                     >
@@ -1916,9 +1936,9 @@ const Automations = () => {
                   </div>
                   <input
                     ref={folderInputRef}
-                    value={effectiveChannel === 'whatsapp' ? newWaFolderName : newFolderName}
-                    onChange={(e) => effectiveChannel === 'whatsapp' ? setNewWaFolderName(e.target.value) : setNewFolderName(e.target.value)}
-                    onKeyDown={(e) => { if (e.key === 'Enter') { effectiveChannel === 'whatsapp' ? createWaFolder() : createFolder(); } }}
+                    value={newFolderName}
+                    onChange={(e) => setNewFolderName(e.target.value)}
+                    onKeyDown={(e) => { if (e.key === 'Enter') { createFolder(); } }}
                     placeholder={t('automations.newFolder')}
                     className="w-full px-2 py-1.5 text-xs bg-muted/50 border-none rounded-md text-foreground placeholder:text-muted-foreground focus:outline-none focus:ring-1 focus:ring-ring"
                   />
@@ -1928,11 +1948,14 @@ const Automations = () => {
                     <p className="text-[11px] text-muted-foreground text-center py-4">{t('automations.noFolders')}</p>
                   )}
                   {activeFolders.map((folder: any) => {
-                    const isAssigned = currentConversationId ? folder.conversationIds.includes(currentConversationId) : false;
+                    const isAssigned = currentConversationId ? folderContainsConversation(folder, effectiveChannel, currentConversationId) : false;
                     return (
                       <div key={folder.id} className="flex items-center justify-between gap-1 px-2 py-1.5 rounded-md hover:bg-accent">
                         <button
-                          onClick={() => setUnifiedFolderFilter(unifiedFolderFilter === `${effectiveChannel}:${folder.id}` ? '' : `${effectiveChannel}:${folder.id}`)}
+                          onClick={() => {
+                            setUnifiedTypeFilter('all');
+                            setUnifiedFolderFilter(unifiedFolderFilter === folder.id ? '' : folder.id);
+                          }}
                           className="flex items-center gap-2 text-xs flex-1 text-left"
                         >
                           <FolderOpen className="h-3.5 w-3.5 text-muted-foreground" />
@@ -1949,7 +1972,7 @@ const Automations = () => {
                             </button>
                           )
                         ) : (
-                          <button onClick={() => effectiveChannel === 'whatsapp' ? deleteWaFolder(folder.id) : deleteFolder(folder.id)} className="p-1 rounded hover:bg-destructive/10 text-muted-foreground hover:text-destructive" title={t('automations.deleteFolder')}>
+                          <button onClick={() => deleteFolder(folder.id)} className="p-1 rounded hover:bg-destructive/10 text-muted-foreground hover:text-destructive" title={t('automations.deleteFolder')}>
                             <Trash2 className="h-3 w-3" />
                           </button>
                         )}
@@ -2121,11 +2144,11 @@ const Automations = () => {
               />
               <div className="space-y-2">
                 <p className="text-xs text-muted-foreground">Carpetas de destino</p>
-                {waFolders.length === 0 ? (
+                {autoData.emailFolders.length === 0 ? (
                   <p className="text-xs text-muted-foreground">Crea al menos una carpeta para usar reglas de clasificacion.</p>
                 ) : (
                   <div className="grid grid-cols-2 gap-2">
-                    {waFolders.map(folder => (
+                    {autoData.emailFolders.map(folder => (
                       <label key={folder.id} className="flex items-center gap-2 text-xs p-2 rounded-md border border-border bg-card cursor-pointer">
                         <input
                           type="checkbox"
@@ -2141,7 +2164,7 @@ const Automations = () => {
               <div className="flex justify-end">
                 <button
                   onClick={saveWaClassifyRule}
-                  disabled={waClassifyLoading || waFolders.length === 0}
+                  disabled={waClassifyLoading || autoData.emailFolders.length === 0}
                   className="px-3 py-1.5 text-xs rounded-md bg-foreground text-background hover:opacity-90 disabled:opacity-50"
                 >
                   {waClassifyLoading ? 'Guardando...' : 'Guardar regla'}
@@ -2161,7 +2184,7 @@ const Automations = () => {
                         <p className="text-xs text-muted-foreground mt-0.5 whitespace-pre-wrap">{rule.description}</p>
                         <div className="mt-2 flex flex-wrap gap-1">
                           {rule.folderIds.map(fid => {
-                            const folder = waFolders.find(f => f.id === fid);
+                            const folder = autoData.emailFolders.find(f => f.id === fid);
                             return (
                               <span key={fid} className="px-2 py-0.5 text-[10px] rounded-full border border-border bg-card text-muted-foreground">
                                 {folder?.name || 'Carpeta'}
@@ -2973,7 +2996,7 @@ const Automations = () => {
       if (folderFilter === '__others__') return c.classificationType === 'otro';
       if (folderFilter && folderFilter !== '__others__') {
         const folder = autoData.emailFolders.find(f => f.id === folderFilter);
-        if (!folder?.conversationIds.includes(c.id)) return false;
+        if (!folder || !folderContainsConversation(folder, 'email', c.id)) return false;
       }
       if (emailFilter === 'manual' && !c.autoReplyPaused) return false;
       if (emailFilter === 'auto' && c.autoReplyPaused) return false;
@@ -3319,7 +3342,7 @@ const Automations = () => {
                   )}
                   {autoData.emailFolders.map((folder) => {
                     const isExpanded = expandedFolderId === folder.id;
-                    const folderConvs = autoData.emailConversations.filter(c => folder.conversationIds.includes(c.id));
+                    const folderConvs = autoData.emailConversations.filter(c => folderContainsConversation(folder, 'email', c.id));
                     return (
                       <div key={folder.id}>
                         <div
@@ -3332,7 +3355,7 @@ const Automations = () => {
                             <ChevronRight className={`h-3 w-3 text-muted-foreground shrink-0 transition-transform duration-200 ${isExpanded ? 'rotate-90' : ''}`} />
                             <FolderOpen className="h-3.5 w-3.5 text-muted-foreground shrink-0" />
                             <span className="text-xs text-foreground truncate">{folder.name}</span>
-                            <span className="text-[10px] text-muted-foreground">({folder.conversationIds.length})</span>
+                            <span className="text-[10px] text-muted-foreground">({folderConvs.length})</span>
                           </div>
                           <button
                             onClick={(e) => { e.stopPropagation(); deleteFolder(folder.id); }}
@@ -3752,7 +3775,7 @@ const Automations = () => {
     const filteredConvs = filteredWaConversations.filter(c => {
       if (waFolderFilter) {
         const folder = waFolders.find(f => f.id === waFolderFilter);
-        if (!folder?.conversationIds.includes(c.id)) return false;
+        if (!folder || !folderContainsConversation(folder, 'whatsapp', c.id)) return false;
       }
       if (waFilter === 'manual' && !c.autoReplyPaused) return false;
       if (waFilter === 'auto' && c.autoReplyPaused) return false;
@@ -4059,11 +4082,11 @@ const Automations = () => {
               />
               <div className="space-y-2">
                 <p className="text-xs text-muted-foreground">Carpetas de destino</p>
-                {waFolders.length === 0 ? (
+                {autoData.emailFolders.length === 0 ? (
                   <p className="text-xs text-muted-foreground">Crea al menos una carpeta para usar reglas de clasificacion.</p>
                 ) : (
                   <div className="grid grid-cols-2 gap-2">
-                    {waFolders.map(folder => (
+                    {autoData.emailFolders.map(folder => (
                       <label key={folder.id} className="flex items-center gap-2 text-xs p-2 rounded-md border border-border bg-card cursor-pointer">
                         <input
                           type="checkbox"
@@ -4079,7 +4102,7 @@ const Automations = () => {
               <div className="flex justify-end">
                 <button
                   onClick={saveWaClassifyRule}
-                  disabled={waClassifyLoading || waFolders.length === 0}
+                  disabled={waClassifyLoading || autoData.emailFolders.length === 0}
                   className="px-3 py-1.5 text-xs rounded-md bg-foreground text-background hover:opacity-90 disabled:opacity-50"
                 >
                   {waClassifyLoading ? 'Guardando...' : 'Guardar regla'}
@@ -4099,7 +4122,7 @@ const Automations = () => {
                         <p className="text-xs text-muted-foreground mt-0.5 whitespace-pre-wrap">{rule.description}</p>
                         <div className="mt-2 flex flex-wrap gap-1">
                           {rule.folderIds.map(fid => {
-                            const folder = waFolders.find(f => f.id === fid);
+                            const folder = autoData.emailFolders.find(f => f.id === fid);
                             return (
                               <span key={fid} className="px-2 py-0.5 text-[10px] rounded-full border border-border bg-card text-muted-foreground">
                                 {folder?.name || 'Carpeta'}

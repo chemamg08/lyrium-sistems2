@@ -608,11 +608,15 @@ function getWhatsAppFolderDescriptions(account: any): Array<{ id: string; nombre
     }
   }
 
-  return (account.whatsappFolders || []).map((folder: any) => ({
+  return (account.emailFolders || []).map((folder: any) => ({
     id: folder.id,
     nombre: folder.name,
     descripcion: (folderIdsToRules.get(folder.id) || []).filter(Boolean).join(' | ') || `Carpeta ${folder.name}`,
   }));
+}
+
+function getWhatsAppConversationFolderKey(conversationId: string): string {
+  return `whatsapp:${conversationId}`;
 }
 
 function getUnifiedConsultaEmails(account: any): string[] {
@@ -647,10 +651,12 @@ async function assignWhatsAppConversationToFolders(
   if (!conversationId || !Array.isArray(folderIds) || folderIds.length === 0) return;
   let modified = false;
   const valid = new Set(folderIds);
-  for (const folder of account.whatsappFolders || []) {
+  const folderKey = getWhatsAppConversationFolderKey(conversationId);
+  for (const folder of account.emailFolders || []) {
     if (!valid.has(folder.id)) continue;
-    if (!folder.conversationIds.includes(conversationId)) {
-      folder.conversationIds.push(conversationId);
+    folder.conversationIds = (folder.conversationIds || []).filter((id: string) => id !== conversationId);
+    if (!folder.conversationIds.includes(folderKey)) {
+      folder.conversationIds.push(folderKey);
       modified = true;
     }
   }
@@ -812,7 +818,7 @@ async function applyWhatsAppClassifyRules(
   const rules: Array<{ id: string; name: string; description: string; folderIds: string[] }> = account.whatsappClassifyRules || [];
   if (rules.length === 0) return;
 
-  const folders: Array<{ id: string; name: string; conversationIds: string[] }> = account.whatsappFolders || [];
+  const folders: Array<{ id: string; name: string; conversationIds: string[] }> = account.emailFolders || [];
   if (folders.length === 0) return;
 
   let modified = false;
@@ -840,9 +846,11 @@ async function applyWhatsAppClassifyRules(
       if (parsed.match !== true) continue;
 
       for (const folderId of targetFolderIds) {
-        const folder = account.whatsappFolders.find((f: any) => f.id === folderId);
-        if (folder && !folder.conversationIds.includes(conversationId)) {
-          folder.conversationIds.push(conversationId);
+        const folder = account.emailFolders.find((f: any) => f.id === folderId);
+        const folderKey = getWhatsAppConversationFolderKey(conversationId);
+        if (folder && !folder.conversationIds.includes(folderKey)) {
+          folder.conversationIds = (folder.conversationIds || []).filter((id: string) => id !== conversationId);
+          folder.conversationIds.push(folderKey);
           modified = true;
         }
       }

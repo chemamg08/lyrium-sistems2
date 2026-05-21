@@ -53,6 +53,10 @@ async function saveAccount(accountId: string, data: Record<string, any>) {
   await Automation.findByIdAndUpdate(accountId, { $set: { ...data, accountId } }, { upsert: true, returnDocument: 'after' });
 }
 
+function getEmailConversationFolderKey(conversationId: string) {
+  return `email:${conversationId}`;
+}
+
 function sanitizeCuentaCorreo(cuenta: Record<string, any>) {
   return {
     ...cuenta,
@@ -649,13 +653,18 @@ export const assignConversationToFolder: RequestHandler = async (req, res) => {
   if (!verifyOwnership(req as AuthRequest, accountId)) { res.status(403).json({ error: 'Acceso denegado' }); return; }
   try {
     const account = await getAccount(accountId);
+    const folderKey = getEmailConversationFolderKey(conversationId);
     const folders = (account.emailFolders || []).map((f: any) => ({
       ...f,
-      conversationIds: (f.conversationIds || []).filter((cid: string) => cid !== conversationId),
+      conversationIds: f.id === folderId
+        ? (f.conversationIds || []).filter((cid: string) => cid !== conversationId)
+        : (f.conversationIds || []),
     }));
     const target = folders.find((f: any) => f.id === folderId);
     if (!target) { res.status(404).json({ error: 'Carpeta no encontrada' }); return; }
-    target.conversationIds.push(conversationId);
+    if (!target.conversationIds.includes(folderKey)) {
+      target.conversationIds.push(folderKey);
+    }
     await saveAccount(accountId, { emailFolders: folders });
     res.json({ ok: true });
   } catch (err: any) {
@@ -669,9 +678,10 @@ export const removeConversationFromFolder: RequestHandler = async (req, res) => 
   if (!accountId || !folderId || !conversationId) { res.status(400).json({ error: 'accountId, folderId y conversationId requeridos' }); return; }
   if (!verifyOwnership(req as AuthRequest, accountId)) { res.status(403).json({ error: 'Acceso denegado' }); return; }
   try {
+    const folderKey = getEmailConversationFolderKey(conversationId);
     const account = await getAccount(accountId);
     const folders = (account.emailFolders || []).map((f: any) =>
-      f.id === folderId ? { ...f, conversationIds: (f.conversationIds || []).filter((cid: string) => cid !== conversationId) } : f
+      f.id === folderId ? { ...f, conversationIds: (f.conversationIds || []).filter((cid: string) => cid !== conversationId && cid !== folderKey) } : f
     );
     await saveAccount(accountId, { emailFolders: folders });
     res.json({ ok: true });
