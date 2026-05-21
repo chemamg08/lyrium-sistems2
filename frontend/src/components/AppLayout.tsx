@@ -7,6 +7,7 @@ import AppSidebar from "./AppSidebar";
 import ProfileModal from "./ProfileModal";
 
 const API_URL = import.meta.env.VITE_API_URL;
+const QUICK_ACCESS_BOOTSTRAP_KEY = 'lyrium_quick_access_bootstrap_done';
 
 const AppLayout = () => {
   const [collapsed, setCollapsed] = useState(false);
@@ -41,8 +42,17 @@ const AppLayout = () => {
         }
 
         persistUserSession(data.user);
+
+        if (!hasSessionSnapshot && canRestoreQuickAccess && !sessionStorage.getItem(QUICK_ACCESS_BOOTSTRAP_KEY)) {
+          sessionStorage.setItem(QUICK_ACCESS_BOOTSTRAP_KEY, '1');
+          window.location.replace(`${window.location.pathname}${window.location.search}${window.location.hash}`);
+          return;
+        }
+
+        sessionStorage.removeItem(QUICK_ACCESS_BOOTSTRAP_KEY);
         if (!cancelled) setAuthState('authenticated');
       } catch {
+        sessionStorage.removeItem(QUICK_ACCESS_BOOTSTRAP_KEY);
         if (!cancelled) setAuthState('unauthenticated');
       }
     };

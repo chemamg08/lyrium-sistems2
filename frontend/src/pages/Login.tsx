@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { useNavigate, useSearchParams } from "react-router-dom";
 import { motion } from "framer-motion";
 import { Button } from "@/components/ui/button";
@@ -16,9 +16,10 @@ import {
   DialogTitle,
   DialogDescription,
 } from "@/components/ui/dialog";
-import { persistUserSession, setQuickAccessPreference } from "@/lib/authFetch";
+import { authFetch, hasQuickAccessPreference, persistUserSession, setQuickAccessPreference } from "@/lib/authFetch";
 
 const API_URL = import.meta.env.VITE_API_URL;
+const QUICK_ACCESS_BOOTSTRAP_KEY = 'lyrium_quick_access_bootstrap_done';
 
 const WavesBg = () => (
   <div className="pointer-events-none absolute inset-0 z-0 overflow-hidden">
@@ -89,6 +90,41 @@ const Login = () => {
   const [activatingFree, setActivatingFree] = useState(false);
   const navigate = useNavigate();
   const [searchParams] = useSearchParams();
+
+  useEffect(() => {
+    const hasSessionSnapshot = Boolean(sessionStorage.getItem('userId'));
+    if (hasSessionSnapshot || !hasQuickAccessPreference()) return;
+
+    let cancelled = false;
+
+    const restoreQuickAccess = async () => {
+      try {
+        const res = await authFetch(`${API_URL}/accounts/me`);
+        if (!res.ok) return;
+
+        const data = await res.json();
+        if (!data?.user?.id || cancelled) return;
+
+        persistUserSession(data.user);
+        if (!sessionStorage.getItem(QUICK_ACCESS_BOOTSTRAP_KEY)) {
+          sessionStorage.setItem(QUICK_ACCESS_BOOTSTRAP_KEY, '1');
+          window.location.replace(data.user.role === 'admin' ? '/admin' : '/');
+          return;
+        }
+
+        sessionStorage.removeItem(QUICK_ACCESS_BOOTSTRAP_KEY);
+        navigate(data.user.role === 'admin' ? '/admin' : '/', { replace: true });
+      } catch {
+        sessionStorage.removeItem(QUICK_ACCESS_BOOTSTRAP_KEY);
+      }
+    };
+
+    restoreQuickAccess();
+
+    return () => {
+      cancelled = true;
+    };
+  }, [navigate]);
 
   const handleLogin = async (e: React.FormEvent) => {
     e.preventDefault();
