@@ -59,6 +59,7 @@ export interface IEmailConversation {
   cuentaCorreoEmail?: string;
   autoClientId?: string;
   autoReplyPaused?: boolean;
+  classificationType?: 'consulta_general' | 'solicitud_servicio' | 'otro';
 }
 
 export interface IPendingConsulta {
@@ -271,6 +272,7 @@ const emailConversationSchema = new Schema({
   cuentaCorreoEmail: String,
   autoClientId: String,
   autoReplyPaused: { type: Boolean, default: false },
+  classificationType: { type: String, default: undefined },
 }, { _id: false });
 
 const emailFolderSchema = new Schema({

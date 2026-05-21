@@ -615,6 +615,16 @@ function getWhatsAppFolderDescriptions(account: any): Array<{ id: string; nombre
   }));
 }
 
+function getUnifiedConsultaEmails(account: any): string[] {
+  const merged = [
+    ...(Array.isArray(account?.correosConsultas) ? account.correosConsultas : []),
+    ...(Array.isArray(account?.whatsappCorreosConsultas) ? account.whatsappCorreosConsultas : []),
+  ]
+    .map((email: any) => String(email || '').trim().toLowerCase())
+    .filter(Boolean);
+  return Array.from(new Set(merged)).slice(0, 1);
+}
+
 function buildWhatsAppEngineMessages(messages: any[]): Array<{
   fechaHora: string;
   autor: 'cliente' | 'asistente' | 'humano';
@@ -856,7 +866,7 @@ async function forwardWhatsAppToConsultas(
   mediaAttachment?: { filename: string; originalName: string; mimeType: string },
   customMessage?: string,
 ): Promise<boolean> {
-  const consultaEmails: string[] = account.whatsappCorreosConsultas || [];
+  const consultaEmails: string[] = getUnifiedConsultaEmails(account);
   if (consultaEmails.length === 0) return false;
 
   const cuentaCorreo = (account.cuentasCorreo || [])[0];
@@ -1417,7 +1427,7 @@ async function processOneIncomingMetaMessageUnified(
         folderIds: rule.folderIds || [],
       })),
       correoConsultas: {
-        destino: account.whatsappCorreosConsultas || [],
+        destino: getUnifiedConsultaEmails(account),
         cuentaOperativa: (account.cuentasCorreo || []).map((item: any) => item.correo).filter(Boolean),
       },
       documentos: (account.documentos || []).map((doc: any) => ({

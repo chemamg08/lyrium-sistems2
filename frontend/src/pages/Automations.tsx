@@ -1,7 +1,7 @@
 ﻿import {
   Mail, MessageCircle, Calendar, ArrowLeft, Send, Paperclip, Search,
   MoreVertical, Users, HelpCircle, X, Plus, Trash2, Eye, Upload, PauseCircle, PanelLeft, Pencil,
-  FolderOpen, Copy, Check, ChevronDown, FileText, Image, Download, ChevronRight, Settings2, Phone, Sparkles, Settings, AlertTriangle, RefreshCw
+  FolderOpen, Copy, Check, ChevronDown, FileText, Image, Download, ChevronRight, Settings2, Phone, Sparkles, Settings, AlertTriangle, RefreshCw, Info
 } from "lucide-react";
 import { useState, useEffect, useRef, DragEvent } from "react";
 import { useTranslation } from "react-i18next";
@@ -39,7 +39,7 @@ interface EmailAttachment { id: string; filename: string; originalName: string; 
 interface EmailMessage { id: string; from: string; text: string; time: string; sent: boolean; attachments?: EmailAttachment[]; }
 interface EmailConversation {
   id: string; contactName: string; contactEmail: string; subject: string;
-  messages: EmailMessage[]; lastMessageTime: string; unread: number; autoClientId?: string; autoReplyPaused?: boolean;
+  messages: EmailMessage[]; lastMessageTime: string; unread: number; autoClientId?: string; autoReplyPaused?: boolean; classificationType?: 'consulta_general' | 'solicitud_servicio' | 'otro';
 }
 interface EmailFolder {
   id: string;
@@ -265,6 +265,7 @@ const Automations = () => {
   const [editingEspId, setEditingEspId] = useState<string | null>(null);
   const [showCuentasCorreo, setShowCuentasCorreo] = useState(false);
   const [showCorreosConsultas, setShowCorreosConsultas] = useState(false);
+  const [showCorreoConsultaInfo, setShowCorreoConsultaInfo] = useState(false);
   const [showSubirInfo, setShowSubirInfo] = useState(false);
   const [showAddCuenta, setShowAddCuenta] = useState(false);
   const [showAddCorreo, setShowAddCorreo] = useState(false);
@@ -304,6 +305,8 @@ const Automations = () => {
   const folderDropdownRef = useRef<HTMLDivElement>(null);
   const [pendingFiles, setPendingFiles] = useState<File[]>([]);
   const emailFileInputRef = useRef<HTMLInputElement>(null);
+  const lastScrollChatRef = useRef<string>('');
+  const lastScrollCountRef = useRef<number>(0);
   const [expandedFolderId, setExpandedFolderId] = useState<string | null>(null);
   const [chatDragOver, setChatDragOver] = useState(false);
   const [isSending, setIsSending] = useState(false);
@@ -375,10 +378,29 @@ const Automations = () => {
     return () => { controller.abort(); clearInterval(interval); };
   }, [accountId]);
 
-  // Auto-scroll to bottom when messages change
+  // Auto-scroll only when switching chat or when a new message arrives
   useEffect(() => {
-    messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
-  }, [autoData.emailConversations, selectedEmailConv]);
+    const currentEmail = autoData.emailConversations.find(c => c.id === selectedEmailConv);
+    const currentWa = waConversations.find(c => c.id === selectedWAContact);
+    const chatKey = view === 'whatsapp'
+      ? (currentWa ? `whatsapp:${currentWa.id}` : '')
+      : view === 'email'
+        ? (currentEmail ? `email:${currentEmail.id}` : '')
+        : currentWa
+          ? `whatsapp:${currentWa.id}`
+          : currentEmail
+            ? `email:${currentEmail.id}`
+            : '';
+    const messageCount = currentWa?.messages.length ?? currentEmail?.messages.length ?? 0;
+    if (!chatKey) return;
+    const switchedChat = lastScrollChatRef.current !== chatKey;
+    const hasNewMessages = messageCount > lastScrollCountRef.current;
+    if (switchedChat || hasNewMessages) {
+      messagesEndRef.current?.scrollIntoView({ behavior: switchedChat ? "auto" : "smooth" });
+    }
+    lastScrollChatRef.current = chatKey;
+    lastScrollCountRef.current = messageCount;
+  }, [view, selectedEmailConv, selectedWAContact, autoData.emailConversations, waConversations]);
 
   const api = async (method: string, path: string, body?: Record<string, unknown>) => {
     const res = await authFetch(`${API}${path}`, {
@@ -808,14 +830,17 @@ const Automations = () => {
 
   const saveWaCorreoConsulta = async () => {
     if (!waCorreoInput.trim()) return;
-    await waApi('POST', '/correos-consultas', { email: waCorreoInput.trim() });
+    if ((autoData.correosConsultas || []).length >= 1) return;
+    await api("POST", "/correos-consultas", { email: waCorreoInput.trim().toLowerCase() });
     setWaCorreoInput('');
     setShowWaCorreosConsultas(false);
+    reload();
     loadWaData();
   };
 
   const deleteWaCorreoConsulta = async (email: string) => {
-    await waApi('DELETE', '/correos-consultas', { email });
+    await api("DELETE", "/correos-consultas", { email });
+    reload();
     loadWaData();
   };
 
@@ -1224,7 +1249,8 @@ const Automations = () => {
 
   const saveCorreo = async () => {
     if (!correoInput.trim()) return;
-    await api("POST", "/correos-consultas", { email: correoInput });
+    if ((autoData.correosConsultas || []).length >= 1) return;
+    await api("POST", "/correos-consultas", { email: correoInput.trim().toLowerCase() });
     setCorreoInput(""); setShowAddCorreo(false); reload();
   };
   const deleteCorreo = async (email: string) => { await api("DELETE", "/correos-consultas", { email }); reload(); };
@@ -1318,6 +1344,17 @@ const Automations = () => {
     } catch {
       setAutoData(prev => ({ ...prev, emailConversations: previousConversations }));
     }
+  };
+  const deleteEmailConversation = async (conversationId: string) => {
+    try {
+      const res = await authFetch(`${API}/conversations/${conversationId}?accountId=${accountId}`, { method: 'DELETE' });
+      if (!res.ok) return;
+      setAutoData(prev => ({
+        ...prev,
+        emailConversations: prev.emailConversations.filter(c => c.id !== conversationId),
+      }));
+      if (selectedEmailConv === conversationId) setSelectedEmailConv("");
+    } catch { /* ignore */ }
   };
   const setSubcuentaEsp = async (subcuentaId: string, especialidadId: string) => {
     await api("PUT", "/subcuenta-especialidad", { subcuentaId, especialidadId }); reload();
@@ -1442,6 +1479,7 @@ const Automations = () => {
         pending: pendingEmailIds.has(conv.id),
         outside24h: false,
         folderKeys: autoData.emailFolders.filter(folder => folder.conversationIds.includes(conv.id)).map(folder => `email:${folder.id}`),
+        classificationType: conv.classificationType,
       })),
       ...waConversations.map(conv => ({
         key: `whatsapp:${conv.id}`,
@@ -1462,6 +1500,8 @@ const Automations = () => {
         if (unifiedChannelFilter !== 'all' && conv.channel !== unifiedChannelFilter) return false;
         if (unifiedStatusFilter === 'pending' && !conv.pending) return false;
         if (unifiedStatusFilter === 'paused' && !conv.autoReplyPaused) return false;
+        if (conv.channel === 'email' && conv.classificationType === 'otro' && unifiedFolderFilter !== '__others__') return false;
+        if (unifiedFolderFilter === '__others__') return conv.channel === 'email' && conv.classificationType === 'otro';
         if (unifiedFolderFilter && !conv.folderKeys.includes(unifiedFolderFilter)) return false;
         if (unifiedSearch) {
           const q = unifiedSearch.toLowerCase();
@@ -1595,6 +1635,7 @@ const Automations = () => {
                 <select value={unifiedFolderFilter} onChange={e => setUnifiedFolderFilter(e.target.value)}
                   className="w-full px-2 py-1 text-xs bg-muted/50 border border-border rounded-md text-foreground">
                   <option value="">{t('automations.allFolders')}</option>
+                  <option value="__others__">Others</option>
                   {unifiedFolderOptions.map(folder => (
                     <option key={folder.key} value={folder.key}>
                       {unifiedChannelFilter === 'all'
@@ -1680,13 +1721,23 @@ const Automations = () => {
                   </div>
                   <div className="flex items-center gap-2 shrink-0">
                     {currentUnified.channel === 'email' && currentEmailConv && (
-                      <SwitchBox active={!currentEmailConv.autoReplyPaused} onChange={() => toggleConvAutoReply(currentEmailConv.id, !currentEmailConv.autoReplyPaused)} label="Auto-reply" />
+                      <>
+                        <SwitchBox active={!currentEmailConv.autoReplyPaused} onChange={() => toggleConvAutoReply(currentEmailConv.id, !currentEmailConv.autoReplyPaused)} label="Auto-reply" />
+                        <button onClick={() => deleteEmailConversation(currentEmailConv.id)} className="p-2 rounded-md hover:bg-accent text-muted-foreground hover:text-red-500 transition-colors" title={t('automations.deleteConversation')}>
+                          <Trash2 className="h-4 w-4" />
+                        </button>
+                      </>
                     )}
                     {currentUnified.channel === 'whatsapp' && currentWAConv && (
-                      <button onClick={() => toggleWaAutoReply(currentWAConv.id)} title={currentWAConv.autoReplyPaused ? t('automations.enableAutoReply') : t('automations.pauseAutoReply')}
-                        className={`p-2 rounded-md hover:bg-accent transition-colors ${currentWAConv.autoReplyPaused ? 'text-yellow-500' : 'text-muted-foreground'}`}>
-                        <PauseCircle className="h-4 w-4" />
-                      </button>
+                      <>
+                        <button onClick={() => toggleWaAutoReply(currentWAConv.id)} title={currentWAConv.autoReplyPaused ? t('automations.enableAutoReply') : t('automations.pauseAutoReply')}
+                          className={`p-2 rounded-md hover:bg-accent transition-colors ${currentWAConv.autoReplyPaused ? 'text-yellow-500' : 'text-muted-foreground'}`}>
+                          <PauseCircle className="h-4 w-4" />
+                        </button>
+                        <button onClick={() => deleteWaConversation(currentWAConv.id)} className="p-2 rounded-md hover:bg-accent text-muted-foreground hover:text-red-500 transition-colors" title={t('automations.deleteConversation')}>
+                          <Trash2 className="h-4 w-4" />
+                        </button>
+                      </>
                     )}
                   </div>
                 </div>
@@ -2051,7 +2102,7 @@ const Automations = () => {
       )}
 
       {showWaClassifyModal && (
-        <Modal title="Reglas de clasificacion de WhatsApp" onClose={() => setShowWaClassifyModal(false)}>
+        <Modal title="Reglas de clasificacion" onClose={() => setShowWaClassifyModal(false)}>
           <div className="space-y-4">
             <p className="text-xs text-muted-foreground">Las reglas ayudan a decidir a que carpeta enviar conversaciones automaticamente.</p>
             <div className="space-y-2 p-3 border border-border rounded-lg bg-muted/20">
@@ -2200,8 +2251,8 @@ const Automations = () => {
                 <button onClick={() => { setShowSubirInfo(true); setShowConsultas(false); }} className="flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium rounded-md border border-border bg-card hover:bg-accent text-foreground">
                   <Upload className="h-3.5 w-3.5" />{t('automations.uploadInfo')}
                 </button>
-                <button onClick={() => { setShowWaCorreosConsultas(true); setShowConsultas(false); }} className="flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium rounded-md bg-foreground text-background hover:opacity-90">
-                  <Phone className="h-3.5 w-3.5" />Correos de consulta WA
+                <button onClick={() => { setShowCorreosConsultas(true); setShowConsultas(false); }} className="flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium rounded-md bg-foreground text-background hover:opacity-90">
+                  <Mail className="h-3.5 w-3.5" />{t('automations.queryEmail')}
                 </button>
                 <button onClick={() => { setShowWaClassifyModal(true); setShowConsultas(false); }} className="flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium rounded-md border border-border bg-card hover:bg-accent text-foreground">
                   <Sparkles className="h-3.5 w-3.5" />Reglas de clasificacion
@@ -2318,9 +2369,14 @@ const Automations = () => {
         <Modal title={t('automations.queryEmailTitle')} onClose={() => setShowCorreosConsultas(false)}>
           <div className="flex items-center justify-between mb-5">
             <span className="text-xs text-muted-foreground">{autoData.correosConsultas.length} {autoData.correosConsultas.length !== 1 ? "emails" : "email"}</span>
-            <button onClick={() => setShowAddCorreo(true)} className="flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium rounded-md bg-foreground text-background hover:opacity-90">
-              <Plus className="h-3.5 w-3.5" />{t('automations.add')}
-            </button>
+            <div className="flex items-center gap-2">
+              <button onClick={() => setShowCorreoConsultaInfo(true)} className="p-2 rounded-md border border-border hover:bg-accent text-muted-foreground hover:text-foreground">
+                <Info className="h-3.5 w-3.5" />
+              </button>
+              <button onClick={() => setShowAddCorreo(true)} disabled={autoData.correosConsultas.length >= 1} className="flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium rounded-md bg-foreground text-background hover:opacity-90 disabled:opacity-50 disabled:cursor-not-allowed">
+                <Plus className="h-3.5 w-3.5" />{t('automations.add')}
+              </button>
+            </div>
           </div>
           {showAddCorreo && (
             <div className="mb-5 p-4 border border-border rounded-lg bg-muted/20 space-y-3">
@@ -2342,6 +2398,17 @@ const Automations = () => {
                   </div>
                 ))}
               </div>}
+        </Modal>
+      )}
+
+      {showCorreoConsultaInfo && (
+        <Modal title={t('automations.queryEmailTitle')} onClose={() => setShowCorreoConsultaInfo(false)}>
+          <div className="space-y-3 text-sm text-foreground">
+            <p>Este correo de consulta es único para todo el workspace.</p>
+            <p>Sirve tanto para dudas que llegan por Email como para dudas que llegan por WhatsApp.</p>
+            <p>Cuando la IA no sabe qué responder o qué hacer, enviará la consulta a este correo y esperará la respuesta.</p>
+            <p>Solo puede existir uno.</p>
+          </div>
         </Modal>
       )}
 
@@ -2902,7 +2969,9 @@ const Automations = () => {
       ? allConversations
       : allConversations.filter((c: any) => c.cuentaCorreoId === emailAccountFilter);
     const conversations = filteredEmailConversations.filter(c => {
-      if (folderFilter) {
+      if (c.classificationType === 'otro' && folderFilter !== '__others__') return false;
+      if (folderFilter === '__others__') return c.classificationType === 'otro';
+      if (folderFilter && folderFilter !== '__others__') {
         const folder = autoData.emailFolders.find(f => f.id === folderFilter);
         if (!folder?.conversationIds.includes(c.id)) return false;
       }
@@ -2976,7 +3045,7 @@ const Automations = () => {
                     >
                       <div className="flex items-center gap-2 min-w-0">
                         <FolderOpen className="h-3 w-3 text-muted-foreground shrink-0" />
-                        <span className="truncate">{folderFilter ? autoData.emailFolders.find(f => f.id === folderFilter)?.name || t('automations.allConversations') : t('automations.allConversations')}</span>
+                        <span className="truncate">{folderFilter === '__others__' ? 'Others' : folderFilter ? autoData.emailFolders.find(f => f.id === folderFilter)?.name || t('automations.allConversations') : t('automations.allConversations')}</span>
                       </div>
                       <ChevronDown className={`h-3 w-3 text-muted-foreground shrink-0 transition-transform duration-200 ${folderDropdownOpen ? 'rotate-180' : ''}`} />
                     </button>
@@ -2988,6 +3057,13 @@ const Automations = () => {
                         >
                           <Mail className="h-3 w-3 text-muted-foreground" />
                           {t('automations.allConversations')}
+                        </button>
+                        <button
+                          onClick={() => { setFolderFilter('__others__'); setFolderDropdownOpen(false); }}
+                          className={`w-full flex items-center gap-2 px-3 py-1.5 text-xs transition-colors ${folderFilter === '__others__' ? 'bg-accent text-foreground font-medium' : 'text-foreground hover:bg-accent/50'}`}
+                        >
+                          <FolderOpen className="h-3 w-3 text-muted-foreground" />
+                          Others
                         </button>
                         {autoData.emailFolders.map(f => (
                           <button
@@ -3964,7 +4040,7 @@ const Automations = () => {
       )}
 
       {showWaClassifyModal && (
-        <Modal title="Reglas de clasificacion de WhatsApp" onClose={() => setShowWaClassifyModal(false)}>
+        <Modal title="Reglas de clasificacion" onClose={() => setShowWaClassifyModal(false)}>
           <div className="space-y-4">
             <p className="text-xs text-muted-foreground">Las reglas ayudan a decidir a que carpeta enviar conversaciones automaticamente.</p>
             <div className="space-y-2 p-3 border border-border rounded-lg bg-muted/20">
@@ -4072,8 +4148,8 @@ const Automations = () => {
             <button onClick={() => setShowWaSelection(true)} className="flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium rounded-md border border-border bg-card hover:bg-accent text-foreground transition-colors">
               <Settings2 className="h-3.5 w-3.5" />Seleccion WhatsApp
             </button>
-            <button onClick={() => setShowWaCorreosConsultas(true)} className="flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium rounded-md border border-border bg-card hover:bg-accent text-foreground transition-colors">
-              <Phone className="h-3.5 w-3.5" />Correos consulta
+            <button onClick={() => setShowCorreosConsultas(true)} className="flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium rounded-md border border-border bg-card hover:bg-accent text-foreground transition-colors">
+              <Mail className="h-3.5 w-3.5" />{t('automations.queryEmail')}
             </button>
             <button
               onClick={() => { setShowWhatsAppSessions(true); void refreshWhatsAppSessionState(); }}
@@ -4449,8 +4525,8 @@ const Automations = () => {
               <button onClick={() => { setShowSubirInfo(true); setShowConsultas(false); }} className="flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium rounded-md border border-border bg-card hover:bg-accent text-foreground">
                 <Upload className="h-3.5 w-3.5" />{t('automations.uploadInfo')}
               </button>
-              <button onClick={() => { setShowWaCorreosConsultas(true); setShowConsultas(false); }} className="flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium rounded-md bg-foreground text-background hover:opacity-90">
-                <Phone className="h-3.5 w-3.5" />Correos de consulta WA
+              <button onClick={() => { setShowCorreosConsultas(true); setShowConsultas(false); }} className="flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium rounded-md bg-foreground text-background hover:opacity-90">
+                <Mail className="h-3.5 w-3.5" />{t('automations.queryEmail')}
               </button>
               <button onClick={() => { setShowWaClassifyModal(true); setShowConsultas(false); }} className="flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium rounded-md border border-border bg-card hover:bg-accent text-foreground">
                 <Sparkles className="h-3.5 w-3.5" />Reglas de clasificacion

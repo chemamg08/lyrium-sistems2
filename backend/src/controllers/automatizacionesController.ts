@@ -313,8 +313,16 @@ export const createCorreoConsulta: RequestHandler = async (req, res) => {
   if (!email) { res.status(400).json({ error: 'email requerido' }); return; }
   try {
     const account = await getAccount(accountId);
-    if (!account.correosConsultas.includes(email)) account.correosConsultas.push(email);
-    await saveAccount(accountId, { correosConsultas: account.correosConsultas });
+    const normalized = String(email).trim().toLowerCase();
+    const current = Array.from(new Set([...(account.correosConsultas || []), ...(account.whatsappCorreosConsultas || [])]));
+    if (current.length >= 1 && !current.includes(normalized)) {
+      res.status(409).json({ error: 'Solo se permite un correo de consulta por workspace' });
+      return;
+    }
+    if (!current.includes(normalized)) current.push(normalized);
+    account.correosConsultas = current.slice(0, 1);
+    account.whatsappCorreosConsultas = [];
+    await saveAccount(accountId, { correosConsultas: account.correosConsultas, whatsappCorreosConsultas: account.whatsappCorreosConsultas });
     res.json({ ok: true });
   } catch (err: any) {
     res.status(500).json({ error: err.message });
@@ -328,8 +336,10 @@ export const deleteCorreoConsulta: RequestHandler = async (req, res) => {
   if (!verifyOwnership(req as AuthRequest, accountId)) { res.status(403).json({ error: 'Acceso denegado' }); return; }
   try {
     const account = await getAccount(accountId);
-    account.correosConsultas = account.correosConsultas.filter(c => c !== email);
-    await saveAccount(accountId, { correosConsultas: account.correosConsultas });
+    const normalized = String(email).trim().toLowerCase();
+    account.correosConsultas = account.correosConsultas.filter(c => c !== normalized);
+    account.whatsappCorreosConsultas = (account.whatsappCorreosConsultas || []).filter(c => c !== normalized);
+    await saveAccount(accountId, { correosConsultas: account.correosConsultas, whatsappCorreosConsultas: account.whatsappCorreosConsultas });
     res.json({ ok: true });
   } catch (err: any) {
     res.status(500).json({ error: err.message });

@@ -404,7 +404,7 @@ export const getWhatsAppConversations: RequestHandler = async (req, res) => {
       folders: account?.whatsappFolders || [],
       switchActivo: account?.whatsappSwitchActivo || false,
       connected: account?.whatsappSession?.connected || false,
-      correosConsultas: account?.whatsappCorreosConsultas || [],
+      correosConsultas: account?.correosConsultas || account?.whatsappCorreosConsultas || [],
       selection: {
         respondConsultasGenerales: account?.whatsappRespondConsultasGenerales !== false,
         respondSolicitudesServicio: account?.whatsappRespondSolicitudesServicio !== false,
@@ -650,12 +650,17 @@ export const createWhatsappCorreoConsulta: RequestHandler = async (req, res) => 
     const account = await getAccount(accountId);
     if (!account) { res.status(404).json({ error: 'Account not found' }); return; }
 
-    const list = account.whatsappCorreosConsultas || [];
+    const list = Array.from(new Set([...(account.correosConsultas || []), ...(account.whatsappCorreosConsultas || [])]));
+    if (list.length >= 1 && !list.includes(normalized)) {
+      res.status(409).json({ error: 'Solo se permite un correo de consulta por workspace' });
+      return;
+    }
     if (!list.includes(normalized)) list.push(normalized);
-    account.whatsappCorreosConsultas = list;
+    account.correosConsultas = list.slice(0, 1);
+    account.whatsappCorreosConsultas = [];
     await account.save();
 
-    res.json({ ok: true, correosConsultas: list });
+    res.json({ ok: true, correosConsultas: account.correosConsultas });
   } catch (err: any) {
     res.status(500).json({ error: err.message });
   }
@@ -671,10 +676,11 @@ export const deleteWhatsappCorreoConsulta: RequestHandler = async (req, res) => 
     const account = await getAccount(accountId);
     if (!account) { res.status(404).json({ error: 'Account not found' }); return; }
 
+    account.correosConsultas = (account.correosConsultas || []).filter((e: string) => e !== normalized);
     account.whatsappCorreosConsultas = (account.whatsappCorreosConsultas || []).filter((e: string) => e !== normalized);
     await account.save();
 
-    res.json({ ok: true, correosConsultas: account.whatsappCorreosConsultas });
+    res.json({ ok: true, correosConsultas: account.correosConsultas });
   } catch (err: any) {
     res.status(500).json({ error: err.message });
   }

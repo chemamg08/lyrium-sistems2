@@ -227,6 +227,7 @@ interface EmailConversation {
   cuentaCorreoEmail?: string;
   autoClientId?: string;
   autoReplyPaused?: boolean;
+  classificationType?: 'consulta_general' | 'solicitud_servicio' | 'otro';
 }
 
 interface PendingConsulta {
@@ -324,8 +325,46 @@ function normalizeConsultaSubject(subject: string): string {
 
 function isConsultaMailbox(account: any, sender: string): boolean {
   const normalizedSender = normalizeEmailAddress(sender);
-  return (account.correosConsultas || []).some((email: string) => normalizeEmailAddress(email) === normalizedSender)
-    || (account.whatsappCorreosConsultas || []).some((email: string) => normalizeEmailAddress(email) === normalizedSender);
+  return getUnifiedConsultaEmails(account).some((email: string) => normalizeEmailAddress(email) === normalizedSender);
+}
+
+function getUnifiedConsultaEmails(account: any): string[] {
+  const merged = [
+    ...(Array.isArray(account?.correosConsultas) ? account.correosConsultas : []),
+    ...(Array.isArray(account?.whatsappCorreosConsultas) ? account.whatsappCorreosConsultas : []),
+  ]
+    .map((email: any) => normalizeEmailAddress(String(email || '')))
+    .filter(Boolean);
+  return Array.from(new Set(merged)).slice(0, 1);
+}
+
+function isLikelyCommercialEmail(email: IncomingEmail): boolean {
+  const from = normalizeEmailAddress(email.from || '');
+  const subject = String(email.subject || '').toLowerCase();
+  const body = String(email.body || '').toLowerCase();
+  const senderName = String(email.fromName || '').toLowerCase();
+
+  const senderHints = [
+    'no-reply', 'noreply', 'newsletter', 'marketing', 'mailer', 'notification',
+    'notifications', 'promo', 'promotions', 'campaign', 'news@', 'offers', 'ofertas',
+  ];
+  const subjectHints = [
+    'newsletter', 'unsubscribe', 'suscr', 'promoción', 'promocion', 'oferta',
+    'descuento', 'black friday', 'sale', 'rebaja', 'últimas plazas', 'ultimas plazas',
+    'webinar', 'evento gratuito', 'free trial', 'trial', 'campaña', 'campana',
+  ];
+  const bodyHints = [
+    'list-unsubscribe', 'unsubscribe', 'darse de baja', 'cancelar suscripción',
+    'cancelar suscripcion', 'view in browser', 'open in browser', 'manage preferences',
+    'preferencias de comunicación', 'preferencias de comunicacion', 'this email was sent to',
+    'ha recibido este correo porque', 'email marketing', 'promotional email',
+  ];
+
+  const senderMatch = senderHints.some((hint) => from.includes(hint) || senderName.includes(hint));
+  const subjectMatch = subjectHints.some((hint) => subject.includes(hint));
+  const bodyMatch = bodyHints.some((hint) => body.includes(hint));
+
+  return senderMatch || (subjectMatch && bodyMatch);
 }
 
 function findPendingConsultaIndex(account: any, reply: IncomingEmail, incomingCuentaCorreo?: CuentaCorreo): number {
@@ -2378,6 +2417,7 @@ function addToConversation(
   cuentaCorreo: CuentaCorreo,
   isReply: boolean,
   replyText?: string,
+  classificationType?: 'consulta_general' | 'solicitud_servicio' | 'otro',
 ): string {
   // Find existing conversation with this contact
   let conv = findEmailConversation(account, email.from, cuentaCorreo.id);
@@ -2425,6 +2465,7 @@ function addToConversation(
       unread: 1,
       cuentaCorreoId: cuentaCorreo.id,
       cuentaCorreoEmail: cuentaCorreo.correo,
+      classificationType,
     };
     account.emailConversations.push(newConv);
     return newConv.id;
@@ -2446,6 +2487,9 @@ function addToConversation(
   });
   conv.unread++;
   conv.lastMessageTime = now.toISOString();
+  if (classificationType) {
+    conv.classificationType = classificationType;
+  }
 
   // Add auto-reply if provided
   if (isReply && replyText) {
@@ -2518,8 +2562,8 @@ async function processOneEmail(
 
   // Check if this is a reply to a pending consulta (from consultas emails)
   const fromLower = email.from.toLowerCase();
-  const isConsulta = account.correosConsultas.some((c: any) => c.toLowerCase() === fromLower)
-    || (account.whatsappCorreosConsultas || []).some((c: any) => c.toLowerCase() === fromLower)
+  const consultaEmails = getUnifiedConsultaEmails(account);
+  const isConsulta = consultaEmails.some((c: any) => c.toLowerCase() === fromLower)
     || email.subject.includes('[Consulta pendiente]');
   if (isConsulta) {
     const handled = await processConsultaReply(email, accountId, cuentaCorreo);
@@ -2569,12 +2613,15 @@ async function processOneEmail(
     : '';
 
   // Classify the email
-  const classification = await classifyEmail(
+  let classification = await classifyEmail(
     email.body,
     email.subject,
     account.especialidades,
     historyContext,
   );
+  if (classification.type !== 'solicitud_servicio' && isLikelyCommercialEmail(email)) {
+    classification = { type: 'otro' };
+  }
 
   // ── Email selection filters ──
   const respondConsultas = account.respondConsultasGenerales !== false;
@@ -2583,7 +2630,7 @@ async function processOneEmail(
 
   if (soloConocidos && !existingConv && classification.type !== 'otro') {
     // Only respond to known contacts — this is a new contact, just store
-    const convIdSolo = addToConversation(account, email, cuentaCorreo, false);
+    const convIdSolo = addToConversation(account, email, cuentaCorreo, false, undefined, classification.type);
     await saveAccount(account);
     await applyClassifyRules(account, convIdSolo, email.subject, email.body);
     return;
@@ -2591,7 +2638,7 @@ async function processOneEmail(
 
   if (classification.type === 'consulta_general' && !respondConsultas) {
     // General queries disabled — store but don't auto-respond
-    const convIdCg = addToConversation(account, email, cuentaCorreo, false);
+    const convIdCg = addToConversation(account, email, cuentaCorreo, false, undefined, classification.type);
     await saveAccount(account);
     await applyClassifyRules(account, convIdCg, email.subject, email.body);
     return;
@@ -2599,7 +2646,7 @@ async function processOneEmail(
 
   if (classification.type === 'solicitud_servicio' && !respondSolicitudes) {
     // Service requests disabled — store but don't auto-manage
-    const convIdSs = addToConversation(account, email, cuentaCorreo, false);
+    const convIdSs = addToConversation(account, email, cuentaCorreo, false, undefined, classification.type);
     await saveAccount(account);
     await applyClassifyRules(account, convIdSs, email.subject, email.body);
     return;
@@ -2607,7 +2654,7 @@ async function processOneEmail(
 
   if (classification.type === 'otro') {
     // Just store the conversation, no action
-    const convIdOtro = addToConversation(account, email, cuentaCorreo, false);
+    const convIdOtro = addToConversation(account, email, cuentaCorreo, false, undefined, classification.type);
     await saveAccount(account);
     await applyClassifyRules(account, convIdOtro, email.subject, email.body);
     return;
@@ -2620,13 +2667,13 @@ async function processOneEmail(
 
     if (kbResult.found && kbResult.answer) {
       // Schedule delayed reply
-      const convId = addToConversation(account, email, cuentaCorreo, false);
+      const convId = addToConversation(account, email, cuentaCorreo, false, undefined, classification.type);
       await saveAccount(account);
       await applyClassifyRules(account, convId, email.subject, email.body);
       await scheduleReply(email.from, email.subject, kbResult.answer, email.messageId, email.references, accountId, convId, cuentaCorreo.id);
     } else {
       // Forward to consultas
-      const convId = addToConversation(account, email, cuentaCorreo, false);
+      const convId = addToConversation(account, email, cuentaCorreo, false, undefined, classification.type);
       await saveAccount(account);
       await applyClassifyRules(account, convId, email.subject, email.body);
       await forwardToConsultas(cuentaConfig, account.correosConsultas, email, account, cuentaCorreo.id, convId);
@@ -2640,7 +2687,7 @@ async function processOneEmail(
     // Check if auto-assign is enabled
     if (!account.autoAssignEnabled) {
       // Auto-assign disabled — create pending case
-      const convIdNoAssign = addToConversation(account, email, cuentaCorreo, false);
+      const convIdNoAssign = addToConversation(account, email, cuentaCorreo, false, undefined, classification.type);
       await saveAccount(account);
       await applyClassifyRules(account, convIdNoAssign, email.subject, email.body);
       const { client } = await findOrCreateClient(accountId, email.from, '', email.fromName || email.from);
@@ -2656,7 +2703,7 @@ async function processOneEmail(
 
       if (explicitRequest) {
         // Client explicitly asked for assignment — assign directly
-        const convId = addToConversation(account, email, cuentaCorreo, false);
+        const convId = addToConversation(account, email, cuentaCorreo, false, undefined, classification.type);
         await saveAccount(account);
         await applyClassifyRules(account, convId, email.subject, email.body);
         await assignCaseUnified(email, accountId, account, classification.especialidadId, cuentaCorreo, convId);
@@ -2668,7 +2715,7 @@ async function processOneEmail(
         // Ask client before assigning — create pending case
         const espName = account.especialidades.find((e: any) => e.id === classification.especialidadId)?.nombre || 'su caso';
         const askMsg = getAutomationMessage(clientLanguage, 'assignmentAskEmail', { espName });
-        const convId = addToConversation(account, email, cuentaCorreo, false);
+        const convId = addToConversation(account, email, cuentaCorreo, false, undefined, classification.type);
         await saveAccount(account);
         await applyClassifyRules(account, convId, email.subject, email.body);
         await scheduleReply(email.from, email.subject, askMsg, email.messageId, email.references, accountId, convId, cuentaCorreo.id);
@@ -2692,7 +2739,7 @@ async function processOneEmail(
       }
     } else {
       // Cannot assign (no specialist) — create pending case and forward
-      const convId = addToConversation(account, email, cuentaCorreo, false);
+      const convId = addToConversation(account, email, cuentaCorreo, false, undefined, classification.type);
       await saveAccount(account);
       await applyClassifyRules(account, convId, email.subject, email.body);
       const { client } = await findOrCreateClient(accountId, email.from, '', email.fromName || email.from);
@@ -2711,8 +2758,8 @@ async function processOneEmailUnified(
   const account = await getAccount(accountId);
   const cuentaConfig = toCuentaConfig(cuentaCorreo);
   const fromLower = email.from.toLowerCase();
-  const isConsulta = account.correosConsultas.some((c: any) => c.toLowerCase() === fromLower)
-    || (account.whatsappCorreosConsultas || []).some((c: any) => c.toLowerCase() === fromLower)
+  const consultaEmails = getUnifiedConsultaEmails(account);
+  const isConsulta = consultaEmails.some((c: any) => c.toLowerCase() === fromLower)
     || email.subject.includes('[Consulta pendiente]');
   if (isConsulta) {
     const handled = await processConsultaReply(email, accountId, cuentaCorreo);
@@ -2793,7 +2840,7 @@ async function processOneEmailUnified(
       folderIds: rule.folderIds || [],
     })),
     correoConsultas: {
-      destino: account.correosConsultas || [],
+      destino: consultaEmails,
       cuentaOperativa: (account.cuentasCorreo || []).map((item: any) => item.correo).filter(Boolean),
     },
     documentos: (account.documentos || []).map((doc: any) => ({
@@ -2807,6 +2854,20 @@ async function processOneEmailUnified(
     ),
   });
 
+  if (decision.clasificacion.tipo !== 'solicitud_servicio' && isLikelyCommercialEmail(email)) {
+    decision.clasificacion.tipo = 'otro';
+    decision.clasificacion.especialidadId = undefined;
+    decision.accion = 'no_responder';
+    decision.mensajeCliente = '';
+    decision.folderIds = [];
+  }
+
+  const storedConversation = account.emailConversations.find((conversation: any) => conversation.id === convId);
+  if (storedConversation) {
+    storedConversation.classificationType = decision.clasificacion.tipo;
+    await saveAccount(account);
+  }
+
   await assignEmailConversationToFolders(account, convId, decision.folderIds);
 
   if (decision.clasificacion.tipo === 'solicitud_servicio') {
@@ -2816,7 +2877,7 @@ async function processOneEmailUnified(
   if (decision.accion === 'preguntar_consultas') {
     await forwardToConsultas(
       cuentaConfig,
-      account.correosConsultas,
+      consultaEmails,
       email,
       account,
       cuentaCorreo.id,
