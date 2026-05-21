@@ -268,8 +268,11 @@ export const sendDefenseMessage = async (req: Request, res: Response) => {
     const confirmationIntent = chat.awaitingStrategyConfirmation
       ? await classifyStrategyConfirmation(content.trim())
       : 'aclarar';
+    const directSaveIntent = !chat.awaitingStrategyConfirmation
+      ? await wantsDirectStrategySave(content.trim())
+      : false;
 
-    if (chat.awaitingStrategyConfirmation && confirmationIntent === 'confirmar') {
+    if ((chat.awaitingStrategyConfirmation && confirmationIntent === 'confirmar') || directSaveIntent) {
       // El usuario confirmó guardar estrategia
       try {
         const extraction = await extractDefenseStrategy(chat.messages);
@@ -445,6 +448,31 @@ async function classifyStrategyConfirmation(userMessage: string): Promise<Strate
   }
 }
 
+// Detecta mediante IA si el usuario pide guardar la estrategia por iniciativa propia
+async function wantsDirectStrategySave(userMessage: string): Promise<boolean> {
+  try {
+    const response = await getAiClient().chat.completions.create({
+      model: AI_MODEL,
+      messages: [
+        {
+          role: 'system',
+          content: 'Eres un clasificador de intenciones. Debes decidir si el usuario está pidiendo de forma clara que se guarde ahora mismo la estrategia de defensa actual. Responde ÚNICAMENTE con una sola palabra exacta: "guardar" o "continuar". Responde "continuar" si el usuario hace una pregunta, pide una aclaración, propone cambios, habla en condicional o no da una orden clara de guardar.'
+        },
+        {
+          role: 'user',
+          content: `Clasifica la intención del siguiente mensaje.\n\nMensaje: "${userMessage}"`
+        }
+      ],
+      max_tokens: 5,
+      temperature: 0
+    });
+    const answer = stripThinkTags(response.choices[0].message.content || '').toLowerCase().trim();
+    return answer.includes('guardar');
+  } catch {
+    return false;
+  }
+}
+
 // POST /api/defense-chat/message/stream
 export const streamDefenseMessage = async (req: Request, res: Response) => {
   try {
@@ -483,8 +511,11 @@ export const streamDefenseMessage = async (req: Request, res: Response) => {
     const confirmationIntent = chat.awaitingStrategyConfirmation
       ? await classifyStrategyConfirmation(content.trim())
       : 'aclarar';
+    const directSaveIntent = !chat.awaitingStrategyConfirmation
+      ? await wantsDirectStrategySave(content.trim())
+      : false;
 
-    if (chat.awaitingStrategyConfirmation && confirmationIntent === 'confirmar') {
+    if ((chat.awaitingStrategyConfirmation && confirmationIntent === 'confirmar') || directSaveIntent) {
       // Iniciar SSE inmediatamente para que el frontend muestre spinner
       let clientDisconnected = false;
       res.on('close', () => { clientDisconnected = true; });
