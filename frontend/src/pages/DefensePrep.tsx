@@ -175,7 +175,9 @@ const DefensePrep = () => {
       loadDefenseChat(activeChatId);
       loadSavedStrategies(activeChatId);
       sessionStorage.setItem(ACTIVE_DEFENSE_CHAT_KEY, activeChatId);
-      setPendingCounterReplicaJobId(sessionStorage.getItem(getCounterReplicaJobKey(activeChatId)));
+      const savedCounterReplicaJobId = sessionStorage.getItem(getCounterReplicaJobKey(activeChatId));
+      setPendingCounterReplicaJobId(savedCounterReplicaJobId);
+      setSimulatingCounter(Boolean(savedCounterReplicaJobId));
 
       // Detectar si hay un stream en curso (componente fue remontado)
       const streamingFlag = sessionStorage.getItem(`streaming_defense_${activeChatId}`);

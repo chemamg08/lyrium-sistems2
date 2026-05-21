@@ -265,13 +265,11 @@ export const sendDefenseMessage = async (req: Request, res: Response) => {
       chat.awaitingStrategyConfirmation = false;
     }
 
-    // Detectar si el usuario está confirmando guardar estrategia
-    const confirmationKeywords = ['sí', 'si', 'guarda', 'guardar', 'guárdalo', 'guardalo', 'ok', 'vale', 'adelante', 'procede'];
-    const userContentLower = content.trim().toLowerCase();
-    const isConfirming = chat.awaitingStrategyConfirmation && 
-                         confirmationKeywords.some(kw => userContentLower.includes(kw));
+    const confirmationIntent = chat.awaitingStrategyConfirmation
+      ? await classifyStrategyConfirmation(content.trim())
+      : 'aclarar';
 
-    if (isConfirming) {
+    if (chat.awaitingStrategyConfirmation && confirmationIntent === 'confirmar') {
       // El usuario confirmó guardar estrategia
       try {
         const extraction = await extractDefenseStrategy(chat.messages);
@@ -342,6 +340,19 @@ export const sendDefenseMessage = async (req: Request, res: Response) => {
         console.error('Error al extraer estrategia:', error);
         // Continuar con flujo normal si falla la extracción
       }
+    } else if (chat.awaitingStrategyConfirmation && confirmationIntent === 'rechazar') {
+      const userMessage: Message = { id: Date.now().toString(), role: 'user', content: content.trim() };
+      chat.messages.push(userMessage);
+      const assistantMessage: Message = {
+        id: (Date.now() + 1).toString(),
+        role: 'assistant',
+        content: 'Perfecto, no la guardo. Seguimos trabajando sobre la defensa hasta que me indiques lo contrario.'
+      };
+      chat.messages.push(assistantMessage);
+      chat.awaitingStrategyConfirmation = false;
+      chat.lastModified = new Date().toISOString();
+      await chat.save();
+      return res.json({ userMessage, assistantMessage, strategySaved: false });
     }
 
     // Crear mensaje del usuario
@@ -405,28 +416,32 @@ export const sendDefenseMessage = async (req: Request, res: Response) => {
   }
 };
 
-// Detecta mediante IA si el usuario quiere guardar la estrategia
-async function wantsSaveStrategy(userMessage: string): Promise<boolean> {
+type StrategyConfirmationIntent = 'confirmar' | 'rechazar' | 'aclarar';
+
+// Detecta mediante IA si el usuario confirma, rechaza o solo aclara
+async function classifyStrategyConfirmation(userMessage: string): Promise<StrategyConfirmationIntent> {
   try {
     const response = await getAiClient().chat.completions.create({
       model: AI_MODEL,
       messages: [
         {
           role: 'system',
-          content: 'Eres un clasificador de intenciones. Responde ÚNICAMENTE con "sí" o "no", sin explicación.'
+          content: 'Eres un clasificador de intenciones. El usuario responde a la pregunta de si quiere guardar una estrategia de defensa. Responde ÚNICAMENTE con una sola palabra exacta entre: "confirmar", "rechazar" o "aclarar". Usa "aclarar" si el usuario hace una pregunta, pide cambios, corrige algo o no está dando permiso claro para guardar.'
         },
         {
           role: 'user',
-          content: `¿El siguiente mensaje expresa la intención de guardar, almacenar o extraer una estrategia de defensa legal?\n\nMensaje: "${userMessage}"` 
+          content: `Clasifica la intención del siguiente mensaje.\n\nMensaje: "${userMessage}"`
         }
       ],
       max_tokens: 5,
       temperature: 0
     });
     const answer = stripThinkTags(response.choices[0].message.content || '').toLowerCase().trim();
-    return answer.startsWith('s');
+    if (answer.includes('confirmar')) return 'confirmar';
+    if (answer.includes('rechazar')) return 'rechazar';
+    return 'aclarar';
   } catch {
-    return false;
+    return 'aclarar';
   }
 }
 
@@ -465,17 +480,11 @@ export const streamDefenseMessage = async (req: Request, res: Response) => {
     chat.lastModified = new Date().toISOString();
     await chat.save();
 
-    // Detectar confirmación de guardar estrategia (keywords + flag)
-    const confirmationKeywords = ['sí', 'si', 'guarda', 'guardar', 'guárdalo', 'guardalo', 'ok', 'vale', 'adelante', 'procede', 'actualiza', 'actualízala'];
-    const userContentLower = content.trim().toLowerCase();
-    const isConfirmingByKeyword = chat.awaitingStrategyConfirmation && 
-                                  confirmationKeywords.some(kw => userContentLower.includes(kw));
+    const confirmationIntent = chat.awaitingStrategyConfirmation
+      ? await classifyStrategyConfirmation(content.trim())
+      : 'aclarar';
 
-    // También detectar intención explícita con IA
-    const hasAssistantMessages = chat.messages.filter(m => m.role === 'assistant').length > 0;
-    const wantsSave = isConfirmingByKeyword || (hasAssistantMessages && await wantsSaveStrategy(content.trim()));
-
-    if (wantsSave) {
+    if (chat.awaitingStrategyConfirmation && confirmationIntent === 'confirmar') {
       // Iniciar SSE inmediatamente para que el frontend muestre spinner
       let clientDisconnected = false;
       res.on('close', () => { clientDisconnected = true; });
@@ -556,6 +565,22 @@ export const streamDefenseMessage = async (req: Request, res: Response) => {
         console.error('Error extrayendo estrategia:', extractError);
         // Si falla la extracción, continuar con flujo normal
       }
+    } else if (chat.awaitingStrategyConfirmation && confirmationIntent === 'rechazar') {
+      const rejectMsg = 'Perfecto, no la guardo. Seguimos trabajando sobre la defensa hasta que me indiques lo contrario.';
+      const assistantMsg: Message = { id: (Date.now() + 1).toString(), role: 'assistant', content: rejectMsg };
+      chat.messages.push(assistantMsg);
+      chat.awaitingStrategyConfirmation = false;
+      await chat.save();
+
+      res.setHeader('Content-Type', 'text/event-stream');
+      res.setHeader('Cache-Control', 'no-cache');
+      res.setHeader('Connection', 'keep-alive');
+      for (const word of rejectMsg.split(' ')) {
+        res.write(`data: ${JSON.stringify({ token: word + ' ' })}\n\n`);
+      }
+      res.write(`data: ${JSON.stringify({ done: true })}\n\n`);
+      res.end();
+      return;
     }
 
     const rawDefMsgs = chat.messages.map(m => ({ role: m.role as 'user' | 'assistant', content: m.content }));
