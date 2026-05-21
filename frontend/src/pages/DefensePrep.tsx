@@ -65,8 +65,8 @@ interface SavedStrategy {
 const API_URL = import.meta.env.VITE_API_URL;
 const PUBLIC_EVIDENCE_API_BASE = '/api/public/evidence';
 const getPublicEvidenceApiUrl = (token?: string) => token ? `${PUBLIC_EVIDENCE_API_BASE}/${token}` : '';
-const getPublicEvidenceViewerUrl = (token?: string) => token ? `/public/evidence/${token}` : '';
 const ACTIVE_DEFENSE_CHAT_KEY = 'activeDefenseChatId';
+const getCounterReplicaJobKey = (chatId: string) => `defenseCounterReplicaJob_${chatId}`;
 
 const DefensePrep = () => {
   const { t } = useTranslation();
@@ -127,6 +127,7 @@ const DefensePrep = () => {
   const [isUploadingEvidence, setIsUploadingEvidence] = useState(false);
   // Counter-replica states
   const [simulatingCounter, setSimulatingCounter] = useState(false);
+  const [pendingCounterReplicaJobId, setPendingCounterReplicaJobId] = useState<string | null>(null);
   const [counterReplicaResult, setCounterReplicaResult] = useState<CounterReplica | null>(null);
   const [savingCounter, setSavingCounter] = useState(false);
   const [counterSaved, setCounterSaved] = useState(false);
@@ -169,9 +170,12 @@ const DefensePrep = () => {
   // Cargar chat activo cuando cambia
   useEffect(() => {
     if (activeChatId) {
+      setCounterReplicaResult(null);
+      setCounterSaved(false);
       loadDefenseChat(activeChatId);
       loadSavedStrategies(activeChatId);
       sessionStorage.setItem(ACTIVE_DEFENSE_CHAT_KEY, activeChatId);
+      setPendingCounterReplicaJobId(sessionStorage.getItem(getCounterReplicaJobKey(activeChatId)));
 
       // Detectar si hay un stream en curso (componente fue remontado)
       const streamingFlag = sessionStorage.getItem(`streaming_defense_${activeChatId}`);
@@ -390,6 +394,56 @@ const DefensePrep = () => {
     if (activeTab === 'evidence' && activeChatId) loadEvidence();
   }, [activeTab, activeChatId]);
 
+  useEffect(() => {
+    if (!pendingCounterReplicaJobId || !activeChatId) return;
+
+    let canceled = false;
+    const poll = async () => {
+      try {
+        const response = await authFetch(`${API_URL}/jobs/${pendingCounterReplicaJobId}`);
+
+        if (response.status === 404) {
+          if (canceled) return;
+          setPendingCounterReplicaJobId(null);
+          sessionStorage.removeItem(getCounterReplicaJobKey(activeChatId));
+          setSimulatingCounter(false);
+          toast({ title: 'La simulacion de contrarréplica ya no está disponible.', variant: 'destructive' });
+          return;
+        }
+
+        if (!response.ok) return;
+
+        const job = await response.json();
+        if (canceled) return;
+
+        if (job.status === 'done') {
+          setPendingCounterReplicaJobId(null);
+          sessionStorage.removeItem(getCounterReplicaJobKey(activeChatId));
+          setSimulatingCounter(false);
+          setCounterReplicaResult(job.result?.counterReplica || null);
+          setShowProvisionalStrategy(true);
+        } else if (job.status === 'failed' || job.status === 'canceled') {
+          setPendingCounterReplicaJobId(null);
+          sessionStorage.removeItem(getCounterReplicaJobKey(activeChatId));
+          setSimulatingCounter(false);
+          toast({ title: job.error || 'Error al simular contrarréplica', variant: 'destructive' });
+        }
+      } catch (error) {
+        console.error('Error consultando job de contrarréplica:', error);
+      }
+    };
+
+    void poll();
+    const interval = setInterval(() => {
+      void poll();
+    }, 1500);
+
+    return () => {
+      canceled = true;
+      clearInterval(interval);
+    };
+  }, [activeChatId, pendingCounterReplicaJobId, toast]);
+
   const handleSaveEvidence = async () => {
     if (!activeChatId) return;
     const accountId = sessionStorage.getItem('accountId');
@@ -454,7 +508,9 @@ const DefensePrep = () => {
         loadEvidenceTrash();
         loadEvidenceQuota();
       }
-    } catch (err) { console.error(err); }
+    } catch (err) {
+      console.error(err);
+    }
   };
 
   const startEditEvidence = (ev: any) => {
@@ -478,18 +534,30 @@ const DefensePrep = () => {
     setCounterReplicaResult(null);
     setCounterSaved(false);
     try {
-      const res = await authFetch(`${import.meta.env.VITE_API_URL}/defense-chat/${activeChatId}/simulate-counter-replica`, {
+      const res = await authFetch(`${API_URL}/jobs`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ accountId }),
+        body: JSON.stringify({
+          endpoint: `/defense-chat/${activeChatId}/simulate-counter-replica`,
+          method: 'POST',
+          accountId,
+          chatId: activeChatId,
+          body: { accountId },
+        }),
       });
       if (res.ok) {
         const data = await res.json();
-        setCounterReplicaResult(data.counterReplica);
-        setShowProvisionalStrategy(true);
+        setPendingCounterReplicaJobId(data.id);
+        sessionStorage.setItem(getCounterReplicaJobKey(activeChatId), data.id);
+      } else {
+        setSimulatingCounter(false);
+        toast({ title: 'Error al iniciar la simulación de contrarréplica', variant: 'destructive' });
       }
-    } catch (err) { console.error(err); }
-    setSimulatingCounter(false);
+    } catch (err) {
+      console.error(err);
+      setSimulatingCounter(false);
+      toast({ title: 'Error al iniciar la simulación de contrarréplica', variant: 'destructive' });
+    }
   };
 
   const handleSaveCounterReplica = async () => {
@@ -1926,7 +1994,17 @@ const DefensePrep = () => {
           <div className="bg-card border border-border rounded-xl max-w-4xl w-full max-h-[90vh] flex flex-col shadow-2xl" onClick={(e) => e.stopPropagation()}>
             <div className="flex items-center justify-between p-4 border-b">
               <h3 className="font-semibold truncate pr-4">{evidenceViewerItem.description || evidenceViewerItem.fileName}</h3>
-              <button onClick={() => setEvidenceViewerItem(null)} className="p-1 hover:bg-accent rounded"><X className="h-4 w-4" /></button>
+              <div className="flex items-center gap-2">
+                <a
+                  href={getPublicEvidenceApiUrl(evidenceViewerItem.publicToken)}
+                  download={evidenceViewerItem.fileName}
+                  className="p-1 hover:bg-accent rounded text-muted-foreground hover:text-foreground"
+                  title="Descargar"
+                >
+                  <Download className="h-4 w-4" />
+                </a>
+                <button onClick={() => setEvidenceViewerItem(null)} className="p-1 hover:bg-accent rounded"><X className="h-4 w-4" /></button>
+              </div>
             </div>
             <div className="flex-1 overflow-auto p-4 flex items-center justify-center bg-black/50">
               {evidenceViewerItem.mimeType?.startsWith('image/') ? (
