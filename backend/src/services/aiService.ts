@@ -141,6 +141,9 @@ Debes ser preciso, profesional y crítico. Si detectas alguna incoherencia, señ
 IMPORTANTE: Tus respuestas NO deben exceder las 500 palabras. Sé conciso y directo.
 
 IDIOMA: Responde SIEMPRE en el mismo idioma en que el usuario te escriba.
+- Si respondes en español, usa español jurídico natural de España.
+- Evita anglicismos y términos en inglés cuando exista un equivalente claro en español.
+- Por ejemplo: di "coartada" y no "alibi".
 
 NO uses emojis ni emoticonos en tus respuestas.`;
 
