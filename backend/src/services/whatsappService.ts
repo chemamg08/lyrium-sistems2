@@ -234,7 +234,36 @@ async function resolveSingleMetaPhone(accessToken: string, wabaId: string): Prom
   return phones[0];
 }
 
-async function inspectMetaToken(accessToken: string): Promise<{ tokenExpiresAt?: string; tokenType?: 'short' | 'long' }> {
+type WhatsAppTokenStatus = 'valid' | 'expiring' | 'expired' | 'invalid';
+type WhatsAppConnectionStatus = 'ok' | 'warning' | 'expired' | 'error' | 'disconnected';
+
+interface MetaTokenInspection {
+  isValid?: boolean;
+  tokenExpiresAt?: string;
+  tokenType?: 'system_user';
+}
+
+interface WhatsAppValidationResult {
+  connected: boolean;
+  connectionStatus: WhatsAppConnectionStatus;
+  tokenStatus: WhatsAppTokenStatus;
+  phoneNumber?: string;
+  tokenExpiresAt?: string;
+  expiryKnown: boolean;
+  lastValidationError?: string;
+}
+
+interface LongLivedExchangeResult {
+  accessToken: string;
+  expiresIn?: number;
+}
+
+function calculateTokenExpiryFromSeconds(expiresIn?: number): string | undefined {
+  if (!Number.isFinite(expiresIn) || !expiresIn || expiresIn <= 0) return undefined;
+  return new Date(Date.now() + expiresIn * 1000).toISOString();
+}
+
+async function inspectMetaToken(accessToken: string): Promise<MetaTokenInspection> {
   try {
     const appAccessToken = `${getMetaAppId()}|${getMetaAppSecret()}`;
     const debugUrl = new URL(`${META_GRAPH_BASE}/debug_token`);
@@ -245,29 +274,20 @@ async function inspectMetaToken(accessToken: string): Promise<{ tokenExpiresAt?:
     if (!res.ok) return {};
 
     const data = await res.json().catch(() => ({}));
-    const expiresAtUnix = Number(data?.data?.expires_at || 0);
-    if (!Number.isFinite(expiresAtUnix) || expiresAtUnix <= 0) return {};
+    const debugData = data?.data || {};
+    const expiresAtUnix = Number(debugData.expires_at || 0);
+    const rawType = String(debugData.type || '').toLowerCase();
 
-    const tokenExpiresAt = new Date(expiresAtUnix * 1000).toISOString();
-    const remainingMs = expiresAtUnix * 1000 - Date.now();
     return {
-      tokenExpiresAt,
-      tokenType: remainingMs > 24 * 60 * 60 * 1000 ? 'long' : 'short',
+      isValid: typeof debugData.is_valid === 'boolean' ? debugData.is_valid : undefined,
+      tokenExpiresAt: Number.isFinite(expiresAtUnix) && expiresAtUnix > 0
+        ? new Date(expiresAtUnix * 1000).toISOString()
+        : undefined,
+      tokenType: rawType.includes('system') ? 'system_user' : undefined,
     };
   } catch {
     return {};
   }
-}
-
-type WhatsAppConnectionStatus = 'ok' | 'warning' | 'expired' | 'error' | 'disconnected';
-
-interface WhatsAppValidationResult {
-  connected: boolean;
-  connectionStatus: WhatsAppConnectionStatus;
-  phoneNumber?: string;
-  tokenExpiresAt?: string;
-  expiryKnown: boolean;
-  lastValidationError?: string;
 }
 
 function isValidEmailAddress(value: string): boolean {
@@ -281,12 +301,20 @@ function getDaysRemaining(expiresAt?: string): number | null {
   return Math.floor((expires - Date.now()) / (1000 * 60 * 60 * 24));
 }
 
-function deriveConnectionStatus(expiresAt?: string, expiryKnown = false): WhatsAppConnectionStatus {
-  if (!expiryKnown || !expiresAt) return 'ok';
+function deriveTokenStatus(expiresAt?: string, expiryKnown = false, isValid?: boolean): WhatsAppTokenStatus {
+  if (isValid === false) return 'invalid';
+  if (!expiryKnown || !expiresAt) return 'valid';
   const daysRemaining = getDaysRemaining(expiresAt);
-  if (daysRemaining === null) return 'ok';
+  if (daysRemaining === null) return 'valid';
   if (daysRemaining < 0) return 'expired';
-  if (daysRemaining <= 7) return 'warning';
+  if (daysRemaining <= 7) return 'expiring';
+  return 'valid';
+}
+
+function deriveConnectionStatus(tokenStatus: WhatsAppTokenStatus): WhatsAppConnectionStatus {
+  if (tokenStatus === 'invalid') return 'error';
+  if (tokenStatus === 'expired') return 'expired';
+  if (tokenStatus === 'expiring') return 'warning';
   return 'ok';
 }
 
@@ -325,7 +353,7 @@ function upsertWhatsAppSession(account: any, phoneNumberId: string, patch: Recor
   return nextSession;
 }
 
-async function exchangeForLongLivedUserToken(shortLivedToken: string): Promise<string> {
+async function exchangeForLongLivedUserToken(shortLivedToken: string): Promise<LongLivedExchangeResult> {
   const appId = getMetaAppId();
   const appSecret = getMetaAppSecret();
   const llUrl = new URL(`${META_GRAPH_BASE}/oauth/access_token`);
@@ -341,17 +369,27 @@ async function exchangeForLongLivedUserToken(shortLivedToken: string): Promise<s
     throw new Error(`No se pudo intercambiar el token temporal por uno long-lived: ${details}`);
   }
 
-  return String(llData.access_token);
+  return {
+    accessToken: String(llData.access_token),
+    expiresIn: Number(llData.expires_in || 0) || undefined,
+  };
 }
 
 function normalizeTokenMetadata(
-  tokenMetadata: { tokenExpiresAt?: string; tokenType?: 'short' | 'long' },
+  tokenMetadata: MetaTokenInspection,
   fallbackTokenType: string,
-): { tokenExpiresAt?: string; expiryKnown: boolean; tokenType: string } {
+  fallbackExpiresAt?: string,
+): { tokenExpiresAt?: string; expiryKnown: boolean; tokenType: string; tokenStatus: WhatsAppTokenStatus; connectionStatus: WhatsAppConnectionStatus } {
+  const tokenExpiresAt = tokenMetadata.tokenExpiresAt || fallbackExpiresAt;
+  const expiryKnown = !!tokenExpiresAt;
+  const tokenType = tokenMetadata.tokenType || fallbackTokenType;
+  const tokenStatus = deriveTokenStatus(tokenExpiresAt, expiryKnown, tokenMetadata.isValid);
   return {
-    tokenExpiresAt: tokenMetadata.tokenExpiresAt,
-    expiryKnown: !!tokenMetadata.tokenExpiresAt,
-    tokenType: tokenMetadata.tokenType || fallbackTokenType,
+    tokenExpiresAt,
+    expiryKnown,
+    tokenType,
+    tokenStatus,
+    connectionStatus: deriveConnectionStatus(tokenStatus),
   };
 }
 
@@ -361,6 +399,7 @@ export async function validateWhatsAppSession(accountId: string, phoneNumberId: 
     return {
       connected: false,
       connectionStatus: 'disconnected',
+      tokenStatus: 'invalid',
       expiryKnown: false,
       lastValidationError: 'Cuenta no encontrada',
     };
@@ -371,6 +410,7 @@ export async function validateWhatsAppSession(accountId: string, phoneNumberId: 
     return {
       connected: false,
       connectionStatus: 'disconnected',
+      tokenStatus: 'invalid',
       expiryKnown: false,
       lastValidationError: 'Sesion no encontrada',
     };
@@ -381,6 +421,7 @@ export async function validateWhatsAppSession(accountId: string, phoneNumberId: 
     return {
       connected: false,
       connectionStatus: 'error',
+      tokenStatus: 'invalid',
       expiryKnown: !!session.tokenExpiresAt,
       tokenExpiresAt: session.tokenExpiresAt,
       lastValidationError: 'Token Meta invalido',
@@ -394,15 +435,19 @@ export async function validateWhatsAppSession(accountId: string, phoneNumberId: 
     ]);
 
     const phoneNumber = phoneData?.display_phone_number || session.phoneNumber || '';
-    const tokenInfo = normalizeTokenMetadata(tokenMetadata, session.tokenType || 'unknown');
-    const connectionStatus = deriveConnectionStatus(tokenInfo.tokenExpiresAt || session.tokenExpiresAt, tokenInfo.expiryKnown || !!session.expiryKnown);
+    const tokenInfo = normalizeTokenMetadata(
+      tokenMetadata,
+      session.tokenType || 'unknown',
+      session.tokenExpiresAt,
+    );
 
     return {
-      connected: true,
-      connectionStatus,
+      connected: tokenInfo.tokenStatus === 'valid' || tokenInfo.tokenStatus === 'expiring',
+      connectionStatus: tokenInfo.connectionStatus,
+      tokenStatus: tokenInfo.tokenStatus,
       phoneNumber,
       tokenExpiresAt: tokenInfo.tokenExpiresAt,
-      expiryKnown: tokenInfo.expiryKnown || !!session.expiryKnown,
+      expiryKnown: tokenInfo.expiryKnown,
     };
   } catch (err: any) {
     const message = String(err?.message || 'Error validando la sesion de WhatsApp');
@@ -411,6 +456,7 @@ export async function validateWhatsAppSession(accountId: string, phoneNumberId: 
     return {
       connected: false,
       connectionStatus: disconnected ? 'error' : 'disconnected',
+      tokenStatus: 'invalid',
       tokenExpiresAt: session.tokenExpiresAt,
       expiryKnown: !!session.expiryKnown,
       lastValidationError: lower.includes('expired') ? 'Token expirado o invalido' : message,
@@ -431,6 +477,7 @@ export async function syncWhatsAppSessionValidation(accountId: string, phoneNumb
   Object.assign(session, {
     connected: validation.connected,
     connectionStatus: validation.connectionStatus,
+    tokenStatus: validation.tokenStatus,
     phoneNumber: validation.phoneNumber || session.phoneNumber || '',
     lastValidatedAt: nowIso,
     lastValidationError: validation.lastValidationError || '',
@@ -1611,9 +1658,18 @@ async function connectMetaWithCodeInternal(
   let accessToken = tokenData?.access_token as string;
   if (!accessToken) throw new Error('Meta no devolvió access_token');
 
-  accessToken = await exchangeForLongLivedUserToken(accessToken);
+  const provisionalExpiresAt = calculateTokenExpiryFromSeconds(Number(tokenData?.expires_in || 0));
+  const exchangeResult = await exchangeForLongLivedUserToken(accessToken);
+  accessToken = exchangeResult.accessToken;
   const quickTokenMetadata = await inspectMetaToken(accessToken);
-  const quickTokenInfo = normalizeTokenMetadata(quickTokenMetadata, 'business_integration');
+  const quickTokenInfo = normalizeTokenMetadata(
+    quickTokenMetadata,
+    'long_lived_user',
+    calculateTokenExpiryFromSeconds(exchangeResult.expiresIn) || provisionalExpiresAt,
+  );
+  if (quickTokenInfo.tokenStatus === 'invalid' || quickTokenInfo.tokenStatus === 'expired') {
+    throw new Error('Meta devolvio un token long-lived invalido. Intentalo de nuevo.');
+  }
 
   const waba = await resolveSingleMetaWaba(accessToken);
   const phone = await resolveSingleMetaPhone(accessToken, waba.id);
@@ -1637,9 +1693,11 @@ async function connectMetaWithCodeInternal(
       connectedAt: new Date().toISOString(),
       instanceName: `lyrium_${accountId}`,
       tokenExpiresAt: quickTokenInfo.tokenExpiresAt,
-      tokenType: 'business_integration',
+      tokenType: quickTokenInfo.tokenType,
+      tokenStatus: quickTokenInfo.tokenStatus,
       name: existingSession.name || `WhatsApp ${phone.display_phone_number || ''}`,
       alertEmail: normalizedAlertEmail,
+      credentialSource: 'embedded_signup',
     });
   } else {
     // Añadir nueva sesión
@@ -1653,9 +1711,11 @@ async function connectMetaWithCodeInternal(
       connectedAt: new Date().toISOString(),
       instanceName: `lyrium_${accountId}`,
       tokenExpiresAt: quickTokenInfo.tokenExpiresAt,
-      tokenType: 'business_integration',
+      tokenType: quickTokenInfo.tokenType,
+      tokenStatus: quickTokenInfo.tokenStatus,
       name: `WhatsApp ${phone.display_phone_number || ''}`,
       alertEmail: normalizedAlertEmail,
+      credentialSource: 'embedded_signup',
     });
   }
 
@@ -1664,11 +1724,13 @@ async function connectMetaWithCodeInternal(
   const quickSession = resolveWhatsAppSession(account, phone.id);
   Object.assign(quickSession || {}, {
     connected: true,
-    connectionStatus: deriveConnectionStatus(quickTokenInfo.tokenExpiresAt, quickTokenInfo.expiryKnown),
+    connectionStatus: quickTokenInfo.connectionStatus,
     expiryKnown: quickTokenInfo.expiryKnown,
     tokenExpiresAt: quickTokenInfo.tokenExpiresAt,
-    tokenType: 'business_integration',
+    tokenType: quickTokenInfo.tokenType,
+    tokenStatus: quickTokenInfo.tokenStatus,
     credentialMode: 'quick_official',
+    credentialSource: 'embedded_signup',
     alertEmail: alertEmail || quickSession?.alertEmail || '',
     lastValidatedAt: new Date().toISOString(),
     lastValidationError: '',
@@ -1703,6 +1765,7 @@ export async function connectMetaWithToken(
   shortLivedToken: string,
   name?: string,
   alertEmail?: string,
+  loginExpiresIn?: number,
 ): Promise<{ connected: boolean; phoneNumber?: string; phoneNumberId?: string }> {
   const account = await Automation.findById(accountId);
   if (!account) throw new Error('Cuenta no encontrada');
@@ -1718,9 +1781,18 @@ export async function connectMetaWithToken(
 
   void getMetaAppId();
   void getMetaAppSecret();
-  let accessToken = await exchangeForLongLivedUserToken(shortLivedToken);
+  const provisionalExpiresAt = calculateTokenExpiryFromSeconds(loginExpiresIn);
+  const exchangeResult = await exchangeForLongLivedUserToken(shortLivedToken);
+  let accessToken = exchangeResult.accessToken;
   const quickTokenMetadata = await inspectMetaToken(accessToken);
-  const quickTokenInfo = normalizeTokenMetadata(quickTokenMetadata, 'business_integration');
+  const quickTokenInfo = normalizeTokenMetadata(
+    quickTokenMetadata,
+    'long_lived_user',
+    calculateTokenExpiryFromSeconds(exchangeResult.expiresIn) || provisionalExpiresAt,
+  );
+  if (quickTokenInfo.tokenStatus === 'invalid' || quickTokenInfo.tokenStatus === 'expired') {
+    throw new Error('Meta devolvio un token long-lived invalido. Intentalo de nuevo.');
+  }
 
   const waba = await resolveSingleMetaWaba(accessToken);
   const phone = await resolveSingleMetaPhone(accessToken, waba.id);
@@ -1744,12 +1816,14 @@ export async function connectMetaWithToken(
       connectedAt: new Date().toISOString(),
       instanceName: `lyrium_${accountId}`,
       tokenExpiresAt: quickTokenInfo.tokenExpiresAt,
-      tokenType: 'business_integration',
+      tokenType: quickTokenInfo.tokenType,
+      tokenStatus: quickTokenInfo.tokenStatus,
       name: name || (existingSession as any).name || `WhatsApp ${phone.display_phone_number || ''}`,
       alertEmail: normalizedAlertEmail,
       expiryKnown: quickTokenInfo.expiryKnown,
-      connectionStatus: deriveConnectionStatus(quickTokenInfo.tokenExpiresAt, quickTokenInfo.expiryKnown),
+      connectionStatus: quickTokenInfo.connectionStatus,
       credentialMode: 'quick_official',
+      credentialSource: 'embedded_signup',
       lastValidatedAt: new Date().toISOString(),
       lastValidationError: '',
       failureAlertOpen: false,
@@ -1766,12 +1840,14 @@ export async function connectMetaWithToken(
       connectedAt: new Date().toISOString(),
       instanceName: `lyrium_${accountId}`,
       tokenExpiresAt: quickTokenInfo.tokenExpiresAt,
-      tokenType: 'business_integration',
+      tokenType: quickTokenInfo.tokenType,
+      tokenStatus: quickTokenInfo.tokenStatus,
       name: name || `WhatsApp ${phone.display_phone_number || ''}`,
       alertEmail: normalizedAlertEmail,
       expiryKnown: quickTokenInfo.expiryKnown,
-      connectionStatus: deriveConnectionStatus(quickTokenInfo.tokenExpiresAt, quickTokenInfo.expiryKnown),
+      connectionStatus: quickTokenInfo.connectionStatus,
       credentialMode: 'quick_official',
+      credentialSource: 'embedded_signup',
       lastValidatedAt: new Date().toISOString(),
       lastValidationError: '',
       failureAlertOpen: false,
@@ -1783,11 +1859,13 @@ export async function connectMetaWithToken(
   const quickSession = resolveWhatsAppSession(account, phone.id);
   Object.assign(quickSession || {}, {
     connected: true,
-    connectionStatus: deriveConnectionStatus(quickTokenInfo.tokenExpiresAt, quickTokenInfo.expiryKnown),
+    connectionStatus: quickTokenInfo.connectionStatus,
     expiryKnown: quickTokenInfo.expiryKnown,
     tokenExpiresAt: quickTokenInfo.tokenExpiresAt,
-    tokenType: 'business_integration',
+    tokenType: quickTokenInfo.tokenType,
+    tokenStatus: quickTokenInfo.tokenStatus,
     credentialMode: 'quick_official',
+    credentialSource: 'embedded_signup',
     alertEmail: normalizedAlertEmail,
     lastValidatedAt: new Date().toISOString(),
     lastValidationError: '',
@@ -1819,12 +1897,21 @@ export async function connectMetaManual(
   if (!isValidEmailAddress(normalizedAlertEmail)) {
     throw new Error('El email de alerta es obligatorio y debe ser valido');
   }
-  const longLivedToken = await exchangeForLongLivedUserToken(accessToken);
+  const exchangeResult = await exchangeForLongLivedUserToken(accessToken);
+  const longLivedToken = exchangeResult.accessToken;
 
   // Verify token works and get phone number display
   const phoneData = await graphFetchJson<any>(`/${phoneNumberId}?fields=id,display_phone_number,verified_name`, longLivedToken);
   if (!phoneData?.id) throw new Error('No se pudo verificar el número con el token proporcionado');
   const tokenMetadata = await inspectMetaToken(longLivedToken);
+  const tokenInfo = normalizeTokenMetadata(
+    tokenMetadata,
+    'long_lived_user',
+    calculateTokenExpiryFromSeconds(exchangeResult.expiresIn),
+  );
+  if (tokenInfo.tokenStatus === 'invalid' || tokenInfo.tokenStatus === 'expired') {
+    throw new Error('Meta devolvio un token long-lived invalido. Intentalo de nuevo.');
+  }
 
   // Discover WABA ID if not provided
   let resolvedWabaId = wabaId || '';
@@ -1855,10 +1942,12 @@ export async function connectMetaManual(
       phoneNumberId: phoneData.id,
       accessToken: encryptPassword(longLivedToken),
       connectedAt: new Date().toISOString(),
-      tokenExpiresAt: tokenMetadata.tokenExpiresAt,
-      tokenType: tokenMetadata.tokenType,
+      tokenExpiresAt: tokenInfo.tokenExpiresAt,
+      tokenType: tokenInfo.tokenType,
+      tokenStatus: tokenInfo.tokenStatus,
       name: name || existingSession.name || `WhatsApp ${phoneData.display_phone_number || ''}`,
       alertEmail: normalizedAlertEmail,
+      credentialSource: 'manual',
     });
   } else {
     // Añadir nueva sesión
@@ -1871,10 +1960,12 @@ export async function connectMetaManual(
       phoneNumberId: phoneData.id,
       accessToken: encryptPassword(longLivedToken),
       connectedAt: new Date().toISOString(),
-      tokenExpiresAt: tokenMetadata.tokenExpiresAt,
-      tokenType: tokenMetadata.tokenType,
+      tokenExpiresAt: tokenInfo.tokenExpiresAt,
+      tokenType: tokenInfo.tokenType,
+      tokenStatus: tokenInfo.tokenStatus,
       name: name || `WhatsApp ${phoneData.display_phone_number || ''}`,
       alertEmail: normalizedAlertEmail,
+      credentialSource: 'manual',
     });
   }
 
@@ -1883,11 +1974,13 @@ export async function connectMetaManual(
   const manualSession = resolveWhatsAppSession(account, phoneData.id);
   Object.assign(manualSession || {}, {
     connected: true,
-    connectionStatus: deriveConnectionStatus(tokenMetadata.tokenExpiresAt, !!tokenMetadata.tokenExpiresAt),
-    expiryKnown: !!tokenMetadata.tokenExpiresAt,
-    tokenExpiresAt: tokenMetadata.tokenExpiresAt,
-    tokenType: 'long',
+    connectionStatus: tokenInfo.connectionStatus,
+    expiryKnown: tokenInfo.expiryKnown,
+    tokenExpiresAt: tokenInfo.tokenExpiresAt,
+    tokenType: tokenInfo.tokenType,
+    tokenStatus: tokenInfo.tokenStatus,
     credentialMode: 'manual_long_lived',
+    credentialSource: 'manual',
     alertEmail: normalizedAlertEmail,
     lastValidatedAt: new Date().toISOString(),
     lastValidationError: '',
@@ -2239,25 +2332,32 @@ export async function refreshWhatsAppToken(
 
     const newToken = data.access_token;
     const tokenMetadata = await inspectMetaToken(newToken);
-    const expiresIn = Number(data.expires_in || 0);
-    const newExpiresAt = tokenMetadata.tokenExpiresAt
-      || (Number.isFinite(expiresIn) && expiresIn > 0 ? new Date(Date.now() + expiresIn * 1000).toISOString() : undefined);
+    const tokenInfo = normalizeTokenMetadata(
+      tokenMetadata,
+      'long_lived_user',
+      calculateTokenExpiryFromSeconds(Number(data.expires_in || 0)),
+    );
+    if (tokenInfo.tokenStatus === 'invalid' || tokenInfo.tokenStatus === 'expired') {
+      return { success: false, error: 'Meta devolvio un token long-lived invalido' };
+    }
 
     session.accessToken = encryptPassword(newToken);
-    session.tokenExpiresAt = newExpiresAt;
-    session.tokenType = 'long';
-    session.expiryKnown = !!newExpiresAt;
-    session.connectionStatus = deriveConnectionStatus(newExpiresAt, !!newExpiresAt);
+    session.tokenExpiresAt = tokenInfo.tokenExpiresAt;
+    session.tokenType = tokenInfo.tokenType;
+    session.tokenStatus = tokenInfo.tokenStatus;
+    session.expiryKnown = tokenInfo.expiryKnown;
+    session.connectionStatus = tokenInfo.connectionStatus;
+    session.connected = tokenInfo.tokenStatus === 'valid' || tokenInfo.tokenStatus === 'expiring';
     session.lastValidatedAt = new Date().toISOString();
     session.lastValidationError = '';
 
     await account.save();
 
-    const daysRemaining = newExpiresAt
-      ? Math.floor((new Date(newExpiresAt).getTime() - Date.now()) / (1000 * 60 * 60 * 24))
+    const daysRemaining = tokenInfo.tokenExpiresAt
+      ? Math.floor((new Date(tokenInfo.tokenExpiresAt).getTime() - Date.now()) / (1000 * 60 * 60 * 24))
       : undefined;
 
-    return { success: true, newExpiresAt, daysRemaining };
+    return { success: true, newExpiresAt: tokenInfo.tokenExpiresAt, daysRemaining };
   } catch (err: any) {
     console.error('[WA] Error renovando token:', err);
     return { success: false, error: err.message || 'Error desconocido' };
@@ -2271,9 +2371,10 @@ export async function getTokenStatus(
   phoneNumberId: string;
   connected: boolean;
   tokenType: string;
+  tokenStatus: WhatsAppTokenStatus;
   expiresAt: string;
   daysRemaining: number;
-  status: 'ok' | 'warning' | 'critical' | 'expired' | 'unknown';
+  status: WhatsAppTokenStatus;
   alertEmail?: string;
   expiryKnown?: boolean;
   connectionStatus?: string;
@@ -2289,24 +2390,20 @@ export async function getTokenStatus(
 
   if (!session) return null;
 
-  let daysRemaining = 999;
-  let status: 'ok' | 'warning' | 'critical' | 'expired' | 'unknown' = session.expiryKnown ? 'ok' : 'unknown';
-
-  if (session.expiryKnown && session.tokenExpiresAt) {
-    const expiresAt = new Date(session.tokenExpiresAt).getTime();
-    const now = Date.now();
-    daysRemaining = Math.floor((expiresAt - now) / (1000 * 60 * 60 * 24));
-
-    if (daysRemaining < 0) status = 'expired';
-    else if (daysRemaining <= 7) status = 'critical';
-    else if (daysRemaining <= 14) status = 'warning';
-    else status = 'ok';
-  }
+  const status = session.tokenStatus || deriveTokenStatus(
+    session.tokenExpiresAt,
+    session.expiryKnown === true,
+    session.connected === false ? false : undefined,
+  );
+  const daysRemaining = session.tokenExpiresAt
+    ? Math.floor((new Date(session.tokenExpiresAt).getTime() - Date.now()) / (1000 * 60 * 60 * 24))
+    : 999;
 
   return {
     phoneNumberId: session.phoneNumberId || '',
-    connected: session.connected,
+    connected: !!session.connected && status !== 'invalid' && status !== 'expired',
     tokenType: session.tokenType || 'unknown',
+    tokenStatus: status,
     expiresAt: session.tokenExpiresAt || '',
     daysRemaining,
     status,

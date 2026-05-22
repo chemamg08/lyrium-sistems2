@@ -198,7 +198,7 @@ export const connectWhatsAppWithCode: RequestHandler = async (req, res) => {
 
 export const connectWhatsAppWithToken: RequestHandler = async (req, res) => {
   try {
-    const { accountId, state, accessToken, name, alertEmail } = req.body;
+    const { accountId, state, accessToken, name, alertEmail, loginExpiresIn } = req.body;
     if (!accountId || !state || !accessToken) {
       res.status(400).json({ error: 'accountId, state y accessToken requeridos' });
       return;
@@ -214,7 +214,14 @@ export const connectWhatsAppWithToken: RequestHandler = async (req, res) => {
       return;
     }
 
-    const data = await waService.connectMetaWithToken(accountId, state, accessToken, name, alertEmail);
+    const data = await waService.connectMetaWithToken(
+      accountId,
+      state,
+      accessToken,
+      name,
+      alertEmail,
+      Number(loginExpiresIn || 0) || undefined,
+    );
     res.json({ ok: true, ...data });
   } catch (err: any) {
     console.error('[WA] connectWhatsAppWithToken error:', err);
@@ -294,7 +301,7 @@ export const getWhatsAppStatus: RequestHandler = async (req, res) => {
     const status = await waService.getInstanceStatus(instanceName);
 
     res.json({
-      connected: sessions.some((s: any) => s.connected) || status.connected,
+      connected: sessions.some((s: any) => s.connected && s.tokenStatus !== 'invalid' && s.tokenStatus !== 'expired') || status.connected,
       whatsappSessions: sessions.map((s: any) => ({
         id: s.phoneNumberId || s.instanceName,
         phoneNumberId: s.phoneNumberId || '',
@@ -304,9 +311,11 @@ export const getWhatsAppStatus: RequestHandler = async (req, res) => {
         connectedAt: s.connectedAt,
         provider: s.provider || 'meta',
         tokenType: s.tokenType,
+        tokenStatus: s.tokenStatus || '',
         tokenExpiresAt: s.tokenExpiresAt,
         alertEmail: s.alertEmail || '',
         credentialMode: s.credentialMode || '',
+        credentialSource: s.credentialSource || '',
         expiryKnown: s.expiryKnown === true,
         connectionStatus: s.connectionStatus || 'disconnected',
         lastValidatedAt: s.lastValidatedAt || '',

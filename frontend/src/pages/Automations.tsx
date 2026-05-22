@@ -78,8 +78,10 @@ interface IWhatsAppSession {
   connected?: boolean;
   tokenExpiresAt?: string;
   tokenType?: string;
+  tokenStatus?: string;
   alertEmail?: string;
   hasAccessToken?: boolean;
+  credentialSource?: string;
   expiryKnown?: boolean;
   connectionStatus?: string;
   lastValidatedAt?: string;
@@ -570,6 +572,7 @@ const Automations = () => {
           configId,
         }, async (response: any) => {
           const accessToken = response?.authResponse?.accessToken;
+          const loginExpiresIn = Number(response?.authResponse?.expiresIn || 0) || undefined;
           if (!accessToken) {
             setWaConnectError('No se recibió autorización de Meta. Inténtalo de nuevo.');
             setWaOAuthProcessing(false);
@@ -579,7 +582,7 @@ const Automations = () => {
             const connectRes = await authFetch(`${WA_API}/meta/connect-token`, {
               method: 'POST',
               headers: { 'Content-Type': 'application/json' },
-              body: JSON.stringify({ accountId, state: oauthState, accessToken, alertEmail: waQuickAlertEmail.trim() }),
+              body: JSON.stringify({ accountId, state: oauthState, accessToken, alertEmail: waQuickAlertEmail.trim(), loginExpiresIn }),
             });
             if (connectRes.ok) {
               await refreshWhatsAppSessionState();
@@ -606,6 +609,7 @@ const Automations = () => {
       } else {
         (window as any).FB.login((response: any) => {
           const accessToken = response?.authResponse?.accessToken;
+          const loginExpiresIn = Number(response?.authResponse?.expiresIn || 0) || undefined;
           if (!accessToken) {
             setWaConnectError('No se recibió autorización de Meta. Inténtalo de nuevo.');
             setWaOAuthProcessing(false);
@@ -618,7 +622,7 @@ const Automations = () => {
               const connectRes = await authFetch(`${WA_API}/meta/connect-token`, {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ accountId, state: oauthState, accessToken, alertEmail: waQuickAlertEmail.trim() }),
+                body: JSON.stringify({ accountId, state: oauthState, accessToken, alertEmail: waQuickAlertEmail.trim(), loginExpiresIn }),
               });
               if (connectRes.ok) {
                 await refreshWhatsAppSessionState();
@@ -918,11 +922,17 @@ const Automations = () => {
 
   const getTokenStatus = (session?: IWhatsAppSession): { color: string; label: string; days: number } => {
     if (!session) return { color: 'text-muted-foreground', label: t('automations.waTokenStatusUnknown'), days: 999 };
-    if (session.connectionStatus === 'error' || session.connectionStatus === 'disconnected') {
+    if (session.tokenStatus === 'invalid' || session.connectionStatus === 'error' || session.connectionStatus === 'disconnected') {
       return { color: 'text-red-400', label: t('automations.waTokenStatusDisconnected'), days: -1 };
     }
-    if (session.connectionStatus === 'expired') {
+    if (session.tokenStatus === 'expired' || session.connectionStatus === 'expired') {
       return { color: 'text-red-400', label: t('automations.waTokenStatusExpired'), days: -1 };
+    }
+    if (session.tokenStatus === 'expiring' && session.tokenExpiresAt) {
+      const expires = new Date(session.tokenExpiresAt).getTime();
+      const now = Date.now();
+      const days = Math.floor((expires - now) / (1000 * 60 * 60 * 24));
+      return { color: 'text-red-400', label: t('automations.waTokenStatusDays', { count: days }), days };
     }
     if (!session.expiryKnown || !session.tokenExpiresAt) {
       return { color: 'text-muted-foreground', label: t('automations.waTokenStatusUnknown'), days: 999 };
@@ -934,6 +944,13 @@ const Automations = () => {
     if (days <= 7) return { color: 'text-red-400', label: t('automations.waTokenStatusDays', { count: days }), days };
     if (days <= 14) return { color: 'text-yellow-400', label: t('automations.waTokenStatusDays', { count: days }), days };
     return { color: 'text-green-400', label: t('automations.waTokenStatusDays', { count: days }), days };
+  };
+
+  const formatTokenExpiryDate = (expiresAt?: string): string => {
+    if (!expiresAt) return '';
+    const date = new Date(expiresAt);
+    if (isNaN(date.getTime())) return '';
+    return date.toLocaleString();
   };
 
   async function loadAutoData() {
@@ -4690,6 +4707,11 @@ const Automations = () => {
                             </p>
                             {s.alertEmail && <p className="text-xs text-muted-foreground">{t('automations.waAlertEmailPrefix')}: {s.alertEmail}</p>}
                           </div>
+                          {!!formatTokenExpiryDate(s.tokenExpiresAt) && (
+                            <p className="text-xs text-muted-foreground mt-1">
+                              Caduca: {formatTokenExpiryDate(s.tokenExpiresAt)}
+                            </p>
+                          )}
                         </div>
                         <div className="flex items-center gap-2">
                           {s.connected && s.phoneNumberId && (

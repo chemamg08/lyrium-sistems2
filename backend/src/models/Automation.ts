@@ -162,8 +162,10 @@ export interface IWhatsAppSession {
   name?: string;
   tokenExpiresAt?: string;
   tokenType?: string;
+  tokenStatus?: 'valid' | 'expiring' | 'expired' | 'invalid';
   alertEmail?: string;
   credentialMode?: 'quick_official' | 'manual_long_lived';
+  credentialSource?: 'embedded_signup' | 'manual';
   expiryKnown?: boolean;
   connectionStatus?: 'ok' | 'warning' | 'expired' | 'error' | 'disconnected';
   lastValidatedAt?: string;
@@ -343,10 +345,12 @@ const whatsappSessionSchema = new Schema({
   phoneNumberId: String,
   accessToken: String,
   tokenExpiresAt: String,
-  tokenType: { type: String, enum: ['short', 'long', 'business_integration', 'unknown'] },
+  tokenType: { type: String, enum: ['short', 'long', 'business_integration', 'temporary_user', 'long_lived_user', 'system_user', 'unknown'] },
+  tokenStatus: { type: String, enum: ['valid', 'expiring', 'expired', 'invalid'] },
   name: String,
   alertEmail: String,
   credentialMode: { type: String, enum: ['quick_official', 'manual_long_lived'] },
+  credentialSource: { type: String, enum: ['embedded_signup', 'manual'] },
   expiryKnown: { type: Boolean, default: false },
   connectionStatus: {
     type: String,
