@@ -1612,7 +1612,8 @@ async function connectMetaWithCodeInternal(
   if (!accessToken) throw new Error('Meta no devolvió access_token');
 
   accessToken = await exchangeForLongLivedUserToken(accessToken);
-  const tokenExchanged = true;
+  const quickTokenMetadata = await inspectMetaToken(accessToken);
+  const quickTokenInfo = normalizeTokenMetadata(quickTokenMetadata, 'business_integration');
 
   const waba = await resolveSingleMetaWaba(accessToken);
   const phone = await resolveSingleMetaPhone(accessToken, waba.id);
@@ -1635,10 +1636,8 @@ async function connectMetaWithCodeInternal(
       accessToken: encryptPassword(accessToken),
       connectedAt: new Date().toISOString(),
       instanceName: `lyrium_${accountId}`,
-      tokenExpiresAt: tokenExchanged
-        ? new Date(Date.now() + 60 * 24 * 60 * 60 * 1000).toISOString()
-        : new Date(Date.now() + 60 * 60 * 1000).toISOString(),
-      tokenType: tokenExchanged ? 'long' : 'short',
+      tokenExpiresAt: quickTokenInfo.tokenExpiresAt,
+      tokenType: 'business_integration',
       name: existingSession.name || `WhatsApp ${phone.display_phone_number || ''}`,
       alertEmail: normalizedAlertEmail,
     });
@@ -1653,10 +1652,8 @@ async function connectMetaWithCodeInternal(
       accessToken: encryptPassword(accessToken),
       connectedAt: new Date().toISOString(),
       instanceName: `lyrium_${accountId}`,
-      tokenExpiresAt: tokenExchanged
-        ? new Date(Date.now() + 60 * 24 * 60 * 60 * 1000).toISOString()
-        : new Date(Date.now() + 60 * 60 * 1000).toISOString(),
-      tokenType: tokenExchanged ? 'long' : 'short',
+      tokenExpiresAt: quickTokenInfo.tokenExpiresAt,
+      tokenType: 'business_integration',
       name: `WhatsApp ${phone.display_phone_number || ''}`,
       alertEmail: normalizedAlertEmail,
     });
@@ -1665,8 +1662,6 @@ async function connectMetaWithCodeInternal(
   // Mantener compatibilidad: actualizar también whatsappSession con la última sesión conectada
   account.whatsappSession = account.whatsappSessions[account.whatsappSessions.length - 1];
   const quickSession = resolveWhatsAppSession(account, phone.id);
-  const quickTokenMetadata = await inspectMetaToken(accessToken);
-  const quickTokenInfo = normalizeTokenMetadata(quickTokenMetadata, 'business_integration');
   Object.assign(quickSession || {}, {
     connected: true,
     connectionStatus: deriveConnectionStatus(quickTokenInfo.tokenExpiresAt, quickTokenInfo.expiryKnown),
@@ -1724,7 +1719,8 @@ export async function connectMetaWithToken(
   void getMetaAppId();
   void getMetaAppSecret();
   let accessToken = await exchangeForLongLivedUserToken(shortLivedToken);
-  const tokenExchanged = true;
+  const quickTokenMetadata = await inspectMetaToken(accessToken);
+  const quickTokenInfo = normalizeTokenMetadata(quickTokenMetadata, 'business_integration');
 
   const waba = await resolveSingleMetaWaba(accessToken);
   const phone = await resolveSingleMetaPhone(accessToken, waba.id);
@@ -1747,12 +1743,16 @@ export async function connectMetaWithToken(
       accessToken: encryptPassword(accessToken),
       connectedAt: new Date().toISOString(),
       instanceName: `lyrium_${accountId}`,
-      tokenExpiresAt: tokenExchanged
-        ? new Date(Date.now() + 60 * 24 * 60 * 60 * 1000).toISOString()
-        : new Date(Date.now() + 60 * 60 * 1000).toISOString(),
-      tokenType: tokenExchanged ? 'long' : 'short',
+      tokenExpiresAt: quickTokenInfo.tokenExpiresAt,
+      tokenType: 'business_integration',
       name: name || (existingSession as any).name || `WhatsApp ${phone.display_phone_number || ''}`,
       alertEmail: normalizedAlertEmail,
+      expiryKnown: quickTokenInfo.expiryKnown,
+      connectionStatus: deriveConnectionStatus(quickTokenInfo.tokenExpiresAt, quickTokenInfo.expiryKnown),
+      credentialMode: 'quick_official',
+      lastValidatedAt: new Date().toISOString(),
+      lastValidationError: '',
+      failureAlertOpen: false,
     });
   } else {
     // Añadir nueva sesión
@@ -1765,17 +1765,35 @@ export async function connectMetaWithToken(
       accessToken: encryptPassword(accessToken),
       connectedAt: new Date().toISOString(),
       instanceName: `lyrium_${accountId}`,
-      tokenExpiresAt: tokenExchanged
-        ? new Date(Date.now() + 60 * 24 * 60 * 60 * 1000).toISOString()
-        : new Date(Date.now() + 60 * 60 * 1000).toISOString(),
-      tokenType: tokenExchanged ? 'long' : 'short',
+      tokenExpiresAt: quickTokenInfo.tokenExpiresAt,
+      tokenType: 'business_integration',
       name: name || `WhatsApp ${phone.display_phone_number || ''}`,
       alertEmail: normalizedAlertEmail,
+      expiryKnown: quickTokenInfo.expiryKnown,
+      connectionStatus: deriveConnectionStatus(quickTokenInfo.tokenExpiresAt, quickTokenInfo.expiryKnown),
+      credentialMode: 'quick_official',
+      lastValidatedAt: new Date().toISOString(),
+      lastValidationError: '',
+      failureAlertOpen: false,
     });
   }
 
   // Mantener compatibilidad: actualizar también whatsappSession con la última sesión conectada
   account.whatsappSession = account.whatsappSessions[account.whatsappSessions.length - 1];
+  const quickSession = resolveWhatsAppSession(account, phone.id);
+  Object.assign(quickSession || {}, {
+    connected: true,
+    connectionStatus: deriveConnectionStatus(quickTokenInfo.tokenExpiresAt, quickTokenInfo.expiryKnown),
+    expiryKnown: quickTokenInfo.expiryKnown,
+    tokenExpiresAt: quickTokenInfo.tokenExpiresAt,
+    tokenType: 'business_integration',
+    credentialMode: 'quick_official',
+    alertEmail: normalizedAlertEmail,
+    lastValidatedAt: new Date().toISOString(),
+    lastValidationError: '',
+    failureAlertOpen: false,
+  });
+  syncLegacyWhatsAppSession(account);
   account.whatsappOAuthState = '';
   account.whatsappOAuthStateExpires = '';
   await account.save();
@@ -1835,7 +1853,7 @@ export async function connectMetaManual(
       phoneNumber: phoneData.display_phone_number || '',
       businessAccountId: resolvedWabaId,
       phoneNumberId: phoneData.id,
-      accessToken: encryptPassword(accessToken),
+      accessToken: encryptPassword(longLivedToken),
       connectedAt: new Date().toISOString(),
       tokenExpiresAt: tokenMetadata.tokenExpiresAt,
       tokenType: tokenMetadata.tokenType,
@@ -2220,16 +2238,24 @@ export async function refreshWhatsAppToken(
     }
 
     const newToken = data.access_token;
-    const expiresIn = data.expires_in || 5184000;
-    const newExpiresAt = new Date(Date.now() + expiresIn * 1000).toISOString();
+    const tokenMetadata = await inspectMetaToken(newToken);
+    const expiresIn = Number(data.expires_in || 0);
+    const newExpiresAt = tokenMetadata.tokenExpiresAt
+      || (Number.isFinite(expiresIn) && expiresIn > 0 ? new Date(Date.now() + expiresIn * 1000).toISOString() : undefined);
 
     session.accessToken = encryptPassword(newToken);
     session.tokenExpiresAt = newExpiresAt;
     session.tokenType = 'long';
+    session.expiryKnown = !!newExpiresAt;
+    session.connectionStatus = deriveConnectionStatus(newExpiresAt, !!newExpiresAt);
+    session.lastValidatedAt = new Date().toISOString();
+    session.lastValidationError = '';
 
     await account.save();
 
-    const daysRemaining = Math.floor((new Date(newExpiresAt).getTime() - Date.now()) / (1000 * 60 * 60 * 24));
+    const daysRemaining = newExpiresAt
+      ? Math.floor((new Date(newExpiresAt).getTime() - Date.now()) / (1000 * 60 * 60 * 24))
+      : undefined;
 
     return { success: true, newExpiresAt, daysRemaining };
   } catch (err: any) {
