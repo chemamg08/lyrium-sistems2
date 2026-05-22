@@ -2623,7 +2623,7 @@ const Automations = () => {
                     </div>
                   </div>
                   <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 text-xs text-muted-foreground">
-                    <p><span className="text-foreground font-medium">Caducidad:</span> {session.expiresAt ? new Date(session.expiresAt).toLocaleString() : 'Desconocida'}</p>
+                    <p><span className="text-foreground font-medium">Caducidad:</span> {session.tokenExpiresAt ? new Date(session.tokenExpiresAt).toLocaleString() : 'Desconocida'}</p>
                     <p><span className="text-foreground font-medium">Email alerta:</span> {session.alertEmail || '-'}</p>
                   </div>
                   <div className="flex justify-end">
