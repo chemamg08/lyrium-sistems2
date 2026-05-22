@@ -276,12 +276,16 @@ async function inspectMetaToken(accessToken: string): Promise<MetaTokenInspectio
     const data = await res.json().catch(() => ({}));
     const debugData = data?.data || {};
     const expiresAtUnix = Number(debugData.expires_at || 0);
+    const dataAccessExpiresAtUnix = Number(debugData.data_access_expires_at || 0);
     const rawType = String(debugData.type || '').toLowerCase();
+    const bestExpiresAtUnix = Number.isFinite(expiresAtUnix) && expiresAtUnix > 0
+      ? expiresAtUnix
+      : (Number.isFinite(dataAccessExpiresAtUnix) && dataAccessExpiresAtUnix > 0 ? dataAccessExpiresAtUnix : 0);
 
     return {
       isValid: typeof debugData.is_valid === 'boolean' ? debugData.is_valid : undefined,
-      tokenExpiresAt: Number.isFinite(expiresAtUnix) && expiresAtUnix > 0
-        ? new Date(expiresAtUnix * 1000).toISOString()
+      tokenExpiresAt: Number.isFinite(bestExpiresAtUnix) && bestExpiresAtUnix > 0
+        ? new Date(bestExpiresAtUnix * 1000).toISOString()
         : undefined,
       tokenType: rawType.includes('system') ? 'system_user' : undefined,
     };
