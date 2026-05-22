@@ -934,7 +934,7 @@ const Automations = () => {
       const days = Math.floor((expires - now) / (1000 * 60 * 60 * 24));
       return { color: 'text-red-400', label: t('automations.waTokenStatusDays', { count: days }), days };
     }
-    if (!session.expiryKnown || !session.tokenExpiresAt) {
+    if (!session.tokenExpiresAt) {
       return { color: 'text-muted-foreground', label: t('automations.waTokenStatusUnknown'), days: 999 };
     }
     const expires = new Date(session.tokenExpiresAt).getTime();
