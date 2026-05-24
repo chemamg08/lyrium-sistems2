@@ -940,7 +940,7 @@
     "juniorUploadSuccess": "Documento caricato con successo",
     "juniorUploadError": "Errore nel caricamento del documento",
     "juniorPending": "Il tuo sconto junior è in attesa di verifica.",
-    "juniorVerified": "Sconto junior attivo (45€/mese o 480€/anno).",
+    "juniorVerified": "Sconto junior attivo (40€/mese o 420€/anno).",
     "juniorRejected": "Il tuo sconto junior è stato rifiutato. L'addebito successivo sarà al prezzo base.",
     "juniorProofRequired": "Devi caricare una prova per attivare lo sconto junior.",
     "featureUpTo0": "0 sottoconti"

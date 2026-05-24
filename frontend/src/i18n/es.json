@@ -963,7 +963,7 @@
     "juniorUploadSuccess": "Documento subido correctamente",
     "juniorUploadError": "Error al subir el documento",
     "juniorPending": "Tu descuento junior está pendiente de verificación.",
-    "juniorVerified": "Descuento junior activo (45€/mes o 480€/año).",
+    "juniorVerified": "Descuento junior activo (40€/mes o 420€/año).",
     "juniorRejected": "Tu descuento junior ha sido rechazado. El siguiente cobro será del precio base.",
     "juniorProofRequired": "Debes subir una prueba para activar el descuento junior.",
     "featureUpTo0": "0 subcuentas"
@@ -1353,7 +1353,7 @@
   "landing": {
     "navBenefits": "Ventajas",
     "navFeatures": "Funciones",
-    "navPricing": "Precios",
+    "navPricing": "Inversión",
     "navLogin": "Iniciar sesión",
     "heroBadge": "Plataforma Legal con Inteligencia Artificial",
     "heroH1a": "El software con IA que",

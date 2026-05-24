@@ -1222,7 +1222,7 @@
     "juniorUploadSuccess": "Dokument erfolgreich hochgeladen",
     "juniorUploadError": "Fehler beim Hochladen des Dokuments",
     "juniorPending": "Ihr Junior-Rabatt wartet auf Überprüfung.",
-    "juniorVerified": "Junior-Rabatt aktiv (45€/Monat oder 480€/Jahr).",
+    "juniorVerified": "Junior-Rabatt aktiv (40€/Monat oder 420€/Jahr).",
     "juniorRejected": "Ihr Junior-Rabatt wurde abgelehnt. Die nächste Abbuchung erfolgt zum Basispreis.",
     "juniorProofRequired": "Sie müssen einen Nachweis hochladen, um den Junior-Rabatt zu aktivieren.",
     "featureUpTo0": "0 Unterkonten"

@@ -555,10 +555,10 @@ const Landing = () => {
   const advancedAnnual = formatPrice(3700, currency);
   const advancedAnnualPerMonth = formatPrice(308, currency);
   const advancedSaving = formatPrice(500, currency);
-  const individualMonthly = formatPrice(60, currency);
-  const individualAnnual = formatPrice(600, currency);
-  const individualJuniorMonthly = formatPrice(45, currency);
-  const individualJuniorAnnual = formatPrice(480, currency);
+  const individualMonthly = formatPrice(50, currency);
+  const individualAnnual = formatPrice(500, currency);
+  const individualJuniorMonthly = formatPrice(40, currency);
+  const individualJuniorAnnual = formatPrice(420, currency);
   const roiPrice = formatPrice(197, currency);
 
   const features = [

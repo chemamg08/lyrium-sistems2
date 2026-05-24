@@ -258,7 +258,7 @@ function sanitizeForWinAnsi(text: string): string {
  * Genera un nuevo PDF con el texto modificado, logo, estilos profesionales y números de página.
  * Soporta: # H1, ## H2, ### H3, **bold** inline, separadores, paginación.
  */
-export async function generateContractFromText(
+async function generateLegacyContractFromText(
   modifiedText: string,
   outputFileName: string,
   accountId?: string
@@ -528,6 +528,440 @@ export async function generateContractFromText(
         size: 8,
         font,
         color: rgb(0.55, 0.55, 0.55)
+      });
+    });
+
+    const outputPath = path.join(GENERATED_DIR, outputFileName);
+    await fs.writeFile(outputPath, await pdfDoc.save());
+    return outputPath;
+  } catch (error) {
+    console.error('Error generando contrato:', error);
+    throw new Error('No se pudo generar el contrato');
+  }
+}
+
+export async function generateContractFromText(
+  modifiedText: string,
+  outputFileName: string,
+  accountId?: string
+): Promise<string> {
+  await ensureDirectories();
+  const sanitizedText = sanitizeForWinAnsi(modifiedText);
+
+  try {
+    const pdfDoc = await PDFDocument.create();
+    const font = await pdfDoc.embedFont(StandardFonts.Helvetica);
+    const boldFont = await pdfDoc.embedFont(StandardFonts.HelveticaBold);
+    const generatedAt = new Date().toLocaleDateString('es-ES', {
+      day: '2-digit',
+      month: '2-digit',
+      year: 'numeric'
+    });
+
+    let logo: PDFImage | null = null;
+    const logoPath = await getLogoPath(accountId);
+    if (logoPath) {
+      try {
+        const logoBytes = await fs.readFile(logoPath);
+        logo = await pdfDoc.embedPng(logoBytes);
+      } catch {
+        logo = null;
+      }
+    }
+
+    const pageWidth = 595;
+    const pageHeight = 842;
+    const marginX = 58;
+    const marginTop = 52;
+    const marginBottom = 46;
+    const headerHeight = 52;
+    const footerHeight = 28;
+    const logoHeight = 28;
+    const maxWidth = pageWidth - marginX * 2;
+    const contentTopY = pageHeight - marginTop - headerHeight;
+    const minY = marginBottom + footerHeight;
+
+    const palette = {
+      text: rgb(0.12, 0.14, 0.18),
+      muted: rgb(0.46, 0.49, 0.54),
+      accent: rgb(0.18, 0.25, 0.42),
+      divider: rgb(0.84, 0.87, 0.91),
+      dividerStrong: rgb(0.72, 0.76, 0.81),
+      sectionBg: rgb(0.962, 0.968, 0.98),
+      sectionBorder: rgb(0.82, 0.85, 0.9)
+    };
+
+    const bodySize = 10.4;
+    const clauseSize = 10;
+    const compactSize = 9.25;
+    const h1Size = 17;
+    const h2Size = 12.8;
+    const h3Size = 11.5;
+    const lineBody = 15.8;
+    const lineClause = 15;
+    const lineCompact = 13.5;
+    const lineH1 = 24;
+    const lineH2 = 19;
+    const lineH3 = 17;
+
+    const allPages: Array<ReturnType<typeof pdfDoc.addPage>> = [];
+    let currentPage = addNewPage();
+    let y = contentTopY;
+
+    function addNewPage() {
+      const page = pdfDoc.addPage([pageWidth, pageHeight]);
+      allPages.push(page);
+
+      page.drawText('LYRIUM SYSTEMS', {
+        x: marginX,
+        y: pageHeight - marginTop + 8,
+        size: 8,
+        font: boldFont,
+        color: palette.accent
+      });
+      page.drawText('Documento contractual generado', {
+        x: marginX,
+        y: pageHeight - marginTop - 4,
+        size: 9,
+        font,
+        color: palette.muted
+      });
+
+      if (logo) {
+        const scale = logoHeight / logo.height;
+        const logoWidth = logo.width * scale;
+        page.drawImage(logo, {
+          x: pageWidth - marginX - logoWidth,
+          y: pageHeight - marginTop - 2,
+          width: logoWidth,
+          height: logoHeight
+        });
+      }
+
+      page.drawLine({
+        start: { x: marginX, y: pageHeight - marginTop - 18 },
+        end: { x: pageWidth - marginX, y: pageHeight - marginTop - 18 },
+        thickness: 1,
+        color: palette.dividerStrong
+      });
+
+      return page;
+    }
+
+    function ensureSpace(requiredHeight: number) {
+      if (y - requiredHeight < minY) {
+        currentPage = addNewPage();
+        y = contentTopY;
+      }
+    }
+
+    function parseInline(text: string) {
+      const segments: Array<{ text: string; bold: boolean }> = [];
+      const regex = /\*\*(.+?)\*\*/g;
+      let lastIndex = 0;
+      let match: RegExpExecArray | null;
+
+      while ((match = regex.exec(text)) !== null) {
+        if (match.index > lastIndex) {
+          segments.push({ text: text.slice(lastIndex, match.index), bold: false });
+        }
+        segments.push({ text: match[1], bold: true });
+        lastIndex = regex.lastIndex;
+      }
+
+      if (lastIndex < text.length) {
+        segments.push({ text: text.slice(lastIndex), bold: false });
+      }
+
+      return segments.length > 0 ? segments : [{ text, bold: false }];
+    }
+
+    function measureInline(text: string, fontSize: number) {
+      return parseInline(text).reduce((total, segment) => {
+        const activeFont = segment.bold ? boldFont : font;
+        return total + activeFont.widthOfTextAtSize(segment.text, fontSize);
+      }, 0);
+    }
+
+    function splitTokenToFit(word: string, isBold: boolean, maxLineWidth: number, fontSize: number) {
+      const activeFont = isBold ? boldFont : font;
+      if (activeFont.widthOfTextAtSize(word, fontSize) <= maxLineWidth) {
+        return [word];
+      }
+
+      const parts: string[] = [];
+      let current = '';
+
+      for (const char of word) {
+        const candidate = current + char;
+        if (current && activeFont.widthOfTextAtSize(candidate, fontSize) > maxLineWidth) {
+          parts.push(`${current}-`);
+          current = char;
+        } else {
+          current = candidate;
+        }
+      }
+
+      if (current) {
+        parts.push(current);
+      }
+
+      return parts;
+    }
+
+    function wrapInline(segments: Array<{ text: string; bold: boolean }>, maxLineWidth: number, fontSize: number) {
+      const spaceWidth = font.widthOfTextAtSize(' ', fontSize);
+      const words: Array<{ value: string; bold: boolean }> = [];
+
+      segments.forEach((segment) => {
+        segment.text.split(/\s+/).filter(Boolean).forEach((word) => {
+          splitTokenToFit(word, segment.bold, maxLineWidth, fontSize).forEach((part) => {
+            words.push({ value: part, bold: segment.bold });
+          });
+        });
+      });
+
+      const lines: string[] = [];
+      let currentLine = '';
+      let currentWidth = 0;
+
+      words.forEach((word) => {
+        const activeFont = word.bold ? boldFont : font;
+        const wordWidth = activeFont.widthOfTextAtSize(word.value, fontSize);
+        const gapWidth = currentLine ? spaceWidth : 0;
+
+        if (currentLine && currentWidth + gapWidth + wordWidth > maxLineWidth) {
+          lines.push(currentLine);
+          currentLine = word.bold ? `**${word.value}**` : word.value;
+          currentWidth = wordWidth;
+          return;
+        }
+
+        currentLine += `${currentLine ? ' ' : ''}${word.bold ? `**${word.value}**` : word.value}`;
+        currentWidth += gapWidth + wordWidth;
+      });
+
+      if (currentLine) {
+        lines.push(currentLine);
+      }
+
+      return lines;
+    }
+
+    function drawInline(text: string, x: number, lineY: number, fontSize: number) {
+      let cursorX = x;
+
+      parseInline(text).forEach((segment) => {
+        if (!segment.text) {
+          return;
+        }
+
+        const activeFont = segment.bold ? boldFont : font;
+        currentPage.drawText(segment.text, {
+          x: cursorX,
+          y: lineY,
+          size: fontSize,
+          font: activeFont,
+          color: palette.text
+        });
+        cursorX += activeFont.widthOfTextAtSize(segment.text, fontSize);
+      });
+    }
+
+    function drawDivider(lineY: number, thickness = 0.8, color = palette.divider) {
+      currentPage.drawLine({
+        start: { x: marginX, y: lineY },
+        end: { x: pageWidth - marginX, y: lineY },
+        thickness,
+        color
+      });
+    }
+
+    function isClauseLine(line: string) {
+      return /^(\d+([.)]|\.\d+)|[A-Z]\)|CL[AÁ]USULA|ANEXO|APARTADO)/i.test(line.trim());
+    }
+
+    function isCompactLine(line: string) {
+      return /^(Firmado|Firma|DNI|NIF|Email|Correo|Tel[eé]fono|En\s+\w+|Lugar|Fecha)/i.test(line.trim());
+    }
+
+    sanitizedText.split('\n').forEach((rawLine) => {
+      const line = rawLine.trimEnd();
+
+      if (!line.trim()) {
+        y -= lineBody * 0.55;
+        return;
+      }
+
+      if (/^[-*_]{3,}$/.test(line.trim())) {
+        ensureSpace(14);
+        drawDivider(y, 0.9, palette.dividerStrong);
+        y -= 14;
+        return;
+      }
+
+      if (/^# /.test(line)) {
+        const title = line.replace(/^# /, '').trim();
+        const wrappedTitle = wrapInline([{ text: title, bold: true }], maxWidth - 40, h1Size);
+        y -= 2;
+
+        wrappedTitle.forEach((titleLine) => {
+          ensureSpace(lineH1 + 16);
+          const centeredX = marginX + Math.max(0, (maxWidth - measureInline(titleLine, h1Size)) / 2);
+          drawInline(titleLine, centeredX, y, h1Size);
+          y -= lineH1;
+        });
+
+        drawDivider(y + 6, 1, palette.dividerStrong);
+        y -= 12;
+        return;
+      }
+
+      if (/^## /.test(line)) {
+        const heading = line.replace(/^## /, '').trim();
+        const wrappedHeading = wrapInline([{ text: heading, bold: true }], maxWidth - 24, h2Size);
+        const boxHeight = wrappedHeading.length * lineH2 + 12;
+
+        ensureSpace(boxHeight + 16);
+        const boxTop = y + 6;
+        currentPage.drawRectangle({
+          x: marginX,
+          y: boxTop - boxHeight,
+          width: maxWidth,
+          height: boxHeight,
+          color: palette.sectionBg,
+          borderColor: palette.sectionBorder,
+          borderWidth: 0.8
+        });
+
+        let headingY = y - 8;
+        wrappedHeading.forEach((headingLine) => {
+          drawInline(headingLine, marginX + 12, headingY, h2Size);
+          headingY -= lineH2;
+        });
+
+        y = boxTop - boxHeight - 10;
+        return;
+      }
+
+      if (/^### /.test(line)) {
+        const subheading = line.replace(/^### /, '').trim();
+        ensureSpace(lineH3 + 8);
+        currentPage.drawText(subheading, {
+          x: marginX,
+          y,
+          size: h3Size,
+          font: boldFont,
+          color: palette.accent
+        });
+        y -= lineH3;
+        drawDivider(y + 7, 0.6, palette.divider);
+        y -= 3;
+        return;
+      }
+
+      const uppercaseLine = line.replace(/\*\*/g, '').trim();
+      if (
+        uppercaseLine.length >= 3 &&
+        uppercaseLine.length < 70 &&
+        uppercaseLine === uppercaseLine.toUpperCase() &&
+        /[A-ZÁÉÍÓÚÑ]/.test(uppercaseLine)
+      ) {
+        const wrappedHeading = wrapInline([{ text: uppercaseLine, bold: true }], maxWidth - 24, h2Size);
+        const boxHeight = wrappedHeading.length * lineH2 + 12;
+
+        ensureSpace(boxHeight + 16);
+        const boxTop = y + 6;
+        currentPage.drawRectangle({
+          x: marginX,
+          y: boxTop - boxHeight,
+          width: maxWidth,
+          height: boxHeight,
+          color: palette.sectionBg,
+          borderColor: palette.sectionBorder,
+          borderWidth: 0.8
+        });
+
+        let headingY = y - 8;
+        wrappedHeading.forEach((headingLine) => {
+          drawInline(headingLine, marginX + 12, headingY, h2Size);
+          headingY -= lineH2;
+        });
+
+        y = boxTop - boxHeight - 10;
+        return;
+      }
+
+      const trimmedLine = line.trim();
+      const isBulletLine = /^[-*]\s+/.test(trimmedLine);
+      const normalizedLine = isBulletLine ? trimmedLine.replace(/^[-*]\s+/, '') : trimmedLine;
+      const paragraphSize = isCompactLine(trimmedLine)
+        ? compactSize
+        : isClauseLine(trimmedLine)
+          ? clauseSize
+          : bodySize;
+      const lineHeight = isCompactLine(trimmedLine)
+        ? lineCompact
+        : isClauseLine(trimmedLine)
+          ? lineClause
+          : lineBody;
+      const indent = isBulletLine ? 18 : isClauseLine(trimmedLine) ? 14 : 0;
+      const availableWidth = maxWidth - indent - (isBulletLine ? 10 : 0);
+      const wrappedParagraph = wrapInline(parseInline(normalizedLine), availableWidth, paragraphSize);
+
+      wrappedParagraph.forEach((wrappedLine, index) => {
+        ensureSpace(lineHeight);
+        if (isBulletLine && index === 0) {
+          currentPage.drawText('•', {
+            x: marginX,
+            y,
+            size: paragraphSize + 1,
+            font: boldFont,
+            color: palette.accent
+          });
+        }
+
+        drawInline(wrappedLine, marginX + indent, y, paragraphSize);
+        y -= lineHeight;
+      });
+
+      y -= lineHeight * 0.18;
+    });
+
+    const totalPages = allPages.length;
+    allPages.forEach((page, index) => {
+      const footerY = marginBottom - 8;
+      const label = 'Documento contractual';
+      const pageText = `Página ${index + 1} de ${totalPages}`;
+      const pageTextWidth = font.widthOfTextAtSize(pageText, 8);
+      const labelWidth = boldFont.widthOfTextAtSize(label, 8);
+
+      page.drawLine({
+        start: { x: marginX, y: footerY + 14 },
+        end: { x: pageWidth - marginX, y: footerY + 14 },
+        thickness: 0.7,
+        color: palette.divider
+      });
+      page.drawText(label, {
+        x: marginX,
+        y: footerY,
+        size: 8,
+        font: boldFont,
+        color: palette.muted
+      });
+      page.drawText(generatedAt, {
+        x: marginX + labelWidth + 10,
+        y: footerY,
+        size: 8,
+        font,
+        color: palette.muted
+      });
+      page.drawText(pageText, {
+        x: pageWidth - marginX - pageTextWidth,
+        y: footerY,
+        size: 8,
+        font,
+        color: palette.muted
       });
     });
 

@@ -229,8 +229,8 @@ const RenewalModal = ({ isOpen, onClose, onSuccess, accountId, userEmail, userCo
     {
       id: 'individual',
       name: 'Plan Individual',
-      monthlyPrice: 60,
-      annualPrice: 600,
+      monthlyPrice: 50,
+      annualPrice: 500,
       maxSubaccounts: 0,
       features: ['Acceso completo a la app para el titular', t('profile.featureAllFeatures'), t('profile.featurePrioritySupport')]
     },
@@ -250,7 +250,7 @@ const RenewalModal = ({ isOpen, onClose, onSuccess, accountId, userEmail, userCo
       const plan = PLANS.find(p => p.id === planId);
       price = interval === 'monthly' ? (plan?.monthlyPrice ?? 0) : (plan?.annualPrice ?? 0);
     } else {
-      price = interval === 'monthly' ? 45 : 480;
+      price = interval === 'monthly' ? 40 : 420;
     }
     if (appliedPromo && appliedPromo.type === 'percentage_discount') {
       price = Math.round(price * (1 - appliedPromo.value / 100));

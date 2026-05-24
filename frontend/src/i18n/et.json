@@ -880,7 +880,7 @@
     "juniorUploadSuccess": "Dokument edukalt üles laaditud",
     "juniorUploadError": "Viga dokumendi üleslaadimisel",
     "juniorPending": "Teie nooradvokaadi allahindlus ootab kinnitust.",
-    "juniorVerified": "Nooradvokaadi allahindlus aktiivne (45€/kuus või 480€/aasta).",
+    "juniorVerified": "Nooradvokaadi allahindlus aktiivne (40€/kuus või 420€/aasta).",
     "juniorRejected": "Teie nooradvokaadi allahindlus on tagasi lükatud. Järgmine tasu on põhihinnaga.",
     "juniorProofRequired": "Peate laadima üles tõendi nooradvokaadi allahindluse aktiveerimiseks.",
     "featureUpTo0": "0 subkontot",

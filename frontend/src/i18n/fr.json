@@ -943,7 +943,7 @@
     "juniorUploadSuccess": "Document téléchargé avec succès",
     "juniorUploadError": "Erreur lors du téléchargement du document",
     "juniorPending": "Votre remise junior est en attente de vérification.",
-    "juniorVerified": "Remise junior active (45€/mois ou 480€/an).",
+    "juniorVerified": "Remise junior active (40€/mois ou 420€/an).",
     "juniorRejected": "Votre remise junior a été rejetée. Le prochain prélèvement sera au prix de base.",
     "juniorProofRequired": "Vous devez télécharger une preuve pour activer la remise junior.",
     "featureUpTo0": "0 sous-comptes"

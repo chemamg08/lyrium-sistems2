@@ -939,7 +939,7 @@
     "juniorUploadSuccess": "Dokument lastet opp",
     "juniorUploadError": "Feil ved opplasting av dokument",
     "juniorPending": "Din juniordrabatt venter på verifisering.",
-    "juniorVerified": "Juniordrabatt aktiv (45€/måned eller 480€/år).",
+    "juniorVerified": "Juniordrabatt aktiv (40€/måned eller 420€/år).",
     "juniorRejected": "Din juniordrabatt er avvist. Neste trekk blir til basisprisen.",
     "juniorProofRequired": "Du må laste opp bevis for å aktivere juniordrabatten.",
     "featureUpTo0": "0 underkonto"

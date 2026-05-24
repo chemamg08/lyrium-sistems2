@@ -940,7 +940,7 @@
     "juniorUploadSuccess": "Document succesvol geüpload",
     "juniorUploadError": "Fout bij het uploaden van het document",
     "juniorPending": "Uw junior-korting wacht op verificatie.",
-    "juniorVerified": "Junior-korting actief (45€/maand of 480€/jaar).",
+    "juniorVerified": "Junior-korting actief (40€/maand of 420€/jaar).",
     "juniorRejected": "Uw junior-korting is afgewezen. De volgende afschrijving zal tegen de basisprijs zijn.",
     "juniorProofRequired": "U moet een bewijs uploaden om de junior-korting te activeren.",
     "featureUpTo0": "0 subaccounts"

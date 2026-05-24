@@ -939,7 +939,7 @@
     "juniorUploadSuccess": "Dokumentum sikeresen feltöltve",
     "juniorUploadError": "Hiba a dokumentum feltöltésekor",
     "juniorPending": "Junior kedvezményed ellenőrzésre vár.",
-    "juniorVerified": "Junior kedvezmény aktív (45€/hónap vagy 480€/év).",
+    "juniorVerified": "Junior kedvezmény aktív (40€/hónap vagy 420€/év).",
     "juniorRejected": "Junior kedvezményedet elutasították. A következő terhelés az alapáron lesz.",
     "juniorProofRequired": "Bizonyítékot kell feltöltened a junior kedvezmény aktiválásához.",
     "featureUpTo0": "0 alszámla"

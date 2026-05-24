@@ -939,7 +939,7 @@
     "juniorUploadSuccess": "Dokument uppladdat framgångsrikt",
     "juniorUploadError": "Fel vid uppladdning av dokument",
     "juniorPending": "Din juniorrabatt väntar på verifiering.",
-    "juniorVerified": "Juniorrabatt aktiv (45€/månad eller 480€/år).",
+    "juniorVerified": "Juniorrabatt aktiv (40€/månad eller 420€/år).",
     "juniorRejected": "Din juniorrabatt har avvisats. Nästa debitering kommer att vara till baspriset.",
     "juniorProofRequired": "Du måste ladda upp ett bevis för att aktivera juniorrabatten.",
     "featureUpTo0": "0 underkonton"

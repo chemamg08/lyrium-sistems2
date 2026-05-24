@@ -71,8 +71,8 @@ const PLANS: Record<LocalPlanId, PlanConfig> = {
   },
   individual: {
     name: 'Individual',
-    monthlyPrice: 60,
-    annualPrice: 600,
+    monthlyPrice: 50,
+    annualPrice: 500,
     stripePriceIdMonthly: process.env.STRIPE_PRICE_INDIVIDUAL_MONTHLY || 'price_individual_monthly',
     stripePriceIdAnnual: process.env.STRIPE_PRICE_INDIVIDUAL_ANNUAL || 'price_individual_annual',
     stripePriceIdJuniorMonthly: process.env.STRIPE_PRICE_INDIVIDUAL_JUNIOR_MONTHLY || 'price_individual_junior_monthly',
@@ -602,7 +602,7 @@ export const createPaymentIntent = async (req: Request, res: Response) => {
     const useJunior = plan === 'individual' && !!isJunior;
     let amount = interval === 'monthly' ? planConfig.monthlyPrice : planConfig.annualPrice;
     if (useJunior) {
-      amount = interval === 'monthly' ? 45 : 480;
+      amount = interval === 'monthly' ? 40 : 420;
     }
 
     let appliedPromo: any = null;
@@ -1045,8 +1045,8 @@ export const confirmPayment = async (req: Request, res: Response) => {
         appliedAt: null,
         verifiedAt: null,
         verifiedBy: null,
-        originalPrice: interval === 'monthly' ? 60 : 600,
-        finalPrice: interval === 'monthly' ? 45 : 480,
+        originalPrice: interval === 'monthly' ? 50 : 500,
+        finalPrice: interval === 'monthly' ? 40 : 420,
       };
     } else if (subscription.juniorDiscount && plan !== 'individual') {
       subscription.juniorDiscount = null;
@@ -1061,7 +1061,7 @@ export const confirmPayment = async (req: Request, res: Response) => {
     if (planConfig) {
       let invoiceAmount = interval === 'monthly' ? planConfig.monthlyPrice : planConfig.annualPrice;
       if (plan === 'individual' && isJunior) {
-        invoiceAmount = interval === 'monthly' ? 45 : 480;
+        invoiceAmount = interval === 'monthly' ? 40 : 420;
       }
       generateAndSendInvoice(
         accountId,

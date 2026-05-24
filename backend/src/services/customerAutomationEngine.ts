@@ -1,5 +1,5 @@
 import OpenAI from 'openai';
-import { AI_AUTOMATION_MODEL } from '../config/aiModel.js';
+import { AI_MODEL } from '../config/aiModel.js';
 import { stripThinkTags } from './aiService.js';
 
 let client: OpenAI | null = null;
@@ -14,34 +14,11 @@ function getClient(): OpenAI {
   return client;
 }
 
-export type AutomationDecisionType =
-  | 'reply'
-  | 'ask_assignment'
-  | 'assign_case'
-  | 'preguntar_consultas'
-  | 'pause_auto_reply'
-  | 'no_responder';
-
 export interface AutomationEngineMessage {
   fechaHora: string;
   autor: 'cliente' | 'asistente' | 'humano';
   canal: 'email' | 'whatsapp';
   texto: string;
-}
-
-export interface AutomationEngineDecision {
-  plataforma: 'email' | 'whatsapp';
-  clasificacion: {
-    tipo: 'consulta_general' | 'solicitud_servicio' | 'otro';
-    especialidadId?: string;
-  };
-  folderIds: string[];
-  accion: AutomationDecisionType;
-  asignarA?: string;
-  mensajeConsultas?: string;
-  mensajeCliente?: string;
-  motivoPausa?: string;
-  bruto: string;
 }
 
 export interface AutomationEngineInput {
@@ -69,9 +46,30 @@ export interface AutomationEngineInput {
   ultimos20Mensajes: AutomationEngineMessage[];
 }
 
-function escapeMultilineText(text: string): string {
-  return String(text || '').replace(/\r/g, ' ').replace(/\n/g, ' ').trim();
+export interface AutomationEngineDecision {
+  plataforma: 'email' | 'whatsapp';
+  folderIds: string[];
+  createPendingCase: boolean;
+  askAssignment: boolean;
+  assignCase: boolean;
+  specialtyId?: string;
+  assignTo?: string;
+  consultasMessage?: string;
+  pauseAutoReply: boolean;
+  noResponder: boolean;
+  mensajeCliente?: string;
+  motivoPausa?: string;
+  bruto: string;
+  valida: boolean;
+  errores: string[];
 }
+
+interface ParsedDecision {
+  decision: AutomationEngineDecision;
+  parseErrors: string[];
+}
+
+const MAX_CORRECTION_RETRIES = 3;
 
 function buildPrompt(input: AutomationEngineInput): string {
   const context = {
@@ -94,58 +92,63 @@ function buildPrompt(input: AutomationEngineInput): string {
 
   return `Eres la recepcionista IA de un despacho de abogados.
 
-Tu trabajo es:
-- responder preguntas simples usando solo la informacion recibida
-- organizar conversaciones en carpetas si corresponde
-- detectar solicitudes de servicio legal
-- preguntar al cliente si quiere que se le asigne un abogado cuando corresponda
-- asignar abogado si el cliente lo confirma y existe candidato valido
-- preguntar al correo de consultas si no tienes base suficiente para decidir o responder
+Debes decidir que hacer con el mensaje mas reciente del cliente usando solo los hechos reales del contexto.
 
-Reglas obligatorias:
-- responde solo por el mismo canal de entrada
-- usa solo la informacion que recibes en este prompt
+Reglas de razonamiento:
+- usa solo la informacion del prompt
 - no inventes
-- no uses plantillas
-- no prometas resultados juridicos
-- no des estrategia juridica compleja
-- si dudas, usa /preguntar_consultas
-- si soloContactosConocidos es true y contactoConocido es false, no debes responder automaticamente al cliente
+- no devuelvas clasificaciones, etiquetas intermedias ni pistas semanticas
+- razona a partir del historial real, los documentos, las reglas y las restricciones tecnicas
 - responde en el idioma del cliente
-- tono cercano pero profesional
-- ten en cuenta siempre los ultimos 20 mensajes con fecha y hora
-- si los ultimos mensajes del cliente llegan en bloque, tienes que interpretar el bloque entero
+- si el cliente parece querer avanzar con un servicio legal, usa acciones reales como crear caso, preguntar asignacion, asignar caso o derivar a consultas
+- si no estas seguro, deriva a consultas
+
+Restricciones tecnicas:
+- responde solo por el mismo canal de entrada
+- si soloContactosConocidos es true y contactoConocido es false, no debes responder automaticamente al cliente
+- si autoAssignEnabled es false, no debes usar /preguntar_asignacion ni /asignar_caso
+- si el canal es whatsapp y la ventana de 24 horas esta cerrada, no debes incluir //mensaje al cliente
 - si decides /preguntar_consultas, no debes incluir //mensaje al cliente
-- si el canal es whatsapp y la ventana de 24 horas esta cerrada, no debes intentar responder al cliente
+- si decides /no_responder, no debes incluir //mensaje al cliente
 
-Formato de salida:
-- primera linea: ///email o ///whatsapp
-- despues, una linea /clasificar tipo="consulta_general|solicitud_servicio|otro" especialidadId="id|null"
-- puedes incluir cero o una linea /mover_a_carpeta folderIds=["id1","id2"]
-- puedes incluir cero o una linea /preguntar_asignacion especialidadId="id|null"
-- puedes incluir cero o una linea /asignar_caso especialidadId="id|null" asignarA="id_cuenta"
-- puedes incluir cero o una linea /preguntar_consultas mensaje="texto natural para el correo de consultas"
-- puedes incluir cero o una linea /pausar_auto_reply motivo="texto"
-- puedes incluir cero o una linea /no_responder
-- si respondes al cliente, la ultima linea debe ser //texto del mensaje al cliente
-- no escribas nada fuera de ese formato
+Comandos disponibles:
+- primera linea obligatoria: ///email o ///whatsapp
+- opcional: /mover_a_carpeta folderIds=["id1","id2"]
+- opcional: /crear_caso_pendiente especialidadId="id|null"
+- opcional: /preguntar_asignacion especialidadId="id|null"
+- opcional: /asignar_caso especialidadId="id|null" asignarA="id_cuenta"
+- opcional: /preguntar_consultas especialidadId="id|null" mensaje="texto natural para el equipo interno"
+- opcional: /pausar_auto_reply motivo="texto"
+- opcional: /no_responder
+- opcional: //texto exacto para el cliente
 
-Prioridades:
-1. no inventar
-2. respetar canal y restricciones
-3. usar especialidades, documentos y contexto real
-4. si no sabes que hacer, usar /preguntar_consultas
+Compatibilidades importantes:
+- puedes combinar /mover_a_carpeta con cualquier accion compatible
+- puedes combinar /crear_caso_pendiente con /preguntar_asignacion
+- puedes combinar /crear_caso_pendiente con /asignar_caso
+- puedes combinar /crear_caso_pendiente con /preguntar_consultas
+- /preguntar_asignacion requiere //mensaje al cliente
+- /asignar_caso puede llevar //mensaje al cliente
+- /pausar_auto_reply puede llevar //mensaje al cliente
+
+Incompatibilidades importantes:
+- no uses /no_responder junto con //mensaje al cliente
+- no uses /preguntar_consultas junto con //mensaje al cliente
+- no uses /preguntar_asignacion junto con /asignar_caso
+- no uses /no_responder junto con /preguntar_asignacion
+- no uses /no_responder junto con /asignar_caso
+
+Devuelve solo comandos validos.
+No escribas explicaciones.
+No uses /clasificar.
 
 Contexto JSON:
 ${JSON.stringify(context, null, 2)}
 
-Decide que hacer con el bloque mas reciente del cliente y responde solo en el formato indicado.
-/no_think`;
+Decide que hacer con el bloque mas reciente del cliente y responde solo con comandos validos.`;
 }
 
 function parseQuotedValue(line: string, key: string): string | undefined {
-  const match = line.match(new RegExp(`${key}="([\\s\\S]*)"$`));
-  if (match) return match[1].trim();
   const generic = line.match(new RegExp(`${key}="([^"]*)"`));
   return generic?.[1]?.trim();
 }
@@ -161,118 +164,303 @@ function parseFolderIds(line: string): string[] {
   }
 }
 
-export function parseAutomationDecision(rawOutput: string, fallbackChannel: 'email' | 'whatsapp'): AutomationEngineDecision {
+function normalizeOptionalId(value?: string): string | undefined {
+  if (!value || value === 'null') return undefined;
+  return value;
+}
+
+function parseAutomationDecision(rawOutput: string, fallbackChannel: 'email' | 'whatsapp'): ParsedDecision {
   const cleaned = stripThinkTags(rawOutput || '').trim();
   const lines = cleaned.split('\n').map((line) => line.trim()).filter(Boolean);
 
   const decision: AutomationEngineDecision = {
     plataforma: fallbackChannel,
-    clasificacion: { tipo: 'consulta_general' },
     folderIds: [],
-    accion: 'preguntar_consultas',
-    mensajeConsultas: 'Hola, no he podido determinar con seguridad que responder ni que hacer con esta conversacion. Dime que debo responder o que actuacion debo seguir.',
+    createPendingCase: false,
+    askAssignment: false,
+    assignCase: false,
+    pauseAutoReply: false,
+    noResponder: false,
     bruto: cleaned,
+    valida: false,
+    errores: [],
   };
+  const parseErrors: string[] = [];
+
+  let channelSeen = false;
+  let askAssignmentSeen = false;
+  let assignCaseSeen = false;
+  let consultasSeen = false;
+  let pauseSeen = false;
+  let noResponderSeen = false;
+  let createPendingSeen = false;
+  let messageSeen = false;
+  let folderSeen = false;
 
   for (const line of lines) {
     if (line.startsWith('///')) {
-      decision.plataforma = line.slice(3).trim() === 'email' ? 'email' : 'whatsapp';
-      continue;
-    }
-
-    if (line.startsWith('/clasificar')) {
-      const tipo = parseQuotedValue(line, 'tipo');
-      const especialidadId = parseQuotedValue(line, 'especialidadId');
-      if (tipo === 'consulta_general' || tipo === 'solicitud_servicio' || tipo === 'otro') {
-        decision.clasificacion.tipo = tipo;
+      if (channelSeen) {
+        parseErrors.push('Se ha devuelto mas de una linea de plataforma.');
+        continue;
       }
-      if (especialidadId && especialidadId !== 'null') {
-        decision.clasificacion.especialidadId = especialidadId;
+      channelSeen = true;
+      const platform = line.slice(3).trim();
+      if (platform !== 'email' && platform !== 'whatsapp') {
+        parseErrors.push('La plataforma devuelta no es valida.');
+        continue;
       }
+      decision.plataforma = platform;
       continue;
     }
 
     if (line.startsWith('/mover_a_carpeta')) {
+      if (folderSeen) {
+        parseErrors.push('Se ha devuelto mas de una linea /mover_a_carpeta.');
+        continue;
+      }
+      folderSeen = true;
       decision.folderIds = parseFolderIds(line);
       continue;
     }
 
-    if (line.startsWith('/preguntar_asignacion')) {
-      decision.accion = 'ask_assignment';
-      const especialidadId = parseQuotedValue(line, 'especialidadId');
-      if (especialidadId && especialidadId !== 'null') {
-        decision.clasificacion.especialidadId = especialidadId;
+    if (line.startsWith('/crear_caso_pendiente')) {
+      if (createPendingSeen) {
+        parseErrors.push('Se ha devuelto mas de una linea /crear_caso_pendiente.');
+        continue;
       }
+      createPendingSeen = true;
+      decision.createPendingCase = true;
+      decision.specialtyId = normalizeOptionalId(parseQuotedValue(line, 'especialidadId')) || decision.specialtyId;
+      continue;
+    }
+
+    if (line.startsWith('/preguntar_asignacion')) {
+      if (askAssignmentSeen) {
+        parseErrors.push('Se ha devuelto mas de una linea /preguntar_asignacion.');
+        continue;
+      }
+      askAssignmentSeen = true;
+      decision.askAssignment = true;
+      decision.specialtyId = normalizeOptionalId(parseQuotedValue(line, 'especialidadId')) || decision.specialtyId;
       continue;
     }
 
     if (line.startsWith('/asignar_caso')) {
-      decision.accion = 'assign_case';
-      const especialidadId = parseQuotedValue(line, 'especialidadId');
-      const asignarA = parseQuotedValue(line, 'asignarA');
-      if (especialidadId && especialidadId !== 'null') {
-        decision.clasificacion.especialidadId = especialidadId;
+      if (assignCaseSeen) {
+        parseErrors.push('Se ha devuelto mas de una linea /asignar_caso.');
+        continue;
       }
-      if (asignarA) {
-        decision.asignarA = asignarA;
-      }
+      assignCaseSeen = true;
+      decision.assignCase = true;
+      decision.specialtyId = normalizeOptionalId(parseQuotedValue(line, 'especialidadId')) || decision.specialtyId;
+      decision.assignTo = normalizeOptionalId(parseQuotedValue(line, 'asignarA'));
       continue;
     }
 
     if (line.startsWith('/preguntar_consultas')) {
-      decision.accion = 'preguntar_consultas';
-      decision.mensajeConsultas = parseQuotedValue(line, 'mensaje') || decision.mensajeConsultas;
-      decision.mensajeCliente = undefined;
+      if (consultasSeen) {
+        parseErrors.push('Se ha devuelto mas de una linea /preguntar_consultas.');
+        continue;
+      }
+      consultasSeen = true;
+      decision.consultasMessage = parseQuotedValue(line, 'mensaje') || '';
+      decision.specialtyId = normalizeOptionalId(parseQuotedValue(line, 'especialidadId')) || decision.specialtyId;
       continue;
     }
 
     if (line.startsWith('/pausar_auto_reply')) {
-      decision.accion = 'pause_auto_reply';
+      if (pauseSeen) {
+        parseErrors.push('Se ha devuelto mas de una linea /pausar_auto_reply.');
+        continue;
+      }
+      pauseSeen = true;
+      decision.pauseAutoReply = true;
       decision.motivoPausa = parseQuotedValue(line, 'motivo') || 'Pausa solicitada por la IA recepcionista';
       continue;
     }
 
     if (line.startsWith('/no_responder')) {
-      decision.accion = 'no_responder';
-      decision.mensajeCliente = undefined;
+      if (noResponderSeen) {
+        parseErrors.push('Se ha devuelto mas de una linea /no_responder.');
+        continue;
+      }
+      noResponderSeen = true;
+      decision.noResponder = true;
       continue;
     }
 
     if (line.startsWith('//')) {
-      decision.mensajeCliente = line.slice(2).trim();
-      if (decision.accion === 'preguntar_consultas') {
-        decision.mensajeCliente = undefined;
-      } else if (decision.accion === 'no_responder') {
-        decision.mensajeCliente = undefined;
-      } else if (decision.accion !== 'ask_assignment' && decision.accion !== 'assign_case' && decision.accion !== 'pause_auto_reply') {
-        decision.accion = 'reply';
+      if (messageSeen) {
+        parseErrors.push('Se ha devuelto mas de una linea de mensaje al cliente.');
+        continue;
       }
+      messageSeen = true;
+      decision.mensajeCliente = line.slice(2).trim();
+      continue;
     }
+
+    if (line.startsWith('/')) {
+      parseErrors.push(`Comando no valido: ${line}`);
+      continue;
+    }
+
+    parseErrors.push(`Linea fuera del contrato: ${line}`);
   }
 
-  if (!decision.mensajeCliente && decision.accion === 'reply') {
-    decision.accion = 'preguntar_consultas';
+  if (!channelSeen) {
+    parseErrors.push('Falta la linea inicial de plataforma.');
   }
 
-  if (decision.accion === 'assign_case' && !decision.asignarA) {
-    decision.accion = 'preguntar_consultas';
-    decision.mensajeConsultas = 'Hola, he detectado que la conversacion deberia asignarse, pero no he podido determinar con seguridad a que cuenta asignarla. Dime que debo hacer.';
+  return { decision, parseErrors };
+}
+
+function validateAutomationDecision(
+  decision: AutomationEngineDecision,
+  parseErrors: string[],
+  input: AutomationEngineInput,
+): string[] {
+  const errors = [...parseErrors];
+  const validFolderIds = new Set((input.carpetas || []).map((item) => item.id));
+  const validCandidateIds = new Set((input.cuentasCandidatas || []).map((item) => item.id));
+  const validSpecialtyIds = new Set((input.especialidades || []).map((item) => item.id));
+
+  if (decision.plataforma !== input.canalEntrada) {
+    errors.push('La plataforma devuelta no coincide con el canal de entrada.');
   }
 
-  return decision;
+  if (decision.folderIds.some((folderId) => !validFolderIds.has(folderId))) {
+    errors.push('Se ha intentado mover la conversacion a carpetas no validas.');
+  }
+
+  if (decision.specialtyId && !validSpecialtyIds.has(decision.specialtyId)) {
+    errors.push('La especialidad indicada no es valida en este workspace.');
+  }
+
+  if (decision.assignTo && !validCandidateIds.has(decision.assignTo)) {
+    errors.push('El destino de asignacion no es valido en este workspace.');
+  }
+
+  if (decision.assignCase && !decision.assignTo) {
+    errors.push('El comando /asignar_caso requiere asignarA.');
+  }
+
+  if (decision.consultasMessage !== undefined && !decision.consultasMessage.trim()) {
+    errors.push('El comando /preguntar_consultas requiere un mensaje interno no vacio.');
+  }
+
+  if (decision.askAssignment && decision.assignCase) {
+    errors.push('No se puede preguntar asignacion y asignar caso en la misma salida.');
+  }
+
+  if (decision.noResponder && !!decision.mensajeCliente) {
+    errors.push('No se puede combinar /no_responder con mensaje al cliente.');
+  }
+
+  if (decision.consultasMessage && !!decision.mensajeCliente) {
+    errors.push('No se puede combinar /preguntar_consultas con mensaje al cliente.');
+  }
+
+  if (decision.noResponder && (decision.askAssignment || decision.assignCase || !!decision.consultasMessage)) {
+    errors.push('No se puede combinar /no_responder con otras acciones excluyentes.');
+  }
+
+  if (decision.askAssignment && !decision.mensajeCliente) {
+    errors.push('El comando /preguntar_asignacion requiere mensaje al cliente.');
+  }
+
+  if (!input.toggles.autoAssignEnabled && (decision.askAssignment || decision.assignCase)) {
+    errors.push('No se puede usar asignacion cuando autoAssignEnabled es false.');
+  }
+
+  if (input.toggles.soloContactosConocidos && !input.contactoConocido && !!decision.mensajeCliente) {
+    errors.push('No se puede responder automaticamente a un contacto desconocido cuando soloContactosConocidos es true.');
+  }
+
+  if (
+    input.canalEntrada === 'whatsapp'
+    && input.restricciones.whatsappVentana24hAbierta === false
+    && !!decision.mensajeCliente
+  ) {
+    errors.push('No se puede responder al cliente por WhatsApp fuera de la ventana de 24 horas.');
+  }
+
+  if (
+    !decision.noResponder
+    && !decision.mensajeCliente
+    && !decision.consultasMessage
+    && !decision.pauseAutoReply
+    && !decision.assignCase
+    && !decision.askAssignment
+    && !decision.createPendingCase
+    && decision.folderIds.length === 0
+  ) {
+    errors.push('La salida no contiene ninguna accion ejecutable.');
+  }
+
+  return errors;
+}
+
+function formatValidationErrors(errors: string[]): string {
+  return errors.map((error, index) => `${index + 1}. ${error}`).join('\n');
+}
+
+function buildInvalidDecision(rawOutput: string, fallbackChannel: 'email' | 'whatsapp', errors: string[]): AutomationEngineDecision {
+  return {
+    plataforma: fallbackChannel,
+    folderIds: [],
+    createPendingCase: false,
+    askAssignment: false,
+    assignCase: false,
+    pauseAutoReply: false,
+    noResponder: false,
+    bruto: stripThinkTags(rawOutput || '').trim(),
+    valida: false,
+    errores: errors,
+  };
 }
 
 export async function runCustomerAutomationEngine(
   input: AutomationEngineInput,
 ): Promise<AutomationEngineDecision> {
   const prompt = buildPrompt(input);
-  const completion = await getClient().chat.completions.create({
-    model: AI_AUTOMATION_MODEL,
-    messages: [{ role: 'user', content: prompt }],
-    max_tokens: 1200,
-    temperature: 0.2,
-  });
+  let messages: Array<{ role: 'user' | 'assistant'; content: string }> = [{ role: 'user', content: prompt }];
+  let lastRawOutput = '';
+  let lastErrors = ['No se ha podido obtener una salida valida del motor.'];
 
-  const rawOutput = completion.choices?.[0]?.message?.content || '';
-  return parseAutomationDecision(rawOutput, input.canalEntrada);
+  for (let attempt = 0; attempt <= MAX_CORRECTION_RETRIES; attempt += 1) {
+    const completion = await getClient().chat.completions.create({
+      model: AI_MODEL,
+      messages,
+      max_tokens: 1400,
+      temperature: 0.2,
+    });
+
+    const rawOutput = completion.choices?.[0]?.message?.content || '';
+    lastRawOutput = rawOutput;
+
+    const { decision, parseErrors } = parseAutomationDecision(rawOutput, input.canalEntrada);
+    const errors = validateAutomationDecision(decision, parseErrors, input);
+
+    if (errors.length === 0) {
+      decision.valida = true;
+      decision.errores = [];
+      return decision;
+    }
+
+    lastErrors = errors;
+    if (attempt === MAX_CORRECTION_RETRIES) {
+      break;
+    }
+
+    messages = [
+      { role: 'user', content: prompt },
+      { role: 'assistant', content: rawOutput },
+      {
+        role: 'user',
+        content: `Tu salida anterior es invalida tecnicamente.\nCorrigela sin explicaciones y devuelve una salida nueva que cumpla el contrato.\nErrores:\n${formatValidationErrors(errors)}`,
+      },
+    ];
+  }
+
+  return buildInvalidDecision(lastRawOutput, input.canalEntrada, lastErrors);
 }

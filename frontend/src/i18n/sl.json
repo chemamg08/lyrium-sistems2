@@ -939,7 +939,7 @@
     "juniorUploadSuccess": "Dokument uspešno naložen",
     "juniorUploadError": "Napaka pri nalaganju dokumenta",
     "juniorPending": "Vaš junior popust čaka na preverjanje.",
-    "juniorVerified": "Junior popust aktiven (45€/mesec ali 480€/leto).",
+    "juniorVerified": "Junior popust aktiven (40€/mesec ali 420€/leto).",
     "juniorRejected": "Vaš junior popust je zavrnjen. Naslednji obračun bo po osnovni ceni.",
     "juniorProofRequired": "Naložiti morate dokaz za aktivacijo junior popusta.",
     "featureUpTo0": "0 podračunov"

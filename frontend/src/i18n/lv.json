@@ -939,7 +939,7 @@
     "juniorUploadSuccess": "Dokuments veiksmīgi augšupielādēts",
     "juniorUploadError": "Kļūda dokumenta augšupielādē",
     "juniorPending": "Jūsu jaunā advokāta atlaide gaida apstiprinājumu.",
-    "juniorVerified": "Jaunā advokāta atlaide aktīva (45€/mēnesī vai 480€/gadā).",
+    "juniorVerified": "Jaunā advokāta atlaide aktīva (40€/mēnesī vai 420€/gadā).",
     "juniorRejected": "Jūsu jaunā advokāta atlaide ir noraidīta. Nākamais maksājums būs par bāzes cenu.",
     "juniorProofRequired": "Jums jāaugšupielādē pierādījums, lai aktivizētu jaunā advokāta atlaidi.",
     "featureUpTo0": "0 subkontu"

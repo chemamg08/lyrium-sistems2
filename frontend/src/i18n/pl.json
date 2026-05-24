@@ -939,7 +939,7 @@
     "juniorUploadSuccess": "Dokument przesłany pomyślnie",
     "juniorUploadError": "Błąd podczas przesyłania dokumentu",
     "juniorPending": "Twoja zniżka junior oczekuje na weryfikację.",
-    "juniorVerified": "Zniżka junior aktywna (45€/miesiąc lub 480€/rok).",
+    "juniorVerified": "Zniżka junior aktywna (40€/miesiąc lub 420€/rok).",
     "juniorRejected": "Twoja zniżka junior została odrzucona. Następna opłata będzie według ceny podstawowej.",
     "juniorProofRequired": "Musisz przesłać dowód, aby aktywować zniżkę junior.",
     "featureUpTo0": "0 subkont"

@@ -960,7 +960,7 @@
     "juniorUploadSuccess": "Document uploaded successfully",
     "juniorUploadError": "Error uploading document",
     "juniorPending": "Your junior discount is pending verification.",
-    "juniorVerified": "Junior discount active (€45/month or €480/year).",
+    "juniorVerified": "Junior discount active (€40/month or €420/year).",
     "juniorRejected": "Your junior discount has been rejected. The next charge will be at the base price.",
     "juniorProofRequired": "You must upload proof to activate the junior discount.",
     "featureUpTo0": "0 subaccounts"

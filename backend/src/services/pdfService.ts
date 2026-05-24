@@ -26,7 +26,7 @@ interface DefenseEvidenceItem {
   publicToken: string;
 }
 
-export function generateDefensePDF(strategies: SavedStrategy[], title: string, evidences?: DefenseEvidenceItem[], publicBaseUrl?: string): PDFKit.PDFDocument {
+function generateLegacyDefensePDF(strategies: SavedStrategy[], title: string, evidences?: DefenseEvidenceItem[], publicBaseUrl?: string): PDFKit.PDFDocument {
   const doc = new PDFDocument({ margin: 50 });
 
   // Header
@@ -200,6 +200,272 @@ export function generateDefensePDF(strategies: SavedStrategy[], title: string, e
     'Este documento contiene estrategias de defensa generadas con asistencia de IA y debe ser revisado por un profesional legal.',
     { align: 'center' }
   );
+
+  doc.end();
+  return doc;
+}
+
+function sanitizeDefensePdfText(value?: string): string {
+  if (!value) {
+    return '';
+  }
+
+  return value
+    .replace(/\r/g, '')
+    .replace(/[•●▪◦]/g, '-')
+    .replace(/[✓✔]/g, '[OK]')
+    .replace(/[⚠]/g, '[!]')
+    .replace(/\t/g, ' ')
+    .replace(/\u00a0/g, ' ')
+    .trim();
+}
+
+export function generateDefensePDF(strategies: SavedStrategy[], title: string, evidences?: DefenseEvidenceItem[], publicBaseUrl?: string): PDFKit.PDFDocument {
+  const doc = new PDFDocument({ margin: 56, size: 'A4', bufferPages: true });
+  const colors = {
+    ink: '#172033',
+    text: '#334155',
+    muted: '#6b7280',
+    line: '#d8dee8',
+    strongLine: '#b9c3d3',
+    soft: '#f5f7fb',
+    accent: '#243b67',
+    danger: '#9f1239',
+    success: '#0f766e',
+    neutral: '#475569',
+  };
+  const generatedAt = new Date().toLocaleDateString('es-ES', {
+    day: '2-digit',
+    month: '2-digit',
+    year: 'numeric',
+  });
+
+  function drawPageChrome() {
+    const topY = 32;
+    doc.font('Helvetica-Bold').fontSize(8).fillColor(colors.accent).text('LYRIUM SYSTEMS', 56, topY, { lineBreak: false });
+    doc.font('Helvetica').fontSize(9).fillColor(colors.muted).text('Preparación de defensa', 56, topY + 12, { lineBreak: false });
+    doc.moveTo(56, 72).lineTo(doc.page.width - 56, 72).lineWidth(1).strokeColor(colors.strongLine).stroke();
+    if (doc.y < 90) {
+      doc.y = 92;
+    }
+  }
+
+  function ensureSpace(minHeight: number) {
+    if (doc.y + minHeight > doc.page.height - 78) {
+      doc.addPage();
+    }
+  }
+
+  function drawSectionTitle(label: string, color: string) {
+    ensureSpace(34);
+    const top = doc.y;
+    doc.roundedRect(56, top, doc.page.width - 112, 24, 6).fillAndStroke(color, color);
+    doc.fillColor('#ffffff').font('Helvetica-Bold').fontSize(11).text(label, 70, top + 7, {
+      width: doc.page.width - 140,
+      lineBreak: false,
+    });
+    doc.y = top + 34;
+  }
+
+  function drawList(items: string[], options?: { accent?: string; ordered?: boolean }) {
+    const accent = options?.accent ?? colors.text;
+    const ordered = options?.ordered ?? false;
+
+    items
+      .map((item) => sanitizeDefensePdfText(item))
+      .filter(Boolean)
+      .forEach((item, index) => {
+        ensureSpace(26);
+        const marker = ordered ? `${index + 1}.` : '•';
+        doc.font('Helvetica-Bold').fontSize(10.5).fillColor(accent).text(marker, 70, doc.y, { lineBreak: false });
+        doc.font('Helvetica').fontSize(10.5).fillColor(colors.text).text(item, 88, doc.y - 1, {
+          width: doc.page.width - 150,
+          align: 'justify',
+          lineGap: 2,
+        });
+        doc.moveDown(0.35);
+      });
+    doc.moveDown(0.5);
+  }
+
+  function drawParagraphBlock(text: string) {
+    const cleanText = sanitizeDefensePdfText(text);
+    if (!cleanText) {
+      return;
+    }
+
+    ensureSpace(72);
+    const startY = doc.y;
+    const boxWidth = doc.page.width - 112;
+    const estimatedHeight = Math.max(64, Math.ceil(cleanText.length / 105) * 14 + 26);
+    doc.roundedRect(56, startY, boxWidth, estimatedHeight, 8).fillAndStroke(colors.soft, colors.line);
+    doc.fillColor(colors.text).font('Helvetica').fontSize(10.5).text(cleanText, 72, startY + 14, {
+      width: boxWidth - 32,
+      align: 'justify',
+      lineGap: 3,
+    });
+    doc.y = Math.max(doc.y, startY + estimatedHeight) + 4;
+  }
+
+  function drawStrengthScore(score: number) {
+    ensureSpace(36);
+    const normalized = Math.max(0, Math.min(100, score));
+    const barWidth = doc.page.width - 176;
+    const startY = doc.y;
+    doc.font('Helvetica-Bold').fontSize(10.5).fillColor(colors.ink).text(`Fortaleza estimada de la defensa: ${normalized}/100`, 56, startY);
+    doc.roundedRect(56, startY + 18, barWidth, 10, 5).fillAndStroke('#e5e7eb', '#e5e7eb');
+    doc.roundedRect(56, startY + 18, Math.max(24, (barWidth * normalized) / 100), 10, 5).fillAndStroke(colors.accent, colors.accent);
+    doc.y = startY + 40;
+  }
+
+  doc.on('pageAdded', drawPageChrome);
+  drawPageChrome();
+
+  doc.font('Helvetica-Bold').fontSize(24).fillColor(colors.ink).text(sanitizeDefensePdfText(title) || 'Preparación de defensa', {
+    align: 'center',
+  });
+  doc.moveDown(0.35);
+  doc.font('Helvetica').fontSize(10).fillColor(colors.muted).text(`Generado por Lyrium Systems · ${generatedAt}`, {
+    align: 'center',
+  });
+  doc.moveDown(1.2);
+
+  if (strategies.length === 0) {
+    doc.font('Helvetica-Bold').fontSize(13).fillColor(colors.danger).text('No hay estrategias guardadas', {
+      align: 'center',
+    });
+    const emptyRange = doc.bufferedPageRange();
+    for (let i = emptyRange.start; i < emptyRange.start + emptyRange.count; i++) {
+      doc.switchToPage(i);
+      const footerY = doc.page.height - 38;
+      doc.moveTo(56, footerY - 8).lineTo(doc.page.width - 56, footerY - 8).lineWidth(0.8).strokeColor(colors.line).stroke();
+      doc.font('Helvetica').fontSize(8).fillColor(colors.muted).text(`Página ${i + 1} de ${emptyRange.count}`, doc.page.width - 116, footerY, {
+        width: 60,
+        align: 'right',
+      });
+    }
+    doc.end();
+    return doc;
+  }
+
+  strategies.forEach((strategy, index) => {
+    if (index > 0) {
+      doc.addPage();
+    }
+
+    const strategyTitle = sanitizeDefensePdfText(strategy.title) || `Estrategia ${index + 1}`;
+    const strategyDate = new Date(strategy.date).toLocaleDateString('es-ES');
+    const sections = strategy.sections || {
+      lineasDefensa: [],
+      argumentosJuridicos: [],
+      jurisprudencia: [],
+      puntosDebiles: [],
+      contraArgumentos: [],
+      recomendaciones: [],
+    };
+
+    doc.font('Helvetica-Bold').fontSize(18).fillColor(colors.ink).text(strategyTitle, { align: 'left' });
+    doc.moveDown(0.2);
+    doc.font('Helvetica').fontSize(9.5).fillColor(colors.muted).text(`Fecha de guardado: ${strategyDate}`, {
+      align: 'left',
+    });
+    doc.moveDown(0.9);
+
+    if (sections.lineasDefensa.length > 0) {
+      drawSectionTitle('Líneas de defensa', colors.accent);
+      drawList(sections.lineasDefensa, { ordered: true, accent: colors.accent });
+    }
+
+    if (sections.argumentosJuridicos.length > 0) {
+      drawSectionTitle('Argumentos jurídicos', colors.neutral);
+      drawList(sections.argumentosJuridicos, { ordered: true, accent: colors.neutral });
+    }
+
+    if (sections.jurisprudencia.length > 0) {
+      drawSectionTitle('Jurisprudencia y normativa aplicable', colors.neutral);
+      drawList(sections.jurisprudencia, { accent: colors.neutral });
+    }
+
+    if (sections.puntosDebiles.length > 0) {
+      drawSectionTitle('Puntos débiles identificados', colors.danger);
+      drawList(sections.puntosDebiles, { accent: colors.danger });
+    }
+
+    if (sections.contraArgumentos.length > 0) {
+      drawSectionTitle('Contraargumentos preparados', colors.accent);
+      drawList(sections.contraArgumentos, { ordered: true, accent: colors.accent });
+    }
+
+    if (sections.recomendaciones.length > 0) {
+      drawSectionTitle('Recomendaciones estratégicas', colors.success);
+      drawList(sections.recomendaciones, { accent: colors.success });
+    }
+
+    if (strategy.counterReplica) {
+      drawSectionTitle('Contrarréplica provisional', '#5b21b6');
+
+      if (strategy.counterReplica.opponentArguments?.length > 0) {
+        doc.font('Helvetica-Bold').fontSize(11).fillColor(colors.ink).text('Argumentos de la contraparte');
+        doc.moveDown(0.35);
+        drawList(strategy.counterReplica.opponentArguments, { ordered: true, accent: '#5b21b6' });
+      }
+
+      if (strategy.counterReplica.rebuttals?.length > 0) {
+        doc.font('Helvetica-Bold').fontSize(11).fillColor(colors.ink).text('Cómo rebatirlos');
+        doc.moveDown(0.35);
+        drawList(strategy.counterReplica.rebuttals, { ordered: true, accent: '#5b21b6' });
+      }
+
+      if (typeof strategy.counterReplica.strengthScore === 'number') {
+        drawStrengthScore(strategy.counterReplica.strengthScore);
+        doc.moveDown(0.4);
+      }
+    }
+
+    if (strategy.content) {
+      drawSectionTitle('Desarrollo completo de la estrategia', colors.neutral);
+      drawParagraphBlock(strategy.content);
+    }
+  });
+
+  if (evidences && evidences.length > 0 && publicBaseUrl) {
+    doc.addPage();
+    drawSectionTitle('Evidencias adjuntas', colors.accent);
+    evidences.forEach((evidence, index) => {
+      ensureSpace(34);
+      const url = `${publicBaseUrl}/public/evidence/${evidence.publicToken}`;
+      doc.font('Helvetica-Bold').fontSize(10.5).fillColor(colors.ink).text(`${index + 1}. ${sanitizeDefensePdfText(evidence.fileName)}`, 70, doc.y, {
+        width: doc.page.width - 140,
+      });
+      doc.moveDown(0.2);
+      doc.font('Helvetica').fontSize(9.5).fillColor(colors.accent).text(url, 70, doc.y, {
+        width: doc.page.width - 140,
+        link: url,
+        underline: true,
+      });
+      doc.moveDown(0.9);
+    });
+  }
+
+  const pageRange = doc.bufferedPageRange();
+  const totalPages = pageRange.count;
+  for (let pageIndex = pageRange.start; pageIndex < pageRange.start + pageRange.count; pageIndex++) {
+    doc.switchToPage(pageIndex);
+    const footerY = doc.page.height - 38;
+    doc.moveTo(56, footerY - 8).lineTo(doc.page.width - 56, footerY - 8).lineWidth(0.8).strokeColor(colors.line).stroke();
+    doc.font('Helvetica').fontSize(8).fillColor(colors.muted).text(
+      'Documento generado con asistencia de IA. Revisión profesional recomendada.',
+      56,
+      footerY,
+      {
+        width: doc.page.width - 172,
+      }
+    );
+    doc.text(`Página ${pageIndex + 1} de ${totalPages}`, doc.page.width - 116, footerY, {
+      width: 60,
+      align: 'right',
+    });
+  }
 
   doc.end();
   return doc;

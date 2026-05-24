@@ -939,7 +939,7 @@
     "juniorUploadSuccess": "Dokumentas sėkmingai įkeltas",
     "juniorUploadError": "Klaida įkeliant dokumentą",
     "juniorPending": "Jūsų jaunesniojo advokato nuolaida laukia patvirtinimo.",
-    "juniorVerified": "Jaunesniojo advokato nuolaida aktyvi (45€/mėnesį arba 480€/metus).",
+    "juniorVerified": "Jaunesniojo advokato nuolaida aktyvi (40€/mėnesį arba 420€/metus).",
     "juniorRejected": "Jūsų jaunesniojo advokato nuolaida atmesta. Kitas mokėjimas bus pagrindine kaina.",
     "juniorProofRequired": "Turite įkelti įrodymą, kad aktyvuotumėte jaunesniojo advokato nuolaidą.",
     "featureUpTo0": "0 subpaskyrų"

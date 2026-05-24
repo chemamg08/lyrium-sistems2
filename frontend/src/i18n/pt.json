@@ -940,7 +940,7 @@
     "juniorUploadSuccess": "Documento carregado com sucesso",
     "juniorUploadError": "Erro ao carregar o documento",
     "juniorPending": "O seu desconto júnior está pendente de verificação.",
-    "juniorVerified": "Desconto júnior ativo (45€/mês ou 480€/ano).",
+    "juniorVerified": "Desconto júnior ativo (40€/mês ou 420€/ano).",
     "juniorRejected": "O seu desconto júnior foi rejeitado. O próximo pagamento será ao preço base.",
     "juniorProofRequired": "Deve carregar um comprovativo para ativar o desconto júnior.",
     "featureUpTo0": "0 subcontas"

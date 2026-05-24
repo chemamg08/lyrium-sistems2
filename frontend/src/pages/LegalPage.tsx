@@ -22,8 +22,8 @@ Lyrium proporciona una plataforma de software como servicio (SaaS) dirigida a de
 
 4. PLANES Y FACTURACIÓN
 
-4.1. Lyrium ofrece un período de prueba gratuito de 14 días con acceso completo a todas las funcionalidades.
-4.2. Al finalizar el período de prueba, el usuario deberá suscribirse a uno de los planes disponibles (Starter o Avanzado) para continuar usando el servicio.
+4.1. Lyrium ofrece un periodo de prueba gratuito de 14 días con acceso completo a todas las funcionalidades.
+4.2. Al finalizar el periodo de prueba, el usuario deberá suscribirse a uno de los planes disponibles para continuar usando el servicio.
 4.3. Los precios se muestran en euros (EUR) e incluyen los impuestos aplicables según la normativa vigente.
 4.4. La facturación se realiza de forma anticipada, mensual o anualmente según el plan elegido.
 4.5. Los cambios de plan se aplicarán al inicio del siguiente ciclo de facturación.
@@ -38,8 +38,10 @@ Lyrium proporciona una plataforma de software como servicio (SaaS) dirigida a de
 
 6.1. El usuario se compromete a utilizar la Plataforma exclusivamente para fines profesionales legítimos.
 6.2. Queda prohibido: (a) usar la Plataforma para actividades ilegales; (b) intentar acceder a datos de otros usuarios; (c) realizar ingeniería inversa del software; (d) compartir credenciales con terceros no autorizados.
+6.3. Cuando el usuario active funcionalidades de comunicación mediante WhatsApp Business Platform, reconoce que dichas funcionalidades dependen de servicios prestados por terceros, en particular Meta Platforms, Inc. y/o sus entidades vinculadas, y que su uso puede estar sujeto a limitaciones técnicas, operativas o normativas impuestas por dichos terceros.
+6.4. El usuario es responsable de utilizar las funcionalidades de WhatsApp de forma lícita, de acuerdo con la normativa aplicable en materia de protección de datos, comunicaciones electrónicas y secreto profesional, así como de obtener las autorizaciones o permisos que resulten necesarios para contactar con terceros.
 
-7. INTELIGENCIA ARTIFICIAL — DESCARGO DE RESPONSABILIDAD
+7. INTELIGENCIA ARTIFICIAL - DESCARGO DE RESPONSABILIDAD
 
 7.1. Las respuestas generadas por la IA son orientativas y no constituyen asesoramiento legal vinculante.
 7.2. El usuario, como profesional del derecho, es el único responsable de verificar, validar y adaptar cualquier contenido generado por la IA antes de su uso profesional.
@@ -88,7 +90,7 @@ Lyrium provides a software-as-a-service (SaaS) platform aimed at law firms and l
 4. PLANS AND BILLING
 
 4.1. Lyrium offers a 14-day free trial period with full access to all features.
-4.2. Upon expiration of the trial period, the user must subscribe to one of the available plans (Starter or Advanced) to continue using the service.
+4.2. Upon expiration of the trial period, the user must subscribe to one of the available plans to continue using the service.
 4.3. Prices are displayed in euros (EUR) and include applicable taxes under current regulations.
 4.4. Billing is done in advance, monthly or annually depending on the chosen plan.
 4.5. Plan changes will take effect at the beginning of the next billing cycle.
@@ -103,8 +105,10 @@ Lyrium provides a software-as-a-service (SaaS) platform aimed at law firms and l
 
 6.1. The user agrees to use the Platform exclusively for legitimate professional purposes.
 6.2. The following is prohibited: (a) using the Platform for illegal activities; (b) attempting to access other users' data; (c) reverse engineering the software; (d) sharing credentials with unauthorized third parties.
+6.3. When the user enables communication features through WhatsApp Business Platform, the user acknowledges that such features depend on third-party services, particularly Meta Platforms, Inc. and/or its affiliated entities, and that their use may be subject to technical, operational, or regulatory limitations imposed by such third parties.
+6.4. The user is responsible for using WhatsApp-related features lawfully, in accordance with applicable data protection, electronic communications, and professional secrecy rules, and for obtaining any permissions or authorisations required to contact third parties.
 
-7. ARTIFICIAL INTELLIGENCE — DISCLAIMER
+7. ARTIFICIAL INTELLIGENCE - DISCLAIMER
 
 7.1. AI-generated responses are for guidance only and do not constitute binding legal advice.
 7.2. The user, as a legal professional, is solely responsible for verifying, validating and adapting any AI-generated content before professional use.
@@ -143,9 +147,10 @@ Correo de contacto para cuestiones de privacidad: customerservice@lyrium.io
 
 2.1. Datos de registro: nombre, dirección de correo electrónico, nombre del despacho, número de colegiado (opcional).
 2.2. Datos de uso: registros de actividad dentro de la plataforma, módulos utilizados, frecuencia de uso.
-2.3. Datos de facturación: información de pago procesada de forma segura a través de Stripe. Lyrium NO almacena datos de tarjetas de crédito.
+2.3. Datos de facturación: información de pago procesada de forma segura a través de Stripe. Lyrium no almacena datos de tarjetas de crédito.
 2.4. Datos profesionales: documentos, contratos e información de clientes que el usuario introduce voluntariamente en la plataforma.
 2.5. Datos técnicos: dirección IP, tipo de navegador, sistema operativo, datos de cookies.
+2.6. Datos de comunicaciones integradas: cuando el usuario conecte canales como WhatsApp Business Platform, podremos tratar números de teléfono, nombres de perfil, contenido de mensajes, archivos adjuntos y metadatos básicos de conversación necesarios para prestar la funcionalidad.
 
 3. FINALIDAD DEL TRATAMIENTO
 
@@ -155,7 +160,8 @@ b) Gestionar la cuenta del usuario y la facturación.
 c) Mejorar y personalizar la experiencia del usuario.
 d) Comunicar actualizaciones del servicio y cambios relevantes.
 e) Cumplir con obligaciones legales y fiscales.
-f) Lyrium NO utiliza ningún dato de usuarios, clientes ni experiencias para entrenar o mejorar modelos de inteligencia artificial.
+f) Lyrium no utiliza ningún dato de usuarios, clientes ni experiencias para entrenar o mejorar modelos de inteligencia artificial.
+g) Gestionar comunicaciones profesionales integradas, incluyendo la recepción, organización, trazabilidad y, en su caso, automatización de mensajes en canales conectados como WhatsApp Business Platform.
 
 4. BASE LEGAL DEL TRATAMIENTO
 
@@ -163,34 +169,37 @@ f) Lyrium NO utiliza ningún dato de usuarios, clientes ni experiencias para ent
 - Interés legítimo (art. 6.1.f RGPD): para mejoras del servicio y seguridad.
 - Consentimiento (art. 6.1.a RGPD): para comunicaciones comerciales opcionales.
 - Obligación legal (art. 6.1.c RGPD): para el cumplimiento de normativa fiscal y mercantil.
+- En el caso de comunicaciones gestionadas a través de WhatsApp Business Platform, el usuario es responsable de contar con una base jurídica adecuada para contactar con sus propios clientes o contactos, incluyendo cuando proceda su consentimiento u otra base habilitante aplicable.
 
 5. DESTINATARIOS DE LOS DATOS
 
 Los datos pueden ser comunicados a:
-- Stripe Inc.: procesamiento de pagos (cumple con el Privacy Shield y RGPD).
-- Proveedores de infraestructura cloud: alojamiento de servidores en la Unión Europea.
-- Proveedores de IA: las consultas enviadas a modelos de IA se procesan sin datos personales identificables del cliente final.
+- Stripe Inc.: procesamiento de pagos.
+- Proveedores de infraestructura cloud: alojamiento de servidores.
+- Proveedores de IA: las consultas enviadas a modelos de IA se procesan de acuerdo con la configuración técnica y contractual aplicable.
+- Meta Platforms, Inc. y/o proveedores vinculados a WhatsApp Business Platform: prestación del canal de mensajería cuando el usuario lo conecte voluntariamente.
 - Autoridades competentes: cuando exista obligación legal.
 
 No vendemos ni compartimos datos personales con terceros con fines comerciales.
 
 6. TRANSFERENCIAS INTERNACIONALES
 
-En caso de transferencias de datos fuera del Espacio Económico Europeo, se garantizan las salvaguardas adecuadas conforme al artículo 46 del RGPD, incluyendo Cláusulas Contractuales Tipo aprobadas por la Comisión Europea.
+En caso de transferencias de datos fuera del Espacio Económico Europeo, se garantizarán las salvaguardas adecuadas conforme a la normativa aplicable, incluyendo en su caso cláusulas contractuales tipo u otros mecanismos válidos.
 
 7. CONSERVACIÓN DE LOS DATOS
 
 - Datos de cuenta activa: durante la vigencia de la relación contractual.
-- Datos tras cancelación: 30 días naturales para permitir la recuperación, tras los cuales se eliminan definitivamente.
-- Datos de facturación: conservados conforme a la normativa fiscal aplicable en cada jurisdicción (generalmente entre 5 y 10 años).
-- Logs de seguridad: 12 meses.
+- Datos tras cancelación: 30 días naturales para permitir la recuperación, tras los cuales se eliminan definitivamente, salvo obligación legal en contrario.
+- Datos de facturación: conservados conforme a la normativa fiscal aplicable en cada jurisdicción.
+- Logs de seguridad: 12 meses o el plazo necesario para fines de seguridad y auditoría.
+- Datos de comunicaciones integradas: durante el tiempo necesario para la prestación del servicio, la gestión del expediente profesional y los plazos de conservación legalmente exigibles o configurados por el usuario.
 
 8. DERECHOS DEL USUARIO
 
 Conforme al RGPD, el usuario tiene derecho a:
 a) Acceso: obtener confirmación y copia de sus datos personales.
 b) Rectificación: solicitar la corrección de datos inexactos.
-c) Supresión: solicitar la eliminación de sus datos ("derecho al olvido").
+c) Supresión: solicitar la eliminación de sus datos.
 d) Limitación: solicitar que se restrinja el tratamiento en determinadas circunstancias.
 e) Portabilidad: recibir sus datos en un formato estructurado y de uso común.
 f) Oposición: oponerse al tratamiento basado en interés legítimo.
@@ -199,16 +208,19 @@ Para ejercer estos derechos, el usuario puede contactar a: customerservice@lyriu
 
 El usuario tiene también derecho a presentar una reclamación ante la autoridad de protección de datos competente en su país de residencia.
 
-9. SEGURIDAD
+9. COMUNICACIONES POR WHATSAPP, OPT-IN Y OPT-OUT
 
-Implementamos las siguientes medidas de seguridad:
-- Cifrado SSL/TLS en todas las comunicaciones.
-- Cifrado AES-256 para datos en reposo.
-- Controles de acceso basados en roles.
-- Auditorías de seguridad periódicas.
-- Copias de seguridad cifradas diarias.
+Si el usuario conecta WhatsApp Business Platform a la Plataforma, será responsable de asegurarse de que dispone de una base jurídica suficiente para contactar con sus clientes o contactos, incluyendo cuando proceda un opt-in válido, informado y verificable.
 
-10. MODIFICACIONES
+Asimismo, el usuario deberá respetar cualquier solicitud de baja, revocación, oposición o opt-out recibida de sus contactos, y abstenerse de seguir utilizando el canal para comunicaciones no autorizadas.
+
+Lyrium ofrece la infraestructura técnica para gestionar dichos canales conectados, pero no sustituye la obligación del usuario de revisar la licitud de cada tratamiento o comunicación realizada mediante WhatsApp.
+
+10. SEGURIDAD
+
+Implementamos medidas razonables de seguridad técnica y organizativa, incluyendo cifrado en tránsito, controles de acceso, registros de actividad y copias de seguridad, sin perjuicio de que ningún sistema puede garantizar seguridad absoluta.
+
+11. MODIFICACIONES
 
 Nos reservamos el derecho de actualizar esta política de privacidad. Los cambios significativos serán notificados por correo electrónico o mediante un aviso visible en la Plataforma.
 `;
@@ -224,9 +236,10 @@ Contact email for privacy matters: customerservice@lyrium.io
 
 2.1. Registration data: name, email address, firm name, bar association number (optional).
 2.2. Usage data: activity logs within the platform, modules used, usage frequency.
-2.3. Billing data: payment information processed securely through Stripe. Lyrium does NOT store credit card data.
+2.3. Billing data: payment information processed securely through Stripe. Lyrium does not store credit card data.
 2.4. Professional data: documents, contracts and client information that the user voluntarily enters into the platform.
 2.5. Technical data: IP address, browser type, operating system, cookie data.
+2.6. Integrated communications data: when the user connects channels such as WhatsApp Business Platform, we may process phone numbers, profile names, message content, attachments, and basic conversation metadata required to provide the feature.
 
 3. PURPOSE OF PROCESSING
 
@@ -236,7 +249,8 @@ b) Manage user accounts and billing.
 c) Improve and personalise the user experience.
 d) Communicate service updates and relevant changes.
 e) Comply with legal and tax obligations.
-f) Lyrium does NOT use any user, client or experience data to train or improve artificial intelligence models.
+f) Lyrium does not use any user, client or experience data to train or improve artificial intelligence models.
+g) Manage integrated professional communications, including the receipt, organisation, traceability, and, where applicable, automation of messages in connected channels such as WhatsApp Business Platform.
 
 4. LEGAL BASIS FOR PROCESSING
 
@@ -244,34 +258,37 @@ f) Lyrium does NOT use any user, client or experience data to train or improve a
 - Legitimate interest (Art. 6.1.f GDPR): for service improvements and security.
 - Consent (Art. 6.1.a GDPR): for optional commercial communications.
 - Legal obligation (Art. 6.1.c GDPR): for compliance with tax and commercial regulations.
+- In the case of communications managed through WhatsApp Business Platform, the user is responsible for having an adequate legal basis to contact their own clients or contacts, including, where applicable, consent or any other applicable lawful basis.
 
 5. DATA RECIPIENTS
 
 Data may be shared with:
-- Stripe Inc.: payment processing (compliant with Privacy Shield and GDPR).
-- Cloud infrastructure providers: server hosting within the European Union.
-- AI providers: queries sent to AI models are processed without personally identifiable end-client data.
+- Stripe Inc.: payment processing.
+- Cloud infrastructure providers: server hosting.
+- AI providers: queries sent to AI models are processed in accordance with the applicable technical and contractual configuration.
+- Meta Platforms, Inc. and/or providers linked to WhatsApp Business Platform: provision of the messaging channel when voluntarily connected by the user.
 - Competent authorities: when there is a legal obligation.
 
 We do not sell or share personal data with third parties for commercial purposes.
 
 6. INTERNATIONAL TRANSFERS
 
-In the event of data transfers outside the European Economic Area, appropriate safeguards are ensured in accordance with Article 46 of the GDPR, including Standard Contractual Clauses approved by the European Commission.
+In the event of data transfers outside the European Economic Area, appropriate safeguards will be implemented in accordance with applicable law, including, where relevant, standard contractual clauses or other valid transfer mechanisms.
 
 7. DATA RETENTION
 
 - Active account data: for the duration of the contractual relationship.
-- Data after cancellation: 30 calendar days to allow recovery, after which they are permanently deleted.
-- Billing data: retained in accordance with applicable tax regulations in each jurisdiction (generally between 5 and 10 years).
-- Security logs: 12 months.
+- Data after cancellation: 30 calendar days to allow recovery, after which they are permanently deleted unless legal retention obligations apply.
+- Billing data: retained in accordance with applicable tax regulations in each jurisdiction.
+- Security logs: 12 months or as long as necessary for security and audit purposes.
+- Integrated communications data: for as long as necessary to provide the service, manage the professional matter, and comply with legally required or user-configured retention periods.
 
 8. USER RIGHTS
 
 Under the GDPR, the user has the right to:
 a) Access: obtain confirmation and a copy of their personal data.
 b) Rectification: request the correction of inaccurate data.
-c) Erasure: request the deletion of their data ("right to be forgotten").
+c) Erasure: request the deletion of their data.
 d) Restriction: request that processing be restricted in certain circumstances.
 e) Portability: receive their data in a structured, commonly used format.
 f) Objection: object to processing based on legitimate interest.
@@ -280,16 +297,19 @@ To exercise these rights, the user may contact: customerservice@lyrium.io
 
 The user also has the right to lodge a complaint with the competent data protection authority in their country of residence.
 
-9. SECURITY
+9. WHATSAPP COMMUNICATIONS, OPT-IN AND OPT-OUT
 
-We implement the following security measures:
-- SSL/TLS encryption on all communications.
-- AES-256 encryption for data at rest.
-- Role-based access controls.
-- Regular security audits.
-- Daily encrypted backups.
+If the user connects WhatsApp Business Platform to the Platform, the user is responsible for ensuring that there is a sufficient legal basis to contact clients or contacts, including, where applicable, a valid, informed, and verifiable opt-in.
 
-10. MODIFICATIONS
+Likewise, the user must respect any unsubscribe request, withdrawal of consent, objection, or opt-out received from contacts, and must refrain from continuing to use the channel for unauthorised communications.
+
+Lyrium provides the technical infrastructure to manage such connected channels, but does not replace the user's obligation to assess the lawfulness of each processing activity or communication carried out through WhatsApp.
+
+10. SECURITY
+
+We implement reasonable technical and organisational security measures, including encryption in transit, access controls, activity logs, and backups, although no system can guarantee absolute security.
+
+11. MODIFICATIONS
 
 We reserve the right to update this privacy policy. Significant changes will be notified by email or through a visible notice on the Platform.
 `;
@@ -321,13 +341,13 @@ Se eliminan automáticamente al cerrar la pestaña del navegador.
 - Stripe: utiliza cookies necesarias para procesar pagos de forma segura (__stripe_mid, __stripe_sid). Consulte la política de cookies de Stripe en https://stripe.com/cookies-policy.
 
 2.5. Cookies analíticas (opcionales)
-- Google Analytics (_ga, _ga_*): utilizadas para comprender cómo los usuarios interactúan con la plataforma y mejorar el servicio. Duración: hasta 2 años. Estas cookies SOLO se activan si el usuario da su consentimiento explícito a través del banner de cookies. Puede revocar su consentimiento en cualquier momento eliminando la clave lyrium_cookie_consent del almacenamiento local de su navegador.
+- Google Analytics (_ga, _ga_*): utilizadas para comprender cómo los usuarios interactúan con la plataforma y mejorar el servicio. Duración: hasta 2 años. Estas cookies solo se activan si el usuario da su consentimiento explícito a través del banner de cookies.
 
 3. BASE LEGAL
 
-- Cookies estrictamente necesarias (autenticación, panel lateral, datos de sesión): interés legítimo (art. 6.1.f RGPD) y ejecución del contrato (art. 6.1.b RGPD).
-- Cookies de Stripe: ejecución del contrato (art. 6.1.b RGPD).
-- Cookies analíticas de Google Analytics: consentimiento del usuario (art. 6.1.a RGPD). Solo se activan tras aceptación explícita.
+- Cookies estrictamente necesarias (autenticación, panel lateral, datos de sesión): interés legítimo y ejecución del contrato.
+- Cookies de Stripe: ejecución del contrato.
+- Cookies analíticas de Google Analytics: consentimiento del usuario.
 
 4. GESTIÓN DEL ALMACENAMIENTO
 
@@ -338,14 +358,14 @@ c) Revocando el consentimiento de cookies analíticas eliminando lyrium_cookie_c
 
 Nota: eliminar el almacenamiento local cerrará la sesión activa y restablecerá las preferencias guardadas.
 
-5. PERÍODO DE CONSERVACIÓN
+5. PERIODO DE CONSERVACIÓN
 
 - Token de autenticación: 7 días.
 - Preferencias (idioma, tema): se conservan indefinidamente hasta que el usuario las elimine.
 - Consentimiento de cookies: se conserva indefinidamente hasta que el usuario lo elimine.
 - Datos de sesión (sessionStorage): se eliminan al cerrar la pestaña del navegador.
 - Borradores de escritura: se conservan hasta que el usuario los elimine.
-- Cookies de Google Analytics: hasta 2 años (solo si se ha dado consentimiento).
+- Cookies de Google Analytics: hasta 2 años, solo si se ha dado consentimiento.
 
 6. ACTUALIZACIONES
 
@@ -383,13 +403,13 @@ Automatically deleted when the browser tab is closed.
 - Stripe: uses necessary cookies to process payments securely (__stripe_mid, __stripe_sid). See Stripe's cookie policy at https://stripe.com/cookies-policy.
 
 2.5. Analytics cookies (optional)
-- Google Analytics (_ga, _ga_*): used to understand how users interact with the platform and improve the service. Duration: up to 2 years. These cookies are ONLY activated if the user gives explicit consent through the cookie banner. You can revoke your consent at any time by deleting the lyrium_cookie_consent key from your browser's local storage.
+- Google Analytics (_ga, _ga_*): used to understand how users interact with the platform and improve the service. Duration: up to 2 years. These cookies are only activated if the user gives explicit consent through the cookie banner.
 
 3. LEGAL BASIS
 
-- Strictly necessary cookies (authentication, sidebar, session data): legitimate interest (Art. 6.1.f GDPR) and contract performance (Art. 6.1.b GDPR).
-- Stripe cookies: contract performance (Art. 6.1.b GDPR).
-- Google Analytics cookies: user consent (Art. 6.1.a GDPR). Only activated after explicit acceptance.
+- Strictly necessary cookies (authentication, sidebar, session data): legitimate interest and contract performance.
+- Stripe cookies: contract performance.
+- Google Analytics cookies: user consent.
 
 4. STORAGE MANAGEMENT
 
@@ -407,7 +427,7 @@ Note: clearing local storage will end the active session and reset saved prefere
 - Cookie consent: retained indefinitely until the user deletes them.
 - Session data (sessionStorage): deleted when the browser tab is closed.
 - Writing drafts: retained until the user deletes them.
-- Google Analytics cookies: up to 2 years (only if consent was given).
+- Google Analytics cookies: up to 2 years, only if consent was given.
 
 6. UPDATES
 
@@ -440,7 +460,6 @@ const LegalPage = () => {
 
   return (
     <div className="min-h-screen bg-[#080808] text-white">
-      {/* Header */}
       <header className="border-b border-white/5 px-4 md:px-8 py-6">
         <div className="max-w-4xl mx-auto flex items-center justify-between">
           <div className="flex items-center gap-2">
@@ -457,7 +476,6 @@ const LegalPage = () => {
         </div>
       </header>
 
-      {/* Content */}
       <main className="max-w-4xl mx-auto px-4 md:px-8 py-16">
         <h1 className="text-3xl sm:text-4xl font-bold tracking-tight mb-2">
           {t(titleKey)}
@@ -469,8 +487,7 @@ const LegalPage = () => {
             const trimmed = line.trim();
             if (!trimmed) return null;
 
-            // Main section headers (numbered: "1. TITLE")
-            if (/^\d+\.\s+[A-ZÁÉÍÓÚÑÜ¿]/.test(trimmed)) {
+            if (/^\d+\.\s+[A-ZÁÉÍÓÚÑÜ¿?0-9]/.test(trimmed)) {
               return (
                 <h2
                   key={i}
@@ -481,8 +498,7 @@ const LegalPage = () => {
               );
             }
 
-            // Sub-items (e.g. "3.1.", "a)", "- Item")
-            if (/^\d+\.\d+\./.test(trimmed) || /^[a-f]\)/.test(trimmed)) {
+            if (/^\d+\.\d+\./.test(trimmed) || /^[a-z]\)/i.test(trimmed)) {
               return (
                 <p key={i} className="text-sm text-white/50 mb-2 pl-4">
                   {trimmed}
@@ -508,7 +524,6 @@ const LegalPage = () => {
         </div>
       </main>
 
-      {/* Footer */}
       <footer className="border-t border-white/5 py-8 px-4 md:px-8">
         <div className="max-w-4xl mx-auto flex items-center justify-between">
           <div className="flex items-center gap-2 text-white/20">

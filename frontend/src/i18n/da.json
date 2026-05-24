@@ -939,7 +939,7 @@
     "juniorUploadSuccess": "Dokument uploadet",
     "juniorUploadError": "Fejl ved upload af dokument",
     "juniorPending": "Din juniorrabat afventer verifikation.",
-    "juniorVerified": "Juniorrabat aktiv (45€/måned eller 480€/år).",
+    "juniorVerified": "Juniorrabat aktiv (40€/måned eller 420€/år).",
     "juniorRejected": "Din juniorrabat er afvist. Næste opkrævning bliver til basisprisen.",
     "juniorProofRequired": "Du skal uploade bevis for at aktivere juniorrabatten.",
     "featureUpTo0": "0 underkonti"

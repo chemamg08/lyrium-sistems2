@@ -939,7 +939,7 @@
     "juniorUploadSuccess": "Asiakirja lähetetty onnistuneesti",
     "juniorUploadError": "Virhe asiakirjan lähetyksessä",
     "juniorPending": "Juniorialennuksesi odottaa vahvistusta.",
-    "juniorVerified": "Juniorialennus aktiivinen (45€/kuukausi tai 480€/vuosi).",
+    "juniorVerified": "Juniorialennus aktiivinen (40€/kuukausi tai 420€/vuosi).",
     "juniorRejected": "Juniorialennuksesi on hylätty. Seuraava veloitus on perushintaan.",
     "juniorProofRequired": "Sinun on lähetettävä todiste juniorialennuksen aktivointiin.",
     "featureUpTo0": "0 alitiliä"

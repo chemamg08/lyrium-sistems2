@@ -292,8 +292,8 @@ const ProfileModal = ({ isOpen, onClose }: ProfileModalProps) => {
     {
       id: 'individual',
       name: 'Plan Individual',
-      monthlyPrice: 60,
-      annualPrice: 600,
+      monthlyPrice: 50,
+      annualPrice: 500,
       maxSubaccounts: 0,
       features: ['Acceso completo a la app para el titular', t('profile.featureAllFeatures'), t('profile.featurePrioritySupport')]
     },
@@ -313,7 +313,7 @@ const ProfileModal = ({ isOpen, onClose }: ProfileModalProps) => {
       const plan = PLANS.find(p => p.id === planId);
       price = interval === 'monthly' ? (plan?.monthlyPrice ?? 0) : (plan?.annualPrice ?? 0);
     } else {
-      price = interval === 'monthly' ? 45 : 480;
+      price = interval === 'monthly' ? 40 : 420;
     }
     if (appliedPromo && appliedPromo.type === 'percentage_discount') {
       price = Math.round(price * (1 - appliedPromo.value / 100));
@@ -1058,7 +1058,7 @@ const ProfileModal = ({ isOpen, onClose }: ProfileModalProps) => {
                   <div className={`rounded-lg p-4 mb-6 ${subscription.juniorDiscountStatus === 'pending' ? 'bg-yellow-50 dark:bg-yellow-950 border border-yellow-200 dark:border-yellow-800' : subscription.juniorDiscountStatus === 'verified' ? 'bg-green-50 dark:bg-green-950 border border-green-200 dark:border-green-800' : 'bg-red-50 dark:bg-red-950 border border-red-200 dark:border-red-800'}`}>
                     <p className={`text-sm font-medium ${subscription.juniorDiscountStatus === 'pending' ? 'text-yellow-800 dark:text-yellow-200' : subscription.juniorDiscountStatus === 'verified' ? 'text-green-800 dark:text-green-200' : 'text-red-800 dark:text-red-200'}`}>
                       {subscription.juniorDiscountStatus === 'pending' && 'Tu descuento junior está pendiente de verificación.'}
-                      {subscription.juniorDiscountStatus === 'verified' && 'Descuento junior activo (45€/mes o 480€/año).'}
+                      {subscription.juniorDiscountStatus === 'verified' && 'Descuento junior activo (40€/mes o 420€/año).'}
                       {subscription.juniorDiscountStatus === 'rejected' && 'Tu descuento junior ha sido rechazado. El siguiente cobro será del precio base.'}
                     </p>
                   </div>
