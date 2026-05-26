@@ -1,0 +1,81 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <meta name="theme-color" content="#455b5a" />
+    <meta
+      name="description"
+      content="Lyrium — a quiet place for lyrics and ideas. Your words stay yours."
+    />
+    <title>Lyrium</title>
+    <link rel="stylesheet" href="/styles.css" />
+  </head>
+  <body>
+    <div class="shell">
+      <main class="site-main landing-main">
+        <div class="notebook-sheet">
+          <article class="manifesto" aria-labelledby="letter-heading">
+            <header class="manifesto-head">
+              <h1 id="letter-heading" class="manifesto-title">AI can’t write lyrics</h1>
+            </header>
+            <div class="manifesto-body">
+              <p>
+                Two hundred songwriting apps don’t get this. AI just writes the song, and the output
+                is derivative by design. Great art is a product of emotion and experience by the
+                unconscious mind, not a rehash of stolen lyrics spewed by matrix math in a data center
+                on plowed-over farmland. Expediting the process while undermining the authenticity is
+                futile.
+              </p>
+              <p>
+                Lyrium is fundamentally different. It’s built from the ground up to cultivate
+                connections and inspiration by tapping a plethora of sources. A rhyme dictionary,
+                Roget’s Thesaurus, your sense memories, your journal, and language models tied together
+                in a first-of-its-kind interface that exposes the power and flexibility you’d expect
+                from a pro app.
+              </p>
+              <p>
+                Tom Petty wrote an entire album looking at magnet words on a music stand. We put a
+                galaxy of magnet words right around your notepad that are seeded by your own creative
+                process and enhanced by AI. We put the best techniques used by pro songwriters like
+                rhyme worksheets and object writing into a deeply interconnected creative process that
+                takes you all the way from collecting inspiration, to writing your first line, to
+                tracking your final lyrics. <strong>Try it today.</strong>
+              </p>
+            </div>
+          </article>
+
+          <section class="download-section" aria-labelledby="app-store-brand">
+            <h2 id="app-store-brand" class="app-download-name" aria-label="Lyrium">lyrium</h2>
+            <a
+              class="app-store-link"
+              href="https://apps.apple.com/us/search?term=Lyrium"
+              target="_blank"
+              rel="noopener noreferrer"
+              aria-label="Download Lyrium on the App Store"
+            >
+              <img
+                src="https://tools.applemediaservices.com/api/badges/download-on-the-app-store/white/en-us?size=250x83"
+                alt="Download on the App Store"
+                width="250"
+                height="83"
+                decoding="async"
+              />
+            </a>
+          </section>
+        </div>
+      </main>
+
+      <footer class="site-footer">
+        <nav aria-label="Legal and site">
+          <ul class="site-footer-nav">
+            <li><a href="/" aria-current="page">Home</a></li>
+            <li><a href="/terms.html">Terms</a></li>
+            <li><a href="/privacy.html">Privacy</a></li>
+            <li><a href="/support.html">Support</a></li>
+          </ul>
+        </nav>
+      </footer>
+    </div>
+  </body>
+</html>
