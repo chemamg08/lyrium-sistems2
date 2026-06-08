@@ -199,7 +199,7 @@ async function checkAccountAndSubscription(decoded: AuthPayload, req: AuthReques
           const periodEnd = new Date(subscription.currentPeriodEnd);
           if (periodEnd < new Date()) {
             // Allow payment endpoints even with expired subscription
-            const allowedPaths = ['/api/subscriptions/payment-intent', '/api/subscriptions/confirm-payment'];
+            const allowedPaths = ['/api/subscriptions/payment-intent', '/api/subscriptions/confirm-payment', '/api/accounts/activate-free'];
             const isPaymentRoute = allowedPaths.some(path => req.originalUrl.startsWith(path));
             
             if (!isPaymentRoute) {
