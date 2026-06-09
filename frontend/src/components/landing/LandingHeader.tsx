@@ -1,7 +1,5 @@
 import type { RefObject } from "react";
 import { ChevronDown, ChevronRight, Scale } from "lucide-react";
-import LandingThemeToggle from "@/components/LandingThemeToggle";
-import type { LandingTheme } from "@/hooks/useLandingTheme";
 
 type CountryOption = {
   code: string;
@@ -9,8 +7,6 @@ type CountryOption = {
 };
 
 type LandingHeaderProps = {
-  theme: LandingTheme;
-  onToggleTheme: () => void;
   scrolled: boolean;
   navBenefitsLabel: string;
   navFeaturesLabel: string;
@@ -31,8 +27,6 @@ type LandingHeaderProps = {
 };
 
 const LandingHeader = ({
-  theme,
-  onToggleTheme,
   scrolled,
   navBenefitsLabel,
   navFeaturesLabel,
@@ -60,11 +54,11 @@ const LandingHeader = ({
           </span>
           <span className="landing-brand-copy">
             <span className="landing-brand-name">Lyrium</span>
-            <span className="landing-brand-tag">Software juridico con IA</span>
+            <span className="landing-brand-tag">Software jurídico con IA</span>
           </span>
         </button>
 
-        <nav className="landing-nav-links" aria-label="Navegacion principal">
+        <nav className="landing-nav-links" aria-label="Navegación principal">
           <button type="button" onClick={() => onScrollTo("ventajas")}>
             {navBenefitsLabel}
           </button>
@@ -77,8 +71,6 @@ const LandingHeader = ({
         </nav>
 
         <div className="landing-header-actions">
-          <LandingThemeToggle theme={theme} onToggle={onToggleTheme} />
-
           <div className="landing-country" ref={countryRef}>
             <button
               type="button"

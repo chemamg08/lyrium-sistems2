@@ -29,7 +29,6 @@ import LandingSecurity from "@/components/landing/LandingSecurity";
 import LandingPricing from "@/components/landing/LandingPricing";
 import LandingFinalCta from "@/components/landing/LandingFinalCta";
 import LandingFooter from "@/components/landing/LandingFooter";
-import { useLandingTheme } from "@/hooks/useLandingTheme";
 import { COUNTRIES_LIST, formatPrice, getCurrencyForCountry, getLanguageForCountry } from "@/i18n";
 import "./landing-theme.css";
 
@@ -39,7 +38,6 @@ const scrollToSection = (id: string) => {
 
 const Landing = () => {
   const { t, i18n } = useTranslation();
-  const { landingTheme, isLightTheme, toggleLandingTheme } = useLandingTheme();
   const [selectedCountry, setSelectedCountry] = useState(() => sessionStorage.getItem("landingCountry") || "ES");
   const [countryOpen, setCountryOpen] = useState(false);
   const [billingAnnual, setBillingAnnual] = useState(true);
@@ -293,10 +291,8 @@ const Landing = () => {
   ];
 
   return (
-    <div className={`landing-shell ${isLightTheme ? "landing-light" : "landing-dark"}`}>
+    <div className="landing-shell">
       <LandingHeader
-        theme={landingTheme}
-        onToggleTheme={toggleLandingTheme}
         scrolled={scrolled}
         navBenefitsLabel={t("landing.navBenefits")}
         navFeaturesLabel={t("landing.navFeatures")}
@@ -364,7 +360,6 @@ const Landing = () => {
           points={productPoints}
           featureCards={productFeatureCards}
           ctaLabel={t("landing.heroButton")}
-          mobileNote={t("landing.demoDesktop")}
           onPrimaryAction={openSignup}
         />
 

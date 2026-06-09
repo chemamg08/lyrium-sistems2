@@ -44,46 +44,19 @@ const LandingHero = ({
               {secondaryCta}
             </button>
           </div>
+        </div>
 
-          <div className="landing-confidence-list">
-            {confidenceItems.map((item) => (
-              <div key={item} className="landing-confidence-item">
+        <aside className="landing-hero-summary">
+          {confidenceItems.map((item, index) => (
+            <div key={item} className="landing-hero-summary-item">
+              <span className="landing-hero-summary-index">0{index + 1}</span>
+              <div className="landing-hero-summary-copy">
                 <CheckCircle2 className="h-4 w-4" />
-                <span>{item}</span>
+                <p>{item}</p>
               </div>
-            ))}
-          </div>
-        </div>
-
-        <div className="landing-hero-panel">
-          <div className="landing-hero-panel-card landing-hero-panel-main">
-            <p className="landing-panel-eyebrow">Vision general del despacho</p>
-            <h2>Un espacio de trabajo juridico claro, ordenado y listo para producir.</h2>
-            <p>
-              Controla expedientes, clientes, documentos y trabajo asistido por IA desde una sola
-              plataforma.
-            </p>
-          </div>
-
-          <div className="landing-hero-panel-grid">
-            <div className="landing-hero-panel-card">
-              <span className="landing-panel-metric">12h</span>
-              <p>menos trabajo manual cada semana</p>
             </div>
-            <div className="landing-hero-panel-card">
-              <span className="landing-panel-metric">1 panel</span>
-              <p>para clientes, expedientes, contratos y automatizaciones</p>
-            </div>
-            <div className="landing-hero-panel-card">
-              <span className="landing-panel-metric">IA</span>
-              <p>aplicada a tareas juridicas y documentales de uso diario</p>
-            </div>
-            <div className="landing-hero-panel-card">
-              <span className="landing-panel-metric">Control</span>
-              <p>sobre informacion sensible, plazos y trabajo de equipo</p>
-            </div>
-          </div>
-        </div>
+          ))}
+        </aside>
       </div>
     </section>
   );

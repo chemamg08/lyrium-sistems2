@@ -19,8 +19,6 @@ import {
   MessageCircle,
   PanelLeftClose,
   PanelLeft,
-  Sun,
-  Moon,
   Search,
   FolderOpen,
   Info,
@@ -840,7 +838,6 @@ const AppDemo = () => {
   const { t } = useTranslation();
   const [module, setModule] = useState<Module>("dashboard");
   const [collapsed, setCollapsed] = useState(false);
-  const [isDark, setIsDark] = useState(true);
 
   // — clients
   const [selectedClient, setSelectedClient] = useState<
@@ -1640,50 +1637,48 @@ const AppDemo = () => {
 
   // ── Light-mode CSS variables (needed because the landing page is always dark,
   // so removing the "dark" class alone doesn't override inherited custom props) ──
-  const lightVars: React.CSSProperties | undefined = isDark
-    ? undefined
-    : ({
-        "--background": "0 0% 98%",
-        "--foreground": "0 0% 8%",
-        "--card": "0 0% 100%",
-        "--card-foreground": "0 0% 8%",
-        "--popover": "0 0% 100%",
-        "--popover-foreground": "0 0% 8%",
-        "--primary": "0 0% 9%",
-        "--primary-foreground": "0 0% 98%",
-        "--secondary": "0 0% 94%",
-        "--secondary-foreground": "0 0% 15%",
-        "--muted": "0 0% 95%",
-        "--muted-foreground": "0 0% 45%",
-        "--accent": "0 0% 92%",
-        "--accent-foreground": "0 0% 9%",
-        "--destructive": "0 72% 51%",
-        "--destructive-foreground": "0 0% 98%",
-        "--border": "0 0% 90%",
-        "--input": "0 0% 90%",
-        "--ring": "0 0% 9%",
-        "--sidebar-background": "0 0% 100%",
-        "--sidebar-foreground": "0 0% 25%",
-        "--sidebar-primary": "0 0% 9%",
-        "--sidebar-primary-foreground": "0 0% 98%",
-        "--sidebar-accent": "0 0% 95%",
-        "--sidebar-accent-foreground": "0 0% 9%",
-        "--sidebar-border": "0 0% 92%",
-        "--sidebar-ring": "0 0% 9%",
-        "--stat-bg": "0 0% 100%",
-        "--stat-border": "0 0% 90%",
-        "--stat-value": "0 0% 9%",
-        "--stat-label": "0 0% 50%",
-        "--chat-user": "0 0% 9%",
-        "--chat-user-foreground": "0 0% 98%",
-        "--chat-ai": "0 0% 95%",
-        "--chat-ai-foreground": "0 0% 15%",
-      } as React.CSSProperties);
+  const demoVars: React.CSSProperties = {
+    "--background": "0 0% 98%",
+    "--foreground": "0 0% 8%",
+    "--card": "0 0% 100%",
+    "--card-foreground": "0 0% 8%",
+    "--popover": "0 0% 100%",
+    "--popover-foreground": "0 0% 8%",
+    "--primary": "0 0% 9%",
+    "--primary-foreground": "0 0% 98%",
+    "--secondary": "0 0% 94%",
+    "--secondary-foreground": "0 0% 15%",
+    "--muted": "0 0% 95%",
+    "--muted-foreground": "0 0% 45%",
+    "--accent": "0 0% 92%",
+    "--accent-foreground": "0 0% 9%",
+    "--destructive": "0 72% 51%",
+    "--destructive-foreground": "0 0% 98%",
+    "--border": "0 0% 90%",
+    "--input": "0 0% 90%",
+    "--ring": "0 0% 9%",
+    "--sidebar-background": "0 0% 100%",
+    "--sidebar-foreground": "0 0% 25%",
+    "--sidebar-primary": "0 0% 9%",
+    "--sidebar-primary-foreground": "0 0% 98%",
+    "--sidebar-accent": "0 0% 95%",
+    "--sidebar-accent-foreground": "0 0% 9%",
+    "--sidebar-border": "0 0% 92%",
+    "--sidebar-ring": "0 0% 9%",
+    "--stat-bg": "0 0% 100%",
+    "--stat-border": "0 0% 90%",
+    "--stat-value": "0 0% 9%",
+    "--stat-label": "0 0% 50%",
+    "--chat-user": "0 0% 9%",
+    "--chat-user-foreground": "0 0% 98%",
+    "--chat-ai": "0 0% 95%",
+    "--chat-ai-foreground": "0 0% 15%",
+  } as React.CSSProperties;
 
   // ── Render ──────────────────────────────────────────────────────────────────
   return (
-    <div className={isDark ? "dark" : ""} style={lightVars}>
-      <div className="flex h-[700px] rounded-2xl border border-white/10 bg-background overflow-hidden shadow-2xl">
+    <div style={demoVars}>
+      <div className="flex h-[700px] rounded-2xl border border-border bg-background overflow-hidden shadow-[0_24px_60px_rgba(15,23,42,0.08)]">
         {/* Sidebar */}
         <aside
           className={`h-full border-r border-border bg-card flex flex-col transition-all duration-300 shrink-0 ${
@@ -1700,7 +1695,7 @@ const AppDemo = () => {
               {!collapsed && (
                 <div className="min-w-0">
                   <h1 className="text-lg font-semibold tracking-tight text-foreground leading-tight">
-                    LexPanel
+                    Lyrium
                   </h1>
                   <p className="text-[10px] text-muted-foreground font-mono">
                     {t('sidebar.legalManagement')}
@@ -1710,13 +1705,6 @@ const AppDemo = () => {
             </div>
             {!collapsed && (
               <div className="flex items-center gap-1 shrink-0">
-                <button
-                  onClick={() => setIsDark(!isDark)}
-                  className="text-muted-foreground hover:text-foreground transition-colors"
-                  title={isDark ? "Light mode" : "Dark mode"}
-                >
-                  {isDark ? <Sun className="h-4 w-4" /> : <Moon className="h-4 w-4" />}
-                </button>
                 <button
                   onClick={() => setCollapsed(true)}
                   className="text-muted-foreground hover:text-foreground transition-colors"
