@@ -1045,8 +1045,13 @@
   }
 
   .landing-header-inner {
-    align-items: flex-start;
+    align-items: center;
     gap: 0.85rem;
+  }
+
+  .landing-brand {
+    flex: 1;
+    min-width: 0;
   }
 
   .landing-header-actions {
@@ -1056,6 +1061,14 @@
 
   .landing-brand-copy {
     min-width: 0;
+  }
+
+  .landing-brand-name,
+  .landing-brand-tag {
+    display: block;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
   }
 
   .landing-brand-tag {
