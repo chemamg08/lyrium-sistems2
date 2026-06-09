@@ -27,7 +27,7 @@ const LandingComparison = ({
   rightItems,
 }: LandingComparisonProps) => {
   return (
-    <section id="ventajas" className="landing-section">
+    <section id="ventajas" className="landing-section landing-section-contrast">
       <div className="landing-container">
         <div className="landing-section-heading">
           <span className="landing-section-chip">{sectionLabel}</span>

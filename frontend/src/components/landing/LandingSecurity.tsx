@@ -22,7 +22,7 @@ const LandingSecurity = ({
   items,
 }: LandingSecurityProps) => {
   return (
-    <section className="landing-section landing-section-soft">
+    <section className="landing-section landing-section-soft landing-section-security">
       <div className="landing-container">
         <div className="landing-section-heading">
           <span className="landing-section-chip">{sectionLabel}</span>

@@ -18,6 +18,7 @@ import Automations from "./pages/Automations";
 import Cases from "./pages/Cases";
 import Login from "./pages/Login";
 import Landing from "./pages/Landing";
+import LandingFeaturesPage from "./pages/LandingFeaturesPage";
 import LegalPage from "./pages/LegalPage";
 import Signup from "./pages/Signup";
 import Setup2FA from "./pages/Setup2FA";
@@ -45,6 +46,7 @@ const App = () => (
         <CookieBanner />
         <Routes>
           <Route path="/landing" element={<Landing />} />
+          <Route path="/funciones" element={<LandingFeaturesPage />} />
           <Route path="/terminos" element={<LegalPage />} />
           <Route path="/privacidad" element={<LegalPage />} />
           <Route path="/cookies" element={<LegalPage />} />

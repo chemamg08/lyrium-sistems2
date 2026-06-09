@@ -37,7 +37,7 @@ const LandingPricing = ({
   billedInEur,
 }: LandingPricingProps) => {
   return (
-    <section id="precio" className="landing-section">
+    <section id="precio" className="landing-section landing-section-investment">
       <div className="landing-container">
         <div className="landing-section-heading">
           <span className="landing-section-chip">{sectionLabel}</span>

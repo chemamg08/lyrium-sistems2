@@ -16,6 +16,7 @@ type LandingHeaderProps = {
   primaryCtaLabel: string;
   selectedCountryCode: string;
   selectedCountryName: string;
+  countrySelectorEnabled: boolean;
   countryOpen: boolean;
   countries: CountryOption[];
   countryRef: RefObject<HTMLDivElement>;
@@ -36,6 +37,7 @@ const LandingHeader = ({
   primaryCtaLabel,
   selectedCountryCode,
   selectedCountryName,
+  countrySelectorEnabled,
   countryOpen,
   countries,
   countryRef,
@@ -74,22 +76,23 @@ const LandingHeader = ({
           <div className="landing-country" ref={countryRef}>
             <button
               type="button"
-              className="landing-country-trigger"
+              className={`landing-country-trigger ${countrySelectorEnabled ? "" : "landing-country-trigger-disabled"}`}
               onClick={onToggleCountry}
               aria-expanded={countryOpen}
+              disabled={!countrySelectorEnabled}
             >
               <span>{selectedCountryCode}</span>
               <span className="landing-country-name">{selectedCountryName}</span>
               <ChevronDown className={`h-4 w-4 transition-transform ${countryOpen ? "rotate-180" : ""}`} />
             </button>
 
-            {countryOpen && (
+            {countryOpen && countrySelectorEnabled && (
               <div className="landing-country-menu">
                 {countries.map((country) => (
                   <button
                     key={country.code}
                     type="button"
-                    className={`landing-country-option ${country.code === selectedCountryCode ? "active" : ""}`}
+                    className={`landing-country-option ${country.code === selectedCountryCode ? "active" : ""} ${country.code !== "ES" ? "landing-country-option-muted" : ""}`}
                     onClick={() => onSelectCountry(country.code)}
                   >
                     <span>{country.code}</span>

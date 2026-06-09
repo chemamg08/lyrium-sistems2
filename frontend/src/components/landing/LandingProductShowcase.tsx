@@ -4,6 +4,8 @@ import AppDemo from "@/components/AppDemo";
 type ProductFeature = {
   title: string;
   description: string;
+  href: string;
+  linkLabel: string;
 };
 
 type LandingProductShowcaseProps = {
@@ -47,7 +49,9 @@ const LandingProductShowcase = ({
           <div className="landing-demo-shell">
             <span className="landing-demo-badge">Demo</span>
             <div className="landing-demo-stage">
-              <AppDemo />
+              <div className="landing-demo-inner">
+                <AppDemo />
+              </div>
             </div>
           </div>
         </div>
@@ -57,6 +61,9 @@ const LandingProductShowcase = ({
             <article key={feature.title} className="landing-product-feature-card">
               <h3>{feature.title}</h3>
               <p>{feature.description}</p>
+              <a href={feature.href} className="landing-product-feature-link">
+                {feature.linkLabel}
+              </a>
             </article>
           ))}
         </div>

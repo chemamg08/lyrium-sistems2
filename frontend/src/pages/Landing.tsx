@@ -24,13 +24,15 @@ import LandingTrustBar from "@/components/landing/LandingTrustBar";
 import LandingComparison from "@/components/landing/LandingComparison";
 import LandingBenefits from "@/components/landing/LandingBenefits";
 import LandingProductShowcase from "@/components/landing/LandingProductShowcase";
-import LandingCapabilities from "@/components/landing/LandingCapabilities";
 import LandingSecurity from "@/components/landing/LandingSecurity";
 import LandingPricing from "@/components/landing/LandingPricing";
 import LandingFinalCta from "@/components/landing/LandingFinalCta";
 import LandingFooter from "@/components/landing/LandingFooter";
 import { COUNTRIES_LIST, formatPrice, getCurrencyForCountry, getLanguageForCountry } from "@/i18n";
 import "./landing-theme.css";
+
+const LANDING_COUNTRY_SELECTOR_ENABLED = false;
+const LANDING_LOCKED_COUNTRY_CODE = "ES";
 
 const scrollToSection = (id: string) => {
   document.getElementById(id)?.scrollIntoView({ behavior: "smooth", block: "start" });
@@ -43,9 +45,11 @@ const Landing = () => {
   const [billingAnnual, setBillingAnnual] = useState(true);
   const [scrolled, setScrolled] = useState(false);
   const countryRef = useRef<HTMLDivElement>(null);
-  const currency = getCurrencyForCountry(selectedCountry);
+  const effectiveCountryCode = LANDING_COUNTRY_SELECTOR_ENABLED ? selectedCountry : LANDING_LOCKED_COUNTRY_CODE;
+  const currency = getCurrencyForCountry(effectiveCountryCode);
 
   useEffect(() => {
+    if (!LANDING_COUNTRY_SELECTOR_ENABLED) return;
     if (sessionStorage.getItem("landingCountry")) return;
 
     const controller = new AbortController();
@@ -85,6 +89,7 @@ const Landing = () => {
   }, []);
 
   const handleCountryChange = (code: string) => {
+    if (!LANDING_COUNTRY_SELECTOR_ENABLED) return;
     setSelectedCountry(code);
     sessionStorage.setItem("landingCountry", code);
     setCountryOpen(false);
@@ -108,7 +113,7 @@ const Landing = () => {
   const individualMonthly = formatPrice(40, currency);
   const individualAnnual = formatPrice(420, currency);
 
-  const currentCountry = COUNTRIES_LIST.find((country) => country.code === selectedCountry) || COUNTRIES_LIST[0];
+  const currentCountry = COUNTRIES_LIST.find((country) => country.code === effectiveCountryCode) || COUNTRIES_LIST[0];
 
   const trustItems = [
     t("landing.trustItem1"),
@@ -160,10 +165,30 @@ const Landing = () => {
   ];
 
   const productFeatureCards = [
-    { title: t("landing.productCard1Title"), description: t("landing.productCard1Desc") },
-    { title: t("landing.productCard2Title"), description: t("landing.productCard2Desc") },
-    { title: t("landing.productCard3Title"), description: t("landing.productCard3Desc") },
-    { title: t("landing.productCard4Title"), description: t("landing.productCard4Desc") },
+    {
+      title: t("landing.productCard1Title"),
+      description: t("landing.productCard1Desc"),
+      href: "/funciones#clientes-expedientes",
+      linkLabel: t("landing.productSeeMore", { defaultValue: "Ver más" }),
+    },
+    {
+      title: t("landing.productCard2Title"),
+      description: t("landing.productCard2Desc"),
+      href: "/funciones#contratos-escritos",
+      linkLabel: t("landing.productSeeMore", { defaultValue: "Ver más" }),
+    },
+    {
+      title: t("landing.productCard3Title"),
+      description: t("landing.productCard3Desc"),
+      href: "/funciones#documentos-analisis",
+      linkLabel: t("landing.productSeeMore", { defaultValue: "Ver más" }),
+    },
+    {
+      title: t("landing.productCard4Title"),
+      description: t("landing.productCard4Desc"),
+      href: "/funciones#automatizaciones-seguimiento",
+      linkLabel: t("landing.productSeeMore", { defaultValue: "Ver más" }),
+    },
   ];
 
   const securityItems = [
@@ -171,54 +196,6 @@ const Landing = () => {
     { icon: ShieldCheck, title: t("landing.secRGPD"), description: t("landing.secRGPDDesc") },
     { icon: KeyRound, title: t("landing.secAES"), description: t("landing.secAESDesc") },
     { icon: Shield, title: t("landing.secISO"), description: t("landing.secISODesc") },
-  ];
-
-  const capabilities = [
-    {
-      title: t("landing.capability1Title"),
-      description: t("landing.capability1Desc"),
-      bullets: [
-        t("landing.capability1Bullet1"),
-        t("landing.capability1Bullet2"),
-        t("landing.capability1Bullet3"),
-      ],
-    },
-    {
-      title: t("landing.capability2Title"),
-      description: t("landing.capability2Desc"),
-      bullets: [
-        t("landing.capability2Bullet1"),
-        t("landing.capability2Bullet2"),
-        t("landing.capability2Bullet3"),
-      ],
-    },
-    {
-      title: t("landing.capability3Title"),
-      description: t("landing.capability3Desc"),
-      bullets: [
-        t("landing.capability3Bullet1"),
-        t("landing.capability3Bullet2"),
-        t("landing.capability3Bullet3"),
-      ],
-    },
-    {
-      title: t("landing.capability4Title"),
-      description: t("landing.capability4Desc"),
-      bullets: [
-        t("landing.capability4Bullet1"),
-        t("landing.capability4Bullet2"),
-        t("landing.capability4Bullet3"),
-      ],
-    },
-    {
-      title: t("landing.capability5Title"),
-      description: t("landing.capability5Desc"),
-      bullets: [
-        t("landing.capability5Bullet1"),
-        t("landing.capability5Bullet2"),
-        t("landing.capability5Bullet3"),
-      ],
-    },
   ];
 
   const pricingPlans = [
@@ -302,6 +279,7 @@ const Landing = () => {
         primaryCtaLabel={t("landing.heroButton")}
         selectedCountryCode={currentCountry.code}
         selectedCountryName={currentCountry.name}
+        countrySelectorEnabled={LANDING_COUNTRY_SELECTOR_ENABLED}
         countryOpen={countryOpen}
         countries={COUNTRIES_LIST}
         countryRef={countryRef}
@@ -361,14 +339,6 @@ const Landing = () => {
           featureCards={productFeatureCards}
           ctaLabel={t("landing.heroButton")}
           onPrimaryAction={openSignup}
-        />
-
-        <LandingCapabilities
-          sectionLabel={t("landing.capabilitiesLabel")}
-          title={t("landing.capabilitiesTitle")}
-          titleAccent={t("landing.capabilitiesTitleAccent")}
-          description={t("landing.capabilitiesDesc")}
-          capabilities={capabilities}
         />
 
         <LandingSecurity

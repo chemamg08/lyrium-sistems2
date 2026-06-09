@@ -30,6 +30,7 @@ const LandingHero = ({
       <div className="landing-container landing-hero-grid">
         <div className="landing-hero-copy">
           <span className="landing-section-chip">{badge}</span>
+          <span className="landing-hero-overline">Plataforma de trabajo para despachos</span>
           <h1 className="landing-hero-title">
             {title} <span>{titleAccent}</span> {titleEnd}
           </h1>
@@ -47,6 +48,10 @@ const LandingHero = ({
         </div>
 
         <aside className="landing-hero-summary">
+          <div className="landing-hero-summary-intro">
+            <p className="landing-hero-summary-label">Una sola plataforma</p>
+            <h2>Más orden operativo. Más claridad para trabajar mejor cada asunto.</h2>
+          </div>
           {confidenceItems.map((item, index) => (
             <div key={item} className="landing-hero-summary-item">
               <span className="landing-hero-summary-index">0{index + 1}</span>

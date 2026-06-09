@@ -23,7 +23,7 @@ const LandingBenefits = ({
   pillars,
 }: LandingBenefitsProps) => {
   return (
-    <section className="landing-section landing-section-soft">
+    <section className="landing-section landing-section-soft landing-section-rhythm">
       <div className="landing-container">
         <div className="landing-section-heading">
           <span className="landing-section-chip">{sectionLabel}</span>
@@ -34,8 +34,8 @@ const LandingBenefits = ({
         </div>
 
         <div className="landing-benefits-grid">
-          {pillars.map((pillar) => (
-            <article key={pillar.title} className="landing-benefit-card">
+          {pillars.map((pillar, index) => (
+            <article key={pillar.title} className={`landing-benefit-card landing-benefit-card-${index + 1}`}>
               <div className="landing-benefit-icon">
                 <pillar.icon className="h-5 w-5" />
               </div>
